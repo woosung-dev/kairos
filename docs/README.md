@@ -13,7 +13,19 @@
 ## 문서 목록
 
 ### requirements/
+- [PRD (전체 로드맵 Phase 1~4)](requirements/prd.md)
 - [MVP Phase 1 기능 명세](requirements/mvp-phase1.md)
+- [PARA 방법론 구현 상세](requirements/para-methodology.md)
+- [UI/UX 인터랙션 명세](requirements/ui-ux-spec.md)
 
 ### architecture/
 - [디렉토리 구조 맵](architecture/directory-map.md)
+- [데이터 모델 관계도 (ERD)](architecture/erd.md)
+- [AI 파이프라인 명세](architecture/ai-pipeline.md)
+- [데이터 흐름 예시](architecture/data-flow-example.md)
+
+### guides/
+- [로컬 개발 환경 셋업](guides/local-setup.md)
+
+### dev-log/
+- [001: 기술 스택 선정](dev-log/001-tech-stack-decisions.md)
