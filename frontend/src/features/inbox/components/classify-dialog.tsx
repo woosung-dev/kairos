@@ -22,8 +22,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { InboxItem } from "@/types/inbox";
-import type { ParaItem, ParaCategory } from "@/types/para";
+import type { InboxItem } from "@/features/inbox/types";
+import type { ParaItem, ParaCategory } from "@/features/para/types";
 
 const categoryConfig = {
   project: { icon: Target, label: "Project", color: "text-blue-500" },

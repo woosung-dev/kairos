@@ -3,7 +3,7 @@
 import { FileText, Mic, Paperclip } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import type { InboxItem } from "@/types/inbox";
+import type { InboxItem } from "@/features/inbox/types";
 import { cn } from "@/lib/utils";
 
 const sourceIconMap = {

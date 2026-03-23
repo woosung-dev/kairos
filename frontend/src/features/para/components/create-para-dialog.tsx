@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { useCreateParaItem } from "../hooks";
 import { createParaItemSchema, type CreateParaItemInput } from "../schemas";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/constants";
-import type { ParaCategory } from "@/types/para";
+import type { ParaCategory } from "@/features/para/types";
 
 interface CreateParaDialogProps {
   isOpen: boolean;

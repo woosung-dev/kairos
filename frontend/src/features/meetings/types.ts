@@ -1,4 +1,4 @@
-import type { UUID, Timestamped, UserBrief } from ".";
+import type { UUID, Timestamped, UserBrief } from "@/types";
 
 export type MeetingStatus =
   | "uploading"

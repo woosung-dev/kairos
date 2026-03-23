@@ -7,7 +7,7 @@ import {
   updateParaItem,
   archiveParaItem,
 } from "./api";
-import type { ParaCategory } from "@/types/para";
+import type { ParaCategory } from "@/features/para/types";
 import type { UUID } from "@/types";
 
 export function useParaItems(workspaceId: string, category?: ParaCategory) {

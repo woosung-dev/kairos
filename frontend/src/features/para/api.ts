@@ -1,4 +1,4 @@
-import type { ParaItem, ParaCategory } from "@/types/para";
+import type { ParaItem, ParaCategory } from "@/features/para/types";
 import type { UUID } from "@/types";
 import { mockParaItems } from "@/mocks/data/para";
 

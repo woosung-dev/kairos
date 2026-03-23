@@ -9,7 +9,7 @@ import { ClassifyDialog } from "./classify-dialog";
 import { useInboxItems, useClassifyInboxItem, useDismissInboxItem } from "../hooks";
 import { useParaItems } from "@/features/para/hooks";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/constants";
-import type { InboxItem } from "@/types/inbox";
+import type { InboxItem } from "@/features/inbox/types";
 
 export function InboxList() {
   const { data: items, isLoading } = useInboxItems(DEFAULT_WORKSPACE_ID);

@@ -1,4 +1,4 @@
-import type { InboxItem } from "@/types/inbox";
+import type { InboxItem } from "@/features/inbox/types";
 
 export const mockInboxItems: InboxItem[] = [
   {

@@ -28,7 +28,7 @@ import { useParaItems, useArchiveParaItem } from "../hooks";
 import { CreateParaDialog } from "./create-para-dialog";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import type { ParaCategory, ParaItem } from "@/types/para";
+import type { ParaCategory, ParaItem } from "@/features/para/types";
 
 const categoryConfig = {
   project: { icon: Target, label: "Projects", color: "text-blue-500", singular: "Project" },

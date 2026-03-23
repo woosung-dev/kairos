@@ -1,4 +1,4 @@
-import type { InboxItem } from "@/types/inbox";
+import type { InboxItem } from "@/features/inbox/types";
 import type { UUID } from "@/types";
 import { mockInboxItems } from "@/mocks/data/inbox";
 

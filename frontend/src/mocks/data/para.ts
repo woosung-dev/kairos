@@ -1,4 +1,4 @@
-import type { ParaItem } from "@/types/para";
+import type { ParaItem } from "@/features/para/types";
 
 const now = new Date().toISOString();
 

@@ -1,5 +1,5 @@
-import type { UUID, Timestamped } from ".";
-import type { ParaCategory } from "./para";
+import type { UUID, Timestamped } from "@/types";
+import type { ParaCategory } from "@/features/para/types";
 
 export type InboxSourceType = "meeting" | "note" | "attachment";
 
