@@ -77,7 +77,7 @@
 
 ## 구현 순서 (Step 1~6)
 
-1. Next.js 14 초기화
+1. Next.js 16 초기화
 2. 3-Panel 대시보드 레이아웃
 3. Inbox 뷰 + PARA 분류 워크플로우
 4. PARA 아이템 CRUD + N:M 연결

@@ -4,40 +4,68 @@
 
 ```
 frontend/
+├── proxy.ts                           # Clerk 인증 미들웨어 (Next.js 16)
 └── src/
     ├── app/                           # 라우트 진입점 (Thin Component)
     │   ├── (auth)/                    # Clerk 인증
+    │   │   ├── sign-in/[[...sign-in]]/
+    │   │   └── sign-up/[[...sign-up]]/
     │   ├── dashboard/
     │   ├── inbox/
     │   ├── weekly-review/
-    │   └── workspace/[id]/
+    │   └── workspace/[workspaceId]/
     │       ├── projects/[paraId]/
-    │       │   ├── meetings/
+    │       │   ├── meetings/[meetingId]/
     │       │   ├── notes/
     │       │   ├── actions/
     │       │   ├── files/
-    │       │   └── ask/
+    │       │   └── ask/               # RAG 채팅
     │       ├── areas/[paraId]/
     │       ├── resources/[paraId]/
     │       └── archives/
     │
     ├── components/                    # 도메인 무관 공통 UI
-    │   ├── ui/                        # shadcn/ui (수정 금지)
-    │   └── layout/                    # Sidebar, Header, PanelLayout
+    │   ├── ui/                        # shadcn/ui v4 (수정 금지)
+    │   └── layout/                    # Sidebar, Header, PanelLayout, RAGPanel
     │
     ├── features/                      # 도메인별 비즈니스 레이어
     │   ├── inbox/
+    │   │   ├── components/            # inbox-list, inbox-item-card, classify-dialog
+    │   │   ├── api.ts
+    │   │   ├── hooks.ts
+    │   │   ├── schemas.ts
+    │   │   └── types.ts
     │   ├── para/
+    │   │   ├── components/            # para-item-list, para-detail, create-para-dialog
+    │   │   ├── api.ts
+    │   │   ├── hooks.ts
+    │   │   ├── schemas.ts
+    │   │   └── types.ts
     │   ├── meetings/
+    │   │   ├── components/
+    │   │   ├── api.ts
+    │   │   ├── hooks.ts
+    │   │   └── types.ts
     │   ├── actions/
+    │   │   ├── components/
+    │   │   ├── api.ts
+    │   │   ├── hooks.ts
+    │   │   └── types.ts
     │   ├── editor/
+    │   │   └── components/            # TiptapEditor
     │   └── rag/
+    │       ├── components/
+    │       ├── api.ts
+    │       └── hooks.ts
     │
     ├── hooks/                         # 공통 유틸리티 훅
-    ├── lib/                           # 서드파티 설정, 유틸
+    ├── lib/                           # 서드파티 설정, 유틸 (constants, utils, query-client)
     ├── mocks/                         # Mock data (개발용)
+    │   └── data/
     ├── store/                         # Zustand 전역 상태
-    └── types/                         # 전역 공유 타입
+    │   └── ui.ts
+    └── types/                         # 공통 유틸 타입만 (UUID, Timestamped 등)
+        └── index.ts
 ```
 
 ## 백엔드 (도메인 모듈러 구조)
