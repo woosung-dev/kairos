@@ -15,14 +15,13 @@
 
 ## 2. 문서화 원칙
 
-```
-docs/
-├── requirements/   # PRD, 기능 명세서, 유저 스토리
-├── architecture/   # 시스템 설계, ERD, 컴포넌트 구조
-├── api/            # API 명세서, 프론트-백엔드 통신 규약
-├── guides/         # 로컬 환경 셋업, 배포, 트러블슈팅
-└── dev-log/        # ADR (Architecture Decision Records)
-```
+| 성격 | 위치 | 시점 |
+|------|------|------|
+| 기능 명세 (WHAT) | `docs/requirements/` | Phase 시작 시 |
+| 설계 상세 (HOW) | `docs/architecture/` | Phase 시작 또는 종료 시 |
+| API 명세 | `docs/api/` | 구현 전 |
+| 의사결정 기록 (WHY) | `docs/dev-log/` | 결정 후 |
+| 가이드 | `docs/guides/` | 필요 시 |
 
 > **"문서가 없으면 기능도 없다."**
 

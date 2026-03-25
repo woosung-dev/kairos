@@ -23,6 +23,7 @@
 - [데이터 모델 관계도 (ERD)](architecture/erd.md)
 - [AI 파이프라인 명세](architecture/ai-pipeline.md)
 - [데이터 흐름 예시](architecture/data-flow-example.md)
+- [크로스 도메인 파이프라인](architecture/cross-domain-pipeline.md)
 
 ### guides/
 - [로컬 개발 환경 셋업](guides/local-setup.md)

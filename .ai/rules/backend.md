@@ -126,6 +126,16 @@ async def get_item_service(
     return ItemService(repo)
 ```
 
+### 아키텍처 원칙
+
+- 크로스 도메인 호출은 **오케스트레이터 서비스**(`pipeline_service.py`)로만. 도메인 간 직접 import 금지.
+- 장기 작업(STT, AI 처리)은 **BackgroundTasks + 202 Accepted + status polling**. HTTP 블로킹 금지.
+- R2는 `aioboto3` 비동기 사용. 동기 `boto3` 직접 사용 금지 (불가피 시 `run_in_executor`).
+- DB 스키마 변경 시 **Alembic 마이그레이션 필수**. models.py만 수정하고 마이그레이션 생략 금지.
+- 여러 Repository가 하나의 트랜잭션이면 **동일 session 공유** + 마지막에 한 번만 commit.
+
+> 상세 구현 패턴: `docs/architecture/` 참조
+
 ---
 
 ## 4. Kairos AI Pipeline
