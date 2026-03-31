@@ -14,7 +14,7 @@ paths: ["backend/**/*"]
 | ORM | SQLModel + SQLAlchemy 2.0 (`asyncpg`) |
 | Validation | Pydantic V2 + `pydantic-settings` |
 | Package Manager | `uv` |
-| Database | PostgreSQL on Neon + pgvector 확장 |
+| Database | PostgreSQL on Neon |
 | Auth | Clerk JWT 검증 |
 | Storage | Cloudflare R2 (boto3 S3 호환 API) |
 | AI | Anthropic Claude API (`anthropic` SDK) |
@@ -187,11 +187,15 @@ def parse_json_response(text: str) -> dict:
 
 ---
 
-## 6. pgvector 임베딩
+## 6. 벡터 임베딩 & RAG 검색
 
-- 임베딩 차원: `1536` (OpenAI text-embedding-3-small)
-- 청킹: 최대 512 토큰, 50 토큰 오버랩
-- 저장: `services/embedding.py`에 집중
+- 임베딩 모델: OpenAI `text-embedding-3-small` (1536차원)
+- 검색 방식: 하이브리드 검색 (Full-text + Vector + RRF)
+- 청킹: 계층적 청킹 (회의→화자 구간→문단, 부모 참조)
+- 캐시: Semantic Cache (유사 질문 즉시 반환)
+- 저장/검색: `services/embedding.py`, `rag/` 도메인에 집중
+
+> 상세 설계: `docs/architecture/rag-pipeline.md` 참조
 
 ---
 

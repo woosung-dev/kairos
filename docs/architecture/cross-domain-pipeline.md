@@ -9,7 +9,7 @@ MeetingService
   → TranscriptionService (STT + 화자 분리)
   → AIProcessingService (요약 + 액션 추출 + PARA 분류)
   → InboxService (Inbox 적재)
-  → EmbeddingService (pgvector 저장)
+  → EmbeddingService (벡터 임베딩 저장)
 ```
 
 각 도메인은 독립적인 모듈이지만, 파이프라인에서는 서로 의존한다.

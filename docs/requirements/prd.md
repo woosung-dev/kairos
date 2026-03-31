@@ -50,7 +50,7 @@
 | 회의 후 수동으로 회의록 작성 | 녹음 업로드 → AI 자동 요약/액션 추출 |
 | 주제별 폴더 정리 | 실행도 기반 PARA 분류 (AI 추천 → 사람 확정) |
 | 끝난 프로젝트 = 죽은 데이터 | Archive → RAG 소스로 재활용 |
-| "어디 있더라?" 검색 | 자연어 질문 → pgvector RAG 답변 |
+| "어디 있더라?" 검색 | 자연어 질문 → RAG 하이브리드 검색 답변 |
 
 ---
 
@@ -63,11 +63,11 @@
   → Claude API: 요약 + 액션 아이템 + PARA 분류 추천
   → Inbox 적재 (is_processed=False)
   → 사용자 PARA 분류 확정
-  → pgvector 임베딩 저장
+  → 벡터 임베딩 저장
   → RAG 검색 & Q&A
 ```
 
-**Tech Stack:** Next.js 16 + FastAPI + PostgreSQL(pgvector) + Cloudflare R2 + Claude API + Whisper
+**Tech Stack:** Next.js 16 + FastAPI + PostgreSQL + Cloudflare R2 + Claude API + Whisper
 
 ---
 
@@ -124,17 +124,17 @@
 
 **목표:** 쌓인 데이터를 "질문할 수 있는 자산"으로 전환.
 
-#### pgvector RAG
-- [ ] 텍스트 청킹 (512 토큰, 50 토큰 오버랩)
-- [ ] OpenAI Embedding → pgvector 저장
-- [ ] 유사도 검색 API
+#### RAG 지식 검색 (`docs/architecture/rag-pipeline.md` 참조)
+- [ ] 계층적 청킹 (회의→화자 구간→문단 + 부모 참조)
+- [ ] 하이브리드 검색 (Full-text + Vector + RRF)
+- [ ] Semantic Cache (유사 질문 즉시 반환)
 - [ ] Claude 스트리밍 답변 (StreamingResponse)
-- [ ] RAG 채팅 패널 UI (우측 슬라이드, 프로젝트 범위 지정)
+- [ ] RAG 채팅 패널 UI (우측 슬라이드, PARA 범위 지정)
 
 #### 노트 에디터
 - [ ] Tiptap 블록 에디터 (StarterKit + Placeholder + CharacterCount)
 - [ ] debounce 자동 저장 (500ms)
-- [ ] 노트 → pgvector 임베딩 자동 등록
+- [ ] 노트 → 벡터 임베딩 자동 등록
 
 #### Archive 재활용
 - [ ] Project 완료 → Archive 전환 (Resource 보존 옵션)

@@ -52,7 +52,7 @@ PARA 방법론(Projects / Areas / Resources / Archives + Inbox)을 기반으로
 회의 녹음 → STT (Whisper + pyannote 화자 분리)
          → AI 구조화 (Claude: 요약 / 액션 아이템 / PARA 분류 추천)
          → Inbox 적재 → PARA 분류 확정
-         → pgvector 임베딩 → RAG 검색 & Q&A
+         → 벡터 임베딩 → RAG 검색 & Q&A
 ```
 
 ---
@@ -63,7 +63,7 @@ PARA 방법론(Projects / Areas / Resources / Archives + Inbox)을 기반으로
 | -------- | ------------------------------------------------------------------ |
 | Frontend | Next.js 16 (App Router) + TypeScript + Tailwind CSS v4 + shadcn/ui v4 |
 | Backend  | FastAPI + SQLModel + asyncpg                                       |
-| Database | PostgreSQL on Neon + pgvector                                      |
+| Database | PostgreSQL on Neon                                                |
 | Auth     | Clerk (Google OAuth)                                               |
 | Storage  | Cloudflare R2 (boto3 S3 호환)                                      |
 | STT      | OpenAI Whisper API + pyannote-audio                                |

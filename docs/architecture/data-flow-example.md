@@ -160,11 +160,11 @@ UPDATE inbox_items SET is_processed = true WHERE source_id = '{meeting_id}';
 
 ### [5] 임베딩 저장
 
-분류 확정 후 (또는 비동기로), 콘텐츠를 pgvector에 저장하여 RAG 소스로 활용.
+분류 확정 후 (또는 비동기로), 콘텐츠를 벡터 임베딩으로 저장하여 RAG 소스로 활용.
 
 ```
 트랜스크립트 전문
-  → 512 토큰 단위 청킹 (50 토큰 오버랩)
+  → 계층적 청킹 (화자 구간 → 문단, 부모 참조)
   → OpenAI text-embedding-3-small (1536차원)
   → embedding_chunks 테이블 저장
 ```
@@ -173,13 +173,19 @@ UPDATE inbox_items SET is_processed = true WHERE source_id = '{meeting_id}';
 INSERT INTO embedding_chunks (
     workspace_id, para_item_id,
     source_type, source_id,
-    chunk_text, embedding
+    chunk_text, embedding,
+    chunk_level, parent_chunk_id, metadata
 ) VALUES (
     '...', '{cms_project_id}',
     'meeting', '{meeting_id}',
-    '가정회비 CMS 고도화... (512 토큰)',
-    '[0.012, -0.034, ...]'  -- vector(1536)
+    '가정회비 CMS 고도화... (~300-500자)',
+    '[0.012, -0.034, ...]',  -- vector(1536)
+    2,                        -- Level 2: paragraph (검색 단위)
+    '{parent_chunk_id}',      -- Level 1: 화자 구간 참조
+    '{"speaker": "튜닝님", "start_sec": 120}'
 );
 ```
 
-이후 RAG 검색 시 이 임베딩을 기반으로 유사도 검색 → Claude 답변 생성.
+이후 RAG 검색 시 하이브리드 검색 (Full-text + Vector + RRF) → Re-ranking → Claude 답변 생성.
+
+> 상세 설계: [RAG 파이프라인 설계](rag-pipeline.md) 참조

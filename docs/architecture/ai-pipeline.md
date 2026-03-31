@@ -8,7 +8,7 @@
   → [2] ACTION_ITEM_SYSTEM_PROMPT       → action_items[] (담당자/기한/우선순위)
   → [3] PARA_CLASSIFY_SYSTEM_PROMPT     → suggested_type, confidence
   → [4] Inbox 적재 (ai_suggested_para_type 포함, is_processed=false)
-  → [5] pgvector 임베딩 저장 (512 토큰 청킹, 50 토큰 오버랩)
+  → [5] 벡터 임베딩 저장 (계층적 청킹, rag-pipeline.md 참조)
 ```
 
 **호출 순서가 중요하다:** 요약 → 액션 추출 → PARA 분류 순서로 호출.
@@ -161,4 +161,16 @@ result = parse_json_response(response.content[0].text)
 | 요약 | `meeting_summaries` | summary, key_decisions, topics |
 | 액션 | `action_items` | title, assignee_id, priority, status |
 | PARA 추천 | `inbox_items` | ai_suggested_para_type, ai_confidence |
-| 임베딩 | `embedding_chunks` | chunk_text, embedding(vector 1536) |
+| 임베딩 | `embedding_chunks` | chunk_text, embedding(vector 1536), chunk_level, parent_chunk_id |
+| 캐시 | `semantic_caches` | question, question_embedding, answer, sources |
+
+---
+
+## RAG 검색 파이프라인
+
+> 이 문서는 **인제스트**(데이터 입력→임베딩 저장) 파이프라인을 다룬다.
+> RAG **검색**(질문→답변 생성) 파이프라인의 상세 설계는 아래 문서를 참조:
+>
+> **→ [RAG 파이프라인 설계 및 고도화 방향](rag-pipeline.md)**
+>
+> 하이브리드 검색, 계층적 청킹, Semantic Cache, Re-ranking, 검색 범위 제어 등 Phase 3 고도화 전략 포함.

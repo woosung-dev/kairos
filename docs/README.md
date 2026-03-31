@@ -21,7 +21,8 @@
 ### architecture/
 - [디렉토리 구조 맵](architecture/directory-map.md)
 - [데이터 모델 관계도 (ERD)](architecture/erd.md)
-- [AI 파이프라인 명세](architecture/ai-pipeline.md)
+- [AI 파이프라인 명세](architecture/ai-pipeline.md) — 인제스트 파이프라인 (STT→요약→액션→PARA→임베딩)
+- [RAG 파이프라인 설계](architecture/rag-pipeline.md) — 검색 파이프라인 (하이브리드 검색, 계층적 청킹, Semantic Cache, Re-ranking)
 - [데이터 흐름 예시](architecture/data-flow-example.md)
 - [크로스 도메인 파이프라인](architecture/cross-domain-pipeline.md)
 
