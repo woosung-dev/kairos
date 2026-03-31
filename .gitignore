@@ -35,3 +35,8 @@ pnpm-debug.log*
 # Misc
 *.tsbuildinfo
 next-env.d.ts
+
+# ai/rules
+.ai/
+.claude/
+.agents/
