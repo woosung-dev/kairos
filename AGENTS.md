@@ -1,7 +1,6 @@
-# {{PROJECT_NAME}} — {{PROJECT_DESCRIPTION}}
+# Kairos — AI 기반 미팅 & 지식 관리 플랫폼
 
-> **새 프로젝트 시작 시:** `## 현재 컨텍스트` 섹션만 채우면 됩니다.
-> 개인 원칙과 스택 규칙은 그대로 재사용됩니다.
+> _καιρός — 흘러가는 시간(Chronos) 속 결정적 순간. 모든 회의엔 포착해야 할 카이로스가 있다._
 
 ---
 
@@ -82,21 +81,16 @@
 
 ```
 docs/
-├── 00_project/       # 프로젝트 개요
-├── 01_requirements/  # PRD, 기능 명세서, 유저 스토리
-├── 02_domain/        # 도메인 모델, ERD, 엔티티 정의
-├── 03_api/           # API 명세서, 프론트-백엔드 통신 규약
-├── 04_architecture/  # 시스템 설계, 컴포넌트 구조
-├── 05_env/           # 환경 설정, .env 가이드
-├── 06_devops/        # CI/CD 파이프라인
-├── 07_infra/         # 인프라 설계, 배포 구성
-├── dev-log/          # ADR (Architecture Decision Records)
-├── guides/           # 로컬 환경 셋업, 배포, 트러블슈팅
-└── TODO.md           # 완료/차단/질문/다음 액션 추적
+├── README.md          # 문서 목차 (진입점)
+├── requirements/      # PRD, 기능 명세, PARA 방법론, UI/UX 스펙
+├── architecture/      # ERD, 파이프라인, 디렉토리맵, 데이터 흐름
+├── guides/            # 로컬 셋업
+└── dev-log/           # ADR (Architecture Decision Records)
 ```
 
 > **"문서가 없으면 기능도 없다."**
-> 상세 규칙(ID 체계, TODO.md 운영)은 `.ai/rules/global.md` 참조.
+> 이상적 번호 체계(00\_~07\_)는 `.ai/rules/global.md` 참조.
+> 상세 규칙(ID 체계, TODO.md 운영)도 동일 파일 참조.
 
 ---
 
@@ -115,32 +109,28 @@ test: 테스트 추가/수정
 
 ## 7. 코딩 스타일
 
-### TypeScript
-- **Strict 모드 필수**, `any` 사용 엄격히 금지 (부득이한 경우 `unknown` + Type Guard)
-- 모든 API 응답 타입은 명시적으로 정의
+> 상세 규칙은 `.ai/rules/` 참조. 핵심 원칙만 요약.
 
-### 컴포넌트 (Thin Component)
-- 페이지/UI 컴포넌트 내부에 비즈니스 로직 직접 작성 금지
-- 비즈니스 로직은 커스텀 훅으로 분리
-- 서버 컴포넌트(RSC) 지향, `"use client"`는 말단 노드에만
+### TypeScript (Frontend)
+- Strict 모드 필수, `any` 금지 → `.ai/rules/frontend.md`
+- Thin Component, RSC 지향, 비즈니스 로직은 커스텀 훅으로
+- `Suspense` + `ErrorBoundary`로 에러 위임
 
-### 상태 관리 3단계
-| 종류 | 도구 | 예시 |
-|------|------|------|
-| Server State | React Query | API 데이터 |
-| Client Global | Zustand | 사이드바 토글 |
-| Client Local | useState | 모달 상태 |
+### Python (Backend)
+- 100% Async, Pydantic V2 → `.ai/rules/backend.md`
+- Router / Service / Repository 레이어 분리
+- AsyncSession은 Repository만 보유
 
-### 에러 핸들링
-- `if (isLoading)` / `if (error)` 남발 금지
-- `Suspense` + `ErrorBoundary`로 위임
+### 상태 관리 (Frontend)
+| 종류 | 도구 |
+|------|------|
+| Server State | React Query |
+| Client Global | Zustand |
+| Client Local | useState |
 
-### 네이밍 규칙
+### 네이밍 공통
 - Boolean: `is`, `has`, `should` 접두사
-- 이벤트 핸들러: `handle` 접두사
-- Props 이벤트: `on` 접두사
-- 컴포넌트 파일: PascalCase
-- 훅 파일: camelCase `use` 접두사
+- 이벤트: `handle` (핸들러) / `on` (Props)
 - 상수: UPPER_SNAKE_CASE
 
 ### 응답 형식
@@ -151,38 +141,95 @@ test: 테스트 추가/수정
 
 ## 현재 컨텍스트
 
-> **새 프로젝트 시작 시 이 섹션을 채우세요.**
-
 ### 프로젝트 개요
-- **이름:** {{PROJECT_NAME}}
-- **한 줄 설명:** {{PROJECT_DESCRIPTION}}
-- **기술 스택:** Next.js 16 + FastAPI (`.ai/rules/` 참조)
+- **이름:** Kairos (καιρός — 결정적 순간)
+- **한 줄 설명:** 회의 녹음 → AI 요약/액션/PARA 분류 → 벡터 임베딩 → RAG Q&A
+- **상세:** `docs/requirements/prd.md`
+
+### 기술 스택
+
+| 레이어 | 기술 | 규칙 |
+|--------|------|------|
+| Frontend | Next.js 16 + React 19 + Tailwind v4 + shadcn/ui v4 | `.ai/rules/frontend.md` |
+| Backend | FastAPI + SQLModel + asyncpg | `.ai/rules/backend.md` |
+| Database | PostgreSQL (Neon) | |
+| Auth | Clerk (Google OAuth) | |
+| Storage | Cloudflare R2 | |
+| STT | Whisper API + pyannote-audio | |
+| AI | Claude `claude-sonnet-4-20250514` (고정) | `docs/architecture/ai-pipeline.md` |
+| Embedding | OpenAI text-embedding-3-small (1536d) | `docs/architecture/rag-pipeline.md` |
+| Deploy | Vercel (FE) + GCP Cloud Run (BE) | |
+
+### 핵심 파이프라인
+
+```
+회의 녹음 → STT (Whisper + pyannote 화자 분리)
+         → AI 구조화 (Claude: 요약 / 액션 아이템 / PARA 분류 추천)
+         → Inbox 적재 → PARA 분류 확정
+         → 벡터 임베딩 → RAG 검색 & Q&A
+```
 
 ### 핵심 도메인
-- {{DOMAIN_1}}
-- {{DOMAIN_2}}
 
-### 현재 작업
-- Phase 1 MVP 개발 진행 중
+1. **PARA 방법론** — Projects/Areas/Resources/Archives, 실행도 기반 분류, N:M 관계
+   → `docs/requirements/para-methodology.md`
+2. **Inbox 워크플로우** — AI 추천(`is_processed=false`) → 사용자 확정 → N:M PARA 연결
+3. **회의 처리 5-Stage** — Upload → STT → AI처리 → Inbox → 임베딩
+   → `docs/architecture/ai-pipeline.md`, `docs/architecture/cross-domain-pipeline.md`
+4. **RAG 6-Layer** — Cache → Query Processing → Hybrid Search → Re-ranking → Generation → Cache Store
+   → `docs/architecture/rag-pipeline.md`
+5. **오케스트레이터 패턴** — 크로스 도메인 서비스 조합, 직접 import 금지
+   → `docs/architecture/cross-domain-pipeline.md`
+
+### 핵심 엔티티
+
+Workspace, User, ParaItem, InboxItem, Meeting, MeetingSummary,
+TranscriptSegment, ActionItem, Note, EmbeddingChunk(계층적), SemanticCache
+→ `docs/architecture/erd.md`
+
+### AI 제약사항
+
+- Claude 모델 고정: `claude-sonnet-4-20250514` (임의 변경 금지)
+- 프롬프트 중앙 관리: `backend/src/common/prompts.py` 상수 (인라인 금지)
+- 크로스 도메인: `pipeline_service.py` 오케스트레이터만 — 도메인 간 직접 import 금지
+- 장기 작업: BackgroundTasks + 202 Accepted + polling
+
+### 현재 진행 상태
+
+| Phase | 상태 | 범위 |
+|-------|------|------|
+| Phase 1 (프론트엔드 스캐폴딩) | **진행 중** ~40% | 3-Panel, Inbox, PARA CRUD 완료. Clerk/업로드/칸반 미완 |
+| Phase 2 (백엔드 + AI 파이프라인) | 미착수 | `backend/` 디렉토리 미존재 |
+| Phase 3 (RAG + 고급 UI) | 설계 완료 | `docs/architecture/rag-pipeline.md` |
+| Phase 4 (권한 + 보고서) | 계획 | |
+
+→ `docs/requirements/prd.md` Phase 로드맵 참조
+
+### 실제 코드 현황
+
+```
+kairos/
+├── frontend/          # Next.js 16 (56 TS/TSX, pnpm)
+│   └── src/
+│       ├── app/       # 라우트 (dashboard, inbox, workspace/[id]/...)
+│       ├── components/# ui/ (shadcn), layout/ (sidebar, header, rag-panel)
+│       ├── features/  # inbox/, para/, meetings/(types만), actions/(types만)
+│       ├── mocks/     # mock data (Phase 1)
+│       └── store/     # Zustand (ui.ts)
+├── backend/           # 미존재 (Phase 2에서 생성)
+├── docs/              # 13개 문서
+└── .ai/               # 규칙 파일
+```
 
 ---
 
 ## 스택 규칙 참조
 
-> 아래 파일에 상세 스택 규칙이 정의되어 있습니다.
-> `@import`를 지원하지 않는 도구는 이 경로를 직접 열어 참조하세요.
->
-> 규칙 원본은 `.ai/common/`, `.ai/stacks/`, `.ai/project/`에 위치합니다.
-> `.ai/rules/`는 심링크 허브이며 실제 파일을 넣지 않습니다.
+> `.ai/rules/`는 심링크 허브. 원본은 `.ai/common/`, `.ai/stacks/`, `.ai/project/`에 위치.
 
-**범용 규칙 (common/)**
-- `.ai/rules/global.md` — 문서화, Git Convention, 환경변수
-
-**스택 규칙 (stacks/) — 프로젝트에 맞게 심링크 교체**
-- `.ai/rules/frontend.md` — Next.js 16 + shadcn v4 + FSD 규칙 (기본값)
-- `.ai/rules/backend.md` — FastAPI + SQLModel 규칙 (기본값)
-- `.ai/rules/mobile.md` — Flutter 규칙 (flutter 선택 시)
-
-**프로젝트 고유 규칙 (project/) — 필요 시 추가**
-- `.ai/rules/domain.md` — 프로젝트 도메인 규칙 (예시)
-- `.ai/rules/pipeline.md` — 프로젝트 파이프라인 규칙 (예시)
+| 파일 | 내용 |
+|------|------|
+| `.ai/rules/global.md` | 문서화, Git Convention, 환경변수, 자기개선 루프 |
+| `.ai/rules/typescript.md` | TypeScript 공통 (Strict, 네이밍) |
+| `.ai/rules/frontend.md` | Next.js 16 + shadcn v4 + FSD + Zod v4 |
+| `.ai/rules/backend.md` | FastAPI + SQLModel + Claude API + R2 |
