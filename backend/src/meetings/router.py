@@ -2,11 +2,12 @@
 """Meeting 라우터 — HTTP 전용."""
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
-from src.meetings.dependencies import get_meeting_service
+from src.meetings.dependencies import get_meeting_service, get_pipeline_service
+from src.meetings.pipeline_service import MeetingPipelineService
 from src.meetings.schemas import CreateMeetingRequest
 from src.meetings.service import MeetingService
 
@@ -17,17 +18,21 @@ router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}/meetings", tags=["m
 async def create_meeting(
     workspace_id: uuid.UUID,
     data: CreateMeetingRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     service: MeetingService = Depends(get_meeting_service),
+    pipeline: MeetingPipelineService = Depends(get_pipeline_service),
 ):
-    # 파이프라인은 Task 10에서 BackgroundTasks로 추가
-    return await service.create_meeting(
+    result = await service.create_meeting(
         workspace_id=workspace_id,
         title=data.title,
         file_key=data.file_key,
         created_by_id=current_user.id,
         recorded_at=data.recorded_at,
     )
+    # 백그라운드에서 파이프라인 실행
+    background_tasks.add_task(pipeline.process_meeting, uuid.UUID(result["id"]))
+    return result
 
 
 @router.get("")

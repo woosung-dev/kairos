@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from src.auth.router import router as auth_router
 from src.core.lifespan import lifespan
 from src.meetings.router import router as meetings_router
+from src.upload.router import router as upload_router
 from src.workspaces.router import router as workspaces_router
 
 app = FastAPI(
@@ -16,6 +17,7 @@ app = FastAPI(
 app.include_router(auth_router)
 app.include_router(workspaces_router)
 app.include_router(meetings_router)
+app.include_router(upload_router)
 
 
 @app.get("/api/v1/health")

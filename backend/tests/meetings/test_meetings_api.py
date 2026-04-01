@@ -11,7 +11,7 @@ from src.auth.dependencies import get_current_user
 from src.auth.models import User
 from src.common.database import get_async_session
 from src.main import app
-from src.meetings.dependencies import get_meeting_service
+from src.meetings.dependencies import get_meeting_service, get_pipeline_service
 
 
 @pytest_asyncio.fixture
@@ -48,6 +48,10 @@ async def test_create_meeting_returns_202(client, mock_user):
         "message": "파이프라인이 시작되었습니다",
     }
     app.dependency_overrides[get_meeting_service] = lambda: mock_service
+
+    # pipeline도 mock (BackgroundTasks에서 사용)
+    mock_pipeline = AsyncMock()
+    app.dependency_overrides[get_pipeline_service] = lambda: mock_pipeline
 
     response = await client.post(
         f"/api/v1/workspaces/{WORKSPACE_ID}/meetings",
