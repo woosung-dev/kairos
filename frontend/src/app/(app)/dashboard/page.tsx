@@ -160,7 +160,7 @@ function MeetingCard({ meeting }: { meeting: Meeting }) {
         </span>
       </div>
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-        {meeting.createdBy.displayName} &middot;{" "}
+        {meeting.createdBy?.displayName ?? "사용자"} &middot;{" "}
         {new Date(meeting.createdAt).toLocaleDateString("ko-KR")}
       </p>
     </Link>

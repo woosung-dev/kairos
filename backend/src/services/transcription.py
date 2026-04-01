@@ -19,7 +19,7 @@ class TranscriptionService:
         )
 
     async def transcribe(
-        self, audio_bytes: bytes
+        self, audio_bytes: bytes, filename: str = "audio.mp3"
     ) -> tuple[list[TranscriptSegment], float]:
         """오디오 바이트 → (TranscriptSegment 리스트, 전체 길이 초).
 
@@ -27,7 +27,7 @@ class TranscriptionService:
         Sprint 2에서 pyannote 추가 예정.
         """
         audio_file = io.BytesIO(audio_bytes)
-        audio_file.name = "audio.mp3"
+        audio_file.name = filename
 
         response = await self.client.audio.transcriptions.create(
             model="whisper-1",

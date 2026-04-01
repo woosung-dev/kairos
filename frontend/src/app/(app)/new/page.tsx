@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { usePresignedUpload } from "@/features/upload/hooks";
+import { useCreateMeeting } from "@/features/meetings/hooks";
+import { useWorkspaceStore } from "@/features/workspaces/store";
 
 const CONTENT_TYPES = [
   {
     id: "meeting",
     icon: "🎙️",
     title: "회의 녹음",
-    description: "회의를 녹음하면 AI가 자동으로 요약하고 액션 아이템을 추출합니다",
+    description: "오디오/영상 파일을 업로드하면 AI가 자동으로 요약합니다",
   },
   {
     id: "note",
@@ -26,10 +30,58 @@ const CONTENT_TYPES = [
 type ContentType = (typeof CONTENT_TYPES)[number]["id"];
 
 export default function NewContentPage() {
-  const [selected, setSelected] = useState<ContentType | null>(null);
+  const router = useRouter();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+
+  const [selected, setSelected] = useState<ContentType>("meeting");
+  const [title, setTitle] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploadStep, setUploadStep] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const presignedUpload = usePresignedUpload();
+  const createMeeting = useCreateMeeting(activeWorkspaceId ?? undefined);
+
+  const isUploading = !!uploadStep;
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      if (!title) {
+        setTitle(selectedFile.name.replace(/\.[^/.]+$/, ""));
+      }
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!file || !title || !activeWorkspaceId) return;
+
+    setError(null);
+
+    try {
+      // 1. Presigned URL 발급 + R2 업로드
+      setUploadStep("파일 업로드 중...");
+      const fileKey = await presignedUpload.upload(file);
+
+      // 2. 회의 생성 (202 Accepted)
+      setUploadStep("회의 생성 중...");
+      const meeting = await createMeeting.mutateAsync({
+        title,
+        fileKey,
+      });
+
+      // 3. 회의 상세 페이지로 이동
+      router.push(`/meetings/${meeting.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "업로드 실패");
+      setUploadStep(null);
+    }
+  };
 
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-3xl mx-auto">
       <div className="mb-6">
         <h1
           className="text-2xl font-bold mb-1"
@@ -69,8 +121,8 @@ export default function NewContentPage() {
         ))}
       </div>
 
-      {/* 선택된 유형의 폼 (빈 껍데기) */}
-      {selected && (
+      {/* 회의 녹음 업로드 폼 */}
+      {selected === "meeting" && (
         <div
           className="p-6 rounded border"
           style={{
@@ -83,97 +135,131 @@ export default function NewContentPage() {
             className="text-lg font-semibold mb-4"
             style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}
           >
-            {CONTENT_TYPES.find((t) => t.id === selected)?.title}
+            회의 녹음
           </h2>
 
-          {selected === "meeting" && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
-                  회의 제목
-                </label>
-                <input
-                  type="text"
-                  placeholder="회의 제목을 입력하세요"
-                  className="w-full px-3 py-2 rounded border text-sm bg-transparent outline-none"
-                  style={{
-                    borderColor: "var(--border)",
-                    color: "var(--text-primary)",
-                    borderRadius: "var(--radius-sm)",
-                  }}
-                />
-              </div>
-              <div
-                className="flex items-center justify-center h-32 rounded border-2 border-dashed"
-                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+          <div className="space-y-4">
+            {/* 제목 */}
+            <div>
+              <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
+                회의 제목
+              </label>
+              <input
+                type="text"
+                placeholder="회의 제목을 입력하세요"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full px-3 py-2 rounded border text-sm bg-transparent outline-none"
+                style={{
+                  borderColor: "var(--border)",
+                  color: "var(--text-primary)",
+                  borderRadius: "var(--radius-sm)",
+                }}
+              />
+            </div>
+
+            {/* 파일 드롭존 */}
+            <div>
+              <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
+                녹음 파일
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/*,video/*,.mp3,.wav,.m4a,.mp4,.webm"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex flex-col items-center justify-center h-32 rounded border-2 border-dashed transition-colors"
+                style={{
+                  borderColor: file ? "var(--accent)" : "var(--border)",
+                  color: "var(--text-muted)",
+                  background: file ? "var(--accent-subtle)" : "transparent",
+                }}
               >
-                <p className="text-sm">녹음 파일을 드래그하거나 클릭하여 업로드</p>
-              </div>
+                {file ? (
+                  <>
+                    <span className="text-2xl mb-1">✅</span>
+                    <p className="text-sm" style={{ color: "var(--text-primary)" }}>
+                      {file.name}
+                    </p>
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      {(file.size / 1024).toFixed(1)} KB — 클릭하여 변경
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-2xl mb-1">🎙️</span>
+                    <p className="text-sm">클릭하여 파일 선택</p>
+                    <p className="text-xs mt-1">MP3, WAV, M4A, MP4, WebM</p>
+                  </>
+                )}
+              </button>
             </div>
-          )}
 
-          {selected === "note" && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
-                  노트 제목
-                </label>
-                <input
-                  type="text"
-                  placeholder="노트 제목을 입력하세요"
-                  className="w-full px-3 py-2 rounded border text-sm bg-transparent outline-none"
-                  style={{
-                    borderColor: "var(--border)",
-                    color: "var(--text-primary)",
-                    borderRadius: "var(--radius-sm)",
-                  }}
-                />
+            {/* 에러 */}
+            {error && (
+              <div
+                className="px-3 py-2 rounded text-sm"
+                style={{
+                  background: "rgba(248,113,113,0.1)",
+                  color: "var(--error)",
+                  borderRadius: "var(--radius-sm)",
+                }}
+              >
+                {error}
               </div>
-              <div>
-                <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
-                  내용
-                </label>
-                <textarea
-                  placeholder="노트 내용을 입력하세요..."
-                  rows={8}
-                  className="w-full px-3 py-2 rounded border text-sm bg-transparent outline-none resize-none"
-                  style={{
-                    borderColor: "var(--border)",
-                    color: "var(--text-primary)",
-                    borderRadius: "var(--radius-sm)",
-                  }}
-                />
+            )}
+
+            {/* 업로드 진행 */}
+            {uploadStep && (
+              <div
+                className="px-3 py-2 rounded text-sm"
+                style={{
+                  background: "var(--accent-subtle)",
+                  color: "var(--accent)",
+                  borderRadius: "var(--radius-sm)",
+                }}
+              >
+                ⏳ {uploadStep}
               </div>
+            )}
+
+            {/* 업로드 버튼 */}
+            <div className="flex justify-end">
+              <button
+                onClick={handleUpload}
+                disabled={!file || !title || isUploading || !activeWorkspaceId}
+                className="px-6 py-2 rounded text-sm font-medium transition-opacity"
+                style={{
+                  background: file && title && !isUploading ? "var(--accent)" : "var(--surface-active)",
+                  color: file && title && !isUploading ? "var(--background)" : "var(--text-muted)",
+                  borderRadius: "var(--radius-sm)",
+                  cursor: !file || !title || isUploading ? "not-allowed" : "pointer",
+                }}
+              >
+                {isUploading ? "업로드 중..." : "업로드 시작"}
+              </button>
             </div>
-          )}
-
-          {selected === "attachment" && (
-            <div
-              className="flex items-center justify-center h-40 rounded border-2 border-dashed"
-              style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
-            >
-              <div className="text-center">
-                <span className="text-3xl mb-2 block">📎</span>
-                <p className="text-sm">파일을 드래그하거나 클릭하여 업로드</p>
-                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                  PDF, DOCX, PNG, JPG (최대 50MB)
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-6 flex justify-end">
-            <button
-              className="px-4 py-2 rounded text-sm font-medium"
-              style={{
-                background: "var(--accent)",
-                color: "var(--background)",
-                borderRadius: "var(--radius-sm)",
-              }}
-            >
-              추가하기
-            </button>
           </div>
+        </div>
+      )}
+
+      {/* 노트 / 자료 (Sprint 2+) */}
+      {(selected === "note" || selected === "attachment") && (
+        <div
+          className="p-6 rounded border text-center"
+          style={{
+            background: "var(--surface)",
+            borderColor: "var(--border-subtle)",
+            borderRadius: "var(--radius-md)",
+          }}
+        >
+          <p style={{ color: "var(--text-muted)" }}>
+            {selected === "note" ? "노트 작성" : "자료 업로드"}은 Sprint 2에서 구현됩니다
+          </p>
         </div>
       )}
     </div>

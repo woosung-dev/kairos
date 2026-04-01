@@ -12,7 +12,11 @@ router = APIRouter(prefix="/api/v1/upload", tags=["upload"])
 
 class PresignedUrlRequest(BaseModel):
     filename: str
-    content_type: str
+    content_type: str | None = None
+    contentType: str | None = None  # FE camelCase 호환
+
+    def get_content_type(self) -> str:
+        return self.content_type or self.contentType or "application/octet-stream"
 
 
 @router.post("/presigned-url")
@@ -21,7 +25,7 @@ async def get_presigned_url(
     current_user: User = Depends(get_current_user),
 ):
     r2 = R2Service()
-    result = await r2.get_presigned_upload_url(data.filename, data.content_type)
+    result = await r2.get_presigned_upload_url(data.filename, data.get_content_type())
     return {
         "uploadUrl": result["upload_url"],
         "fileKey": result["file_key"],

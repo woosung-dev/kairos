@@ -44,7 +44,9 @@ class MeetingPipelineService:
 
             audio_url = await self.r2_service.get_download_url(meeting.file_key)
             audio_bytes = await self.transcription_service.download_audio(audio_url)
-            segments, duration = await self.transcription_service.transcribe(audio_bytes)
+            # file_key에서 파일명 추출 (예: "uploads/uuid/meeting.m4a" → "meeting.m4a")
+            filename = meeting.file_key.split("/")[-1] if "/" in meeting.file_key else meeting.file_key
+            segments, duration = await self.transcription_service.transcribe(audio_bytes, filename)
 
             await self.meeting_repo.save_segments(meeting_id, segments)
             await self.meeting_repo.set_has_transcript(meeting_id, True)
