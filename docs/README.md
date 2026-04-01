@@ -28,6 +28,9 @@
 
 ### guides/
 - [로컬 개발 환경 셋업](guides/local-setup.md)
+- [개발 방법론 (8 Stage)](guides/development-methodology.md) — AI 기반 1인 풀스택 개발 프로세스
 
 ### dev-log/
 - [001: 기술 스택 선정](dev-log/001-tech-stack-decisions.md)
+- [002: 실행 전략 — Vertical Slice Sprint 채택](dev-log/002-execution-strategy.md)
+- [003: 디자인 도구 선정 — Stitch + Pencil + gstack 조합](dev-log/003-design-tools-decisions.md)

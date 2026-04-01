@@ -73,6 +73,21 @@
 
 ## 5. Phase 로드맵
 
+> **실행 전략:** Vertical Slice Sprint — Phase 순차 진행 대신 핵심 가치 흐름을 FE+BE 관통.
+> 의사결정 근거: `docs/dev-log/002-execution-strategy.md`
+
+---
+
+### Phase 0 — 문서 구체화 + 아키텍처 검증 (Sprint 0, ~3일)
+
+**목표:** Phase 1~4 실행에 필요한 문서 병목 해소.
+
+- [ ] `docs/api/endpoints.md` — 16개 REST API 명세 (Request/Response 스키마 포함)
+- [ ] `docs/architecture/backend-scaffolding.md` — 백엔드 초기 셋업 가이드
+- [ ] 본 PRD Sprint 분해 완료 (이 섹션)
+
+**완료 기준:** API 명세 + 백엔드 셋업 가이드 작성 완료, 다음 Sprint 즉시 착수 가능
+
 ---
 
 ### Phase 1 — 프론트엔드 스캐폴딩 (Mock Data) ✅ 진행 중
@@ -85,81 +100,147 @@
 - [x] Inbox 뷰 UI (mock data)
 - [x] PARA 아이템 CRUD (mock data)
 
-#### 남은 작업
-- [ ] Clerk 인증 연동 (sign-in / sign-up / proxy.ts)
-- [ ] 회의 업로드 페이지 (파일 드롭존 + 인앱 녹음 UI)
-- [ ] 회의 상세 페이지 (트랜스크립트 뷰어, mock data)
-- [ ] 액션 아이템 칸반 보드 (To Do / In Progress / Done, mock data)
-- [ ] PARA 분류 확정 워크플로우 (AI 추천 뱃지 → 클릭 확정)
+#### 남은 작업 (Sprint 1에서 Phase 2와 병합)
+
+| 작업 | 우선순위 | 예상 (CC) | 의존성 | Sprint |
+|------|----------|-----------|--------|--------|
+| Clerk 인증 연동 (FE 전용: proxy.ts + 컴포넌트) | P0 | 1h | 없음 | Sprint 1 |
+| 회의 업로드 페이지 (드롭존 + 녹음 UI) | P0 | 2h | Clerk | Sprint 1 |
+| 회의 상세 페이지 (트랜스크립트 뷰어) | P1 | 2h | 업로드 | Sprint 2 |
+| 액션 아이템 칸반 보드 | P1 | 2h | 없음 | Sprint 2 |
+| PARA 분류 확정 워크플로우 | P1 | 1h | Inbox UI | Sprint 2 |
+
+> Phase 1 남은 작업은 Phase 2와 동시 진행 (Vertical Slice 전략).
+> FE는 worktree에서 병렬로, BE 스캐폴딩과 동시에 진행한다.
 
 ---
 
-### Phase 2 — 백엔드 + AI 파이프라인 연동
+### Sprint 1 (Week 1-2): "회의 → AI 요약" Vertical Slice
 
-**목표:** "업로드 → 처리 → Inbox 자동 적재" 핵심 파이프라인 완성.
+**목표:** 녹음 업로드 → AI 요약 출력까지 FE+BE End-to-End 동작.
 
-#### FastAPI 백엔드 스캐폴딩
-- [ ] 프로젝트 구조 셋업 (uv, SQLModel, Alembic)
-- [ ] DB 마이그레이션 (ERD 기반 전체 테이블 생성)
+#### 백엔드 (Phase 2 착수)
+- [ ] FastAPI 프로젝트 구조 셋업 (uv, SQLModel, Alembic)
+- [ ] DB 마이그레이션 (User, Workspace, Meeting, MeetingSummary)
 - [ ] Clerk JWT 검증 미들웨어
-- [ ] 공통 유틸 (pagination, exceptions, R2 클라이언트)
-
-#### AI 파이프라인
 - [ ] Cloudflare R2 파일 업로드 API
+- [ ] `POST /meetings` (202 Accepted + BackgroundTasks)
+- [ ] `GET /meetings/{id}/status` (polling)
 - [ ] Whisper API + pyannote-audio 화자 분리
-- [ ] Claude API 통합:
-  - 회의 요약 (3~5줄)
-  - 액션 아이템 추출 (담당자, 기한, 우선순위)
-  - PARA 분류 추천
-- [ ] Inbox 자동 적재 (is_processed=False → 사용자 확정)
+- [ ] Claude 요약 파이프라인 (1개 프롬프트: MEETING_SUMMARY)
 
-#### 프론트엔드 API 연동
-- [ ] Mock data → 실제 API 교체 (Inbox, PARA, 회의)
-- [ ] React Query 뮤테이션 연동
-- [ ] 업로드 진행률 UI (onUploadProgress)
+#### 프론트엔드 (Phase 1 잔여 + API 연결)
+- [ ] Clerk 인증 연동 (proxy.ts + sign-in/up)
+- [ ] 회의 업로드 페이지 (드롭존 → R2 → BE 호출)
+- [ ] 회의 상세 페이지 (요약 표시, 트랜스크립트 뷰어)
+
+**완료 기준:** 녹음 파일 업로드 → 2분 내 AI 요약 확인 가능
+**병렬화:** FE(Clerk + 업로드)는 worktree-A, BE(스캐폴딩)는 main에서 동시 진행
 
 ---
 
-### Phase 3 — 지식 검색 (RAG) + 고급 UI
+### Sprint 2 (Week 3-4): "Inbox + PARA + 액션" 확장
 
-**목표:** 쌓인 데이터를 "질문할 수 있는 자산"으로 전환.
+**목표:** 업로드 → 요약 → 액션 추출 → Inbox → PARA 분류 완전 체인.
 
-#### RAG 지식 검색 (`docs/architecture/rag-pipeline.md` 참조)
-- [ ] 계층적 청킹 (회의→화자 구간→문단 + 부모 참조)
-- [ ] 하이브리드 검색 (Full-text + Vector + RRF)
-- [ ] Semantic Cache (유사 질문 즉시 반환)
-- [ ] Claude 스트리밍 답변 (StreamingResponse)
-- [ ] RAG 채팅 패널 UI (우측 슬라이드, PARA 범위 지정)
+#### 백엔드
+- [ ] Claude 액션 아이템 추출 + PARA 분류 추천 파이프라인
+- [ ] Inbox CRUD API (`GET /inbox`, `POST /inbox/{id}/classify`, `POST /inbox/{id}/dismiss`)
+- [ ] PARA CRUD API (`GET/POST/PATCH/DELETE /para-items`, `POST /para-items/{id}/archive`)
+- [ ] ActionItem CRUD API (`GET/POST/PATCH /action-items`)
+- [ ] 오케스트레이터 통합 (MeetingPipelineService)
+- [ ] Inbox 자동 적재 (is_processed=false)
 
-#### 노트 에디터
+#### 프론트엔드
+- [ ] Mock → Real API 전환 (Inbox, PARA, ActionItem)
+- [ ] React Query 뮤테이션 연동
+- [ ] 액션 아이템 칸반 보드
+- [ ] PARA 분류 확정 워크플로우 (AI 뱃지 → 클릭 확정)
+- [ ] 업로드 진행률 UI
+
+**완료 기준:** 업로드 → 요약 → 액션 → Inbox → 분류 확정까지 전체 흐름 동작
+**Phase 1 남은 작업 완료 시점:** 이 Sprint 종료 시 Phase 1 + Phase 2 핵심 모두 완료
+
+---
+
+### Sprint 3 (Week 5-6): RAG + 노트 — "질문할 수 있는 지식"
+
+**목표:** 쌓인 데이터를 자연어로 질문 가능한 자산으로 전환.
+
+> 상세 설계: `docs/architecture/rag-pipeline.md`
+
+#### 백엔드
+- [ ] 임베딩 서비스 (계층적 청킹: 회의→화자 구간→문단)
+- [ ] 하이브리드 검색 API (pg_trgm + vector + RRF)
+- [ ] Semantic Cache (유사도 ≥ 0.93 즉시 반환)
+- [ ] `POST /rag/ask` (SSE 스트리밍)
+- [ ] Note CRUD API
+
+#### 프론트엔드
+- [ ] RAG 채팅 패널 (PARA 범위 지정, 시간/소스 필터)
 - [ ] Tiptap 블록 에디터 (StarterKit + Placeholder + CharacterCount)
 - [ ] debounce 자동 저장 (500ms)
-- [ ] 노트 → 벡터 임베딩 자동 등록
+- [ ] 노트 → 임베딩 자동 등록
 
-#### Archive 재활용
+#### Archive
 - [ ] Project 완료 → Archive 전환 (Resource 보존 옵션)
 - [ ] Archive 데이터 RAG 소스 포함
 
+**완료 기준:** "지난 회의에서 CMS 관련 결정이 뭐였지?" → 2초 내 스트리밍 답변
+
 ---
 
-### Phase 4 — 권한 관리 + 보고서 생성
+### Sprint 4 (Week 7-8): Polish + Auth + 배포 — "내부 팀에게 전달"
 
-**목표:** 실제 사내 배포 가능한 수준의 보안 + 부가가치 기능.
+**목표:** 내부 팀 5명이 실제 사용 가능한 수준으로 마무리.
 
-#### RBAC 권한 관리
+#### RBAC + 보안
 - [ ] 역할 4단계: Owner / Admin / Member / Viewer
-- [ ] 워크스페이스 / 문서 단위 권한 설정
+- [ ] 워크스페이스 단위 권한 설정
 - [ ] 초대 링크 + 이메일 초대
 
-#### AI 문서 생성
+#### 배포
+- [ ] GCP Cloud Run 배포 (Docker)
+- [ ] Vercel 프론트엔드 배포
+- [ ] 환경변수 관리 (production)
+- [ ] 헬스체크 + 모니터링 기본 셋업
+
+#### 품질 보증
+- [ ] 전체 QA (gstack /qa)
+- [ ] UI 디자인 감사 (gstack /design-review)
+- [ ] 보안 감사 (gstack /cso)
+- [ ] 성능 기준선 측정 (gstack /benchmark)
+
+**완료 기준:** 내부 5명 온보딩 + 실제 회의 업로드 + RAG 검색 사용
+
+---
+
+### Phase 4 — 보고서 생성 + 외부 연동 (Sprint 5+, 시기 미정)
+
+**목표:** MVP 검증 후 확장 기능 추가.
+
+> Phase 4는 내부 팀 피드백 기반으로 우선순위를 재조정한다.
+> 아래는 후보 목록이며, Sprint 4 완료 후 `/office-hours`로 재검토.
+
+#### AI 문서 생성 (후보)
 - [ ] 주간/월간 보고서 자동 생성 (프로젝트 활동 요약)
 - [ ] 슬라이드 발표 자료 초안 생성
-- [ ] 인포그래픽 초안 (차트 데이터 기반)
 
-#### 외부 연동 (검토)
+#### 외부 연동 (후보)
 - [ ] Google Meet 녹화본 자동 연동
 - [ ] Zoom 클라우드 녹화 연동
 - [ ] Slack 알림 (액션 아이템 마감 리마인더)
+
+---
+
+### Sprint 전환 기준
+
+| 조건 | 다음 Sprint 진입 가능 |
+|------|:---:|
+| 해당 Sprint "완료 기준" 충족 | O |
+| 핵심 기능 동작 (버그 있어도 흐름 완성) | O |
+| 핵심 기능 미동작 (흐름 끊김) | X — 해당 Sprint 연장 |
+| QA Health score 8 미만 | 주의 — 버그 수정 후 진입 권장 |
 
 ---
 
