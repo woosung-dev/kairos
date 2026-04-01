@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from src.auth.router import router as auth_router
 from src.core.lifespan import lifespan
+from src.workspaces.router import router as workspaces_router
 
 app = FastAPI(
     title="Kairos API",
@@ -12,6 +13,7 @@ app = FastAPI(
 )
 
 app.include_router(auth_router)
+app.include_router(workspaces_router)
 
 
 @app.get("/api/v1/health")
