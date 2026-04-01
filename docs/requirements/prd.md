@@ -82,9 +82,9 @@
 
 **목표:** Phase 1~4 실행에 필요한 문서 병목 해소.
 
-- [ ] `docs/api/endpoints.md` — 16개 REST API 명세 (Request/Response 스키마 포함)
-- [ ] `docs/architecture/backend-scaffolding.md` — 백엔드 초기 셋업 가이드
-- [ ] 본 PRD Sprint 분해 완료 (이 섹션)
+- [x] `docs/api/endpoints.md` — 32개 REST API 명세 (Sprint 1~2 상세)
+- [x] `docs/architecture/backend-scaffolding.md` — 백엔드 초기 셋업 가이드
+- [x] 본 PRD Sprint 분해 완료 (이 섹션)
 
 **완료 기준:** API 명세 + 백엔드 셋업 가이드 작성 완료, 다음 Sprint 즉시 착수 가능
 

@@ -25,6 +25,10 @@
 - [RAG 파이프라인 설계](architecture/rag-pipeline.md) — 검색 파이프라인 (하이브리드 검색, 계층적 청킹, Semantic Cache, Re-ranking)
 - [데이터 흐름 예시](architecture/data-flow-example.md)
 - [크로스 도메인 파이프라인](architecture/cross-domain-pipeline.md)
+- [백엔드 초기 셋업 가이드](architecture/backend-scaffolding.md) — FastAPI + SQLModel + Alembic 프로젝트 구조
+
+### api/
+- [REST API 명세](api/endpoints.md) — 32개 엔드포인트 (Sprint 1~2 상세, 3~4 목록)
 
 ### guides/
 - [로컬 개발 환경 셋업](guides/local-setup.md)
