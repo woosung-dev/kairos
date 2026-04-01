@@ -17,7 +17,7 @@ cd backend/
 uv add fastapi "uvicorn[standard]" sqlmodel asyncpg alembic pydantic-settings
 
 # 외부 서비스
-uv add anthropic aioboto3 clerk-backend-api
+uv add google-genai aioboto3 clerk-backend-api
 
 # 개발 의존성
 uv add --dev pytest pytest-asyncio httpx
@@ -45,7 +45,7 @@ backend/
     │   ├── database.py             # AsyncSession, get_async_session
     │   ├── exceptions.py           # 공통 예외 클래스 + 글로벌 핸들러
     │   ├── pagination.py           # PaginatedResponse 제네릭
-    │   ├── prompts.py              # Claude 프롬프트 상수 (인라인 금지)
+    │   ├── prompts.py              # Gemini 프롬프트 상수 (인라인 금지)
     │   └── r2.py                   # R2 presigned URL (aioboto3)
     ├── auth/                       # Sprint 1
     │   ├── router.py
@@ -88,7 +88,7 @@ backend/
     │   ├── models.py               # EmbeddingChunk, SemanticCache
     │   ├── schemas.py, dependencies.py, exceptions.py
     └── services/                    # 공유 서비스 (도메인이 아닌 인프라)
-        ├── ai_processing.py         # Claude API 집중 관리
+        ├── ai_processing.py         # Gemini API 집중 관리
         ├── transcription.py         # Whisper + pyannote 화자 분리
         └── embedding.py             # OpenAI 임베딩 + 청킹
 ```
@@ -172,7 +172,7 @@ class Settings(BaseSettings):
     r2_public_url: str = ""
 
     # AI
-    anthropic_api_key: SecretStr
+    gemini_api_key: SecretStr
     openai_api_key: SecretStr
 
 
@@ -386,7 +386,7 @@ R2_BUCKET_NAME=kairos-uploads
 R2_PUBLIC_URL=
 
 # AI
-ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=...
 OPENAI_API_KEY=sk-...
 ```
 

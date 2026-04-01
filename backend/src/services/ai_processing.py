@@ -1,21 +1,21 @@
 # backend/src/services/ai_processing.py
-"""Claude AI 처리 서비스. 모든 Claude 호출을 여기서 집중 관리."""
-import anthropic
+"""Gemini AI 처리 서비스. 모든 LLM 호출을 여기서 집중 관리."""
+from google import genai
 
 from src.common.prompts import MEETING_SUMMARY_SYSTEM_PROMPT, parse_json_response
 from src.core.config import get_settings
 
-# Claude 모델 고정 — 임의 변경 금지
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+# Gemini 모델 고정
+GEMINI_MODEL = "gemini-2.5-flash"
 
 
 class AIProcessingService:
-    """Claude API를 통한 회의 요약 생성."""
+    """Gemini API를 통한 회의 요약 생성."""
 
     def __init__(self) -> None:
         settings = get_settings()
-        self.client = anthropic.AsyncAnthropic(
-            api_key=settings.anthropic_api_key.get_secret_value()
+        self.client = genai.Client(
+            api_key=settings.gemini_api_key.get_secret_value()
         )
 
     async def summarize(self, transcript: str) -> dict:
@@ -31,10 +31,8 @@ class AIProcessingService:
             "next_meeting_agenda": list[str],
         }
         """
-        response = await self.client.messages.create(
-            model=CLAUDE_MODEL,
-            max_tokens=4096,
-            system=MEETING_SUMMARY_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": transcript}],
+        response = await self.client.aio.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=f"{MEETING_SUMMARY_SYSTEM_PROMPT}\n\n{transcript}",
         )
-        return parse_json_response(response.content[0].text)
+        return parse_json_response(response.text)

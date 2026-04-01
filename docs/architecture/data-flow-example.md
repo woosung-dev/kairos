@@ -57,9 +57,9 @@
 
 ---
 
-### [2] AI 처리 (Claude API)
+### [2] AI 처리 (Gemini API)
 
-트랜스크립트를 Claude에 순차 전달. (`ai-pipeline.md` 참조)
+트랜스크립트를 Gemini에 순차 전달. (`ai-pipeline.md` 참조)
 
 **요약 결과:**
 ```json
@@ -186,6 +186,6 @@ INSERT INTO embedding_chunks (
 );
 ```
 
-이후 RAG 검색 시 하이브리드 검색 (Full-text + Vector + RRF) → Re-ranking → Claude 답변 생성.
+이후 RAG 검색 시 하이브리드 검색 (Full-text + Vector + RRF) → Re-ranking → Gemini 답변 생성.
 
 > 상세 설계: [RAG 파이프라인 설계](rag-pipeline.md) 참조

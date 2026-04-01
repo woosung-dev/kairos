@@ -82,7 +82,7 @@
 ```
 docs/
 ├── README.md          # 문서 목차 (진입점)
-├── requirements/      # PRD, 기능 명세, PARA 방법론, UI/UX 스펙
+├── requirements/      # PRD, 기능 명세, 세컨드 브레인(CODE), UI/UX 스펙
 ├── architecture/      # ERD, 파이프라인, 디렉토리맵, 데이터 흐름
 ├── guides/            # 로컬 셋업
 └── dev-log/           # ADR (Architecture Decision Records)
@@ -143,7 +143,7 @@ test: 테스트 추가/수정
 
 ### 프로젝트 개요
 - **이름:** Kairos (καιρός — 결정적 순간)
-- **한 줄 설명:** 회의 녹음 → AI 요약/액션/PARA 분류 → 벡터 임베딩 → RAG Q&A
+- **한 줄 설명:** 팀의 세컨드 브레인 — 회의/노트/자료 → AI Distillation → 프로젝트 구조화 → RAG 인사이트
 - **상세:** `docs/requirements/prd.md`
 
 ### 기술 스택
@@ -156,25 +156,26 @@ test: 테스트 추가/수정
 | Auth | Clerk (Google OAuth) | |
 | Storage | Cloudflare R2 | |
 | STT | Whisper API + pyannote-audio | |
-| AI | Claude `claude-sonnet-4-20250514` (고정) | `docs/architecture/ai-pipeline.md` |
+| AI | Gemini `gemini-2.5-flash` (고정) | `docs/architecture/ai-pipeline.md` |
 | Embedding | OpenAI text-embedding-3-small (1536d) | `docs/architecture/rag-pipeline.md` |
 | Deploy | Vercel (FE) + GCP Cloud Run (BE) | |
 
 ### 핵심 파이프라인
 
 ```
-회의 녹음 → STT (Whisper + pyannote 화자 분리)
-         → AI 구조화 (Claude: 요약 / 액션 아이템 / PARA 분류 추천)
-         → Inbox 적재 → PARA 분류 확정
-         → 벡터 임베딩 → RAG 검색 & Q&A
+[Capture] 회의 녹음 / 노트 / 자료 입력
+[Organize] → STT → AI 구조화 (요약 / 액션 / 프로젝트 연결 + 태그)
+[Distill]  → Inbox 적재 → AI 자동 확정 (또는 사용자 조정)
+           → AI 프로젝트 인사이트 (L1~L4)
+[Express]  → 벡터 임베딩 → RAG 검색 & Q&A + 프로액티브 인사이트
 ```
 
 ### 핵심 도메인
 
-1. **PARA 방법론** — Projects/Areas/Resources/Archives, 실행도 기반 분류, N:M 관계
-   → `docs/requirements/para-methodology.md`
-2. **Inbox 워크플로우** — AI 추천(`is_processed=false`) → 사용자 확정 → N:M PARA 연결
-3. **회의 처리 5-Stage** — Upload → STT → AI처리 → Inbox → 임베딩
+1. **팀 세컨드 브레인 (CODE)** — Capture→Organize→Distill→Express, AI 자동화
+   → `docs/requirements/second-brain.md`
+2. **Inbox 워크플로우** — AI 자동 프로젝트 연결 + 태그 → 사용자 선택적 조정
+3. **콘텐츠 파이프라인** — Upload → STT → AI처리 → Inbox → 임베딩
    → `docs/architecture/ai-pipeline.md`, `docs/architecture/cross-domain-pipeline.md`
 4. **RAG 6-Layer** — Cache → Query Processing → Hybrid Search → Re-ranking → Generation → Cache Store
    → `docs/architecture/rag-pipeline.md`
@@ -183,13 +184,13 @@ test: 테스트 추가/수정
 
 ### 핵심 엔티티
 
-Workspace, User, ParaItem, InboxItem, Meeting, MeetingSummary,
+Workspace, User, Project, InboxItem, Meeting, MeetingSummary,
 TranscriptSegment, ActionItem, Note, EmbeddingChunk(계층적), SemanticCache
 → `docs/architecture/erd.md`
 
 ### AI 제약사항
 
-- Claude 모델 고정: `claude-sonnet-4-20250514` (임의 변경 금지)
+- Gemini 모델 고정: `gemini-2.5-flash` (임의 변경 금지)
 - 프롬프트 중앙 관리: `backend/src/common/prompts.py` 상수 (인라인 금지)
 - 크로스 도메인: `pipeline_service.py` 오케스트레이터만 — 도메인 간 직접 import 금지
 - 장기 작업: BackgroundTasks + 202 Accepted + polling
@@ -198,7 +199,7 @@ TranscriptSegment, ActionItem, Note, EmbeddingChunk(계층적), SemanticCache
 
 | Phase | 상태 | 범위 |
 |-------|------|------|
-| Phase 1 (프론트엔드 스캐폴딩) | **진행 중** ~40% | 3-Panel, Inbox, PARA CRUD 완료. Clerk/업로드/칸반 미완 |
+| Phase 1 (프론트엔드 스캐폴딩) | **방향 전환 중** | 3-Panel, Inbox 완료. PARA→프로젝트 구조 전환 필요 (ADR-004) |
 | Phase 2 (백엔드 + AI 파이프라인) | 미착수 | `backend/` 디렉토리 미존재 |
 | Phase 3 (RAG + 고급 UI) | 설계 완료 | `docs/architecture/rag-pipeline.md` |
 | Phase 4 (권한 + 보고서) | 계획 | |
@@ -238,7 +239,7 @@ In QA mode, flag any code that doesn't match DESIGN.md.
 | `.ai/rules/global.md` | 문서화, Git Convention, 환경변수, 자기개선 루프 |
 | `.ai/rules/typescript.md` | TypeScript 공통 (Strict, 네이밍) |
 | `.ai/rules/frontend.md` | Next.js 16 + shadcn v4 + FSD + Zod v4 |
-| `.ai/rules/backend.md` | FastAPI + SQLModel + Claude API + R2 |
+| `.ai/rules/backend.md` | FastAPI + SQLModel + Gemini API + R2 |
 
 ## Skill routing
 

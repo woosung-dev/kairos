@@ -20,13 +20,13 @@
 
 - 모든 프롬프트는 `backend/src/common/prompts.py`에 **상수**로 정의
 - 인라인 프롬프트 작성 **절대 금지**
-- Claude 모델 고정: `claude-sonnet-4-20250514` (임의 변경 금지)
-- 모든 Claude 호출은 `services/ai_processing.py`에 집중 관리
+- Gemini 모델 고정: `gemini-2.5-flash` (임의 변경 금지)
+- 모든 Gemini 호출은 `services/ai_processing.py`에 집중 관리
 - LLM 구현체는 `BaseLLMService` 인터페이스로 추상화
 
 ---
 
-## Claude 프롬프트 템플릿
+## Gemini 프롬프트 템플릿
 
 ### Template 1: 회의 요약 생성
 
@@ -119,41 +119,43 @@ RAG_ANSWER_SYSTEM_PROMPT = """
 
 ## JSON 파싱 안전 유틸
 
-모든 Claude 응답은 이 유틸을 통해 파싱한다. 직접 `json.loads()` 호출 금지.
+모든 Gemini 응답은 이 유틸을 통해 파싱한다. 직접 `json.loads()` 호출 금지.
 
 ```python
 # backend/src/common/prompts.py 하단에 포함
 import json, re
 
 def parse_json_response(text: str) -> dict:
-    """Claude 응답에서 JSON을 안전하게 파싱한다."""
+    """Gemini 응답에서 JSON을 안전하게 파싱한다."""
     clean = re.sub(r"```json\s*|```\s*", "", text).strip()
     try:
         return json.loads(clean)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Claude 응답 JSON 파싱 실패: {e}\n원본:\n{text}") from e
+        raise ValueError(f"Gemini 응답 JSON 파싱 실패: {e}\n원본:\n{text}") from e
 ```
 
 ---
 
-## Claude API 호출 패턴
+## Gemini API 호출 패턴
 
 ```python
-import anthropic
+from google import genai
 from src.core.config import settings
 
-client = anthropic.AsyncAnthropic(
-    api_key=settings.anthropic_api_key.get_secret_value()
+client = genai.Client(
+    api_key=settings.gemini_api_key.get_secret_value()
 )
 
 # 사용 예시
-response = await client.messages.create(
-    model="claude-sonnet-4-20250514",
-    max_tokens=4096,
-    system=MEETING_SUMMARY_SYSTEM_PROMPT,
-    messages=[{"role": "user", "content": transcript_text}],
+response = await client.aio.models.generate_content(
+    model="gemini-2.5-flash",
+    contents=transcript_text,
+    config=genai.types.GenerateContentConfig(
+        system_instruction=MEETING_SUMMARY_SYSTEM_PROMPT,
+        max_output_tokens=4096,
+    ),
 )
-result = parse_json_response(response.content[0].text)
+result = parse_json_response(response.text)
 ```
 
 ---

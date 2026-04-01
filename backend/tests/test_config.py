@@ -13,7 +13,7 @@ def test_settings_loads_from_env(monkeypatch):
     monkeypatch.setenv("R2_ACCESS_KEY_ID", "test_key")
     monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "test_secret")
     monkeypatch.setenv("R2_BUCKET_NAME", "test-bucket")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-xxx")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-xxx")
     monkeypatch.setenv("APP_ENV", "test")
 
@@ -24,7 +24,7 @@ def test_settings_loads_from_env(monkeypatch):
     assert settings.r2_bucket_name == "test-bucket"
     # SecretStr 검증
     assert settings.clerk_secret_key.get_secret_value() == "sk_test_xxx"
-    assert settings.anthropic_api_key.get_secret_value() == "sk-ant-xxx"
+    assert settings.gemini_api_key.get_secret_value() == "test-gemini-key"
 
 
 def test_settings_secret_str_not_exposed(monkeypatch):
@@ -36,7 +36,7 @@ def test_settings_secret_str_not_exposed(monkeypatch):
     monkeypatch.setenv("R2_ACCESS_KEY_ID", "test")
     monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "test")
     monkeypatch.setenv("R2_BUCKET_NAME", "test")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-xxx")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-xxx")
 
     from src.core.config import Settings

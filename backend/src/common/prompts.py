@@ -19,7 +19,7 @@ MEETING_SUMMARY_SYSTEM_PROMPT = """당신은 회의 트랜스크립트를 구조
 
 
 def parse_json_response(text: str) -> dict:
-    """Claude 응답에서 JSON을 안전하게 파싱한다.
+    """AI 응답에서 JSON을 안전하게 파싱한다.
 
     코드펜스(```json ... ```) 제거 후 파싱.
     직접 json.loads() 호출 금지 — 반드시 이 유틸을 사용할 것.
@@ -28,4 +28,4 @@ def parse_json_response(text: str) -> dict:
     try:
         return json.loads(clean)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Claude 응답 JSON 파싱 실패: {e}\n원본:\n{text}") from e
+        raise ValueError(f"AI 응답 JSON 파싱 실패: {e}\n원본:\n{text}") from e

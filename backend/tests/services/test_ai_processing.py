@@ -1,5 +1,5 @@
 # backend/tests/services/test_ai_processing.py
-"""Claude AI 요약 서비스 테스트."""
+"""Gemini AI 요약 서비스 테스트."""
 import json
 
 import pytest
@@ -17,24 +17,21 @@ MOCK_SUMMARY_RESPONSE = json.dumps({
 
 def _mock_settings():
     settings = MagicMock()
-    settings.anthropic_api_key.get_secret_value.return_value = "sk-ant-test"
+    settings.gemini_api_key.get_secret_value.return_value = "test-gemini-key"
     return settings
 
 
 @pytest.mark.asyncio
 async def test_summarize_returns_structured_dict():
-    """Claude 응답을 구조화된 dict로 반환."""
-    mock_content = MagicMock()
-    mock_content.text = MOCK_SUMMARY_RESPONSE
-
+    """Gemini 응답을 구조화된 dict로 반환."""
     mock_response = MagicMock()
-    mock_response.content = [mock_content]
+    mock_response.text = MOCK_SUMMARY_RESPONSE
 
     with patch("src.services.ai_processing.get_settings", return_value=_mock_settings()):
-        with patch("src.services.ai_processing.anthropic") as mock_anthropic:
-            mock_client = AsyncMock()
-            mock_client.messages.create = AsyncMock(return_value=mock_response)
-            mock_anthropic.AsyncAnthropic.return_value = mock_client
+        with patch("src.services.ai_processing.genai") as mock_genai:
+            mock_client = MagicMock()
+            mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+            mock_genai.Client.return_value = mock_client
 
             from src.services.ai_processing import AIProcessingService
             service = AIProcessingService()
@@ -47,19 +44,16 @@ async def test_summarize_returns_structured_dict():
 
 @pytest.mark.asyncio
 async def test_summarize_with_code_fence():
-    """코드펜스 포함된 Claude 응답도 파싱."""
+    """코드펜스 포함된 Gemini 응답도 파싱."""
     fenced = f"```json\n{MOCK_SUMMARY_RESPONSE}\n```"
-    mock_content = MagicMock()
-    mock_content.text = fenced
-
     mock_response = MagicMock()
-    mock_response.content = [mock_content]
+    mock_response.text = fenced
 
     with patch("src.services.ai_processing.get_settings", return_value=_mock_settings()):
-        with patch("src.services.ai_processing.anthropic") as mock_anthropic:
-            mock_client = AsyncMock()
-            mock_client.messages.create = AsyncMock(return_value=mock_response)
-            mock_anthropic.AsyncAnthropic.return_value = mock_client
+        with patch("src.services.ai_processing.genai") as mock_genai:
+            mock_client = MagicMock()
+            mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+            mock_genai.Client.return_value = mock_client
 
             from src.services.ai_processing import AIProcessingService
             service = AIProcessingService()
@@ -70,23 +64,19 @@ async def test_summarize_with_code_fence():
 
 @pytest.mark.asyncio
 async def test_summarize_uses_correct_model():
-    """claude-sonnet-4-20250514 모델 고정 확인."""
-    mock_content = MagicMock()
-    mock_content.text = MOCK_SUMMARY_RESPONSE
-
+    """gemini-2.5-flash 모델 고정 확인."""
     mock_response = MagicMock()
-    mock_response.content = [mock_content]
+    mock_response.text = MOCK_SUMMARY_RESPONSE
 
     with patch("src.services.ai_processing.get_settings", return_value=_mock_settings()):
-        with patch("src.services.ai_processing.anthropic") as mock_anthropic:
-            mock_client = AsyncMock()
-            mock_client.messages.create = AsyncMock(return_value=mock_response)
-            mock_anthropic.AsyncAnthropic.return_value = mock_client
+        with patch("src.services.ai_processing.genai") as mock_genai:
+            mock_client = MagicMock()
+            mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+            mock_genai.Client.return_value = mock_client
 
             from src.services.ai_processing import AIProcessingService
             service = AIProcessingService()
             await service.summarize("테스트")
 
-            # create 호출 인자 확인
-            call_kwargs = mock_client.messages.create.call_args.kwargs
-            assert call_kwargs["model"] == "claude-sonnet-4-20250514"
+            call_kwargs = mock_client.aio.models.generate_content.call_args.kwargs
+            assert call_kwargs["model"] == "gemini-2.5-flash"

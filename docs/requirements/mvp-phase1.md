@@ -21,7 +21,7 @@
 
 ## Feature 2: AI 콘텐츠 처리 파이프라인 (Organize + Distill)
 
-- 트랜스크립트 → Claude API → 구조화 출력 → Inbox 자동 적재
+- 트랜스크립트 → Gemini API → 구조화 출력 → Inbox 자동 적재
 - AI 추출: 회의 요약 (3~5줄), 액션 아이템, 핵심 결정사항, 프로젝트 연결 + 태그 추천
 - AI Distillation L1~L2 자동 수행
 
@@ -57,7 +57,7 @@
 
 ## Feature 6: RAG 기반 지식 검색 (Express)
 
-- 프로젝트 범위 자연어 질문 → 하이브리드 검색 → Claude 답변
+- 프로젝트 범위 자연어 질문 → 하이브리드 검색 → Gemini 답변
 - Archive 과거 데이터 포함 검색
 - 소스 신선도 표시 (🟢최근/🟡보통/🔴오래됨)
 - UI: RAG가 홈 + 상시 패널 + Cmd+K

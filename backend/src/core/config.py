@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     r2_bucket_name: str
 
     # AI
-    anthropic_api_key: SecretStr
+    gemini_api_key: SecretStr
     openai_api_key: SecretStr
 
     model_config = {

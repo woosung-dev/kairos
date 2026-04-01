@@ -11,17 +11,17 @@ Kairos의 RAG(Retrieval-Augmented Generation)는 쌓인 회의록·노트·액�
 ### 현재 구현 (Phase 2 기본)
 
 ```
-질문 → pgvector cosine similarity Top-K → Claude 답변
+질문 → pgvector cosine similarity Top-K → Gemini 답변
 ```
 
 - 512 토큰 flat 청킹, 50 토큰 오버랩
 - OpenAI `text-embedding-3-small` (1536차원)
-- 단순 유사도 검색 → Claude 답변
+- 단순 유사도 검색 → Gemini 답변
 
 ### 목표 구현 (Phase 3 고도화)
 
 ```
-질문 → Semantic Cache → Query Processing → Hybrid Search → Re-ranking → Claude 스트리밍 답변 → Cache Store
+질문 → Semantic Cache → Query Processing → Hybrid Search → Re-ranking → Gemini 스트리밍 답변 → Cache Store
 ```
 
 - 하이브리드 검색 (Full-text + Vector + RRF)
@@ -49,7 +49,7 @@ Query Processing (범위 필터 결정, 질문 정규화)
                            ↓
               시스템 프롬프트 + 검색 결과 + 질문
                            ↓
-              Claude → 스트리밍 답변 + 출처 표기
+              Gemini → 스트리밍 답변 + 출처 표기
 ```
 
 ### 3가지 조정 축
@@ -105,7 +105,7 @@ Query Processing (범위 필터 결정, 질문 정규화)
 │  + Re-ranked 검색 결과 Top-10                            │
 │  + 출처 메타데이터 (회의명, 날짜, 발언자)                    │
 │  + 사용자 질문                                            │
-│  → Claude (claude-sonnet-4) → 스트리밍 답변 + 출처 표기   │
+│  → Gemini (gemini-2.5-flash) → 스트리밍 답변 + 출처 표기  │
 └─────────────────────┬───────────────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -465,7 +465,7 @@ async def check_semantic_cache(
     ↓
 [Re-ranking]
     ↓
-[Claude 답변 생성]
+[Gemini 답변 생성]
     ↓
 [캐시 저장]  ← 가장 뒷단
     ↓
@@ -552,7 +552,7 @@ async def rerank_results(
 
 ```
 원본 질문: "보안 관련 결정사항이 뭐였지?"
-    ↓ Claude 전처리
+    ↓ Gemini 전처리
 확장된 쿼리:
   - "보안 검토 및 개선 방안에 대한 회의 결정사항"
   - "데이터 유출 사고 대응 및 AWS 전환 관련 논의"
@@ -562,7 +562,7 @@ async def rerank_results(
 ```
 
 **장점:** 사용자의 짧고 모호한 질문을 확장하여 재현율(recall) 대폭 상승
-**비용:** Claude 호출 1회 추가 (~$0.001/쿼리)
+**비용:** Gemini 호출 1회 추가 (~$0.001/쿼리)
 **적용 시점:** Phase 4
 
 ### 방향 2: Agentic RAG (다단계 검색-추론-검증) — ★★★☆☆
@@ -674,12 +674,12 @@ CREATE INDEX idx_chunks_trgm ON embedding_chunks
 - 계층적 청킹 (화자 구간 → 문단 + 부모 참조)
 - 프로젝트 범위 + 시간 범위 + 소스 타입 필터
 - Semantic Cache (유사 질문 즉시 반환)
-- Claude 스트리밍 답변 (StreamingResponse)
+- Gemini 스트리밍 답변 (StreamingResponse)
 - RAG 채팅 패널 UI (우측 슬라이드, 범위 선택)
 
 ### Phase 4 (심화)
 - Re-ranking (Cohere Rerank API)
-- Query Expansion (Claude 전처리)
+- Query Expansion (Gemini 전처리)
 - Cross-Project RAG (워크스페이스 전체 검색)
 - Agentic RAG (복합 질문 → 다단계 검색, "심층 분석" 모드)
 
@@ -698,6 +698,6 @@ Kairos RAG 설계는 truewords-platform의 아키텍처를 참조하되, **프�
 | 멀티테넌시 | 없음 (단일 챗봇) | 워크스페이스 격리 (필수) |
 | 검색 범위 | payload 필터 (A\|B\|C 챗봇 버전) | 프로젝트 범위 + 시간 + 소스 타입 |
 | 캐시 | Qdrant semantic_cache 컬렉션 | PostgreSQL semantic_caches 테이블 |
-| 생성 모델 | Gemini 2.5 | Claude claude-sonnet-4 |
+| 생성 모델 | Gemini 2.5 | Gemini gemini-2.5-flash |
 
 **핵심 차이:** Kairos는 워크스페이스 단위 소규모 데이터이므로 별도 벡터 DB 불필요. PostgreSQL 하나로 운영 데이터 + 벡터 검색 + Full-text 검색 + 캐시를 모두 처리한다.

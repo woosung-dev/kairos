@@ -83,7 +83,7 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
   → (오디오) Whisper STT + pyannote 화자 분리
 
 [Organize] AI 자동 구조화
-  → Claude API: 요약 + 액션 아이템 + 프로젝트 연결 + 태그 자동 부여
+  → Gemini API: 요약 + 액션 아이템 + 프로젝트 연결 + 태그 자동 부여
   → Inbox 적재 (AI 자동 연결, 사용자 선택적 조정)
 
 [Distill] AI 핵심 추출
@@ -97,7 +97,7 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
   → Cmd+K 통합 검색
 ```
 
-**Tech Stack:** Next.js 16 + FastAPI + PostgreSQL + Cloudflare R2 + Claude API + Whisper
+**Tech Stack:** Next.js 16 + FastAPI + PostgreSQL + Cloudflare R2 + Gemini API + Whisper
 
 ---
 
@@ -157,7 +157,7 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 - [ ] `POST /meetings` (202 Accepted + BackgroundTasks)
 - [ ] `GET /meetings/{id}/status` (polling)
 - [ ] Whisper API + pyannote-audio 화자 분리
-- [ ] Claude 요약 파이프라인 (1개 프롬프트: MEETING_SUMMARY)
+- [ ] Gemini 요약 파이프라인 (1개 프롬프트: MEETING_SUMMARY)
 
 #### 프론트엔드 (Phase 1 잔여 + API 연결)
 - [ ] Clerk 인증 연동 (proxy.ts + sign-in/up)
@@ -174,7 +174,7 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 **목표:** 업로드 → 요약 → 액션 추출 → Inbox → 프로젝트 연결 완전 체인.
 
 #### 백엔드
-- [ ] Claude 액션 아이템 추출 + 프로젝트 연결/태그 추천 파이프라인
+- [ ] Gemini 액션 아이템 추출 + 프로젝트 연결/태그 추천 파이프라인
 - [ ] Inbox CRUD API (`GET /inbox`, `POST /inbox/{id}/classify`, `POST /inbox/{id}/dismiss`)
 - [ ] Project CRUD API (`GET/POST/PATCH/DELETE /projects`, `POST /projects/{id}/archive`)
 - [ ] ActionItem CRUD API (`GET/POST/PATCH /action-items`)
