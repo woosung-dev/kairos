@@ -128,7 +128,7 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 - [x] Next.js 16 프로젝트 초기화
 - [x] 3-Panel 레이아웃 (사이드바 / 메인 / RAG 패널)
 - [x] Inbox 뷰 UI (mock data)
-- [x] PARA 아이템 CRUD (mock data)
+- [x] ~~PARA 아이템 CRUD~~ (mock data) — ADR-004: 프로젝트 구조로 전환 필요
 
 #### 남은 작업 (Sprint 1에서 Phase 2와 병합)
 
@@ -138,7 +138,7 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 | 회의 업로드 페이지 (드롭존 + 녹음 UI) | P0 | 2h | Clerk | Sprint 1 |
 | 회의 상세 페이지 (트랜스크립트 뷰어) | P1 | 2h | 업로드 | Sprint 2 |
 | 액션 아이템 칸반 보드 | P1 | 2h | 없음 | Sprint 2 |
-| PARA 분류 확정 워크플로우 | P1 | 1h | Inbox UI | Sprint 2 |
+| 프로젝트 연결 워크플로우 (PARA 대체) | P1 | 1h | Inbox UI | Sprint 2 |
 
 > Phase 1 남은 작업은 Phase 2와 동시 진행 (Vertical Slice 전략).
 > FE는 worktree에서 병렬로, BE 스캐폴딩과 동시에 진행한다.
@@ -169,26 +169,26 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 
 ---
 
-### Sprint 2 (Week 3-4): "Inbox + PARA + 액션" 확장
+### Sprint 2 (Week 3-4): "Inbox + 프로젝트 연결 + 액션" 확장
 
-**목표:** 업로드 → 요약 → 액션 추출 → Inbox → PARA 분류 완전 체인.
+**목표:** 업로드 → 요약 → 액션 추출 → Inbox → 프로젝트 연결 완전 체인.
 
 #### 백엔드
-- [ ] Claude 액션 아이템 추출 + PARA 분류 추천 파이프라인
+- [ ] Claude 액션 아이템 추출 + 프로젝트 연결/태그 추천 파이프라인
 - [ ] Inbox CRUD API (`GET /inbox`, `POST /inbox/{id}/classify`, `POST /inbox/{id}/dismiss`)
-- [ ] PARA CRUD API (`GET/POST/PATCH/DELETE /para-items`, `POST /para-items/{id}/archive`)
+- [ ] Project CRUD API (`GET/POST/PATCH/DELETE /projects`, `POST /projects/{id}/archive`)
 - [ ] ActionItem CRUD API (`GET/POST/PATCH /action-items`)
 - [ ] 오케스트레이터 통합 (MeetingPipelineService)
-- [ ] Inbox 자동 적재 (is_processed=false)
+- [ ] Inbox 자동 적재 (AI confidence ≥ 0.8 자동 확정)
 
 #### 프론트엔드
-- [ ] Mock → Real API 전환 (Inbox, PARA, ActionItem)
+- [ ] Mock → Real API 전환 (Inbox, Project, ActionItem)
 - [ ] React Query 뮤테이션 연동
 - [ ] 액션 아이템 칸반 보드
-- [ ] PARA 분류 확정 워크플로우 (AI 뱃지 → 클릭 확정)
+- [ ] 프로젝트 연결 워크플로우 (AI 추천 → 자동/수동 확정)
 - [ ] 업로드 진행률 UI
 
-**완료 기준:** 업로드 → 요약 → 액션 → Inbox → 분류 확정까지 전체 흐름 동작
+**완료 기준:** 업로드 → 요약 → 액션 → Inbox → 프로젝트 연결까지 전체 흐름 동작
 **Phase 1 남은 작업 완료 시점:** 이 Sprint 종료 시 Phase 1 + Phase 2 핵심 모두 완료
 
 ---
@@ -207,7 +207,7 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 - [ ] Note CRUD API
 
 #### 프론트엔드
-- [ ] RAG 채팅 패널 (PARA 범위 지정, 시간/소스 필터)
+- [ ] RAG 채팅 패널 (프로젝트 범위 지정, 시간/소스 필터) + Cmd+K
 - [ ] Tiptap 블록 에디터 (StarterKit + Placeholder + CharacterCount)
 - [ ] debounce 자동 저장 (500ms)
 - [ ] 노트 → 임베딩 자동 등록

@@ -35,8 +35,8 @@ frontend/
     │   │   ├── hooks.ts
     │   │   ├── schemas.ts
     │   │   └── types.ts
-    │   ├── para/
-    │   │   ├── components/            # para-item-list, para-detail, create-para-dialog
+    │   ├── projects/
+    │   │   ├── components/            # project-list, project-detail, create-project-dialog
     │   │   ├── api.ts
     │   │   ├── hooks.ts
     │   │   ├── schemas.ts

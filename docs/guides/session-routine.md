@@ -65,7 +65,7 @@
 | RAG 기능 구현      | `docs/architecture/rag-pipeline.md`          |
 | 크로스 도메인 연동 | `docs/architecture/cross-domain-pipeline.md` |
 | UI/UX 구현         | `docs/requirements/` 내 해당 스펙            |
-| PARA 관련          | `docs/requirements/para-methodology.md`      |
+| 프로젝트/지식 구조  | `docs/requirements/second-brain.md`          |
 
 **핵심 원리:** CLAUDE.md의 "Plan Before Code" 규칙과 연결된다. AI가 코드 작성 전에 설계 문서를 참조하게 강제하는 것.
 
