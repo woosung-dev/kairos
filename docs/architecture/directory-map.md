@@ -75,7 +75,7 @@ backend/
 └── src/
     ├── auth/                          # Clerk JWT 검증
     ├── inbox/                         # Inbox 적재 + 분류
-    ├── para/                          # PARA CRUD + N:M 링크
+    ├── projects/                      # 프로젝트 CRUD + N:M 링크 + 태그
     ├── meetings/                      # 회의 인제스트, STT, AI 파이프라인
     ├── actions/                       # 액션 아이템
     ├── notes/                         # Tiptap 노트

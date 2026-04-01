@@ -28,7 +28,7 @@ Kairos의 RAG(Retrieval-Augmented Generation)는 쌓인 회의록·노트·액�
 - 계층적 청킹 (회의→화자 구간→문단 + 부모 참조)
 - Semantic Cache (유사 질문 즉시 반환)
 - Re-ranking (Cross-encoder 정밀 선별)
-- 범위 기반 검색 (워크스페이스/프로젝트/시간/소스 타입)
+- 범위 기반 검색 (워크스페이스/프로젝트 단위/시간/소스 타입)
 
 ---
 
@@ -56,7 +56,7 @@ Query Processing (범위 필터 결정, 질문 정규화)
 
 1. **시스템 프롬프트** (가장 강력) — 답변 스타일, 출처 표기 규칙, 방어 지침
 2. **참조 문서** (RAG) — 하이브리드 검색으로 관련 청크 주입
-3. **검색 범위** (Scope) — PARA/시간/소스 타입 필터로 정밀 제어
+3. **검색 범위** (Scope) — 프로젝트/시간/소스 타입 필터로 정밀 제어
 
 ---
 
@@ -65,7 +65,7 @@ Query Processing (범위 필터 결정, 질문 정규화)
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    사용자 인터페이스                        │
-│  [PARA 범위 선택] [질문 입력] [시간 필터] [소스 필터]       │
+│  [프로젝트 범위 선택] [질문 입력] [시간 필터] [소스 필터]     │
 └─────────────────────┬───────────────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -78,7 +78,7 @@ Query Processing (범위 필터 결정, 질문 정규화)
 ┌─────────────────────────────────────────────────────────┐
 │              Layer 2: Query Processing                   │
 │  1. 워크스페이스 격리 (필수, workspace_id)                  │
-│  2. PARA 범위 필터 결정 (para_item_id)                    │
+│  2. 프로젝트 범위 필터 결정 (project_id)                    │
 │  3. 시간 범위 필터 (선택적, "최근 3개월")                   │
 │  4. 소스 타입 필터 ("회의만" | "노트만" | "전체")           │
 └─────────────────────┬───────────────────────────────────┘
@@ -208,7 +208,7 @@ def reciprocal_rank_fusion(
 
 ```
 워크스페이스
-  └── 회의 (Meeting) — 메타: 제목, 일시, 참석자, PARA 연결
+  └── 회의 (Meeting) — 메타: 제목, 일시, 참석자, 프로젝트 연결
       └── 화자 구간 (Speaker Turn) — 메타: 화자명, 시작/종료 시간
           └── 문단 (Paragraph) — 검색 단위, ~300-500자
               └── 부모 참조 (parent_chunk_id → 화자 구간)
@@ -270,7 +270,7 @@ def chunk_transcript(
 ### 노트 데이터 청킹
 
 ```
-노트 (Note) — 메타: 제목, 작성자, PARA 연결
+노트 (Note) — 메타: 제목, 작성자, 프로젝트 연결
   └── 섹션 (Heading 단위) — Level 1 (부모)
       └── 본문 단락 — Level 2 (검색 단위)
 ```
@@ -281,12 +281,12 @@ def chunk_transcript(
 async def search_with_context(
     query: str,
     workspace_id: str,
-    para_item_id: str | None = None,
+    project_id: str | None = None,
 ) -> list[SearchResult]:
     """Level 2 청크에서 검색 후, 부모 청크 맥락을 자동 추가한다."""
     results = await hybrid_search(
         query, workspace_id,
-        para_item_id=para_item_id,
+        project_id=project_id,
         chunk_level=2,
     )
 
@@ -309,7 +309,7 @@ async def search_with_context(
 ```
 [필수] 워크스페이스 격리 (workspace_id) — 멀티테넌시
   ↓
-[선택] PARA 범위 (para_item_id) — "이 프로젝트 범위에서 검색"
+[선택] 프로젝트 범위 (project_id) — "이 프로젝트 범위에서 검색"
   ↓
 [선택] 시간 범위 (created_at) — "최근 3개월"
   ↓
@@ -323,7 +323,7 @@ SELECT id, chunk_text,
        1 - (embedding <=> $query_vector) AS score
 FROM embedding_chunks
 WHERE workspace_id = $1                            -- 필수: 워크스페이스 격리
-  AND ($2::uuid IS NULL OR para_item_id = $2)      -- 선택: PARA 범위
+  AND ($2::uuid IS NULL OR project_id = $2)      -- 선택: 프로젝트 범위
   AND ($3::timestamp IS NULL OR created_at >= $3)   -- 선택: 시간 범위
   AND ($4::text IS NULL OR source_type = $4)        -- 선택: 소스 타입
   AND chunk_level = 2                               -- 검색 대상은 Level 2만
@@ -392,7 +392,7 @@ semantic_caches 테이블에서 유사 질문 검색
 CREATE TABLE semantic_caches (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id UUID NOT NULL REFERENCES workspaces(id),
-    para_item_id UUID REFERENCES para_items(id),  -- 범위별 캐시
+    project_id UUID REFERENCES projects(id),  -- 범위별 캐시
     question TEXT NOT NULL,
     question_embedding vector(1536) NOT NULL,
     answer TEXT NOT NULL,
@@ -413,7 +413,7 @@ CREATE INDEX idx_cache_workspace ON semantic_caches(workspace_id);
 async def check_semantic_cache(
     question_embedding: list[float],
     workspace_id: str,
-    para_item_id: str | None = None,
+    project_id: str | None = None,
     threshold: float = 0.93,
 ) -> CacheResult | None:
     """의미적으로 유사한 질문의 캐시를 검색한다."""
@@ -422,14 +422,14 @@ async def check_semantic_cache(
            1 - (question_embedding <=> $1) AS similarity
     FROM semantic_caches
     WHERE workspace_id = $2
-      AND ($3::uuid IS NULL OR para_item_id = $3)
+      AND ($3::uuid IS NULL OR project_id = $3)
       AND expires_at > now()
       AND 1 - (question_embedding <=> $1) >= $4
     ORDER BY question_embedding <=> $1
     LIMIT 1
     """
     result = await db.fetch_one(
-        query, [question_embedding, workspace_id, para_item_id, threshold]
+        query, [question_embedding, workspace_id, project_id, threshold]
     )
 
     if result:
@@ -446,8 +446,8 @@ async def check_semantic_cache(
 
 | 이벤트 | 동작 |
 |--------|------|
-| 새 회의 추가 (해당 프로젝트) | 해당 `para_item_id`의 캐시 삭제 |
-| 노트 수정 (해당 프로젝트) | 해당 `para_item_id`의 캐시 삭제 |
+| 새 회의 추가 (해당 프로젝트) | 해당 `project_id`의 캐시 삭제 |
+| 노트 수정 (해당 프로젝트) | 해당 `project_id`의 캐시 삭제 |
 | 7일 경과 | TTL 자동 만료 |
 | 임베딩 재생성 | 워크스페이스 전체 캐시 삭제 |
 
@@ -584,11 +584,11 @@ Agent Step 4: 추론 결과 검증할 추가 회의록 검색
 
 ### 방향 3: Cross-Project RAG — ★★★☆☆
 
-Phase 3까지는 PARA 범위(프로젝트/영역) 단위 검색. Phase 4에서 워크스페이스 전체 검색 지원.
+Phase 3까지는 프로젝트 범위(프로젝트/영역) 단위 검색. Phase 4에서 워크스페이스 전체 검색 지원.
 
 ```
 UI 옵션: [전체 워크스페이스 검색 ▾]
-  → workspace_id만으로 필터 (para_item_id 필터 해제)
+  → workspace_id만으로 필터 (project_id 필터 해제)
   → 모든 프로젝트/영역/리소스/아카이브에서 검색
 ```
 
@@ -616,7 +616,7 @@ CREATE TABLE embedding_chunks (
 CREATE TABLE embedding_chunks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id UUID NOT NULL REFERENCES workspaces(id),
-    para_item_id UUID REFERENCES para_items(id),
+    project_id UUID REFERENCES projects(id),
     source_id UUID NOT NULL,
     source_type VARCHAR NOT NULL,           -- meeting | note | action
     embedding vector(1536) NOT NULL,
@@ -630,7 +630,7 @@ CREATE TABLE embedding_chunks (
 
 -- 인덱스
 CREATE INDEX idx_chunks_workspace ON embedding_chunks(workspace_id);
-CREATE INDEX idx_chunks_para ON embedding_chunks(para_item_id);
+CREATE INDEX idx_chunks_para ON embedding_chunks(project_id);
 CREATE INDEX idx_chunks_source ON embedding_chunks(source_type, source_id);
 CREATE INDEX idx_chunks_parent ON embedding_chunks(parent_chunk_id);
 CREATE INDEX idx_chunks_level ON embedding_chunks(chunk_level);
@@ -645,7 +645,7 @@ CREATE INDEX idx_chunks_trgm ON embedding_chunks
 | 컬럼 | 용도 |
 |------|------|
 | `workspace_id` | 멀티테넌시 격리 (필수 필터) |
-| `para_item_id` | PARA 범위 검색 (프로젝트/영역 단위) |
+| `project_id` | 프로젝트 범위 검색 (프로젝트/영역 단위) |
 | `chunk_level` | 계층적 청킹 레벨 (검색 시 level=2만 대상) |
 | `parent_chunk_id` | 부모 청크 참조 (맥락 확장용) |
 | `metadata` | 화자명, 시간, 토픽 등 동적 메타데이터 |
@@ -672,7 +672,7 @@ CREATE INDEX idx_chunks_trgm ON embedding_chunks
 ### Phase 3 (고도화) — 핵심 목표
 - 하이브리드 검색 (pg_trgm + pgvector + RRF)
 - 계층적 청킹 (화자 구간 → 문단 + 부모 참조)
-- PARA 범위 + 시간 범위 + 소스 타입 필터
+- 프로젝트 범위 + 시간 범위 + 소스 타입 필터
 - Semantic Cache (유사 질문 즉시 반환)
 - Claude 스트리밍 답변 (StreamingResponse)
 - RAG 채팅 패널 UI (우측 슬라이드, 범위 선택)
@@ -696,7 +696,7 @@ Kairos RAG 설계는 truewords-platform의 아키텍처를 참조하되, **프�
 | 데이터 규모 | ~60만 청크 (615권) | ~1만-2만 청크/워크스페이스 |
 | 청킹 단위 | 권→장→문단 | 회의→화자 구간→문단 |
 | 멀티테넌시 | 없음 (단일 챗봇) | 워크스페이스 격리 (필수) |
-| 검색 범위 | payload 필터 (A\|B\|C 챗봇 버전) | PARA 범위 + 시간 + 소스 타입 |
+| 검색 범위 | payload 필터 (A\|B\|C 챗봇 버전) | 프로젝트 범위 + 시간 + 소스 타입 |
 | 캐시 | Qdrant semantic_cache 컬렉션 | PostgreSQL semantic_caches 테이블 |
 | 생성 모델 | Gemini 2.5 | Claude claude-sonnet-4 |
 

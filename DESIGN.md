@@ -1,7 +1,7 @@
 # Design System — Kairos
 
 ## Product Context
-- **What this is:** PARA 기반 지식 관리 + RAG 인사이트 플랫폼. 프로젝트 진행 중 쌓이는 회의, 아이디어, 자료를 구조화하고, AI로 인사이트를 추출.
+- **What this is:** 팀의 세컨드 브레인 — 프로젝트 진행 중 쌓이는 회의, 아이디어, 자료를 AI가 자동 구조화하고 인사이트를 추출하는 복리 지식 플랫폼.
 - **Who it's for:** 매주 3~5회 회의하는 팀 리더/PM, 여러 프로젝트를 관리하는 중간관리자/CEO
 - **Space/industry:** 지식 관리 + AI 검색 (NotebookLM, Notion, Linear 교차점)
 - **Project type:** SaaS 웹 앱 (다크모드 우선, 데이터 밀도 높음)
@@ -61,7 +61,7 @@
 - **Accent Hover:** #35B39C
 - **Accent Subtle:** rgba(62,207,180,0.1)
 
-### PARA Category Colors
+### Project Category Colors
 - **Project:** #3ECFB4 (청록) — 실행 중, 마감이 있는 업무
 - **Area:** #F0963C (주황) — 지속 관리 영역
 - **Resource:** #A78BFA (보라) — 참고 자료
@@ -86,7 +86,7 @@
 ## Layout
 - **Approach:** Grid-disciplined (3-Panel)
 - **구조:**
-  - 좌측 사이드바: 고정 220px (PARA 네비게이션)
+  - 좌측 사이드바: 고정 220px (프로젝트 네비게이션)
   - 중앙 콘텐츠: flex-1 (메인 작업 영역)
   - 우측 RAG 패널: 320px (지식 검색, 상시 노출 옵션)
 - **Max content width:** 제한 없음 (패널 기반)

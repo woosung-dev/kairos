@@ -73,9 +73,9 @@ backend/
     ├── inbox/                       # Sprint 2
     │   ├── router.py, service.py, repository.py
     │   ├── models.py, schemas.py, dependencies.py, exceptions.py
-    ├── para/                        # Sprint 2
+    ├── projects/                    # Sprint 2
     │   ├── router.py, service.py, repository.py
-    │   ├── models.py               # ParaItem, MeetingParaLink (N:M)
+    │   ├── models.py               # Project, MeetingProjectLink (N:M)
     │   ├── schemas.py, dependencies.py, exceptions.py
     ├── actions/                     # Sprint 2
     │   ├── router.py, service.py, repository.py
@@ -132,7 +132,7 @@ dependencies.py 에서 Depends()로 조립
 | Sprint | 생성 모듈 | 비고 |
 |--------|-----------|------|
 | Sprint 1 | `core/` → `common/` → `auth/` → `workspaces/` → `meetings/` → `services/` | 기본 인프라 + 핵심 도메인 |
-| Sprint 2 | `inbox/` → `para/` → `actions/` + `meetings/pipeline_service.py` 완성 | AI 처리 파이프라인 + PARA 워크플로우 |
+| Sprint 2 | `inbox/` → `projects/` → `actions/` + `meetings/pipeline_service.py` 완성 | AI 처리 파이프라인 + 프로젝트 연결 워크플로우 |
 | Sprint 3 | `notes/` → `rag/` | 임베딩 + RAG 검색 |
 | Sprint 4 | `auth/`에 RBAC 추가 | 역할 기반 접근 제어 |
 

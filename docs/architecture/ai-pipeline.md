@@ -6,13 +6,13 @@
 트랜스크립트 입력
   → [1] MEETING_SUMMARY_SYSTEM_PROMPT   → summary, key_decisions, topics, participants
   → [2] ACTION_ITEM_SYSTEM_PROMPT       → action_items[] (담당자/기한/우선순위)
-  → [3] PARA_CLASSIFY_SYSTEM_PROMPT     → suggested_type, confidence
-  → [4] Inbox 적재 (ai_suggested_para_type 포함, is_processed=false)
+  → [3] PROJECT_CLASSIFY_SYSTEM_PROMPT  → suggested_project_id, tags, confidence
+  → [4] Inbox 적재 (ai_suggested_project_id + ai_suggested_tags 포함, is_processed=false)
   → [5] 벡터 임베딩 저장 (계층적 청킹, rag-pipeline.md 참조)
 ```
 
-**호출 순서가 중요하다:** 요약 → 액션 추출 → PARA 분류 순서로 호출.
-PARA 분류는 요약 결과를 입력으로 사용하기 때문.
+**호출 순서가 중요하다:** 요약 → 액션 추출 → 프로젝트 연결 추천 순서로 호출.
+프로젝트 연결 추천은 요약 결과를 입력으로 사용하기 때문.
 
 ---
 
@@ -70,26 +70,30 @@ ACTION_ITEM_SYSTEM_PROMPT = """
 """
 ```
 
-### Template 3: PARA 자동 분류 추천
+### Template 3: 프로젝트 연결 + 태그 자동 부여
 
 ```python
-PARA_CLASSIFY_SYSTEM_PROMPT = """
-당신은 PARA 방법론 전문가입니다. 회의 요약을 보고 PARA 분류를 추천하세요.
+PROJECT_CLASSIFY_SYSTEM_PROMPT = """
+당신은 세컨드 브레인(CODE 프레임워크) 전문가입니다.
+회의 요약을 보고 연결할 프로젝트와 태그를 추천하세요.
 
-PARA 분류 기준 (실행도 기반):
-- project:  명확한 마감일 + 구체적 결과물이 있는 업무
-- area:     지속적으로 책임져야 하는 영역 (마감 없음, 기준 유지)
-- resource: 참고 자료, 관심사, 나중에 활용할 지식
-- archive:  완료되었거나 중단된 항목
+기존 프로젝트 목록:
+{existing_projects}
+
+규칙:
+1. 기존 프로젝트 중 가장 관련 있는 것을 추천 (없으면 새 프로젝트 생성 추천)
+2. 회의 내용에서 핵심 태그를 자동 추출
+3. 프로젝트 상태: active(진행 중) / completed(완료) / archived(보관)
 
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요.
 
 출력 JSON 스키마:
 {
-  "suggested_type": "project | area | resource | archive",
-  "suggested_name": "string (분류될 PARA 아이템 이름)",
+  "suggested_project_id": "string | null (기존 프로젝트 ID, 없으면 null)",
+  "suggested_project_title": "string (연결할 프로젝트 이름)",
+  "suggested_tags": ["string"],
   "confidence": "number (0.0 ~ 1.0)",
-  "reason": "string (분류 이유 한 줄, 한국어)"
+  "reason": "string (추천 이유 한 줄, 한국어)"
 }
 """
 ```
@@ -160,7 +164,7 @@ result = parse_json_response(response.content[0].text)
 |------|-------------|-----------|
 | 요약 | `meeting_summaries` | summary, key_decisions, topics |
 | 액션 | `action_items` | title, assignee_id, priority, status |
-| PARA 추천 | `inbox_items` | ai_suggested_para_type, ai_confidence |
+| 프로젝트 연결 추천 | `inbox_items` | ai_suggested_project_id, ai_suggested_tags, ai_confidence |
 | 임베딩 | `embedding_chunks` | chunk_text, embedding(vector 1536), chunk_level, parent_chunk_id |
 | 캐시 | `semantic_caches` | question, question_embedding, answer, sources |
 

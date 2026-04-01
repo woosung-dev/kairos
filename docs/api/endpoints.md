@@ -88,23 +88,23 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 | 8 | 1 | `POST` | `/api/v1/upload/presigned-url` | R2 프리사인드 URL 발급 |
 | 9 | 1 | `POST` | `/api/v1/workspaces/{wid}/meetings` | 회의 생성 + 파이프라인 트리거 |
 | 10 | 1 | `GET` | `/api/v1/workspaces/{wid}/meetings` | 회의 목록 |
-| 11 | 1 | `GET` | `/api/v1/workspaces/{wid}/meetings/{id}` | 회의 상세 (요약+트랜스크립트+PARA) |
+| 11 | 1 | `GET` | `/api/v1/workspaces/{wid}/meetings/{id}` | 회의 상세 (요약+트랜스크립트+프로젝트) |
 | 12 | 1 | `GET` | `/api/v1/workspaces/{wid}/meetings/{id}/status` | 처리 상태 폴링 |
 | 13 | 2 | `GET` | `/api/v1/workspaces/{wid}/inbox` | Inbox 목록 |
-| 14 | 2 | `POST` | `/api/v1/workspaces/{wid}/inbox/{id}/classify` | PARA 분류 확정 (N:M) |
+| 14 | 2 | `POST` | `/api/v1/workspaces/{wid}/inbox/{id}/classify` | 프로젝트 연결 확정 (N:M) |
 | 15 | 2 | `POST` | `/api/v1/workspaces/{wid}/inbox/{id}/dismiss` | Inbox 무시 |
-| 16 | 2 | `GET` | `/api/v1/workspaces/{wid}/para-items` | PARA 목록 (카테고리 필터) |
-| 17 | 2 | `GET` | `/api/v1/workspaces/{wid}/para-items/{id}` | PARA 상세 |
-| 18 | 2 | `POST` | `/api/v1/workspaces/{wid}/para-items` | PARA 생성 |
-| 19 | 2 | `PATCH` | `/api/v1/workspaces/{wid}/para-items/{id}` | PARA 수정 |
-| 20 | 2 | `DELETE` | `/api/v1/workspaces/{wid}/para-items/{id}` | PARA 삭제 |
-| 21 | 2 | `POST` | `/api/v1/workspaces/{wid}/para-items/{id}/archive` | Archive 전환 |
+| 16 | 2 | `GET` | `/api/v1/workspaces/{wid}/projects` | 프로젝트 목록 (카테고리 필터) |
+| 17 | 2 | `GET` | `/api/v1/workspaces/{wid}/projects/{id}` | 프로젝트 상세 |
+| 18 | 2 | `POST` | `/api/v1/workspaces/{wid}/projects` | 프로젝트 생성 |
+| 19 | 2 | `PATCH` | `/api/v1/workspaces/{wid}/projects/{id}` | 프로젝트 수정 |
+| 20 | 2 | `DELETE` | `/api/v1/workspaces/{wid}/projects/{id}` | 프로젝트 삭제 |
+| 21 | 2 | `POST` | `/api/v1/workspaces/{wid}/projects/{id}/archive` | Archive 전환 |
 | 22 | 2 | `GET` | `/api/v1/workspaces/{wid}/action-items` | 액션 목록 |
 | 23 | 2 | `POST` | `/api/v1/workspaces/{wid}/action-items` | 액션 생성 |
 | 24 | 2 | `PATCH` | `/api/v1/workspaces/{wid}/action-items/{id}` | 액션 수정 |
 | 25 | 3 | `POST` | `/api/v1/workspaces/{wid}/rag/ask` | RAG 질문 (SSE 스트리밍) |
-| 26 | 3 | `GET` | `/api/v1/workspaces/{wid}/para-items/{pid}/notes` | 노트 목록 |
-| 27 | 3 | `POST` | `/api/v1/workspaces/{wid}/para-items/{pid}/notes` | 노트 생성 |
+| 26 | 3 | `GET` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 목록 |
+| 27 | 3 | `POST` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 생성 |
 | 28 | 3 | `PATCH` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 수정 (자동저장) |
 | 29 | 3 | `DELETE` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 삭제 |
 | 30 | 4 | `PATCH` | `/api/v1/workspaces/{id}/members/{uid}/role` | 역할 변경 |
@@ -428,9 +428,9 @@ Cloudflare R2 프리사인드 업로드 URL을 발급한다. 클라이언트는 
 
 #### `GET /api/v1/workspaces/{wid}/meetings/{id}`
 
-회의 상세 정보를 반환한다. 요약, 트랜스크립트, 연결된 PARA 아이템을 포함한다.
+회의 상세 정보를 반환한다. 요약, 트랜스크립트, 연결된 프로젝트을 포함한다.
 
-Meeting과 ParaItem은 N:M 관계이며 `MeetingParaLink` 중간 테이블을 통해 연결된다.
+Meeting과 Project은 N:M 관계이며 `MeetingProjectLink` 중간 테이블을 통해 연결된다.
 
 **Request:**
 
@@ -474,7 +474,7 @@ Meeting과 ParaItem은 N:M 관계이며 `MeetingParaLink` 중간 테이블을 �
     "keyDecisions": ["CMS 3월 내 완료"],
     "topics": ["CMS", "보안"]
   },
-  "paraItems": [
+  "projects": [
     {
       "id": "uuid",
       "title": "CMS 고도화",
@@ -583,7 +583,7 @@ Inbox 아이템 목록을 반환한다. AI가 자동 생성한 미분류 항목�
 
 #### `POST /api/v1/workspaces/{wid}/inbox/{id}/classify`
 
-Inbox 아이템을 PARA 아이템에 분류 확정한다. N:M 관계로 여러 PARA 아이템에 동시에 연결할 수 있다.
+Inbox 아이템을 프로젝트에 분류 확정한다. N:M 관계로 여러 프로젝트에 동시에 연결할 수 있다.
 
 **Request:**
 
@@ -591,7 +591,7 @@ Inbox 아이템을 PARA 아이템에 분류 확정한다. N:M 관계로 여러 P
 |------|-----|
 | Headers | `Authorization: Bearer <clerk_jwt>` |
 | Path | `wid` — 워크스페이스 UUID, `id` — Inbox 아이템 UUID |
-| Body | `{ "paraItemIds": ["uuid-1", "uuid-2"] }` |
+| Body | `{ "projectIds": ["uuid-1", "uuid-2"] }` |
 
 **Response:**
 
@@ -603,7 +603,7 @@ Inbox 아이템을 PARA 아이템에 분류 확정한다. N:M 관계로 여러 P
 {
   "id": "uuid",
   "isProcessed": true,
-  "linkedParaItems": [
+  "linkedProjects": [
     { "id": "uuid-1", "title": "CMS 고도화", "category": "project" },
     { "id": "uuid-2", "title": "보안 관리", "category": "area" }
   ]
@@ -644,11 +644,11 @@ Inbox 아이템을 무시(dismiss) 처리한다.
 
 ---
 
-### PARA Items
+### Projects
 
-#### `GET /api/v1/workspaces/{wid}/para-items`
+#### `GET /api/v1/workspaces/{wid}/projects`
 
-PARA 아이템 목록을 반환한다. 카테고리, 상태로 필터링할 수 있다.
+프로젝트 목록을 반환한다. 카테고리, 상태로 필터링할 수 있다.
 
 **Request:**
 
@@ -696,16 +696,16 @@ PARA 아이템 목록을 반환한다. 카테고리, 상태로 필터링할 수 
 
 ---
 
-#### `GET /api/v1/workspaces/{wid}/para-items/{id}`
+#### `GET /api/v1/workspaces/{wid}/projects/{id}`
 
-PARA 아이템 상세 정보를 반환한다.
+프로젝트 상세 정보를 반환한다.
 
 **Request:**
 
 | 항목 | 값 |
 |------|-----|
 | Headers | `Authorization: Bearer <clerk_jwt>` |
-| Path | `wid` — 워크스페이스 UUID, `id` — PARA 아이템 UUID |
+| Path | `wid` — 워크스페이스 UUID, `id` — 프로젝트 UUID |
 
 **Response:**
 
@@ -714,20 +714,20 @@ PARA 아이템 상세 정보를 반환한다.
 ```
 
 ```json
-ParaItem
+Project
 ```
 
 **에러:**
 
 | 상태 | 응답 |
 |:----:|------|
-| 404 | `{ "detail": "PARA 아이템을 찾을 수 없습니다" }` |
+| 404 | `{ "detail": "프로젝트을 찾을 수 없습니다" }` |
 
 ---
 
-#### `POST /api/v1/workspaces/{wid}/para-items`
+#### `POST /api/v1/workspaces/{wid}/projects`
 
-PARA 아이템을 생성한다.
+프로젝트을 생성한다.
 
 **Request:**
 
@@ -752,21 +752,21 @@ PARA 아이템을 생성한다.
 ```
 
 ```json
-ParaItem
+Project
 ```
 
 ---
 
-#### `PATCH /api/v1/workspaces/{wid}/para-items/{id}`
+#### `PATCH /api/v1/workspaces/{wid}/projects/{id}`
 
-PARA 아이템을 수정한다. 모든 필드는 optional이다.
+프로젝트을 수정한다. 모든 필드는 optional이다.
 
 **Request:**
 
 | 항목 | 값 |
 |------|-----|
 | Headers | `Authorization: Bearer <clerk_jwt>` |
-| Path | `wid` — 워크스페이스 UUID, `id` — PARA 아이템 UUID |
+| Path | `wid` — 워크스페이스 UUID, `id` — 프로젝트 UUID |
 | Body | 아래 참조 |
 
 ```json
@@ -785,21 +785,21 @@ PARA 아이템을 수정한다. 모든 필드는 optional이다.
 ```
 
 ```json
-ParaItem
+Project
 ```
 
 ---
 
-#### `DELETE /api/v1/workspaces/{wid}/para-items/{id}`
+#### `DELETE /api/v1/workspaces/{wid}/projects/{id}`
 
-PARA 아이템을 삭제한다.
+프로젝트을 삭제한다.
 
 **Request:**
 
 | 항목 | 값 |
 |------|-----|
 | Headers | `Authorization: Bearer <clerk_jwt>` |
-| Path | `wid` — 워크스페이스 UUID, `id` — PARA 아이템 UUID |
+| Path | `wid` — 워크스페이스 UUID, `id` — 프로젝트 UUID |
 
 **Response:**
 
@@ -809,16 +809,16 @@ PARA 아이템을 삭제한다.
 
 ---
 
-#### `POST /api/v1/workspaces/{wid}/para-items/{id}/archive`
+#### `POST /api/v1/workspaces/{wid}/projects/{id}/archive`
 
-PARA 아이템을 Archive로 전환한다. 관련 리소스를 보존할 수 있다.
+프로젝트을 Archive로 전환한다. 관련 리소스를 보존할 수 있다.
 
 **Request:**
 
 | 항목 | 값 |
 |------|-----|
 | Headers | `Authorization: Bearer <clerk_jwt>` |
-| Path | `wid` — 워크스페이스 UUID, `id` — PARA 아이템 UUID |
+| Path | `wid` — 워크스페이스 UUID, `id` — 프로젝트 UUID |
 | Body | `{ "preserveAsResource": true }` |
 
 **Response:**
@@ -841,7 +841,7 @@ PARA 아이템을 Archive로 전환한다. 관련 리소스를 보존할 수 있
 
 #### `GET /api/v1/workspaces/{wid}/action-items`
 
-액션 아이템 목록을 반환한다. 상태, 우선순위, PARA 아이템으로 필터링할 수 있다.
+액션 아이템 목록을 반환한다. 상태, 우선순위, 프로젝트으로 필터링할 수 있다.
 
 **Request:**
 
@@ -849,7 +849,7 @@ PARA 아이템을 Archive로 전환한다. 관련 리소스를 보존할 수 있
 |------|-----|
 | Headers | `Authorization: Bearer <clerk_jwt>` |
 | Path | `wid` — 워크스페이스 UUID |
-| Query | `status` (todo\|in_progress\|done), `priority` (high\|medium\|low), `paraItemId` (UUID), `page` (기본 1), `pageSize` (기본 50) |
+| Query | `status` (todo\|in_progress\|done), `priority` (high\|medium\|low), `projectId` (UUID), `page` (기본 1), `pageSize` (기본 50) |
 
 **Response:**
 
@@ -863,7 +863,7 @@ PARA 아이템을 Archive로 전환한다. 관련 리소스를 보존할 수 있
     {
       "id": "uuid",
       "meetingId": "uuid" | null,
-      "paraItemId": "uuid" | null,
+      "projectId": "uuid" | null,
       "title": "CMS DB 스키마 설계",
       "description": "ERD 기반으로 테이블 생성",
       "assignee": {
@@ -904,7 +904,7 @@ PARA 아이템을 Archive로 전환한다. 관련 리소스를 보존할 수 있
   "title": "CMS DB 스키마 설계",
   "description": "ERD 기반으로 테이블 생성" | null,
   "meetingId": "uuid" | null,
-  "paraItemId": "uuid" | null,
+  "projectId": "uuid" | null,
   "assigneeId": "uuid" | null,
   "dueDate": "2026-04-10" | null,
   "priority": "medium"
@@ -963,9 +963,9 @@ ActionItem
 
 | # | Method | Path | 설명 |
 |:-:|--------|------|------|
-| 25 | `POST` | `/api/v1/workspaces/{wid}/rag/ask` | RAG 질문 (SSE 스트리밍, PARA 범위/시간/소스 필터) |
-| 26 | `GET` | `/api/v1/workspaces/{wid}/para-items/{pid}/notes` | 노트 목록 |
-| 27 | `POST` | `/api/v1/workspaces/{wid}/para-items/{pid}/notes` | 노트 생성 |
+| 25 | `POST` | `/api/v1/workspaces/{wid}/rag/ask` | RAG 질문 (SSE 스트리밍, 프로젝트 범위/시간/소스 필터) |
+| 26 | `GET` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 목록 |
+| 27 | `POST` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 생성 |
 | 28 | `PATCH` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 수정 (debounce 자동저장) |
 | 29 | `DELETE` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 삭제 |
 

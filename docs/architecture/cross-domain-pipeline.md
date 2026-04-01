@@ -7,7 +7,7 @@ Kairos의 회의 처리 파이프라인은 여러 도메인 서비스를 순차�
 ```
 MeetingService
   → TranscriptionService (STT + 화자 분리)
-  → AIProcessingService (요약 + 액션 추출 + PARA 분류)
+  → AIProcessingService (요약 + 액션 추출 + 프로젝트 연결 추천)
   → InboxService (Inbox 적재)
   → EmbeddingService (벡터 임베딩 저장)
 ```
@@ -61,13 +61,14 @@ class MeetingPipelineService:
         await self.meeting_repo.update_status(meeting_id, "summarizing")
         summary = await self.ai_processing.summarize(transcript)
         actions = await self.ai_processing.extract_actions(transcript)
-        para_suggestion = await self.ai_processing.classify_para(summary)
+        project_suggestion = await self.ai_processing.classify_project(summary)
 
         # [3] Inbox 적재
         await self.inbox_service.create_from_meeting(
             meeting_id=meeting_id,
-            suggested_para_type=para_suggestion["suggested_type"],
-            confidence=para_suggestion["confidence"],
+            suggested_project_id=project_suggestion["suggested_project_id"],
+            suggested_tags=project_suggestion["suggested_tags"],
+            confidence=project_suggestion["confidence"],
         )
 
         # [4] 임베딩 저장
@@ -120,7 +121,7 @@ async def get_meeting_pipeline_service(
     → TranscriptionService.transcribe()        # 외부 API (Whisper)
     → AIProcessingService.summarize()           # 외부 API (Claude)
     → AIProcessingService.extract_actions()     # 외부 API (Claude)
-    → AIProcessingService.classify_para()       # 외부 API (Claude)
+    → AIProcessingService.classify_project()    # 외부 API (Claude)
     → InboxService.create_from_meeting()        # DB 쓰기
     → EmbeddingService.embed_transcript()       # 외부 API (OpenAI) + DB 쓰기
     → MeetingRepository.update_status()         # DB 쓰기

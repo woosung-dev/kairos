@@ -95,13 +95,13 @@
 }
 ```
 
-**PARA 분류 추천 결과:**
+**프로젝트 연결 + 태그 추천 결과:**
 ```json
 {
-  "suggested_type": "project",
-  "suggested_name": "가정회비 CMS 고도화",
+  "suggested_project": "가정회비 CMS 고도화",
+  "suggested_tags": ["보안", "CMS", "인프라"],
   "confidence": 0.92,
-  "reason": "명확한 결과물(CMS 기능 개발)과 개발 일정이 존재하는 프로젝트"
+  "reason": "기존 CMS 고도화 프로젝트와 관련된 회의"
 }
 ```
 
@@ -120,11 +120,11 @@ AI 처리 완료 후, 회의가 Inbox에 자동 적재된다.
 ```sql
 INSERT INTO inbox_items (
     workspace_id, source_type, source_id,
-    ai_suggested_para_type, ai_suggested_para_id,
+    ai_suggested_project_id, ai_suggested_tags,
     ai_confidence, is_processed
 ) VALUES (
     '...', 'meeting', '{meeting_id}',
-    'project', '{para_item_id or null}',
+    '{project_id or null}', '["보안", "CMS"]',
     0.92, false
 );
 ```
@@ -132,25 +132,25 @@ INSERT INTO inbox_items (
 | 상태 | 의미 |
 |------|------|
 | `is_processed = false` | 사용자 확인 대기 중 |
-| `ai_suggested_para_type = project` | AI가 Project로 추천 |
-| `ai_confidence = 0.92` | 높은 확신도 → UI에서 강조 표시 |
+| `ai_suggested_project_id` | AI가 연결할 프로젝트 추천 |
+| `ai_confidence = 0.92` | 높은 확신도 → ≥0.8이면 자동 확정 |
 
 ---
 
 ### [4] 사용자 분류 확정
 
-사용자가 Inbox에서 AI 추천을 확인하고 PARA 분류를 확정한다.
+사용자가 Inbox에서 AI 추천을 확인하고 프로젝트 연결을 확정한다 (또는 AI 자동 확정).
 
-이 회의는 **여러 PARA에 동시 연결** (N:M):
+이 회의는 **여러 프로젝트에 동시 연결** (N:M):
 
 ```sql
--- "CMS 고도화 프로젝트"에 연결
-INSERT INTO content_para_links (content_id, content_type, para_item_id)
-VALUES ('{meeting_id}', 'meeting', '{cms_project_id}');
+-- "CMS 고도화" 프로젝트에 연결
+INSERT INTO meeting_project_links (meeting_id, project_id)
+VALUES ('{meeting_id}', '{cms_project_id}');
 
--- "보안 관리 Area"에도 연결
-INSERT INTO content_para_links (content_id, content_type, para_item_id)
-VALUES ('{meeting_id}', 'meeting', '{security_area_id}');
+-- "보안 인프라 개선" 프로젝트에도 연결
+INSERT INTO meeting_project_links (meeting_id, project_id)
+VALUES ('{meeting_id}', '{security_project_id}');
 
 -- Inbox 처리 완료
 UPDATE inbox_items SET is_processed = true WHERE source_id = '{meeting_id}';
@@ -171,7 +171,7 @@ UPDATE inbox_items SET is_processed = true WHERE source_id = '{meeting_id}';
 
 ```sql
 INSERT INTO embedding_chunks (
-    workspace_id, para_item_id,
+    workspace_id, project_id,
     source_type, source_id,
     chunk_text, embedding,
     chunk_level, parent_chunk_id, metadata

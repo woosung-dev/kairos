@@ -34,23 +34,23 @@ erDiagram
         string summary
         enum sourceType "meeting | note | attachment"
         uuid sourceId
-        enum aiSuggestedParaType "project | area | resource | archive"
-        uuid aiSuggestedParaId
-        string aiSuggestedParaTitle
+        uuid aiSuggestedProjectId
+        string aiSuggestedProjectTitle
+        jsonb aiSuggestedTags "AI 자동 부여 태그"
         float aiConfidence
         boolean isProcessed
         timestamp createdAt
         timestamp updatedAt
     }
 
-    ParaItem {
+    Project {
         uuid id PK
         uuid workspaceId FK
-        enum category "project | area | resource | archive"
         string title
         string description
         enum status "active | completed | archived"
-        int paraOrder
+        jsonb tags "AI 자동 분류 + 사용자 태그"
+        int sortOrder
         uuid createdById FK
         timestamp createdAt
         timestamp updatedAt
@@ -71,10 +71,10 @@ erDiagram
         timestamp updatedAt
     }
 
-    MeetingParaLink {
+    MeetingProjectLink {
         uuid id PK
         uuid meetingId FK
-        uuid paraItemId FK
+        uuid projectId FK
     }
 
     TranscriptSegment {
@@ -97,7 +97,7 @@ erDiagram
     ActionItem {
         uuid id PK
         uuid meetingId FK
-        uuid paraItemId FK
+        uuid projectId FK
         string title
         string description
         uuid assigneeId FK
@@ -110,7 +110,7 @@ erDiagram
 
     Note {
         uuid id PK
-        uuid paraItemId FK
+        uuid projectId FK
         string title
         json content "Tiptap JSON"
         uuid createdById FK
@@ -121,7 +121,7 @@ erDiagram
     EmbeddingChunk {
         uuid id PK
         uuid workspaceId FK
-        uuid paraItemId FK "PARA 범위 검색용"
+        uuid projectId FK "프로젝트 범위 검색용"
         uuid sourceId
         enum sourceType "meeting | note | action"
         vector embedding "1536차원"
@@ -136,7 +136,7 @@ erDiagram
     SemanticCache {
         uuid id PK
         uuid workspaceId FK
-        uuid paraItemId FK "범위별 캐시"
+        uuid projectId FK "범위별 캐시"
         string question
         vector questionEmbedding "1536차원"
         string answer
@@ -150,37 +150,37 @@ erDiagram
     Workspace ||--o{ WorkspaceMember : "멤버"
     User ||--o{ WorkspaceMember : "소속"
     Workspace ||--o{ InboxItem : "포함"
-    Workspace ||--o{ ParaItem : "포함"
+    Workspace ||--o{ Project : "포함"
     Workspace ||--o{ Meeting : "포함"
-    ParaItem ||--o{ ActionItem : "포함"
-    ParaItem ||--o{ Note : "포함"
+    Project ||--o{ ActionItem : "포함"
+    Project ||--o{ Note : "포함"
     Meeting ||--o{ TranscriptSegment : "포함"
     Meeting ||--o| MeetingSummary : "1:1 요약"
     Meeting ||--o{ ActionItem : "추출"
-    Meeting ||--o{ MeetingParaLink : "N:M 연결"
-    ParaItem ||--o{ MeetingParaLink : "N:M 연결"
-    User ||--o{ ParaItem : "생성"
+    Meeting ||--o{ MeetingProjectLink : "N:M 연결"
+    Project ||--o{ MeetingProjectLink : "N:M 연결"
+    User ||--o{ Project : "생성"
     User ||--o{ Meeting : "생성"
     User ||--o{ ActionItem : "담당"
     Workspace ||--o{ EmbeddingChunk : "포함"
     Workspace ||--o{ SemanticCache : "포함"
-    ParaItem ||--o{ EmbeddingChunk : "범위 검색"
-    ParaItem ||--o{ SemanticCache : "범위별 캐시"
+    Project ||--o{ EmbeddingChunk : "범위 검색"
+    Project ||--o{ SemanticCache : "범위별 캐시"
     EmbeddingChunk ||--o{ EmbeddingChunk : "부모-자식 계층"
 ```
 
 ## 관계 설명
 
 ### N:M 관계
-- **Meeting ↔ ParaItem**: `MeetingParaLink` 중간 테이블로 다대다 연결. 하나의 회의가 여러 PARA 아이템에 연결 가능.
+- **Meeting ↔ Project**: `MeetingProjectLink` 중간 테이블로 다대다 연결. 하나의 회의가 여러 프로젝트에 연결 가능.
 
 ### 1:N 관계
-- **Workspace → ParaItem, Meeting, InboxItem**: 모든 콘텐츠는 워크스페이스 소속
-- **ParaItem → ActionItem, Note**: PARA 아이템 하위에 액션/노트 종속
+- **Workspace → Project, Meeting, InboxItem**: 모든 콘텐츠는 워크스페이스 소속
+- **Project → ActionItem, Note**: 프로젝트 하위에 액션/노트 종속
 - **Meeting → TranscriptSegment, ActionItem**: 회의에서 트랜스크립트와 액션 아이템 추출
 - **Workspace → EmbeddingChunk, SemanticCache**: 멀티테넌시 격리
-- **ParaItem → EmbeddingChunk**: PARA 범위 검색 (프로젝트/영역 단위 RAG)
-- **ParaItem → SemanticCache**: PARA 범위별 캐시 격리
+- **Project → EmbeddingChunk**: 프로젝트 범위 검색 (프로젝트 단위 RAG)
+- **Project → SemanticCache**: 프로젝트 범위별 캐시 격리
 
 ### 1:1 관계
 - **Meeting → MeetingSummary**: 회의당 AI 요약 하나
@@ -198,5 +198,5 @@ erDiagram
 - **SemanticCache**: 의미적으로 유사한 질문에 대해 캐시된 답변을 즉시 반환
 - `questionEmbedding`: 질문 벡터로 유사도 ≥ 0.93 시 캐시 히트
 - `expiresAt`: TTL 7일 자동 만료
-- 데이터 변경 시 해당 `paraItemId`의 캐시 무효화
+- 데이터 변경 시 해당 `projectId`의 캐시 무효화
 - 상세 설계: [RAG 파이프라인 설계](rag-pipeline.md) 참조

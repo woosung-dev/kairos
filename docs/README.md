@@ -15,13 +15,14 @@
 ### requirements/
 - [PRD (전체 로드맵 Phase 1~4)](requirements/prd.md)
 - [MVP Phase 1 기능 명세](requirements/mvp-phase1.md)
-- [PARA 방법론 구현 상세](requirements/para-methodology.md)
+- [팀 세컨드 브레인 구현 상세](requirements/second-brain.md) — CODE 프레임워크 + 프로젝트 중심 구조
+- [~~PARA 방법론~~](requirements/para-methodology.md) — *ADR-004에 의해 second-brain.md로 대체*
 - [UI/UX 인터랙션 명세](requirements/ui-ux-spec.md)
 
 ### architecture/
 - [디렉토리 구조 맵](architecture/directory-map.md)
 - [데이터 모델 관계도 (ERD)](architecture/erd.md)
-- [AI 파이프라인 명세](architecture/ai-pipeline.md) — 인제스트 파이프라인 (STT→요약→액션→PARA→임베딩)
+- [AI 파이프라인 명세](architecture/ai-pipeline.md) — 인제스트 파이프라인 (STT→요약→액션→프로젝트 연결→임베딩)
 - [RAG 파이프라인 설계](architecture/rag-pipeline.md) — 검색 파이프라인 (하이브리드 검색, 계층적 청킹, Semantic Cache, Re-ranking)
 - [데이터 흐름 예시](architecture/data-flow-example.md)
 - [크로스 도메인 파이프라인](architecture/cross-domain-pipeline.md)
@@ -38,3 +39,4 @@
 - [001: 기술 스택 선정](dev-log/001-tech-stack-decisions.md)
 - [002: 실행 전략 — Vertical Slice Sprint 채택](dev-log/002-execution-strategy.md)
 - [003: 디자인 도구 선정 — Stitch + Pencil + gstack 조합](dev-log/003-design-tools-decisions.md)
+- [004: PARA → 팀 세컨드 브레인 방향 전환](dev-log/004-second-brain-pivot.md)
