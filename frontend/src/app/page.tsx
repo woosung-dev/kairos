@@ -1,6 +1,15 @@
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const { userId } = await auth();
+
+  // 로그인 상태면 대시보드로 리다이렉트
+  if (userId) {
+    redirect("/dashboard");
+  }
+
   return (
     <div
       className="flex flex-col items-center justify-center min-h-screen px-4"
