@@ -1,10 +1,13 @@
 # backend/src/services/ai_processing.py
 """Gemini AI 처리 서비스. 모든 LLM 호출을 여기서 집중 관리."""
+from collections.abc import AsyncGenerator
+
 from google import genai
 
 from src.common.prompts import (
     MEETING_ACTIONS_AND_LINKING_PROMPT,
     MEETING_SUMMARY_SYSTEM_PROMPT,
+    RAG_SYSTEM_PROMPT,
     parse_json_response,
 )
 from src.core.config import get_settings
@@ -83,3 +86,21 @@ class AIProcessingService:
             contents=prompt,
         )
         return parse_json_response(response.text)
+
+    async def stream_rag_answer(
+        self,
+        question: str,
+        sources_text: str,
+    ) -> AsyncGenerator[str, None]:
+        """RAG 답변 스트리밍. Gemini의 토큰을 하나씩 yield."""
+        prompt = RAG_SYSTEM_PROMPT.format(
+            sources=sources_text,
+            question=question,
+        )
+
+        async for chunk in self.client.aio.models.generate_content_stream(
+            model=GEMINI_MODEL,
+            contents=prompt,
+        ):
+            if chunk.text:
+                yield chunk.text
