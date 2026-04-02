@@ -36,6 +36,13 @@ pnpm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Playwright MCP
+.playwright-mcp/
+e2e-*.png
+
+# MCP config
+.mcp.json
+
 # ai/rules
 .ai/
 .claude/
