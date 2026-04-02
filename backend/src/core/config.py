@@ -9,6 +9,10 @@ class Settings(BaseSettings):
 
     # 앱
     app_env: str = "development"
+    log_level: str = "INFO"
+
+    # CORS (쉼표 구분, 예: "http://localhost:3000,https://kairos.vercel.app")
+    cors_origins: str = "http://localhost:3000"
 
     # DB
     database_url: str

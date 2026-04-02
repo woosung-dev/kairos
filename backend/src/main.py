@@ -1,16 +1,27 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.actions.router import router as actions_router
 from src.auth.router import router as auth_router
+from src.core.config import get_settings
 from src.core.lifespan import lifespan
 from src.inbox.router import router as inbox_router
 from src.meetings.router import router as meetings_router
-from src.projects.router import meeting_project_router, router as projects_router
 from src.notes.router import router as notes_router
+from src.projects.router import meeting_project_router, router as projects_router
 from src.rag.router import router as rag_router
 from src.upload.router import router as upload_router
 from src.workspaces.router import router as workspaces_router
+
+settings = get_settings()
+
+# 로깅 설정
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 app = FastAPI(
     title="Kairos API",
@@ -22,7 +33,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[origin.strip() for origin in settings.cors_origins.split(",")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
