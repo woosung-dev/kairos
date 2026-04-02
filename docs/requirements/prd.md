@@ -299,9 +299,11 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 ## 8. 현재 컨텍스트
 
 - **방향 전환:** PARA → 팀 세컨드 브레인 (ADR-004, 2026-04-02)
-- **현재 Phase:** Phase 0 완료, Stage 3 디자인 진행 중 (DESIGN.md 완성)
-- **다음 작업:** 세컨드 브레인 방향 반영 후 Sprint 1 착수
-- **백엔드:** 아직 미착수 (API 명세 + 백엔드 셋업 가이드 완성됨, ERD 수정 필요)
+- **현재 Phase:** Sprint 3 구현 완료 (RAG + 노트)
+- **Sprint 1-2:** 회의 업로드 → STT → AI 요약 → 액션 → Inbox → 프로젝트 연결 완료
+- **Sprint 3:** 임베딩(pgvector) + Hybrid Search + SSE RAG + Tiptap 노트 + Semantic Cache
+- **다음 작업:** Sprint 4 — RBAC + 배포 + QA
+- **설계 문서:** `docs/superpowers/specs/2026-04-02-sprint3-rag-notes-design.md`
 
 ---
 
