@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, Text
+from sqlalchemy import JSON, Column, Text
 from sqlmodel import Field, SQLModel
 
 
@@ -16,7 +16,7 @@ class Note(SQLModel, table=True):
         default=None, foreign_key="projects.id", index=True
     )
     title: str = Field(default="")
-    content: dict = Field(default_factory=dict, sa_type="JSON")
+    content: dict = Field(default_factory=dict, sa_type=JSON)
     plain_text: str = Field(default="", sa_column=Column(Text, server_default=""))
     created_by_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)

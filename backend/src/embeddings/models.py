@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import Column, Text
+from sqlalchemy import JSON, Column, Text
 from sqlmodel import Field, SQLModel
 
 try:
@@ -34,7 +34,7 @@ class EmbeddingChunk(SQLModel, table=True):
         default=None,
         sa_column=Column(Vector(1536)) if Vector else Column(Text),
     )
-    metadata_json: dict = Field(default_factory=dict, sa_type="JSON")
+    metadata_json: dict = Field(default_factory=dict, sa_type=JSON)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -58,7 +58,7 @@ class SemanticCache(SQLModel, table=True):
         sa_column=Column(Vector(1536)) if Vector else Column(Text),
     )
     answer: str = Field(sa_column=Column(Text, nullable=False))
-    sources: list = Field(default_factory=list, sa_type="JSON")
+    sources: list = Field(default_factory=list, sa_type=JSON)
     hit_count: int = Field(default=0)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: datetime = Field(default_factory=_default_expires_at)
