@@ -1,9 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import { useProject } from "../hooks";
+import { useWorkspaceStore } from "@/features/workspaces/store";
 import { EmptyState } from "@/components/empty-state";
 
 const TABS = ["전체", "회의", "노트", "액션", "자료"] as const;
+
+const STATUS_LABELS: Record<string, string> = {
+  active: "진행 중",
+  completed: "완료",
+  archived: "보관",
+};
+
+const STATUS_BG: Record<string, string> = {
+  active: "var(--accent-subtle)",
+  completed: "rgba(52,211,153,0.1)",
+  archived: "rgba(156,163,175,0.1)",
+};
+
+const STATUS_COLOR: Record<string, string> = {
+  active: "var(--accent)",
+  completed: "var(--success)",
+  archived: "var(--text-muted)",
+};
 
 interface ProjectDetailProps {
   projectId: string;
@@ -18,6 +38,30 @@ const STAT_ITEMS = [
 
 export function ProjectDetail({ projectId }: ProjectDetailProps) {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("전체");
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const { data: project, isLoading, error } = useProject(activeWorkspaceId ?? undefined, projectId);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16 p-6">
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          프로젝트 불러오는 중...
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center py-16 p-6">
+        <p className="text-sm" style={{ color: "var(--error)" }}>
+          프로젝트를 불러오지 못했습니다
+        </p>
+      </div>
+    );
+  }
+
+  const status = project?.status ?? "active";
 
   return (
     <div className="p-6">
@@ -28,19 +72,40 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
             className="text-2xl font-bold"
             style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}
           >
-            프로젝트
+            {project?.title ?? "프로젝트"}
           </h1>
           <span
             className="px-2 py-0.5 rounded-full text-xs font-medium"
             style={{
-              background: "var(--accent-subtle)",
-              color: "var(--accent)",
+              background: STATUS_BG[status] ?? "var(--accent-subtle)",
+              color: STATUS_COLOR[status] ?? "var(--accent)",
             }}
           >
-            진행 중
+            {STATUS_LABELS[status] ?? status}
           </span>
         </div>
-        <p className="text-xs" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+        {project?.description && (
+          <p className="text-sm mb-1" style={{ color: "var(--text-secondary)" }}>
+            {project.description}
+          </p>
+        )}
+        {project?.tags && project.tags.length > 0 && (
+          <div className="flex items-center gap-1 flex-wrap mt-2">
+            {project.tags.map((tag) => (
+              <span
+                key={tag}
+                className="px-2 py-0.5 rounded-full text-[11px]"
+                style={{
+                  background: "var(--surface-active)",
+                  color: "var(--text-muted)",
+                }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="text-xs mt-2" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
           ID: {projectId}
         </p>
       </div>

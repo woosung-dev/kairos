@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useProjects } from "@/features/projects/hooks";
+import { useWorkspaceStore } from "@/features/workspaces/store";
 
 const NAV_ITEMS = [
   { href: "/", label: "홈", icon: "🏠" },
@@ -12,6 +14,10 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const { data } = useProjects(activeWorkspaceId ?? undefined, { status: "active" });
+
+  const projects = data?.items ?? [];
 
   return (
     <aside
@@ -57,9 +63,31 @@ export function Sidebar() {
             프로젝트
           </span>
         </div>
-        <p className="text-xs py-4 text-center" style={{ color: "var(--text-muted)" }}>
-          프로젝트 없음
-        </p>
+        {projects.length === 0 ? (
+          <p className="text-xs py-4 text-center" style={{ color: "var(--text-muted)" }}>
+            프로젝트 없음
+          </p>
+        ) : (
+          <div className="space-y-0.5">
+            {projects.map((project) => {
+              const isActive = pathname === `/projects/${project.id}`;
+              return (
+                <Link
+                  key={project.id}
+                  href={`/projects/${project.id}`}
+                  className="block px-2 py-1.5 rounded text-xs truncate transition-colors"
+                  style={{
+                    background: isActive ? "var(--surface-active)" : "transparent",
+                    color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                >
+                  {project.title}
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
     </aside>
   );
