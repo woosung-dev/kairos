@@ -13,6 +13,9 @@ from src.core.config import get_settings
 from src.auth.models import User  # noqa: F401
 from src.workspaces.models import Workspace, WorkspaceMember  # noqa: F401
 from src.meetings.models import Meeting, MeetingSummary, TranscriptSegment  # noqa: F401
+from src.projects.models import Project, MeetingProjectLink  # noqa: F401
+from src.actions.models import ActionItem  # noqa: F401
+from src.inbox.models import InboxItem  # noqa: F401
 
 from sqlmodel import SQLModel
 

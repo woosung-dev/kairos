@@ -18,6 +18,44 @@ MEETING_SUMMARY_SYSTEM_PROMPT = """당신은 회의 트랜스크립트를 구조
 }"""
 
 
+# ── 액션 아이템 추출 + 프로젝트 연결 추천 프롬프트 ──
+MEETING_ACTIONS_AND_LINKING_PROMPT = """당신은 회의 트랜스크립트를 분석하여 액션 아이템을 추출하고,
+관련 프로젝트를 추천하는 AI 비서입니다.
+
+## 트랜스크립트
+{transcript}
+
+## AI 요약
+{summary}
+
+## 기존 프로젝트 목록
+{projects_context}
+
+## 지시사항
+1. 트랜스크립트에서 구체적인 액션 아이템(할 일, 결정된 작업)을 추출하세요.
+2. 기존 프로젝트 목록과 비교하여 가장 관련 있는 프로젝트를 추천하세요.
+3. 관련 프로젝트가 없으면 새 프로젝트 이름을 제안하세요.
+4. 회의 내용에 맞는 태그를 추천하세요.
+
+반드시 아래 JSON 형식으로만 응답하세요:
+{{
+  "actionItems": [
+    {{
+      "title": "구체적인 액션 아이템 제목",
+      "description": "상세 설명 (선택, 없으면 null)",
+      "priority": "high 또는 medium 또는 low",
+      "dueDate": "YYYY-MM-DD 또는 null"
+    }}
+  ],
+  "suggestedProject": {{
+    "existingProjectId": "기존 프로젝트 UUID 또는 null",
+    "newProjectTitle": "새 프로젝트 이름 또는 null",
+    "confidence": 0.0에서 1.0 사이의 확신도
+  }},
+  "suggestedTags": ["태그1", "태그2"]
+}}"""
+
+
 def parse_json_response(text: str) -> dict:
     """AI 응답에서 JSON을 안전하게 파싱한다.
 

@@ -1,14 +1,36 @@
 "use client";
 
-import type { Project } from "../types";
+import { useProjects } from "../hooks";
+import { useWorkspaceStore } from "@/features/workspaces/store";
 import { ProjectCard } from "./project-card";
 import { EmptyState } from "@/components/empty-state";
 
-interface ProjectListProps {
-  projects: Project[];
-}
+export function ProjectList() {
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const { data, isLoading, error } = useProjects(activeWorkspaceId ?? undefined);
 
-export function ProjectList({ projects }: ProjectListProps) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          프로젝트 불러오는 중...
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <p className="text-sm" style={{ color: "var(--error)" }}>
+          프로젝트를 불러오지 못했습니다
+        </p>
+      </div>
+    );
+  }
+
+  const projects = data?.items ?? [];
+
   if (projects.length === 0) {
     return (
       <EmptyState

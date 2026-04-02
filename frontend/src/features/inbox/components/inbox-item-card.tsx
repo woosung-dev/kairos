@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import type { InboxItem } from "../types";
+import { useClassifyInbox, useDismissInbox } from "../hooks";
+import { useWorkspaceStore } from "@/features/workspaces/store";
+import { ProjectCombobox } from "@/features/projects/components/project-combobox";
 
 interface InboxItemCardProps {
   item: InboxItem;
-  onClassify?: (item: InboxItem) => void;
-  onDismiss?: (item: InboxItem) => void;
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -20,7 +22,31 @@ const SOURCE_ICONS: Record<string, string> = {
   attachment: "📎",
 };
 
-export function InboxItemCard({ item, onClassify, onDismiss }: InboxItemCardProps) {
+export function InboxItemCard({ item }: InboxItemCardProps) {
+  const [isComboboxOpen, setIsComboboxOpen] = useState(false);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const classifyInbox = useClassifyInbox(activeWorkspaceId ?? undefined);
+  const dismissInbox = useDismissInbox(activeWorkspaceId ?? undefined);
+
+  const isActioning = classifyInbox.isPending || dismissInbox.isPending;
+
+  /** AI 추천 프로젝트로 확정 */
+  function handleConfirm() {
+    if (!item.aiSuggestedProjectId) return;
+    classifyInbox.mutate({ id: item.id, projectIds: [item.aiSuggestedProjectId] });
+  }
+
+  /** 무시 */
+  function handleDismiss() {
+    dismissInbox.mutate(item.id);
+  }
+
+  /** ProjectCombobox에서 선택 시 */
+  function handleProjectSelect(projectId: string) {
+    classifyInbox.mutate({ id: item.id, projectIds: [projectId] });
+    setIsComboboxOpen(false);
+  }
+
   return (
     <div
       className="p-4 rounded border transition-colors"
@@ -28,6 +54,8 @@ export function InboxItemCard({ item, onClassify, onDismiss }: InboxItemCardProp
         background: "var(--surface)",
         borderColor: "var(--border-subtle)",
         borderRadius: "var(--radius-md)",
+        opacity: isActioning ? 0.6 : 1,
+        pointerEvents: isActioning ? "none" : "auto",
       }}
     >
       {/* 상단: 소스 뱃지 + 제목 */}
@@ -59,7 +87,25 @@ export function InboxItemCard({ item, onClassify, onDismiss }: InboxItemCardProp
         </div>
       </div>
 
-      {/* AI 추천 */}
+      {/* AI 태그 */}
+      {item.aiSuggestedTags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {item.aiSuggestedTags.map((tag) => (
+            <span
+              key={tag}
+              className="px-1.5 py-0.5 rounded text-[10px]"
+              style={{
+                background: "var(--surface-active)",
+                color: "var(--text-muted)",
+              }}
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* AI 추천 프로젝트 */}
       {item.aiSuggestedProjectTitle && (
         <div
           className="flex items-center gap-2 px-3 py-2 rounded mb-3"
@@ -86,30 +132,71 @@ export function InboxItemCard({ item, onClassify, onDismiss }: InboxItemCardProp
       )}
 
       {/* 액션 버튼 */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => onClassify?.(item)}
-          className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-          style={{
-            background: "var(--accent)",
-            color: "var(--background)",
-            borderRadius: "var(--radius-sm)",
-          }}
-        >
-          분류 확정
-        </button>
-        <button
-          onClick={() => onDismiss?.(item)}
-          className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
-          style={{
-            borderColor: "var(--border)",
-            color: "var(--text-muted)",
-            borderRadius: "var(--radius-sm)",
-          }}
-        >
-          무시
-        </button>
-      </div>
+      {!item.isProcessed && (
+        <div className="flex items-center gap-2 relative">
+          {/* AI 추천이 있으면 확정 버튼 */}
+          {item.aiSuggestedProjectId && (
+            <button
+              onClick={handleConfirm}
+              disabled={isActioning}
+              className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+              style={{
+                background: "var(--accent)",
+                color: "var(--background)",
+                borderRadius: "var(--radius-sm)",
+              }}
+            >
+              확정
+            </button>
+          )}
+
+          {/* 변경 (다른 프로젝트 선택) */}
+          <button
+            onClick={() => setIsComboboxOpen(!isComboboxOpen)}
+            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
+            style={{
+              borderColor: "var(--accent)",
+              color: "var(--accent)",
+              borderRadius: "var(--radius-sm)",
+            }}
+          >
+            {item.aiSuggestedProjectId ? "변경" : "프로젝트 선택"}
+          </button>
+
+          {/* 무시 */}
+          <button
+            onClick={handleDismiss}
+            disabled={isActioning}
+            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
+            style={{
+              borderColor: "var(--border)",
+              color: "var(--text-muted)",
+              borderRadius: "var(--radius-sm)",
+            }}
+          >
+            무시
+          </button>
+
+          {/* ProjectCombobox 드롭다운 */}
+          {isComboboxOpen && (
+            <div className="absolute top-full left-0 mt-1">
+              <ProjectCombobox
+                onSelect={handleProjectSelect}
+                onClose={() => setIsComboboxOpen(false)}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 처리 완료 표시 */}
+      {item.isProcessed && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs" style={{ color: "var(--success)" }}>
+            처리 완료
+          </span>
+        </div>
+      )}
     </div>
   );
 }

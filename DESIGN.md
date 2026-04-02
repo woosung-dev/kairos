@@ -96,6 +96,17 @@
   - lg: 8px (모달, 패널)
   - full: 9999px (뱃지 카운트, 아바타)
 
+### Responsive Breakpoints
+| 이름 | 범위 | Tailwind | 레이아웃 |
+|------|------|----------|----------|
+| Desktop | ≥1280px | `xl:` (기본) | 3-Panel 풀: 사이드바 220px + 메인 + RAG 320px |
+| Compact | 768~1279px | `md:` | 사이드바 아이콘 48px + 메인 + RAG 접힘(토글) |
+| Mobile | <768px | 기본 | 단일 패널 + 하단 네비게이션 바 |
+
+- **Sidebar:** Desktop=220px 텍스트+아이콘, Compact=48px 아이콘만, Mobile=숨김
+- **RAG Panel:** Desktop=320px 상시, Compact=토글 슬라이드, Mobile=`/search` 라우트
+- **Bottom Nav (Mobile):** [홈] [프로젝트] [업로드+] [Inbox] [검색] — `md:hidden`
+
 ## Motion
 - **Approach:** Minimal-functional — 상태 전환과 패널 토글만.
 - **Easing:** enter(ease-out) exit(ease-in) move(ease-in-out)

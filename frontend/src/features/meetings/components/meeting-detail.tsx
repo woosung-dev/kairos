@@ -1,8 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { toast } from "sonner";
 import { useMeetingDetail, useMeetingStatus } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import {
+  useAddMeetingProject,
+  useRemoveMeetingProject,
+} from "@/features/projects/hooks";
+import { ProjectCombobox } from "@/features/projects/components/project-combobox";
 import { MeetingSummary } from "./meeting-summary";
 import { TranscriptViewer } from "./transcript-viewer";
 
@@ -11,8 +17,7 @@ const TABS = ["요약", "트랜스크립트"] as const;
 const statusLabels: Record<string, string> = {
   uploading: "업로드 중",
   transcribing: "트랜스크립트 생성 중...",
-  summarizing: "AI 요약 생성 중...",
-  analyzing: "분석 중...",
+  analyzing: "AI 분석 중...",
   embedding: "임베딩 중...",
   completed: "완료",
   failed: "실패",
@@ -21,7 +26,6 @@ const statusLabels: Record<string, string> = {
 const statusColors: Record<string, string> = {
   uploading: "var(--info)",
   transcribing: "var(--info)",
-  summarizing: "var(--info)",
   analyzing: "var(--info)",
   embedding: "var(--info)",
   completed: "var(--success)",
@@ -34,14 +38,50 @@ interface MeetingDetailProps {
 
 export function MeetingDetail({ meetingId }: MeetingDetailProps) {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("요약");
+  const [isProjectComboboxOpen, setIsProjectComboboxOpen] = useState(false);
+  const comboboxAnchorRef = useRef<HTMLDivElement>(null);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
   const statusQuery = useMeetingStatus(activeWorkspaceId ?? undefined, meetingId);
   const detailQuery = useMeetingDetail(activeWorkspaceId ?? undefined, meetingId);
+  const addProject = useAddMeetingProject(activeWorkspaceId ?? undefined);
+  const removeProject = useRemoveMeetingProject(activeWorkspaceId ?? undefined);
 
   const status = statusQuery.data?.status ?? "uploading";
   const isProcessing = !["completed", "failed"].includes(status);
   const meeting = detailQuery.data;
+
+  // 처리 완료 시 토스트
+  const prevStatusRef = useRef(status);
+  useEffect(() => {
+    if (prevStatusRef.current !== "completed" && status === "completed") {
+      toast.success("AI가 프로젝트에 연결했습니다");
+    }
+    prevStatusRef.current = status;
+  }, [status]);
+
+  function handleAddProject(projectId: string) {
+    addProject.mutate(
+      { meetingId, projectId },
+      {
+        onSuccess: () => toast.success("프로젝트가 연결되었습니다"),
+        onError: (err: Error) => toast.error(err.message || "프로젝트 연결에 실패했습니다"),
+      }
+    );
+    setIsProjectComboboxOpen(false);
+  }
+
+  function handleRemoveProject(projectId: string) {
+    removeProject.mutate(
+      { meetingId, projectId },
+      {
+        onSuccess: () => toast("프로젝트 연결이 해제되었습니다"),
+        onError: (err: Error) => toast.error(err.message || "연결 해제에 실패했습니다"),
+      }
+    );
+  }
+
+  const linkedProjectIds = (meeting?.projects ?? []).map((p) => p.id);
 
   return (
     <div className="p-6">
@@ -69,6 +109,67 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
             {Math.floor(meeting.durationSec / 60)}분 {meeting.durationSec % 60}초
           </p>
         )}
+      </div>
+
+      {/* 연결된 프로젝트 섹션 */}
+      <div className="mb-6">
+        <h2
+          className="text-sm font-semibold mb-2"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          연결된 프로젝트
+        </h2>
+        <div className="flex flex-wrap items-center gap-2 relative" ref={comboboxAnchorRef}>
+          {(meeting?.projects ?? []).map((project) => (
+            <span
+              key={project.id}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
+              style={{
+                background: "var(--accent-subtle)",
+                color: "var(--accent)",
+                borderRadius: "var(--radius-sm)",
+              }}
+            >
+              {project.title}
+              <button
+                onClick={() => handleRemoveProject(project.id)}
+                className="ml-0.5 hover:opacity-70 transition-opacity"
+                style={{ color: "var(--accent)" }}
+                aria-label={`${project.title} 연결 해제`}
+              >
+                &times;
+              </button>
+            </span>
+          ))}
+
+          {(meeting?.projects ?? []).length === 0 && !isProjectComboboxOpen && (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              연결된 프로젝트가 없습니다
+            </span>
+          )}
+
+          <button
+            onClick={() => setIsProjectComboboxOpen(!isProjectComboboxOpen)}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-colors"
+            style={{
+              borderColor: "var(--border)",
+              color: "var(--text-muted)",
+              borderRadius: "var(--radius-sm)",
+            }}
+          >
+            + 추가
+          </button>
+
+          {isProjectComboboxOpen && (
+            <div className="absolute top-full left-0 mt-1">
+              <ProjectCombobox
+                onSelect={handleAddProject}
+                onClose={() => setIsProjectComboboxOpen(false)}
+                excludeIds={linkedProjectIds}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 처리 중 표시 */}

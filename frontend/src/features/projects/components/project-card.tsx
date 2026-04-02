@@ -18,12 +18,6 @@ const STATUS_LABELS: Record<string, string> = {
   archived: "보관",
 };
 
-const VISIBILITY_LABELS: Record<string, string> = {
-  public: "공개",
-  draft: "초안",
-  private: "비공개",
-};
-
 export function ProjectCard({ project }: ProjectCardProps) {
   return (
     <a
@@ -60,23 +54,35 @@ export function ProjectCard({ project }: ProjectCardProps) {
         >
           {STATUS_LABELS[project.status]}
         </span>
-        <span
-          className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px]"
-          style={{
-            background: "var(--surface-active)",
-            color: "var(--text-muted)",
-          }}
-        >
-          {VISIBILITY_LABELS[project.visibility]}
-        </span>
       </div>
 
-      {/* 통계 */}
-      <div className="flex items-center gap-4 text-xs" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-        <span>회의 {project.meetingCount}</span>
-        <span>콘텐츠 {project.contentCount}</span>
-        <span>액션 {project.actionItemCount}</span>
-      </div>
+      {/* 태그 */}
+      {project.tags.length > 0 && (
+        <div className="flex items-center gap-1 flex-wrap">
+          {project.tags.map((tag) => (
+            <span
+              key={tag}
+              className="px-1.5 py-0.5 rounded-full text-[10px]"
+              style={{
+                background: "var(--surface-active)",
+                color: "var(--text-muted)",
+              }}
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* 설명 */}
+      {project.description && (
+        <p
+          className="mt-1.5 text-xs truncate"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {project.description}
+        </p>
+      )}
     </a>
   );
 }
