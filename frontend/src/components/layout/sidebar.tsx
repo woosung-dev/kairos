@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useProjects } from "@/features/projects/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
-import { Home, Inbox, Plus, Search } from "lucide-react";
+import { FileText, Home, Inbox, Plus, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface NavItem {
@@ -16,6 +16,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "홈", icon: Home },
   { href: "/inbox", label: "Inbox", icon: Inbox },
+  { href: "/notes", label: "노트", icon: FileText },
   { href: "/new", label: "콘텐츠 추가", icon: Plus },
   { href: "/search", label: "검색", icon: Search },
 ];

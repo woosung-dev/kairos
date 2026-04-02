@@ -3,8 +3,11 @@
 import { RagChat } from "@/features/rag/components/rag-chat";
 import { RagInput } from "@/features/rag/components/rag-input";
 import { SearchScope } from "@/features/rag/components/search-scope";
+import { useRagStream } from "@/features/rag/hooks";
 
 export default function SearchPage() {
+  const { ask } = useRagStream();
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b" style={{ borderColor: "var(--border-subtle)" }}>
@@ -16,12 +19,8 @@ export default function SearchPage() {
         </h1>
         <SearchScope />
       </div>
-      <div className="flex-1 overflow-y-auto p-4">
-        <RagChat messages={[]} />
-      </div>
-      <div className="p-4 border-t" style={{ borderColor: "var(--border-subtle)" }}>
-        <RagInput onSubmit={() => {}} />
-      </div>
+      <RagChat />
+      <RagInput onSubmit={ask} />
     </div>
   );
 }

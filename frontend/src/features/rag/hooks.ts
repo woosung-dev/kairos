@@ -1,0 +1,113 @@
+"use client";
+
+import { useCallback } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { useWorkspaceStore } from "@/features/workspaces/store";
+import { askRag } from "./api";
+import { useRagStore } from "./store";
+import type { SSESearchResultsEvent, SSEAnswerEvent } from "./types";
+
+export function useRagStream() {
+  const { getToken } = useAuth();
+  const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const {
+    addMessage,
+    updateLastAssistantMessage,
+    setSourcesOnLastAssistant,
+    setIsStreaming,
+    searchFilter,
+  } = useRagStore();
+
+  const ask = useCallback(
+    async (question: string) => {
+      if (!wid) return;
+
+      const token = await getToken();
+      if (!token) return;
+
+      // 사용자 메시지 추가
+      addMessage({
+        id: crypto.randomUUID(),
+        role: "user",
+        content: question,
+        createdAt: new Date().toISOString(),
+      });
+
+      // 어시스턴트 플레이스홀더
+      addMessage({
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: "",
+        isStreaming: true,
+        createdAt: new Date().toISOString(),
+      });
+
+      setIsStreaming(true);
+
+      try {
+        const response = await askRag(token, wid, {
+          question,
+          projectId: searchFilter.projectId ?? null,
+          timeRange: searchFilter.timeRange ?? null,
+          sourceType: searchFilter.sourceType ?? null,
+        });
+
+        const reader = response.body?.getReader();
+        if (!reader) return;
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          let currentEvent = "";
+          for (const line of lines) {
+            if (line.startsWith("event:")) {
+              currentEvent = line.slice(6).trim();
+            } else if (line.startsWith("data:")) {
+              const data = line.slice(5).trim();
+              if (!data) continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                switch (currentEvent) {
+                  case "thinking":
+                    break;
+                  case "search_results": {
+                    const sr = parsed as SSESearchResultsEvent;
+                    setSourcesOnLastAssistant(sr.chunks);
+                    break;
+                  }
+                  case "answer": {
+                    const ans = parsed as SSEAnswerEvent;
+                    updateLastAssistantMessage(ans.token);
+                    break;
+                  }
+                  case "done":
+                    break;
+                }
+              } catch {
+                // JSON 파싱 실패 무시
+              }
+            }
+          }
+        }
+      } catch {
+        updateLastAssistantMessage(
+          "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+        );
+      } finally {
+        setIsStreaming(false);
+      }
+    },
+    [wid, getToken, addMessage, updateLastAssistantMessage, setSourcesOnLastAssistant, setIsStreaming, searchFilter]
+  );
+
+  return { ask };
+}

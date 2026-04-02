@@ -16,6 +16,8 @@ dependencies = [
     "pyjwt[crypto]>=2.12.1",
     "sqlmodel>=0.0.37",
     "uvicorn[standard]>=0.42.0",
+    "pgvector>=0.4.0",
+    "sse-starlette>=2.0.0",
 ]
 
 [dependency-groups]

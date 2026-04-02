@@ -16,6 +16,8 @@ from src.meetings.models import Meeting, MeetingSummary, TranscriptSegment  # no
 from src.projects.models import Project, MeetingProjectLink  # noqa: F401
 from src.actions.models import ActionItem  # noqa: F401
 from src.inbox.models import InboxItem  # noqa: F401
+from src.embeddings.models import EmbeddingChunk, SemanticCache  # noqa: F401
+from src.notes.models import Note  # noqa: F401
 
 from sqlmodel import SQLModel
 

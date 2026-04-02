@@ -1015,17 +1015,31 @@ ActionItem
 
 ---
 
-## Sprint 3: RAG + Notes (목록 수준)
+## Sprint 3: RAG + Notes (구현 완료)
 
-> 상세 스키마는 Sprint 3 착수 시 `docs/architecture/rag-pipeline.md` 기반으로 확정한다.
+> 설계 문서: `docs/superpowers/specs/2026-04-02-sprint3-rag-notes-design.md`
 
 | # | Method | Path | 설명 |
 |:-:|--------|------|------|
-| 27 | `POST` | `/api/v1/workspaces/{wid}/rag/ask` | RAG 질문 (SSE 스트리밍, 프로젝트 범위/시간/소스 필터) |
-| 28 | `GET` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 목록 |
-| 29 | `POST` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 생성 |
-| 30 | `PATCH` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 수정 (debounce 자동저장) |
-| 31 | `DELETE` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 삭제 |
+| 27 | `POST` | `/api/v1/workspaces/{wid}/rag/ask` | RAG 질문 (SSE 스트리밍, `sse-starlette`) |
+| 28 | `GET` | `/api/v1/workspaces/{wid}/notes` | 노트 목록 (`?projectId=` 필터) |
+| 29 | `GET` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 상세 |
+| 30 | `POST` | `/api/v1/workspaces/{wid}/notes` | 노트 생성 (`projectId` 선택적) |
+| 31 | `PATCH` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 수정 (debounce 자동저장) |
+| 32 | `DELETE` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 삭제 (204) |
+
+### RAG Ask (`POST /rag/ask`)
+
+```
+Request: { "question": str, "projectId?": UUID, "timeRange?": "1m"|"3m"|"6m", "sourceType?": "meeting"|"note" }
+Response: SSE stream (event: thinking → search_results → answer → done)
+```
+
+### Notes
+
+- `project_id` nullable (CODE 철학 마찰 최소화)
+- 생성/수정 시 BackgroundTasks로 비동기 임베딩
+- Tiptap JSON content + plain_text (임베딩용)
 
 ---
 

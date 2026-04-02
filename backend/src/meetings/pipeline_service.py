@@ -23,13 +23,14 @@ from src.inbox.repository import InboxRepository
 from src.meetings.repository import MeetingRepository
 from src.projects.repository import ProjectRepository
 from src.services.ai_processing import AIProcessingService
+from src.embeddings.service import EmbeddingService
 from src.services.transcription import TranscriptionService
 
 logger = logging.getLogger(__name__)
 
 
 class MeetingPipelineService:
-    """STT → 요약 → 액션 추출 → Inbox 적재 → 자동 확정 파이프라인."""
+    """STT → 요약 → 액션 추출 → Inbox 적재 → 자동 확정 → 임베딩 파이프라인."""
 
     def __init__(
         self,
@@ -40,6 +41,7 @@ class MeetingPipelineService:
         r2_service: R2Service,
         transcription_service: TranscriptionService,
         ai_service: AIProcessingService,
+        embedding_service: EmbeddingService,
     ) -> None:
         self.meeting_repo = meeting_repo
         self.project_repo = project_repo
@@ -48,6 +50,7 @@ class MeetingPipelineService:
         self.r2_service = r2_service
         self.transcription_service = transcription_service
         self.ai_service = ai_service
+        self.embedding_service = embedding_service
 
     async def process_meeting(self, meeting_id: uuid.UUID) -> None:
         """회의 처리 전체 파이프라인. 실패 시 status: failed로 롤백."""
@@ -163,6 +166,41 @@ class MeetingPipelineService:
                     meeting_id,
                     existing_project_id_str,
                     confidence,
+                )
+
+            # [2-6] 임베딩 생성 (비치명적 — 실패해도 파이프라인은 완료)
+            try:
+                project_id = None
+                if confidence >= 0.8 and existing_project_id_str:
+                    project_id = uuid.UUID(existing_project_id_str)
+
+                segments_data = [
+                    {
+                        "speaker": seg.speaker,
+                        "text": seg.text,
+                        "start_sec": seg.start_sec,
+                        "end_sec": seg.end_sec,
+                    }
+                    for seg in segments
+                ]
+                chunk_count = await self.embedding_service.embed_meeting(
+                    meeting_id=meeting.id,
+                    workspace_id=meeting.workspace_id,
+                    project_id=project_id,
+                    title=meeting.title,
+                    segments=segments_data,
+                )
+                await self.embedding_service.invalidate_cache(
+                    meeting.workspace_id, project_id
+                )
+                logger.info(
+                    "임베딩 %d개 생성 (meeting=%s)", chunk_count, meeting_id
+                )
+            except Exception as emb_err:
+                logger.warning(
+                    "임베딩 생성 실패 (비치명적, meeting=%s): %s",
+                    meeting_id,
+                    emb_err,
                 )
 
             # [3] 완료

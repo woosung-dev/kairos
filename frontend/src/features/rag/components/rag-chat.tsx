@@ -1,40 +1,31 @@
 "use client";
 
-import type { RagMessage } from "../types";
-import { EmptyState } from "@/components/empty-state";
+import { useEffect, useRef } from "react";
+import { useRagStore } from "../store";
+import { RagSources } from "./rag-sources";
 
-interface RagChatProps {
-  messages: RagMessage[];
-}
+export function RagChat() {
+  const { messages, isStreaming } = useRagStore();
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-const FRESHNESS_LABELS: Record<string, string> = {
-  recent: "최근",
-  normal: "보통",
-  stale: "오래됨",
-};
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isStreaming]);
 
-const FRESHNESS_COLORS: Record<string, string> = {
-  recent: "var(--success)",
-  normal: "var(--text-muted)",
-  stale: "var(--warning)",
-};
-
-export function RagChat({ messages }: RagChatProps) {
   if (messages.length === 0) {
     return (
-      <EmptyState
-        icon="🤖"
-        title="대화를 시작하세요"
-        description="프로젝트에 대해 질문하면 AI가 지식을 기반으로 답변합니다"
-      />
+      <div className="flex-1 flex items-center justify-center px-4">
+        <p className="text-sm text-center" style={{ color: "var(--text-muted)" }}>
+          프로젝트에 대해 질문하세요
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
       {messages.map((msg) => (
-        <div key={msg.id} className="space-y-2">
-          {/* 메시지 */}
+        <div key={msg.id} className="space-y-1.5">
           <div
             className="flex gap-3"
             style={{
@@ -42,46 +33,33 @@ export function RagChat({ messages }: RagChatProps) {
             }}
           >
             <div
-              className="max-w-[80%] px-4 py-3 rounded"
+              className="max-w-[85%] px-3 py-2.5 rounded text-sm"
               style={{
-                background: msg.role === "user" ? "var(--accent-subtle)" : "var(--surface)",
+                background:
+                  msg.role === "user"
+                    ? "var(--accent-subtle)"
+                    : "var(--surface)",
                 borderRadius: "var(--radius-md)",
+                color: "var(--text-primary)",
+                whiteSpace: "pre-wrap",
               }}
             >
-              <p className="text-sm" style={{ color: "var(--text-primary)" }}>
-                {msg.content}
-              </p>
+              {msg.content}
+              {msg.isStreaming && !msg.content && (
+                <span
+                  className="inline-block w-2 h-4 ml-0.5 animate-pulse"
+                  style={{ background: "var(--accent)" }}
+                />
+              )}
             </div>
           </div>
 
-          {/* 소스 인용 */}
           {msg.sources && msg.sources.length > 0 && (
-            <div className="flex flex-wrap gap-2 pl-3">
-              {msg.sources.map((source, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2 px-2 py-1 rounded text-[10px]"
-                  style={{
-                    background: "var(--surface-hover)",
-                    borderRadius: "var(--radius-sm)",
-                  }}
-                >
-                  <span style={{ color: "var(--text-secondary)" }}>{source.title}</span>
-                  <span
-                    className="px-1 rounded"
-                    style={{
-                      color: FRESHNESS_COLORS[source.freshness],
-                      fontFamily: "var(--font-mono)",
-                    }}
-                  >
-                    {FRESHNESS_LABELS[source.freshness]}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <RagSources sources={msg.sources} />
           )}
         </div>
       ))}
+      <div ref={bottomRef} />
     </div>
   );
 }

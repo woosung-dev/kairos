@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.actions.repository import ActionItemRepository
 from src.common.database import get_async_session
 from src.common.r2 import R2Service
+from src.embeddings.repository import EmbeddingRepository
+from src.embeddings.service import EmbeddingService
 from src.inbox.repository import InboxRepository
 from src.meetings.pipeline_service import MeetingPipelineService
 from src.meetings.repository import MeetingRepository
@@ -39,4 +41,5 @@ async def get_pipeline_service(
         r2_service=R2Service(),
         transcription_service=TranscriptionService(),
         ai_service=AIProcessingService(),
+        embedding_service=EmbeddingService(EmbeddingRepository(session)),
     )
