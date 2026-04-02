@@ -16,7 +16,7 @@ class Meeting(SQLModel, table=True):
     file_key: str  # R2 저장 경로
     recorded_at: datetime | None = None
     duration_sec: int | None = None
-    status: str = "uploading"  # uploading|transcribing|summarizing|completed|failed
+    status: str = "uploading"  # uploading|transcribing|analyzing|completed|failed
     error_message: str | None = None
     has_transcript: bool = False
     has_summary: bool = False

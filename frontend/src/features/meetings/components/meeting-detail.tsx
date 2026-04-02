@@ -11,8 +11,7 @@ const TABS = ["요약", "트랜스크립트"] as const;
 const statusLabels: Record<string, string> = {
   uploading: "업로드 중",
   transcribing: "트랜스크립트 생성 중...",
-  summarizing: "AI 요약 생성 중...",
-  analyzing: "분석 중...",
+  analyzing: "AI 분석 중...",
   embedding: "임베딩 중...",
   completed: "완료",
   failed: "실패",
@@ -21,7 +20,6 @@ const statusLabels: Record<string, string> = {
 const statusColors: Record<string, string> = {
   uploading: "var(--info)",
   transcribing: "var(--info)",
-  summarizing: "var(--info)",
   analyzing: "var(--info)",
   embedding: "var(--info)",
   completed: "var(--success)",
