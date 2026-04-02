@@ -1,17 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { useRagStore } from "../store";
 
 interface RagInputProps {
   onSubmit: (query: string) => void;
-  placeholder?: string;
 }
 
-export function RagInput({ onSubmit, placeholder = "질문을 입력하세요..." }: RagInputProps) {
+export function RagInput({ onSubmit }: RagInputProps) {
   const [query, setQuery] = useState("");
+  const { isStreaming } = useRagStore();
 
   const handleSubmit = () => {
-    if (!query.trim()) return;
+    if (!query.trim() || isStreaming) return;
     onSubmit(query.trim());
     setQuery("");
   };
@@ -24,34 +25,38 @@ export function RagInput({ onSubmit, placeholder = "질문을 입력하세요...
   };
 
   return (
-    <div
-      className="flex items-center gap-2 px-3 py-2 rounded border"
-      style={{
-        background: "var(--surface)",
-        borderColor: "var(--border)",
-        borderRadius: "var(--radius-md)",
-      }}
-    >
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        className="flex-1 bg-transparent text-sm outline-none"
-        style={{ color: "var(--text-primary)" }}
-      />
-      <button
-        onClick={handleSubmit}
-        className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+    <div className="p-3 border-t" style={{ borderColor: "var(--border-subtle)" }}>
+      <div
+        className="flex items-center gap-2 px-3 py-2 rounded border"
         style={{
-          background: query.trim() ? "var(--accent)" : "var(--surface-active)",
-          color: query.trim() ? "var(--background)" : "var(--text-muted)",
-          borderRadius: "var(--radius-sm)",
+          background: "var(--surface)",
+          borderColor: "var(--border)",
+          borderRadius: "var(--radius-md)",
         }}
       >
-        전송
-      </button>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="질문을 입력하세요..."
+          disabled={isStreaming}
+          className="flex-1 bg-transparent text-sm outline-none"
+          style={{ color: "var(--text-primary)" }}
+        />
+        <button
+          onClick={handleSubmit}
+          disabled={!query.trim() || isStreaming}
+          className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+          style={{
+            background: query.trim() && !isStreaming ? "var(--accent)" : "var(--surface-active)",
+            color: query.trim() && !isStreaming ? "var(--background)" : "var(--text-muted)",
+            borderRadius: "var(--radius-sm)",
+          }}
+        >
+          {isStreaming ? "..." : "전송"}
+        </button>
+      </div>
     </div>
   );
 }

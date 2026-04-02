@@ -7,19 +7,43 @@ export interface RagMessage {
   role: "user" | "assistant";
   content: string;
   sources?: RagSource[];
+  isStreaming?: boolean;
   createdAt: string;
 }
 
 export interface RagSource {
-  title: string;
-  type: "meeting" | "note" | "attachment";
+  id: string;
+  text: string;
+  source: string;
+  sourceType: "meeting" | "note";
   date: string;
   speaker?: string;
+  score: number;
   freshness: SourceFreshness;
 }
 
-export interface SearchScope {
+export interface SearchFilter {
   projectId?: UUID;
-  timeRange?: "all" | "1m" | "3m" | "6m";
-  sourceType?: "all" | "meeting" | "note" | "attachment";
+  timeRange?: "1m" | "3m" | "6m" | null;
+  sourceType?: "meeting" | "note" | null;
+}
+
+export interface RagAskRequest {
+  question: string;
+  projectId?: string | null;
+  timeRange?: string | null;
+  sourceType?: string | null;
+}
+
+export interface SSESearchResultsEvent {
+  chunks: RagSource[];
+}
+
+export interface SSEAnswerEvent {
+  token: string;
+}
+
+export interface SSEDoneEvent {
+  cached: boolean;
+  sourceCount: number;
 }
