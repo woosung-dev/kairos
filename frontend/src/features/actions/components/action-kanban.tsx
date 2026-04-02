@@ -16,7 +16,7 @@ import {
 import { useActionItems, useUpdateActionItem } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { EmptyState } from "@/components/empty-state";
-import type { ActionItem, ActionStatus, ActionPriority } from "../types";
+import type { ActionItem, ActionPriority } from "../types";
 
 // --- 상수 ---
 
