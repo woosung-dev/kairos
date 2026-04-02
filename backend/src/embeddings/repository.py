@@ -78,10 +78,10 @@ class EmbeddingRepository:
         query = text(f"""
             SELECT id, chunk_text, source_id, source_type, metadata_json,
                    parent_chunk_id, created_at,
-                   1 - (embedding <=> :qvec::vector) AS score
+                   1 - (embedding <=> CAST(:qvec AS vector)) AS score
             FROM embedding_chunks
             WHERE {filters}
-            ORDER BY embedding <=> :qvec::vector
+            ORDER BY embedding <=> CAST(:qvec AS vector)
             LIMIT :limit
         """)
         params["qvec"] = str(query_embedding)
@@ -148,11 +148,11 @@ class EmbeddingRepository:
 
         query = text(f"""
             SELECT id, answer, sources, hit_count,
-                   1 - (question_embedding <=> :qvec::vector) AS similarity
+                   1 - (question_embedding <=> CAST(:qvec AS vector)) AS similarity
             FROM semantic_caches
             WHERE {filters}
-              AND 1 - (question_embedding <=> :qvec::vector) >= :threshold
-            ORDER BY question_embedding <=> :qvec::vector
+              AND 1 - (question_embedding <=> CAST(:qvec AS vector)) >= :threshold
+            ORDER BY question_embedding <=> CAST(:qvec AS vector)
             LIMIT 1
         """)
         params["qvec"] = str(question_embedding)

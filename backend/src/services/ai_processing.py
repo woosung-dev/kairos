@@ -98,9 +98,10 @@ class AIProcessingService:
             question=question,
         )
 
-        async for chunk in self.client.aio.models.generate_content_stream(
+        stream = await self.client.aio.models.generate_content_stream(
             model=GEMINI_MODEL,
             contents=prompt,
-        ):
+        )
+        async for chunk in stream:
             if chunk.text:
                 yield chunk.text
