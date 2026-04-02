@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.actions.router import router as actions_router
 from src.auth.router import router as auth_router
 from src.core.lifespan import lifespan
+from src.inbox.router import router as inbox_router
 from src.meetings.router import router as meetings_router
 from src.projects.router import meeting_project_router, router as projects_router
 from src.upload.router import router as upload_router
@@ -31,6 +32,7 @@ app.include_router(meetings_router)
 app.include_router(projects_router)
 app.include_router(meeting_project_router)
 app.include_router(actions_router)
+app.include_router(inbox_router)
 app.include_router(upload_router)
 
 
