@@ -1,11 +1,9 @@
 "use client";
 
 import type { ActionItem } from "../types";
+import { useActionItems } from "../hooks";
+import { useWorkspaceStore } from "@/features/workspaces/store";
 import { EmptyState } from "@/components/empty-state";
-
-interface ActionListProps {
-  items?: ActionItem[];
-}
 
 const PRIORITY_COLORS: Record<string, string> = {
   high: "var(--error)",
@@ -26,7 +24,32 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "취소",
 };
 
-export function ActionList({ items = [] }: ActionListProps) {
+export function ActionList() {
+  const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const { data, isLoading, error } = useActionItems(wid ?? undefined);
+
+  const items: ActionItem[] = data?.items ?? [];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+          로딩 중...
+        </span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <span className="text-sm" style={{ color: "var(--error)" }}>
+          액션 아이템을 불러오지 못했습니다
+        </span>
+      </div>
+    );
+  }
+
   if (items.length === 0) {
     return (
       <EmptyState
