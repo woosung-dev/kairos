@@ -93,7 +93,7 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 | 13 | 2 | `GET` | `/api/v1/workspaces/{wid}/inbox` | Inbox 목록 |
 | 14 | 2 | `POST` | `/api/v1/workspaces/{wid}/inbox/{id}/classify` | 프로젝트 연결 확정 (N:M) |
 | 15 | 2 | `POST` | `/api/v1/workspaces/{wid}/inbox/{id}/dismiss` | Inbox 무시 |
-| 16 | 2 | `GET` | `/api/v1/workspaces/{wid}/projects` | 프로젝트 목록 (카테고리 필터) |
+| 16 | 2 | `GET` | `/api/v1/workspaces/{wid}/projects` | 프로젝트 목록 (태그/상태 필터) |
 | 17 | 2 | `GET` | `/api/v1/workspaces/{wid}/projects/{id}` | 프로젝트 상세 |
 | 18 | 2 | `POST` | `/api/v1/workspaces/{wid}/projects` | 프로젝트 생성 |
 | 19 | 2 | `PATCH` | `/api/v1/workspaces/{wid}/projects/{id}` | 프로젝트 수정 |
@@ -102,14 +102,16 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 | 22 | 2 | `GET` | `/api/v1/workspaces/{wid}/action-items` | 액션 목록 |
 | 23 | 2 | `POST` | `/api/v1/workspaces/{wid}/action-items` | 액션 생성 |
 | 24 | 2 | `PATCH` | `/api/v1/workspaces/{wid}/action-items/{id}` | 액션 수정 |
-| 25 | 3 | `POST` | `/api/v1/workspaces/{wid}/rag/ask` | RAG 질문 (SSE 스트리밍) |
-| 26 | 3 | `GET` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 목록 |
-| 27 | 3 | `POST` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 생성 |
-| 28 | 3 | `PATCH` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 수정 (자동저장) |
-| 29 | 3 | `DELETE` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 삭제 |
-| 30 | 4 | `PATCH` | `/api/v1/workspaces/{id}/members/{uid}/role` | 역할 변경 |
-| 31 | 4 | `DELETE` | `/api/v1/workspaces/{id}/members/{uid}` | 멤버 제거 |
-| 32 | 4 | `POST` | `/api/v1/workspaces/{id}/invite` | 초대 링크 생성 |
+| 25 | 2 | `POST` | `/api/v1/workspaces/{wid}/meetings/{mid}/projects` | 회의-프로젝트 연결 |
+| 26 | 2 | `DELETE` | `/api/v1/workspaces/{wid}/meetings/{mid}/projects/{pid}` | 회의-프로젝트 연결 해제 |
+| 27 | 3 | `POST` | `/api/v1/workspaces/{wid}/rag/ask` | RAG 질문 (SSE 스트리밍) |
+| 28 | 3 | `GET` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 목록 |
+| 29 | 3 | `POST` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 생성 |
+| 30 | 3 | `PATCH` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 수정 (자동저장) |
+| 31 | 3 | `DELETE` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 삭제 |
+| 32 | 4 | `PATCH` | `/api/v1/workspaces/{id}/members/{uid}/role` | 역할 변경 |
+| 33 | 4 | `DELETE` | `/api/v1/workspaces/{id}/members/{uid}` | 멤버 제거 |
+| 34 | 4 | `POST` | `/api/v1/workspaces/{id}/invite` | 초대 링크 생성 |
 
 ---
 
@@ -477,8 +479,7 @@ Meeting과 Project은 N:M 관계이며 `MeetingProjectLink` 중간 테이블을 
   "projects": [
     {
       "id": "uuid",
-      "title": "CMS 고도화",
-      "category": "project"
+      "title": "CMS 고도화"
     }
   ],
   "createdAt": "ISO8601",
@@ -563,9 +564,9 @@ Inbox 아이템 목록을 반환한다. AI가 자동 생성한 미분류 항목�
       "summary": "CMS 고도화 관련 킥오프...",
       "sourceType": "meeting",
       "sourceId": "uuid",
-      "aiSuggestedParaType": "project",
-      "aiSuggestedParaId": "uuid" | null,
-      "aiSuggestedParaTitle": "CMS 고도화",
+      "aiSuggestedProjectId": "uuid" | null,
+      "aiSuggestedProjectTitle": "CMS 고도화",
+      "aiSuggestedTags": ["CMS", "개발"],
       "aiConfidence": 0.87,
       "isProcessed": false,
       "createdAt": "ISO8601",
@@ -604,8 +605,8 @@ Inbox 아이템을 프로젝트에 분류 확정한다. N:M 관계로 여러 프
   "id": "uuid",
   "isProcessed": true,
   "linkedProjects": [
-    { "id": "uuid-1", "title": "CMS 고도화", "category": "project" },
-    { "id": "uuid-2", "title": "보안 관리", "category": "area" }
+    { "id": "uuid-1", "title": "CMS 고도화" },
+    { "id": "uuid-2", "title": "보안 관리" }
   ]
 }
 ```
@@ -648,7 +649,7 @@ Inbox 아이템을 무시(dismiss) 처리한다.
 
 #### `GET /api/v1/workspaces/{wid}/projects`
 
-프로젝트 목록을 반환한다. 카테고리, 상태로 필터링할 수 있다.
+프로젝트 목록을 반환한다. 태그, 상태로 필터링할 수 있다.
 
 **Request:**
 
@@ -656,7 +657,7 @@ Inbox 아이템을 무시(dismiss) 처리한다.
 |------|-----|
 | Headers | `Authorization: Bearer <clerk_jwt>` |
 | Path | `wid` — 워크스페이스 UUID |
-| Query | `category` (project\|area\|resource\|archive), `status` (active\|completed\|archived), `page` (기본 1), `pageSize` (기본 50) |
+| Query | `tag` (string), `status` (active\|completed\|archived), `page` (기본 1), `pageSize` (기본 50) |
 
 **Response:**
 
@@ -670,11 +671,11 @@ Inbox 아이템을 무시(dismiss) 처리한다.
     {
       "id": "uuid",
       "workspaceId": "uuid",
-      "category": "project",
       "title": "CMS 고도화",
       "description": "3월 내 완료 목표",
       "status": "active",
-      "paraOrder": 0,
+      "tags": ["CMS", "개발"],
+      "sortOrder": 0,
       "createdBy": {
         "id": "uuid",
         "displayName": "당근",
@@ -739,7 +740,6 @@ Project
 
 ```json
 {
-  "category": "project",
   "title": "CMS 고도화",
   "description": "3월 내 완료 목표" | null
 }
@@ -773,7 +773,6 @@ Project
 {
   "title": "수정된 제목",
   "description": "변경된 설명",
-  "category": "area",
   "status": "completed"
 }
 ```
@@ -811,7 +810,7 @@ Project
 
 #### `POST /api/v1/workspaces/{wid}/projects/{id}/archive`
 
-프로젝트을 Archive로 전환한다. 관련 리소스를 보존할 수 있다.
+프로젝트을 Archive로 전환한다.
 
 **Request:**
 
@@ -819,7 +818,6 @@ Project
 |------|-----|
 | Headers | `Authorization: Bearer <clerk_jwt>` |
 | Path | `wid` — 워크스페이스 UUID, `id` — 프로젝트 UUID |
-| Body | `{ "preserveAsResource": true }` |
 
 **Response:**
 
@@ -830,10 +828,70 @@ Project
 ```json
 {
   "id": "uuid",
-  "status": "archived",
-  "preservedResourceCount": 3
+  "status": "archived"
 }
 ```
+
+---
+
+### Meeting-Project Link
+
+#### `POST /api/v1/workspaces/{wid}/meetings/{mid}/projects`
+
+회의에 프로젝트를 연결한다.
+
+**Request:**
+
+| 항목 | 값 |
+|------|-----|
+| Headers | `Authorization: Bearer <clerk_jwt>` |
+| Path | `wid` — 워크스페이스 UUID, `mid` — 회의 UUID |
+| Body | `{ "projectId": "uuid" }` |
+
+**Response:**
+
+```
+201 Created
+```
+
+```json
+{
+  "meetingId": "uuid",
+  "projectId": "uuid"
+}
+```
+
+**에러:**
+
+| 상태 | 응답 |
+|:----:|------|
+| 404 | `{ "detail": "회의 또는 프로젝트를 찾을 수 없습니다" }` |
+| 409 | `{ "detail": "이미 연결되어 있습니다" }` |
+
+---
+
+#### `DELETE /api/v1/workspaces/{wid}/meetings/{mid}/projects/{pid}`
+
+회의-프로젝트 연결을 해제한다.
+
+**Request:**
+
+| 항목 | 값 |
+|------|-----|
+| Headers | `Authorization: Bearer <clerk_jwt>` |
+| Path | `wid` — 워크스페이스 UUID, `mid` — 회의 UUID, `pid` — 프로젝트 UUID |
+
+**Response:**
+
+```
+204 No Content
+```
+
+**에러:**
+
+| 상태 | 응답 |
+|:----:|------|
+| 404 | `{ "detail": "연결을 찾을 수 없습니다" }` |
 
 ---
 
@@ -963,11 +1021,11 @@ ActionItem
 
 | # | Method | Path | 설명 |
 |:-:|--------|------|------|
-| 25 | `POST` | `/api/v1/workspaces/{wid}/rag/ask` | RAG 질문 (SSE 스트리밍, 프로젝트 범위/시간/소스 필터) |
-| 26 | `GET` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 목록 |
-| 27 | `POST` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 생성 |
-| 28 | `PATCH` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 수정 (debounce 자동저장) |
-| 29 | `DELETE` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 삭제 |
+| 27 | `POST` | `/api/v1/workspaces/{wid}/rag/ask` | RAG 질문 (SSE 스트리밍, 프로젝트 범위/시간/소스 필터) |
+| 28 | `GET` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 목록 |
+| 29 | `POST` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 생성 |
+| 30 | `PATCH` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 수정 (debounce 자동저장) |
+| 31 | `DELETE` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 삭제 |
 
 ---
 
@@ -977,6 +1035,6 @@ ActionItem
 
 | # | Method | Path | 설명 |
 |:-:|--------|------|------|
-| 30 | `PATCH` | `/api/v1/workspaces/{id}/members/{uid}/role` | 역할 변경 |
-| 31 | `DELETE` | `/api/v1/workspaces/{id}/members/{uid}` | 멤버 제거 |
-| 32 | `POST` | `/api/v1/workspaces/{id}/invite` | 초대 링크 생성 |
+| 32 | `PATCH` | `/api/v1/workspaces/{id}/members/{uid}/role` | 역할 변경 |
+| 33 | `DELETE` | `/api/v1/workspaces/{id}/members/{uid}` | 멤버 제거 |
+| 34 | `POST` | `/api/v1/workspaces/{id}/invite` | 초대 링크 생성 |
