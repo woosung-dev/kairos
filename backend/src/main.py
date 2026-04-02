@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.auth.router import router as auth_router
 from src.core.lifespan import lifespan
 from src.meetings.router import router as meetings_router
+from src.projects.router import meeting_project_router, router as projects_router
 from src.upload.router import router as upload_router
 from src.workspaces.router import router as workspaces_router
 
@@ -26,6 +27,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(workspaces_router)
 app.include_router(meetings_router)
+app.include_router(projects_router)
+app.include_router(meeting_project_router)
 app.include_router(upload_router)
 
 
