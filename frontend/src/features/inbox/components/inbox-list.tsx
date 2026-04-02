@@ -2,17 +2,18 @@
 
 import { useState } from "react";
 import { EmptyState } from "@/components/empty-state";
-import type { InboxItem } from "../types";
+import { useInbox } from "../hooks";
+import { useWorkspaceStore } from "@/features/workspaces/store";
 import { InboxItemCard } from "./inbox-item-card";
 
 const FILTERS = ["전체", "미처리", "처리완료"] as const;
 
-interface InboxListProps {
-  items?: InboxItem[];
-}
-
-export function InboxList({ items = [] }: InboxListProps) {
+export function InboxList() {
   const [activeFilter, setActiveFilter] = useState<(typeof FILTERS)[number]>("전체");
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const { data, isLoading } = useInbox(activeWorkspaceId ?? undefined);
+
+  const items = data?.items ?? [];
 
   const filteredItems = items.filter((item) => {
     if (activeFilter === "미처리") return !item.isProcessed;
@@ -52,19 +53,30 @@ export function InboxList({ items = [] }: InboxListProps) {
         ))}
       </div>
 
+      {/* 로딩 */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-12">
+          <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+            불러오는 중...
+          </span>
+        </div>
+      )}
+
       {/* 카드 리스트 */}
-      {filteredItems.length === 0 ? (
+      {!isLoading && filteredItems.length === 0 ? (
         <EmptyState
           icon="📥"
           title="처리할 항목이 없습니다"
           description="회의를 녹음하거나 노트를 추가하면 AI가 자동으로 분류합니다"
         />
       ) : (
-        <div className="grid gap-3">
-          {filteredItems.map((item) => (
-            <InboxItemCard key={item.id} item={item} />
-          ))}
-        </div>
+        !isLoading && (
+          <div className="grid gap-3">
+            {filteredItems.map((item) => (
+              <InboxItemCard key={item.id} item={item} />
+            ))}
+          </div>
+        )
       )}
     </div>
   );
