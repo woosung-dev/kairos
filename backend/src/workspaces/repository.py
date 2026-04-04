@@ -51,6 +51,12 @@ class WorkspaceRepository:
         )
         return result.scalar_one_or_none()
 
+    async def find_by_workspace_and_user(
+        self, workspace_id: uuid.UUID, user_id: uuid.UUID
+    ) -> WorkspaceMember | None:
+        """워크스페이스-유저 조합으로 멤버 조회. RBAC 검증용."""
+        return await self.find_member(workspace_id, user_id)
+
     async def add_member(self, member: WorkspaceMember) -> WorkspaceMember:
         self.session.add(member)
         await self.session.flush()
