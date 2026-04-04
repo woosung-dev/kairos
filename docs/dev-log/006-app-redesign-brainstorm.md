@@ -86,6 +86,7 @@
 
 ---
 
-## 와이어프레임 참조
-- 레이아웃 비교: `/private/tmp/kairos-layout-compare/index.html`
-- RAG 상세 인터랙션: `/private/tmp/kairos-layout-compare/rag-detail.html`
+## 와이어프레임 참조 (docs/wireframes/ 에 보존)
+- 레이아웃 비교 (C/D/C|D): `docs/wireframes/layout-compare.html`
+- RAG 상세 인터랙션 ([1] 출처 클릭 + 소스 범위 선택): `docs/wireframes/rag-detail.html`
+- 랜딩 AIDA 프로토타입 (t-combined): `docs/wireframes/landing-combined.html`

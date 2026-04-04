@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kairos — AI가 정리합니다. 당신은 결정만.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Satoshi:wght@400;500;600;700;900&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+/* ═══ DESIGN.md Light (기본) ═══ */
+:root{
+  --bg:#FAFAFA;--surface:#FFFFFF;--surface-h:#F5F5F5;
+  --text:#111111;--text2:#6B6B73;--text3:#9E9EA6;
+  --accent:#0FA889;--accent-h:#0D9478;--accent-bg:rgba(15,168,137,0.05);--accent-bd:rgba(15,168,137,0.18);
+  /* DESIGN.md Category Colors → L1-L4 배지 */
+  --cat-project:#0FA889;--cat-area:#D97706;--cat-resource:#7C3AED;--cat-archive:#6B6B73;
+  --cat-project-bg:rgba(15,168,137,0.06);--cat-area-bg:rgba(217,119,6,0.06);
+  --cat-resource-bg:rgba(124,58,237,0.06);--cat-archive-bg:rgba(107,107,115,0.06);
+  --border:#E5E5E5;--border2:#F0F0F0;
+  --shadow:0 1px 3px rgba(0,0,0,0.04),0 1px 2px rgba(0,0,0,0.02);
+  --shadow-h:0 8px 24px rgba(0,0,0,0.07),0 2px 4px rgba(0,0,0,0.03);
+  --h:'Satoshi',sans-serif;--b:'Pretendard Variable','Pretendard',system-ui,sans-serif;--m:'Geist Mono',monospace;
+  --r:8px;--rl:12px;--ease:cubic-bezier(0,0,.2,1);color-scheme:light dark;
+}
+
+/* ═══ DESIGN.md Dark ═══ */
+@media(prefers-color-scheme:dark){:root{
+  --bg:#0A0A0B;--surface:#141416;--surface-h:#1A1A1E;
+  --text:#EDEDEF;--text2:#8E8E93;--text3:#5C5C63;
+  --accent:#3ECFB4;--accent-h:#35B39C;--accent-bg:rgba(62,207,180,0.08);--accent-bd:rgba(62,207,180,0.18);
+  --cat-project:#3ECFB4;--cat-area:#FBBF24;--cat-resource:#A78BFA;--cat-archive:#6B6B73;
+  --cat-project-bg:rgba(62,207,180,0.08);--cat-area-bg:rgba(251,191,36,0.08);
+  --cat-resource-bg:rgba(167,139,250,0.08);--cat-archive-bg:rgba(107,107,115,0.08);
+  --border:#2A2A2E;--border2:#1E1E22;
+  --shadow:0 1px 3px rgba(0,0,0,0.2);--shadow-h:0 8px 24px rgba(0,0,0,0.35);
+}}
+
+body{background:var(--bg);color:var(--text);font-family:var(--b);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--h);letter-spacing:-0.02em}
+a{text-decoration:none;color:inherit}
+
+/* ═══ A11y ═══ */
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+::selection{background:var(--accent);color:#fff}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.reveal{opacity:1!important;transform:none!important}}
+.reveal{opacity:0;transform:translateY(16px);transition:opacity .4s var(--ease),transform .4s var(--ease)}
+.reveal.visible{opacity:1;transform:none}
+
+/* ═══ Buttons (44px) ═══ */
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 24px;font-family:var(--h);font-size:14px;font-weight:600;border-radius:var(--r);cursor:pointer;transition:all .2s var(--ease);border:none;touch-action:manipulation}
+.btn:active{transform:scale(.97)}
+.btn-accent{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(15,168,137,0.18)}
+.btn-accent:hover{background:var(--accent-h);transform:translateY(-1px);box-shadow:0 4px 16px rgba(15,168,137,0.22)}
+.btn-ghost{border:1.5px solid var(--border);color:var(--text2);background:transparent}
+.btn-ghost:hover{border-color:var(--accent-bd);color:var(--accent)}
+
+/* ═══ Nav ═══ */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:14px 32px;display:flex;justify-content:space-between;align-items:center;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border2)}
+.logo{font-family:var(--h);font-weight:700;font-size:18px}
+nav .r{display:flex;align-items:center;gap:20px}
+nav a{font-size:13px;color:var(--text2);cursor:pointer;transition:color .1s}
+nav a:hover{color:var(--text)}
+nav .btn{min-height:36px;padding:0 16px;font-size:13px;box-shadow:none}
+
+/* ═══ 1. Hero — 약속 ═══ */
+.hero{max-width:800px;margin:0 auto;padding:152px 24px 48px;text-align:center}
+.hero .tag{display:inline-block;font-family:var(--m);font-size:12px;color:var(--accent);background:var(--accent-bg);border:1px solid var(--accent-bd);padding:5px 14px;border-radius:100px;margin-bottom:28px}
+.hero h1{font-size:clamp(32px,5.5vw,52px);font-weight:900;line-height:1.1;letter-spacing:-.035em;margin-bottom:20px}
+.hero h1 .acc{color:var(--accent)}
+.hero p{font-size:17px;color:var(--text2);max-width:540px;margin:0 auto 32px;line-height:1.8}
+.hero .ctas{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.hero .trust{margin-top:20px;font-family:var(--m);font-size:11px;color:var(--text3)}
+
+/* ═══ 2. 검색 데모 — 증거 (T3) ═══ */
+.search-w{max-width:620px;margin:0 auto;padding:20px 24px 80px}
+.search-lbl{font-family:var(--m);font-size:11px;color:var(--text3);text-align:center;margin-bottom:16px;letter-spacing:.04em}
+.sbox{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;box-shadow:var(--shadow-h)}
+.sinput{display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border2);gap:12px}
+.sinput .ic{color:var(--text3);flex-shrink:0}
+.sinput .q{font-size:15px;color:var(--text);flex:1}
+.sinput .kbd{font-family:var(--m);font-size:10px;color:var(--text3);background:var(--surface-h);padding:3px 10px;border-radius:4px;border:1px solid var(--border2)}
+.sresults{padding:6px}
+.sr{display:flex;gap:12px;padding:12px;border-radius:var(--r)}
+.sr:first-child{background:var(--accent-bg)}
+.sr .type{font-family:var(--m);font-size:10px;font-weight:500;padding:3px 7px;border-radius:3px;border:1px solid var(--border2);color:var(--text3);white-space:nowrap;margin-top:2px}
+.sr:first-child .type{border-color:var(--accent-bd);color:var(--accent)}
+.sr h4{font-size:14px;font-weight:600;margin-bottom:2px}
+.sr p{font-size:12px;color:var(--text3);line-height:1.55}
+.sr .src{font-family:var(--m);font-size:11px;color:var(--accent);margin-top:3px}
+
+/* ═══ 3. Before/After — 공감 (T3) ═══ */
+.s{max-width:960px;margin:0 auto;padding:80px 24px}
+.s h2{font-size:28px;font-weight:700;text-align:center;margin-bottom:8px}
+.s .sub{text-align:center;color:var(--text2);margin-bottom:48px;font-size:15px}
+.ba-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:740px;margin:0 auto}
+.ba-col{border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;box-shadow:var(--shadow)}
+.ba-col .hd{padding:14px 20px;font-family:var(--m);font-size:12px;font-weight:600;letter-spacing:.04em;border-bottom:1px solid var(--border2)}
+.ba-col.before .hd{color:var(--text3);background:var(--surface)}
+.ba-col.after .hd{color:var(--accent);background:var(--accent-bg)}
+.ba-col .items{padding:6px}
+.ba-item{padding:12px 16px;font-size:14px;line-height:1.6;border-bottom:1px solid var(--border2)}
+.ba-item:last-child{border-bottom:none}
+.ba-col.before .ba-item{color:var(--text3)}
+
+/* ═══ 4. Pipeline — 구조 (T1 디자인) ═══ */
+.pipe{display:flex;gap:12px;align-items:stretch}
+.pc{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:28px 22px;position:relative;transition:all .2s;box-shadow:var(--shadow)}
+.pc:hover{border-color:var(--accent-bd);box-shadow:var(--shadow-h);transform:translateY(-2px)}
+.pc.core{border-color:var(--accent);background:var(--accent-bg);box-shadow:0 2px 12px rgba(15,168,137,0.08)}
+.pc .lt{font-family:var(--h);font-size:36px;font-weight:900;color:var(--accent);opacity:.12;position:absolute;top:18px;right:18px;line-height:1}
+.pc.core .lt{opacity:.3}
+.pc h3{font-size:16px;font-weight:700;margin-bottom:6px}
+.pc p{font-size:13px;color:var(--text2);line-height:1.65}
+.pc .dt{margin-top:12px;padding-top:12px;border-top:1px solid var(--border2);font-family:var(--m);font-size:11px;color:var(--text3)}
+.pa{display:flex;align-items:center;color:var(--text3);font-size:18px;flex-shrink:0}
+
+/* Distill 하이라이트 (축약) */
+.distill-hl{max-width:700px;margin:-32px auto 0;padding:0 24px}
+.dbox{border:1px solid var(--accent-bd);border-radius:var(--rl);padding:24px;background:var(--accent-bg);display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center}
+.dbox .label{font-family:var(--m);font-size:11px;color:var(--accent);letter-spacing:.04em;white-space:nowrap}
+.lvs{display:flex;gap:8px;flex-wrap:wrap}
+.lv{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);font-size:12px}
+.lv .l{font-family:var(--m);font-weight:600}
+.lv1 .l{color:var(--cat-project)}.lv2 .l{color:var(--cat-area)}.lv3 .l{color:var(--cat-resource)}.lv4 .l{color:var(--cat-archive)}
+.lv .n{font-weight:500;color:var(--text2)}
+
+/* ═══ 5. 진화 타임라인 — 미래 (T3) ═══ */
+.evo{max-width:680px;margin:0 auto;padding-left:28px;position:relative}
+.evo::before{content:'';position:absolute;left:7px;top:24px;bottom:24px;width:1px;background:linear-gradient(to bottom,var(--cat-project),var(--cat-resource),var(--border))}
+.es{display:flex;gap:20px;padding:24px 0}
+.es .mk{flex-shrink:0;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--m);font-size:12px;font-weight:600;position:relative;z-index:1;margin-left:-22px}
+.mk1{background:var(--cat-project-bg);color:var(--cat-project);border:1px solid var(--accent-bd)}
+.mk2{background:var(--cat-resource-bg);color:var(--cat-resource);border:1px solid rgba(124,58,237,0.15)}
+.mk3{background:var(--cat-area-bg);color:var(--cat-area);border:1px solid rgba(217,119,6,0.15)}
+.es .time{font-family:var(--m);font-size:11px;color:var(--text3);margin-bottom:4px;letter-spacing:.04em}
+.es h3{font-size:16px;font-weight:700;margin-bottom:4px}
+.es p{font-size:14px;color:var(--text2);line-height:1.6}
+.es .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.es .tg{font-size:11px;padding:3px 8px;border-radius:4px;background:var(--surface-h);border:1px solid var(--border);color:var(--text2)}
+
+/* ═══ 6. Stats — 신뢰 (T1) ═══ */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:640px;margin:0 auto}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:24px 16px;text-align:center;box-shadow:var(--shadow)}
+.stat .num{font-family:var(--h);font-size:32px;font-weight:900;color:var(--accent)}
+.stat .lbl{font-size:13px;color:var(--text2);margin-top:4px}
+
+/* ═══ 7. CTA — 행동 (다크 반전) ═══ */
+.cta-s{max-width:600px;margin:0 auto;padding:0 24px 120px;text-align:center}
+.cta-box{background:var(--text);border-radius:16px;padding:48px 36px;color:#fff;box-shadow:0 8px 32px rgba(0,0,0,0.1)}
+@media(prefers-color-scheme:dark){.cta-box{background:#1A1A1E;box-shadow:0 8px 32px rgba(0,0,0,0.4)}}
+.cta-box h2{font-family:var(--h);font-size:26px;font-weight:700;margin-bottom:12px}
+.cta-box p{color:#94A3B8;margin-bottom:28px;font-size:15px;line-height:1.7}
+.cta-box .btn-accent{background:#fff;color:var(--text);box-shadow:none}
+@media(prefers-color-scheme:dark){.cta-box .btn-accent{background:var(--accent);color:#0A0A0B}}
+.cta-box .note{font-family:var(--m);font-size:11px;color:#5C5C63;margin-top:14px}
+footer{text-align:center;padding:32px 24px;font-size:12px;color:var(--text3)}
+
+/* ═══ Responsive ═══ */
+@media(max-width:768px){
+  .pipe{flex-direction:column}.pa{transform:rotate(90deg);justify-content:center;padding:4px 0}
+  .ba-grid{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr}
+  .evo::before{left:6px}
+  nav{padding:12px 16px}
+  .hero{padding:120px 16px 40px}
+  .dbox{flex-direction:column;text-align:center}
+}
+@media(max-width:480px){.hero h1{font-size:28px}.pipe .pc{padding:20px 16px}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">Kairos</div>
+  <div class="r"><a href="#pipe">기능</a><a href="#cta">요금</a><a href="#cta" class="btn btn-accent">시작하기</a></div>
+</nav>
+
+<!-- 1. Hero — 약속 -->
+<section class="hero reveal">
+  <div class="tag">Capture → Organize → Distill → Express</div>
+  <h1>AI가 정리합니다.<br><span class="acc">당신은 결정만 하세요.</span></h1>
+  <p>팀의 대화, 노트, 자료가 CODE 파이프라인을 거치면 자동으로 구조화된 지식이 됩니다. 세컨드 브레인의 가장 어려운 단계를 AI가 완전히 자동화합니다.</p>
+  <div class="ctas"><a href="#cta" class="btn btn-accent">무료로 시작하기</a><a href="#pipe" class="btn btn-ghost">어떻게 작동하나요?</a></div>
+  <div class="trust">설정 5분 · 14일 무료 · 신용카드 불필요</div>
+</section>
+
+<!-- 2. 검색 데모 — 증거 (T3 교훈 재활용 시나리오) -->
+<section class="search-w reveal">
+  <div class="search-lbl">CMD+K — 정리된 지식이 이렇게 활용됩니다</div>
+  <div class="sbox">
+    <div class="sinput">
+      <svg class="ic" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+      <span class="q">지난 프로젝트에서 런칭이 왜 늦어졌지?</span>
+      <span class="kbd">&#8984;K</span>
+    </div>
+    <div class="sresults">
+      <div class="sr"><span class="type">인사이트</span><div><h4>Q1 런칭 지연 원인: QA 시작 시점 문제</h4><p>개발 완료 2주 후에야 QA 시작. 긴급 버그 수정으로 일정 초과.</p><div class="src">Q1 프로젝트 아카이브 · L4 조직 인사이트</div></div></div>
+      <div class="sr"><span class="type">교훈</span><div><h4>현재 프로젝트에서 유사 패턴 감지</h4><p>QA 계획 미수립 상태. 조기 QA 시작을 권장합니다.</p><div class="src">프로액티브 인사이트 · 유사도 89%</div></div></div>
+      <div class="sr"><span class="type">회의</span><div><h4>Q1 회고: "QA를 스프린트 초반부터"</h4><p>팀 합의: 다음 프로젝트부터 QA 병행 진행.</p><div class="src">1/28 회고 회의 · 결정사항</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Before/After — 공감 (T3) -->
+<section class="s reveal">
+  <h2>이 문제들, 익숙하지 않으세요?</h2><p class="sub"></p>
+  <div class="ba-grid">
+    <div class="ba-col before"><div class="hd">WITHOUT KAIROS</div><div class="items">
+      <div class="ba-item">"회의록 어디에 있더라?"</div>
+      <div class="ba-item">"왜 그렇게 결정했는지 기억이 안 나"</div>
+      <div class="ba-item">"신입에게 맥락 전달이 몇 주 걸려"</div>
+      <div class="ba-item">"지난번에도 같은 실수를 했는데..."</div>
+    </div></div>
+    <div class="ba-col after"><div class="hd">WITH KAIROS</div><div class="items">
+      <div class="ba-item">Cmd+K → 소스와 함께 즉시 답변</div>
+      <div class="ba-item">모든 결정 맥락이 프로젝트에 자동 기록</div>
+      <div class="ba-item">프로젝트 인사이트로 온보딩 80% 단축</div>
+      <div class="ba-item">과거 교훈이 자동으로 표면화</div>
+    </div></div>
+  </div>
+</section>
+
+<!-- 4. Pipeline — 구조 (T1 떠있는 카드) -->
+<section class="s reveal" id="pipe">
+  <h2>CODE 파이프라인</h2>
+  <p class="sub">입력은 편하게, 정리는 AI가, 재활용은 자동으로</p>
+  <div class="pipe">
+    <div class="pc"><div class="lt">C</div><h3>Capture</h3><p>마찰 없는 입력. 녹음, 노트, 문서를 드래그 앤 드롭으로.</p><div class="dt">Whisper API · 화자 분리</div></div>
+    <span class="pa">→</span>
+    <div class="pc"><div class="lt">O</div><h3>Organize</h3><p>AI가 프로젝트에 자동 연결하고 태그를 부여합니다.</p><div class="dt">자동 매핑 · Inbox</div></div>
+    <span class="pa">→</span>
+    <div class="pc core"><div class="lt">D</div><h3>Distill</h3><p>4단계 자동 증류. 개별 요약에서 조직 인사이트까지.</p><div class="dt">L1→L2→L3→L4</div></div>
+    <span class="pa">→</span>
+    <div class="pc"><div class="lt">E</div><h3>Express</h3><p>축적된 지식을 RAG Q&A로 즉시 꺼냅니다.</p><div class="dt">소스 명시 · 신뢰도</div></div>
+  </div>
+</section>
+
+<!-- Distill 하이라이트 (축약) -->
+<section class="distill-hl reveal">
+  <div class="dbox">
+    <span class="label">DISTILL 4-LEVEL</span>
+    <div class="lvs">
+      <span class="lv lv1"><span class="l">L1</span><span class="n">콘텐츠 요약</span></span>
+      <span class="lv lv2"><span class="l">L2</span><span class="n">결정 + 액션</span></span>
+      <span class="lv lv3"><span class="l">L3</span><span class="n">프로젝트 인사이트</span></span>
+      <span class="lv lv4"><span class="l">L4</span><span class="n">조직 인사이트</span></span>
+    </div>
+  </div>
+</section>
+
+<!-- 5. 진화 타임라인 — 미래 (T3) -->
+<section class="s reveal">
+  <h2>팀이 진화하는 세 단계</h2><p class="sub"></p>
+  <div class="evo">
+    <div class="es"><div class="mk mk1">W1</div><div><div class="time">WEEK 1</div><h3>흩어진 지식이 한 곳에 모인다</h3><p>5분 설정, AI가 전사·요약·액션 아이템을 자동 추출하고 프로젝트에 연결.</p><div class="tags"><span class="tg">자동 전사</span><span class="tg">화자 분리</span><span class="tg">AI 요약</span></div></div></div>
+    <div class="es"><div class="mk mk2">M1</div><div><div class="time">MONTH 1</div><h3>지식이 연결되고 인사이트가 나타난다</h3><p>프로젝트 간 교차 인사이트 등장. 신입 온보딩 시간이 절반으로.</p><div class="tags"><span class="tg">프로젝트 인사이트</span><span class="tg">온보딩 단축</span></div></div></div>
+    <div class="es"><div class="mk mk3">Q1</div><div><div class="time">QUARTER 1</div><h3>조직이 같은 실수를 반복하지 않는다</h3><p>끝난 프로젝트의 교훈이 프로액티브 인사이트로 표면화. 팀이 진화합니다.</p><div class="tags"><span class="tg">조직 인사이트 (L4)</span><span class="tg">교훈 재활용</span></div></div></div>
+  </div>
+</section>
+
+<!-- 6. Stats — 신뢰 (T1) -->
+<section class="s reveal">
+  <div class="stats">
+    <div class="stat"><div class="num">95%</div><div class="lbl">수동 정리 시간 절감</div></div>
+    <div class="stat"><div class="num">12x</div><div class="lbl">지식 재활용률</div></div>
+    <div class="stat"><div class="num">24h</div><div class="lbl">첫 인사이트까지</div></div>
+  </div>
+</section>
+
+<!-- 7. CTA — 행동 -->
+<section class="cta-s reveal" id="cta">
+  <div class="cta-box">
+    <h2>팀의 세컨드 브레인을<br>지금 구축하세요</h2>
+    <p>14일 무료 · 신용카드 불필요 · 5분 설정<br>팀의 첫 인사이트는 24시간 이내에.</p>
+    <a href="#" class="btn btn-accent" style="padding:0 36px;font-size:15px">무료 체험 시작</a>
+    <div class="note">Google 워크스페이스 연동 · 팀 초대 무제한</div>
+  </div>
+</section>
+<footer>© 2024 Kairos — Team Second Brain</footer>
+
+<script>
+if(!matchMedia('(prefers-reduced-motion:reduce)').matches){
+  const o=new IntersectionObserver(e=>{e.forEach(x=>{if(x.isIntersecting){x.target.classList.add('visible');o.unobserve(x.target)}})},{threshold:.1});
+  document.querySelectorAll('.reveal').forEach(el=>o.observe(el))
+}else{document.querySelectorAll('.reveal').forEach(el=>el.classList.add('visible'))}
+</script>
+</body></html>

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kairos 레이아웃 비교 — C vs D vs C|D</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#eee;font-family:system-ui,sans-serif;padding:24px}
+h1{text-align:center;font-size:22px;margin-bottom:8px}
+p.sub{text-align:center;color:#888;margin-bottom:32px;font-size:14px}
+h2{font-size:18px;margin-bottom:12px;color:#3ECFB4}
+.desc{color:#999;font-size:13px;margin-bottom:16px;line-height:1.6}
+.section{margin-bottom:48px;max-width:1100px;margin-left:auto;margin-right:auto}
+
+/* 와이어프레임 공통 */
+.wire{border:1px solid #333;border-radius:8px;overflow:hidden;height:480px;position:relative;background:#0A0A0B}
+.wire .topbar{height:40px;background:#141416;border-bottom:1px solid #2A2A2E;display:flex;align-items:center;padding:0 12px;gap:8px;font-size:12px;color:#8E8E93}
+.wire .topbar .logo{color:#3ECFB4;font-weight:700;font-size:14px}
+.wire .topbar .search-bar{flex:1;max-width:400px;height:28px;background:#1A1A1E;border:1px solid #2A2A2E;border-radius:4px;display:flex;align-items:center;padding:0 10px;color:#5C5C63;font-size:11px;margin-left:auto;margin-right:auto}
+.wire .topbar .btn{background:#3ECFB4;color:#0A0A0B;padding:4px 12px;border-radius:4px;font-size:11px;font-weight:600}
+.wire .body{display:flex;height:calc(100% - 40px)}
+
+/* 패널들 */
+.sidebar{width:200px;background:#141416;border-right:1px solid #2A2A2E;padding:12px;font-size:11px;flex-shrink:0;overflow:hidden}
+.sidebar .nav-label{color:#5C5C63;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;margin-top:12px}
+.sidebar .nav-item{padding:5px 8px;border-radius:4px;color:#8E8E93;margin-bottom:2px;cursor:default}
+.sidebar .nav-item.active{background:rgba(62,207,180,0.1);color:#3ECFB4}
+.sidebar .nav-item .indent{padding-left:16px;color:#5C5C63;font-size:10px}
+.sidebar .source-item{padding:4px 8px 4px 24px;color:#5C5C63;font-size:10px;display:flex;align-items:center;gap:4px}
+.sidebar .source-item::before{content:'📄';font-size:9px}
+.sidebar .source-item.audio::before{content:'🎙'}
+
+.main{flex:1;background:#0A0A0B;padding:20px;overflow:hidden;position:relative}
+.main .page-title{font-size:16px;font-weight:700;color:#EDEDEF;margin-bottom:4px}
+.main .page-sub{font-size:12px;color:#5C5C63;margin-bottom:16px}
+
+.rag-panel{width:280px;background:#141416;border-left:1px solid #2A2A2E;padding:12px;font-size:11px;flex-shrink:0;display:flex;flex-direction:column}
+.rag-panel .rag-title{font-size:12px;font-weight:600;color:#EDEDEF;margin-bottom:8px}
+.rag-panel .rag-input{height:32px;background:#1A1A1E;border:1px solid #2A2A2E;border-radius:4px;display:flex;align-items:center;padding:0 8px;color:#5C5C63;font-size:11px;margin-bottom:12px}
+.rag-panel .msg{padding:8px;border-radius:6px;margin-bottom:6px;font-size:11px;line-height:1.5}
+.msg.user{background:rgba(62,207,180,0.08);color:#EDEDEF;text-align:right}
+.msg.ai{background:#1A1A1E;color:#EDEDEF}
+.msg .cite{color:#3ECFB4;font-size:10px;cursor:pointer;text-decoration:underline}
+.msg .src{font-size:9px;color:#5C5C63;margin-top:4px}
+
+/* 콘텐츠 mock */
+.mock-card{background:#141416;border:1px solid #2A2A2E;border-radius:6px;padding:12px;margin-bottom:8px}
+.mock-card .title{font-size:12px;font-weight:600;color:#EDEDEF;margin-bottom:4px}
+.mock-card .meta{font-size:10px;color:#5C5C63}
+.mock-card .body{font-size:11px;color:#8E8E93;margin-top:6px;line-height:1.5}
+
+.mock-tabs{display:flex;gap:0;margin-bottom:12px;border-bottom:1px solid #2A2A2E}
+.mock-tab{padding:6px 12px;font-size:11px;color:#5C5C63;border-bottom:2px solid transparent}
+.mock-tab.active{color:#3ECFB4;border-color:#3ECFB4}
+
+/* Overlay (D, C|D) */
+.overlay{position:absolute;top:0;right:0;width:320px;height:100%;background:#141416;border-left:1px solid #3ECFB4;padding:12px;display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,0.4)}
+.overlay .close{position:absolute;top:8px;right:8px;color:#5C5C63;font-size:14px;cursor:pointer}
+.overlay .rag-title{font-size:12px;font-weight:600;color:#EDEDEF;margin-bottom:8px}
+
+/* Source viewer (메인 안에) */
+.source-viewer{background:#141416;border:1px solid #2A2A2E;border-radius:6px;padding:12px;height:200px;overflow:hidden}
+.source-viewer .sv-title{font-size:12px;font-weight:600;color:#EDEDEF;margin-bottom:8px}
+.source-viewer .sv-body{font-size:10px;color:#8E8E93;line-height:1.6}
+.source-viewer .highlight{background:rgba(62,207,180,0.15);padding:1px 2px;border-radius:2px}
+
+/* 라벨/배지 */
+.label{position:absolute;top:8px;right:12px;font-size:10px;padding:3px 8px;border-radius:4px;font-weight:600}
+.label-c{background:rgba(62,207,180,0.1);color:#3ECFB4}
+.label-d{background:rgba(167,139,250,0.1);color:#A78BFA}
+.label-cd{background:rgba(251,191,36,0.1);color:#FBBF24}
+
+.score{display:inline-block;font-size:20px;font-weight:700;margin-right:8px}
+.score-detail{font-size:12px;color:#888}
+</style>
+</head>
+<body>
+<h1>Kairos 레이아웃 비교</h1>
+<p class="sub">C (컨텍스트 전환형) vs D (2-Panel + 오버레이) vs C|D (절충안)</p>
+
+<!-- ═══ C ═══ -->
+<div class="section">
+  <h2>C. 컨텍스트 전환형 — <span class="score">7.5</span><span class="score-detail">프로젝트+소스 트리 / 메인 / RAG 상시</span></h2>
+  <p class="desc">좌측: 프로젝트 네비 + 선택 시 소스 목록 트리 펼침. 우측: RAG 패널 상시 노출 (320px). 메인 영역이 가장 좁음.</p>
+  <div class="wire">
+    <span class="label label-c">C안</span>
+    <div class="topbar">
+      <span class="logo">Kairos</span>
+      <span style="color:#5C5C63">CMS 고도화 프로젝트</span>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        <span style="color:#5C5C63">⌘K</span>
+      </div>
+    </div>
+    <div class="body">
+      <!-- 사이드바 -->
+      <div class="sidebar">
+        <div class="nav-label">프로젝트</div>
+        <div class="nav-item active">CMS 고도화</div>
+        <!-- 소스 트리 펼침 -->
+        <div class="source-item audio">3/12 마케팅 리뷰 회의</div>
+        <div class="source-item audio">3/19 전략 회의</div>
+        <div class="source-item">CMS 요구사항정리.docx</div>
+        <div class="source-item">시스템 아키텍처.pdf</div>
+        <div class="source-item">가정연합 CMS 업그레이드.txt</div>
+        <div class="nav-item">보안 인프라</div>
+        <div class="nav-item">마케팅 Q2</div>
+        <div class="nav-label" style="margin-top:16px">상태</div>
+        <div class="nav-item" style="color:#3ECFB4;font-size:10px">● Active (3)</div>
+        <div class="nav-item" style="color:#6B6B73;font-size:10px">● Archived (5)</div>
+      </div>
+
+      <!-- 메인 (좁음) -->
+      <div class="main" style="max-width:calc(100% - 200px - 280px)">
+        <div class="page-title">CMS 고도화 프로젝트</div>
+        <div class="page-sub">소스 5개 · 회의 2건 · 액션 7건</div>
+        <div class="mock-tabs">
+          <div class="mock-tab active">요약</div>
+          <div class="mock-tab">회의록</div>
+          <div class="mock-tab">노트</div>
+          <div class="mock-tab">액션</div>
+          <div class="mock-tab">내보내기</div>
+        </div>
+        <div class="mock-card">
+          <div class="title">L3 프로젝트 인사이트</div>
+          <div class="meta">자동 생성 · 2026-04-03</div>
+          <div class="body">DB 마이그레이션과 CMS 실시간 연동이 핵심 과제로 반복 언급됨. 미완료 액션 7건 중 3건이 이번 주 마감.</div>
+        </div>
+        <div class="mock-card">
+          <div class="title">3/19 전략 회의 요약</div>
+          <div class="meta">L1 · 참석 4명 · 42분</div>
+          <div class="body">하나로행정과 CMS 실시간 연동 방안 논의. PostgreSQL 전환 + 보안통신 도입 결정.</div>
+        </div>
+      </div>
+
+      <!-- RAG 패널 (상시) -->
+      <div class="rag-panel">
+        <div class="rag-title">지식 검색</div>
+        <div class="rag-input">무엇이든 질문하세요...</div>
+        <div class="msg user">DB 권한 지연 대응 방법은?</div>
+        <div class="msg ai">
+          3/12 회의에서 논의된 대응 방안은 다음과 같습니다:
+          <br><br>
+          1. 임시 읽기 전용 권한으로 개발 시작 <span class="cite">[1]</span>
+          <br>
+          2. DBA팀과 주간 동기화 미팅 신설 <span class="cite">[2]</span>
+          <div class="src">소스: 3/12 마케팅 리뷰 · 신뢰도 94%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ D ═══ -->
+<div class="section">
+  <h2 style="color:#A78BFA">D. 2-Panel + 오버레이 — <span class="score">7.5</span><span class="score-detail">프로젝트+소스 사이드바 / 넓은 메인 / RAG는 Cmd+K 오버레이</span></h2>
+  <p class="desc">좌측: 프로젝트+소스 통합 사이드바. RAG 패널 없음 — Cmd+K로 호출하면 우측에서 슬라이드 인. 메인 영역이 가장 넓음.</p>
+  <div class="wire">
+    <span class="label label-d">D안</span>
+    <div class="topbar">
+      <span class="logo">Kairos</span>
+      <div class="search-bar">⌘K 질문하거나 검색...</div>
+      <span class="btn">+ 새 회의</span>
+    </div>
+    <div class="body">
+      <!-- 사이드바 -->
+      <div class="sidebar">
+        <div class="nav-label">프로젝트</div>
+        <div class="nav-item active">CMS 고도화</div>
+        <div class="source-item audio">3/12 마케팅 리뷰 회의</div>
+        <div class="source-item audio">3/19 전략 회의</div>
+        <div class="source-item">CMS 요구사항정리.docx</div>
+        <div class="source-item">시스템 아키텍처.pdf</div>
+        <div class="source-item">가정연합 CMS 업그레이드.txt</div>
+        <div class="nav-item">보안 인프라</div>
+        <div class="nav-item">마케팅 Q2</div>
+        <div class="nav-label" style="margin-top:16px">빠른 접근</div>
+        <div class="nav-item">📥 Inbox (3)</div>
+        <div class="nav-item">✅ 오늘 마감 (2)</div>
+      </div>
+
+      <!-- 넓은 메인 -->
+      <div class="main">
+        <div class="page-title">CMS 고도화 프로젝트</div>
+        <div class="page-sub">소스 5개 · 회의 2건 · 액션 7건</div>
+        <div class="mock-tabs">
+          <div class="mock-tab active">요약</div>
+          <div class="mock-tab">회의록</div>
+          <div class="mock-tab">노트</div>
+          <div class="mock-tab">액션</div>
+          <div class="mock-tab">내보내기</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="mock-card">
+            <div class="title">L3 프로젝트 인사이트</div>
+            <div class="meta">자동 생성 · 2026-04-03</div>
+            <div class="body">DB 마이그레이션과 CMS 실시간 연동이 핵심 과제. 미완료 액션 7건 중 3건이 이번 주 마감. "보안통신 도입" 주제 3회 반복.</div>
+          </div>
+          <div class="mock-card">
+            <div class="title">3/19 전략 회의 요약</div>
+            <div class="meta">L1 · 참석 4명 · 42분</div>
+            <div class="body">하나로행정과 CMS 실시간 연동 방안 논의. PostgreSQL 전환 + 보안통신 도입 결정. 예산 재검토 필요.</div>
+          </div>
+          <div class="mock-card">
+            <div class="title">3/12 마케팅 리뷰 요약</div>
+            <div class="meta">L1 · 참석 3명 · 35분</div>
+            <div class="body">SNS → 콘텐츠 마케팅 전환 결정. 월 8건 블로그, 뉴스레터 격주. DB 권한 지연 이슈 공유.</div>
+          </div>
+          <div class="mock-card">
+            <div class="title">미완료 액션 (7건)</div>
+            <div class="meta">3건 이번주 마감</div>
+            <div class="body">□ 콘텐츠 캘린더 초안 (4/5)<br>□ DB 권한 요청서 제출 (4/4)<br>□ 보안통신 PoC 검토 (4/7)</div>
+          </div>
+        </div>
+        <!-- RAG 슬라이드 오버레이 (Cmd+K 누르면 나타남) -->
+        <div class="overlay">
+          <span class="close">✕</span>
+          <div class="rag-title">지식 검색 (⌘K)</div>
+          <div class="rag-input" style="height:32px;background:#1A1A1E;border:1px solid #2A2A2E;border-radius:4px;display:flex;align-items:center;padding:0 8px;color:#5C5C63;font-size:11px;margin-bottom:12px">DB 권한 지연 대응 방법은?</div>
+          <div class="msg ai">
+            3/12 회의에서 논의된 대응 방안:
+            <br><br>
+            1. 임시 읽기 전용 권한으로 개발 시작 <span class="cite">[1]</span>
+            <br>
+            2. DBA팀과 주간 동기화 미팅 신설 <span class="cite">[2]</span>
+            <div class="src">소스: 3/12 마케팅 리뷰 · 신뢰도 94%</div>
+          </div>
+          <div style="margin-top:auto;padding-top:8px;border-top:1px solid #2A2A2E">
+            <div class="rag-input" style="height:32px;background:#1A1A1E;border:1px solid #2A2A2E;border-radius:4px;display:flex;align-items:center;padding:0 8px;color:#5C5C63;font-size:11px">후속 질문...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ C|D ═══ -->
+<div class="section">
+  <h2 style="color:#FBBF24">C|D. 절충안 — <span class="score">8.5</span><span class="score-detail">프로젝트+소스 트리 / 넓은 메인 + 상단 검색바 / RAG 슬라이드 오버레이</span></h2>
+  <p class="desc">C의 프로젝트+소스 트리 + D의 넓은 메인. 상단 바에 RAG 검색 항상 노출 (접근성). Cmd+K 또는 클릭 시 우측 오버레이로 RAG 대화. 소스 뷰어는 메인 영역에 열림.</p>
+  <div class="wire">
+    <span class="label label-cd">C|D 절충안 (추천)</span>
+    <div class="topbar">
+      <span class="logo">Kairos</span>
+      <div class="search-bar">🔍 팀 지식 검색... ⌘K</div>
+      <span class="btn">+ 새 회의</span>
+    </div>
+    <div class="body">
+      <!-- 사이드바 (C의 트리) -->
+      <div class="sidebar">
+        <div class="nav-item" style="color:#EDEDEF;font-weight:600;font-size:12px">📥 Inbox <span style="color:#3ECFB4;font-size:10px;margin-left:auto">3</span></div>
+        <div class="nav-item" style="color:#EDEDEF;font-size:11px">✅ 오늘 할 일 <span style="color:#F0963C;font-size:10px">2</span></div>
+        <div class="nav-label">프로젝트</div>
+        <div class="nav-item active">CMS 고도화</div>
+        <div class="source-item audio">3/12 마케팅 리뷰 회의</div>
+        <div class="source-item audio">3/19 전략 회의</div>
+        <div class="source-item">CMS 요구사항정리.docx</div>
+        <div class="source-item">시스템 아키텍처.pdf</div>
+        <div class="source-item">가정연합 CMS 업그레이드.txt</div>
+        <div class="nav-item">보안 인프라</div>
+        <div class="nav-item">마케팅 Q2</div>
+        <div class="nav-label" style="margin-top:16px">Archive</div>
+        <div class="nav-item" style="color:#5C5C63;font-size:10px">Q1 런칭 프로젝트</div>
+      </div>
+
+      <!-- 넓은 메인 (D의 장점) -->
+      <div class="main">
+        <div class="page-title">CMS 고도화 프로젝트</div>
+        <div class="page-sub">소스 5개 · 회의 2건 · 노트 3건 · 액션 7건 · <span style="color:#3ECFB4">L3 인사이트 업데이트됨</span></div>
+        <div class="mock-tabs">
+          <div class="mock-tab active">요약</div>
+          <div class="mock-tab">회의록</div>
+          <div class="mock-tab">노트</div>
+          <div class="mock-tab">액션</div>
+          <div class="mock-tab">인사이트</div>
+          <div class="mock-tab">내보내기 ↗</div>
+        </div>
+
+        <!-- 2컬럼 레이아웃 (넓은 메인 활용) -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <!-- 인사이트 카드 (프로액티브) -->
+          <div class="mock-card" style="border-color:rgba(62,207,180,0.3);grid-column:span 2">
+            <div class="title" style="color:#3ECFB4">💡 프로액티브 인사이트</div>
+            <div class="body">"보안통신 도입" 주제가 최근 3개 회의에서 반복됨. Q1 런칭 프로젝트의 "늦은 QA" 교훈과 유사한 패턴 감지 — <span style="color:#3ECFB4">조기 QA 시작 권장</span></div>
+          </div>
+
+          <div class="mock-card">
+            <div class="title">3/19 전략 회의</div>
+            <div class="meta">L1 요약 · 42분 · 4명</div>
+            <div class="body">PostgreSQL 전환 + 보안통신 도입 결정. 예산 재검토 필요.</div>
+          </div>
+
+          <div class="mock-card">
+            <div class="title">이번 주 액션 (3건)</div>
+            <div class="meta">7건 중 3건 마감 임박</div>
+            <div class="body">□ 콘텐츠 캘린더 초안 (4/5)<br>□ DB 권한 요청서 (4/4)<br>□ 보안통신 PoC (4/7)</div>
+          </div>
+        </div>
+
+        <!-- 소스 뷰어 (메인 내에서 열림) -->
+        <div class="source-viewer" style="margin-top:8px">
+          <div class="sv-title">📄 가정연합 CMS 업그레이드.txt — <span style="color:#3ECFB4;font-size:10px">출처 [1]에서 열림</span></div>
+          <div class="sv-body">
+            가정연합 CMS 시스템 업그레이드 주요내용<br><br>
+            주요대상 현행 업그레이드 후<br>
+            1. <span class="highlight">DB변경 로컬 Firebird MS SQL SERVER</span><br>
+            2. 회원정보관리 cms 회원관리에서 별도입력 가정연한 회원관리에서 온라인 입력 처리...<br><br>
+            <span style="color:#3ECFB4;font-size:10px">↑ RAG 응답 [1]의 원문 위치</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 비교 표 -->
+<div class="section" style="margin-top:48px">
+  <h2 style="color:#eee">비교 요약</h2>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:16px">
+    <tr style="border-bottom:1px solid #333">
+      <th style="text-align:left;padding:8px;color:#888">기준</th>
+      <th style="text-align:center;padding:8px;color:#3ECFB4">C</th>
+      <th style="text-align:center;padding:8px;color:#A78BFA">D</th>
+      <th style="text-align:center;padding:8px;color:#FBBF24">C|D (추천)</th>
+    </tr>
+    <tr style="border-bottom:1px solid #222"><td style="padding:8px;color:#888">메인 영역 너비</td><td style="text-align:center;padding:8px;color:#F87171">좁음 (3패널)</td><td style="text-align:center;padding:8px;color:#34D399">넓음</td><td style="text-align:center;padding:8px;color:#34D399">넓음</td></tr>
+    <tr style="border-bottom:1px solid #222"><td style="padding:8px;color:#888">RAG 접근성</td><td style="text-align:center;padding:8px;color:#34D399">항상 보임</td><td style="text-align:center;padding:8px;color:#FBBF24">Cmd+K 필요</td><td style="text-align:center;padding:8px;color:#34D399">상단바 항상 + 오버레이</td></tr>
+    <tr style="border-bottom:1px solid #222"><td style="padding:8px;color:#888">소스 트리</td><td style="text-align:center;padding:8px;color:#34D399">있음</td><td style="text-align:center;padding:8px;color:#34D399">있음</td><td style="text-align:center;padding:8px;color:#34D399">있음 + Inbox/오늘</td></tr>
+    <tr style="border-bottom:1px solid #222"><td style="padding:8px;color:#888">소스 뷰어 위치</td><td style="text-align:center;padding:8px;color:#FBBF24">메인 (좁아서 불편)</td><td style="text-align:center;padding:8px;color:#34D399">메인 (넓어서 여유)</td><td style="text-align:center;padding:8px;color:#34D399">메인 (넓어서 여유)</td></tr>
+    <tr style="border-bottom:1px solid #222"><td style="padding:8px;color:#888">인라인 출처 클릭</td><td style="text-align:center;padding:8px;color:#FBBF24">RAG→메인 전환 복잡</td><td style="text-align:center;padding:8px;color:#34D399">오버레이→메인 자연스럽</td><td style="text-align:center;padding:8px;color:#34D399">오버레이→메인 소스뷰어</td></tr>
+    <tr style="border-bottom:1px solid #222"><td style="padding:8px;color:#888">모바일 대응</td><td style="text-align:center;padding:8px;color:#F87171">3→1 복잡</td><td style="text-align:center;padding:8px;color:#34D399">2→1 자연스럽</td><td style="text-align:center;padding:8px;color:#34D399">2→1 자연스럽</td></tr>
+    <tr><td style="padding:8px;color:#888;font-weight:700">총점</td><td style="text-align:center;padding:8px;color:#3ECFB4;font-weight:700">7.5</td><td style="text-align:center;padding:8px;color:#A78BFA;font-weight:700">7.5</td><td style="text-align:center;padding:8px;color:#FBBF24;font-weight:700">8.5</td></tr>
+  </table>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RAG 상세 인터랙션 — 출처 클릭 + 소스 범위 선택</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0A0A0B;color:#EDEDEF;font-family:'Pretendard Variable',system-ui,sans-serif;font-size:14px;line-height:1.6;padding:24px}
+h1{text-align:center;font-size:20px;margin-bottom:6px;font-family:'Satoshi',sans-serif}
+p.sub{text-align:center;color:#5C5C63;margin-bottom:32px;font-size:13px}
+h2{font-size:16px;margin-bottom:12px;color:#3ECFB4;font-family:'Satoshi',sans-serif}
+.desc{color:#8E8E93;font-size:12px;margin-bottom:16px;line-height:1.6}
+.section{margin-bottom:56px;max-width:1100px;margin-left:auto;margin-right:auto}
+.step-label{display:inline-block;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600;margin-bottom:12px}
+.step-1{background:rgba(62,207,180,0.1);color:#3ECFB4}
+.step-2{background:rgba(167,139,250,0.1);color:#A78BFA}
+.step-3{background:rgba(251,191,36,0.1);color:#FBBF24}
+
+/* 와이어프레임 */
+.wire{border:1px solid #2A2A2E;border-radius:8px;overflow:hidden;background:#0A0A0B;position:relative}
+.topbar{height:40px;background:#141416;border-bottom:1px solid #2A2A2E;display:flex;align-items:center;padding:0 12px;gap:8px;font-size:12px;color:#8E8E93}
+.topbar .logo{color:#3ECFB4;font-weight:700;font-size:14px}
+.topbar .search-bar{flex:1;max-width:400px;height:28px;background:#1A1A1E;border:1px solid #2A2A2E;border-radius:4px;display:flex;align-items:center;padding:0 10px;color:#5C5C63;font-size:11px;margin:0 auto}
+.body{display:flex;height:500px}
+
+.sidebar{width:200px;background:#141416;border-right:1px solid #2A2A2E;padding:12px;font-size:11px;flex-shrink:0}
+.nav-label{color:#5C5C63;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;margin-top:10px}
+.nav-item{padding:5px 8px;border-radius:4px;color:#8E8E93;margin-bottom:2px}
+.nav-item.active{background:rgba(62,207,180,0.1);color:#3ECFB4}
+.source-item{padding:3px 8px 3px 20px;color:#5C5C63;font-size:10px;display:flex;align-items:center;gap:4px}
+
+.main{flex:1;padding:16px;overflow-y:auto;position:relative}
+
+/* RAG 오버레이 */
+.rag-overlay{position:absolute;top:0;right:0;width:340px;height:100%;background:#141416;border-left:1px solid #3ECFB4;display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,0.4);z-index:10}
+.rag-header{padding:10px 12px;border-bottom:1px solid #2A2A2E;display:flex;align-items:center;justify-content:space-between}
+.rag-header .title{font-size:12px;font-weight:600}
+.rag-header .close{color:#5C5C63;cursor:pointer;font-size:16px}
+.rag-body{flex:1;padding:12px;overflow-y:auto}
+.rag-footer{padding:10px 12px;border-top:1px solid #2A2A2E}
+.rag-input{height:36px;background:#1A1A1E;border:1px solid #2A2A2E;border-radius:6px;display:flex;align-items:center;padding:0 10px;color:#5C5C63;font-size:12px;width:100%}
+
+/* 소스 필터 */
+.source-filter{padding:10px 12px;border-bottom:1px solid #2A2A2E;background:#0A0A0B}
+.source-filter .filter-title{font-size:11px;color:#5C5C63;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.source-filter .filter-title .toggle{color:#3ECFB4;font-size:10px;cursor:pointer}
+.filter-chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:4px;font-size:10px;border:1px solid #2A2A2E;cursor:pointer;transition:all 0.15s}
+.chip.on{background:rgba(62,207,180,0.08);border-color:rgba(62,207,180,0.3);color:#3ECFB4}
+.chip.off{background:transparent;border-color:#2A2A2E;color:#5C5C63;opacity:0.5}
+.chip .check{font-size:9px}
+.chip .icon{font-size:9px}
+
+/* 채팅 메시지 */
+.msg{padding:10px;border-radius:8px;margin-bottom:8px;font-size:12px;line-height:1.6}
+.msg.user{background:rgba(62,207,180,0.06);color:#EDEDEF;text-align:right}
+.msg.ai{background:#1A1A1E;color:#EDEDEF}
+.cite{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;font-size:9px;font-weight:700;cursor:pointer;transition:all 0.15s;vertical-align:middle;margin:0 1px}
+.cite-1{background:rgba(62,207,180,0.15);color:#3ECFB4}
+.cite-1:hover,.cite-1.active{background:#3ECFB4;color:#0A0A0B}
+.cite-2{background:rgba(167,139,250,0.15);color:#A78BFA}
+.cite-2:hover,.cite-2.active{background:#A78BFA;color:#0A0A0B}
+.cite-3{background:rgba(251,191,36,0.15);color:#FBBF24}
+.cite-3:hover,.cite-3.active{background:#FBBF24;color:#0A0A0B}
+.msg .src-line{font-size:10px;color:#5C5C63;margin-top:6px;display:flex;gap:8px}
+.msg .src-tag{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:3px;font-size:9px;background:#1A1A1E;border:1px solid #2A2A2E}
+.msg .actions{display:flex;gap:6px;margin-top:8px}
+.msg .action-btn{font-size:10px;color:#5C5C63;padding:3px 8px;border:1px solid #2A2A2E;border-radius:4px;cursor:pointer}
+.msg .action-btn:hover{border-color:#3ECFB4;color:#3ECFB4}
+
+/* 메인 콘텐츠 — 소스 뷰어 */
+.page-title{font-size:15px;font-weight:700;margin-bottom:4px;font-family:'Satoshi',sans-serif}
+.page-sub{font-size:11px;color:#5C5C63;margin-bottom:12px}
+
+.source-viewer{background:#141416;border:1px solid #2A2A2E;border-radius:8px;overflow:hidden}
+.sv-header{padding:10px 14px;border-bottom:1px solid #2A2A2E;display:flex;align-items:center;justify-content:space-between}
+.sv-header .sv-title{font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px}
+.sv-header .sv-actions{display:flex;gap:6px}
+.sv-header .sv-btn{font-size:10px;color:#5C5C63;padding:3px 8px;border:1px solid #2A2A2E;border-radius:4px;cursor:pointer}
+.sv-header .sv-btn:hover{border-color:#3ECFB4;color:#3ECFB4}
+.sv-body{padding:14px;font-size:12px;color:#8E8E93;line-height:1.8;max-height:350px;overflow-y:auto}
+.sv-body .hl{background:rgba(62,207,180,0.15);color:#EDEDEF;padding:2px 4px;border-radius:3px;border-left:3px solid #3ECFB4}
+.sv-body .hl-2{background:rgba(167,139,250,0.12);color:#EDEDEF;padding:2px 4px;border-radius:3px;border-left:3px solid #A78BFA}
+.sv-body .section-break{border-top:1px solid #2A2A2E;margin:12px 0;padding-top:12px}
+.cite-marker{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:3px;font-size:8px;font-weight:700;vertical-align:middle;margin-right:4px}
+
+/* 화살표 안내 */
+.arrow-guide{position:absolute;z-index:20}
+.arrow-label{font-size:11px;padding:4px 10px;border-radius:4px;white-space:nowrap}
+
+/* 두 번째 와이어프레임: 소스 범위 선택 상세 */
+.filter-panel{background:#141416;border:1px solid #2A2A2E;border-radius:8px;overflow:hidden;max-width:360px}
+.fp-header{padding:10px 14px;border-bottom:1px solid #2A2A2E;font-size:12px;font-weight:600}
+.fp-body{padding:10px 14px}
+.fp-section{margin-bottom:12px}
+.fp-section-title{font-size:10px;color:#5C5C63;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.fp-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;font-size:11px;cursor:pointer;transition:background 0.1s}
+.fp-item:hover{background:#1A1A1E}
+.fp-item .checkbox{width:16px;height:16px;border:1.5px solid #2A2A2E;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
+.fp-item .checkbox.checked{background:rgba(62,207,180,0.15);border-color:#3ECFB4;color:#3ECFB4}
+.fp-item .icon{font-size:12px;flex-shrink:0}
+.fp-item .name{flex:1;color:#EDEDEF}
+.fp-item .meta{color:#5C5C63;font-size:10px}
+.fp-item.disabled .name{color:#5C5C63}
+
+.scope-bar{display:flex;gap:4px;margin-bottom:8px}
+.scope-btn{padding:4px 10px;border-radius:4px;font-size:10px;border:1px solid #2A2A2E;cursor:pointer;color:#5C5C63}
+.scope-btn.active{background:rgba(62,207,180,0.08);border-color:rgba(62,207,180,0.3);color:#3ECFB4}
+</style>
+</head>
+<body>
+
+<h1>RAG 상세 인터랙션</h1>
+<p class="sub">[1] 출처 클릭 흐름 + 소스 범위 선택 UI</p>
+
+<!-- ═══ 시나리오 1: [1] 클릭 → 소스 원문 하이라이트 ═══ -->
+<div class="section">
+  <span class="step-label step-1">시나리오 1</span>
+  <h2>[1] 출처 클릭 → 소스 원문 하이라이트</h2>
+  <p class="desc">RAG 응답의 인라인 번호 [1] [2]를 클릭하면, 메인 영역에 해당 소스 문서가 열리고 원문 위치가 하이라이트됩니다.</p>
+
+  <div class="wire" style="height:540px">
+    <div class="topbar">
+      <span class="logo">Kairos</span>
+      <div class="search-bar">🔍 팀 지식 검색... ⌘K</div>
+    </div>
+    <div class="body">
+      <!-- 사이드바 -->
+      <div class="sidebar">
+        <div class="nav-item" style="font-size:11px;color:#EDEDEF">📥 Inbox <span style="color:#3ECFB4;font-size:10px">3</span></div>
+        <div class="nav-label">프로젝트</div>
+        <div class="nav-item active">CMS 고도화</div>
+        <div class="source-item" style="color:#3ECFB4">📄 가정연합 CMS 업그레이드.txt</div>
+        <div class="source-item">🎙 3/12 마케팅 리뷰 회의</div>
+        <div class="source-item">🎙 3/19 전략 회의</div>
+        <div class="source-item">📄 CMS 요구사항정리.docx</div>
+        <div class="source-item">📄 시스템 아키텍처.pdf</div>
+        <div class="nav-item">보안 인프라</div>
+      </div>
+
+      <!-- 메인: 소스 뷰어가 열린 상태 -->
+      <div class="main" style="padding:16px;overflow-y:auto">
+        <div class="page-sub" style="margin-bottom:8px">← CMS 고도화 프로젝트 / 소스 뷰어</div>
+
+        <div class="source-viewer">
+          <div class="sv-header">
+            <div class="sv-title">
+              📄 가정연합 CMS 업그레이드.txt
+              <span style="font-size:10px;color:#5C5C63;font-weight:400">소스 12개 중</span>
+            </div>
+            <div class="sv-actions">
+              <div class="sv-btn">📋 복사</div>
+              <div class="sv-btn">↗ 내보내기</div>
+              <div class="sv-btn">✕ 닫기</div>
+            </div>
+          </div>
+          <div class="sv-body">
+            가정연합 CMS 시스템 업그레이드 주요내용<br><br>
+            주요대상 현행 업그레이드 후<br><br>
+
+            <div class="hl">
+              <span class="cite-marker" style="background:rgba(62,207,180,0.15);color:#3ECFB4">1</span>
+              DB변경 로컬 Firebird MS SQL SERVER. 회원정보관리 cms 회원관리에서 별도입력 가정연한 회원관리에서 온라인 입력 처리. CMS에서 직접 입력 불필요 *기존 가정연한 회원관리에서의 로직 변경요함
+            </div>
+
+            <br>
+            3.CMS 승인및 해지 수동으로 승, 수신 대상회원 자동 승인 및 해지 4.CMS 출금요청 및 결과처리 수동으로 출금처리일 지정 후 자동 출금신청및 결과 처리<br><br>
+
+            <div class="hl-2">
+              <span class="cite-marker" style="background:rgba(167,139,250,0.12);color:#A78BFA">2</span>
+              5.금융결제원 관련업무 간소화 현재 보안인증서를 통한 파일 송수신 처리 금융결제원 보안통신으로 송수신절차 간소화. 보안인증서 필요없음(암호화드라이브 없이)
+            </div>
+
+            <br>
+            6.후원금 처리결과(CMS로 통한 출금내역 동시처리) 출금 결과를 엑셀로 변경 후 후원관리에 적용 CMS 출금 결과를 현 회원관리 시스템으로 자동 업데이트<br><br>
+            7.현금영수증 국세청 자동 신고 미적용 출금과 동시에 현금영수증 처리. 결과 연동
+          </div>
+        </div>
+      </div>
+
+      <!-- RAG 오버레이 -->
+      <div class="rag-overlay">
+        <div class="rag-header">
+          <span class="title">지식 검색</span>
+          <span class="close">✕</span>
+        </div>
+        <div class="rag-body">
+          <div class="msg user">CMS 시스템 변경 시 DB 마이그레이션 어떻게 해야 해?</div>
+          <div class="msg ai">
+            CMS 업그레이드 문서에 따르면 다음과 같은 변경이 필요합니다:
+            <br><br>
+            <b>1. DB 전환:</b> 로컬 Firebird에서 MS SQL Server로 마이그레이션 <span class="cite cite-1 active">1</span>
+            <br><br>
+            <b>2. 보안통신 도입:</b> 기존 보안인증서 기반에서 금융결제원 보안통신으로 전환하여 송수신 절차 간소화 <span class="cite cite-2">2</span>
+            <br><br>
+            <b>3. 자동화:</b> 회원 승인/해지, 출금 처리, 현금영수증 발급이 모두 자동화됩니다 <span class="cite cite-3">3</span>
+
+            <div class="src-line">
+              <span class="src-tag"><span style="color:#3ECFB4">1</span> 가정연합 CMS 업그레이드.txt</span>
+              <span class="src-tag"><span style="color:#A78BFA">2</span> 가정연합 CMS 업그레이드.txt</span>
+              <span class="src-tag"><span style="color:#FBBF24">3</span> 3/19 전략 회의</span>
+            </div>
+
+            <div class="actions">
+              <div class="action-btn">📋 복사</div>
+              <div class="action-btn">📝 노트로 저장</div>
+              <div class="action-btn">↗ 내보내기</div>
+            </div>
+          </div>
+        </div>
+        <div class="rag-footer">
+          <div class="rag-input">후속 질문...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;padding:16px;background:#141416;border:1px solid #2A2A2E;border-radius:8px">
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#3ECFB4">흐름 설명</div>
+    <div style="font-size:12px;color:#8E8E93;line-height:1.8">
+      <b style="color:#EDEDEF">1.</b> 사용자가 RAG에 질문 → AI가 인라인 출처 <span class="cite cite-1" style="display:inline-flex">1</span> <span class="cite cite-2" style="display:inline-flex">2</span> <span class="cite cite-3" style="display:inline-flex">3</span> 포함 응답<br>
+      <b style="color:#EDEDEF">2.</b> <span class="cite cite-1" style="display:inline-flex">1</span> 클릭 → 메인 영역에 해당 소스 문서가 열림 (좌측 사이드바에서도 해당 소스 하이라이트)<br>
+      <b style="color:#EDEDEF">3.</b> 소스 뷰어에서 <span style="background:rgba(62,207,180,0.15);padding:2px 6px;border-radius:3px;border-left:3px solid #3ECFB4;font-size:11px">원문 해당 부분이 하이라이트</span>되어 스크롤 위치 자동 이동<br>
+      <b style="color:#EDEDEF">4.</b> 다른 출처 <span class="cite cite-2" style="display:inline-flex">2</span> 클릭하면 같은 문서 내 다른 위치로 이동 or 다른 문서가 열림<br>
+      <b style="color:#EDEDEF">5.</b> 응답 하단 액션: 복사 / 노트로 저장 / 내보내기
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 시나리오 2: 소스 범위 선택 ═══ -->
+<div class="section">
+  <span class="step-label step-2">시나리오 2</span>
+  <h2>RAG 소스 범위 선택 — "어떤 데이터를 검색할지"</h2>
+  <p class="desc">RAG 질문 시 검색 범위를 제한할 수 있습니다. 특정 프로젝트, 특정 소스만 선택하거나 전체 검색.</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+    <!-- 방법 A: 검색바 내 필터 칩 -->
+    <div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#A78BFA">방법 A — 검색바 내 스코프 칩</div>
+      <div style="background:#141416;border:1px solid #2A2A2E;border-radius:8px;padding:14px">
+        <div style="font-size:11px;color:#5C5C63;margin-bottom:8px">RAG 오버레이 상단</div>
+
+        <!-- 스코프 바 -->
+        <div class="scope-bar">
+          <div class="scope-btn active">전체</div>
+          <div class="scope-btn">현재 프로젝트</div>
+          <div class="scope-btn">선택한 소스</div>
+        </div>
+
+        <div class="rag-input" style="margin-bottom:8px">DB 마이그레이션 방법은?</div>
+
+        <div style="font-size:10px;color:#5C5C63;line-height:1.6">
+          <b>전체:</b> 모든 프로젝트의 모든 소스에서 검색<br>
+          <b>현재 프로젝트:</b> 사이드바에서 선택된 프로젝트 내부만<br>
+          <b>선택한 소스:</b> 아래 체크박스로 개별 소스 선택
+        </div>
+      </div>
+    </div>
+
+    <!-- 방법 B: 소스 선택 패널 -->
+    <div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#A78BFA">방법 B — "선택한 소스" 클릭 시 펼쳐지는 목록</div>
+      <div class="filter-panel">
+        <div class="fp-header" style="display:flex;align-items:center;justify-content:space-between">
+          <span>검색 범위 설정</span>
+          <span style="font-size:10px;color:#3ECFB4;cursor:pointer">전체 선택</span>
+        </div>
+        <div class="fp-body">
+          <div class="fp-section">
+            <div class="fp-section-title">
+              <span>CMS 고도화 (5개)</span>
+              <span style="color:#3ECFB4;font-size:10px">5/5</span>
+            </div>
+            <div class="fp-item">
+              <div class="checkbox checked">✓</div>
+              <span class="icon">🎙</span>
+              <span class="name">3/12 마케팅 리뷰 회의</span>
+              <span class="meta">42분</span>
+            </div>
+            <div class="fp-item">
+              <div class="checkbox checked">✓</div>
+              <span class="icon">🎙</span>
+              <span class="name">3/19 전략 회의</span>
+              <span class="meta">35분</span>
+            </div>
+            <div class="fp-item">
+              <div class="checkbox checked">✓</div>
+              <span class="icon">📄</span>
+              <span class="name">가정연합 CMS 업그레이드.txt</span>
+              <span class="meta">2.1KB</span>
+            </div>
+            <div class="fp-item">
+              <div class="checkbox checked">✓</div>
+              <span class="icon">📄</span>
+              <span class="name">CMS 요구사항정리.docx</span>
+              <span class="meta">15KB</span>
+            </div>
+            <div class="fp-item">
+              <div class="checkbox" style="border-color:#5C5C63"></div>
+              <span class="icon">📄</span>
+              <span class="name disabled" style="color:#5C5C63">시스템 아키텍처.pdf</span>
+              <span class="meta">제외됨</span>
+            </div>
+          </div>
+
+          <div class="fp-section">
+            <div class="fp-section-title">
+              <span>보안 인프라 (3개)</span>
+              <span style="color:#5C5C63;font-size:10px">0/3</span>
+            </div>
+            <div class="fp-item">
+              <div class="checkbox" style="border-color:#5C5C63"></div>
+              <span class="icon">🎙</span>
+              <span class="name disabled" style="color:#5C5C63">3/25 보안 리뷰</span>
+              <span class="meta">28분</span>
+            </div>
+            <div class="fp-item">
+              <div class="checkbox" style="border-color:#5C5C63"></div>
+              <span class="icon">📄</span>
+              <span class="name disabled" style="color:#5C5C63">보안정책 가이드.pdf</span>
+              <span class="meta">4.2MB</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;padding:16px;background:#141416;border:1px solid #2A2A2E;border-radius:8px">
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#A78BFA">NotebookLM과의 비교</div>
+    <div style="font-size:12px;color:#8E8E93;line-height:1.8">
+      <b style="color:#EDEDEF">NotebookLM:</b> 노트북 단위로 소스가 격리됨. 소스 추가/제거만 가능. 검색 범위 = 노트북 전체.<br>
+      <b style="color:#3ECFB4">Kairos:</b> 프로젝트 간 교차 검색 가능 + 개별 소스 단위 on/off + "전체/현재 프로젝트/선택" 3단계 스코프.<br>
+      <span style="color:#FBBF24">→ Kairos가 더 유연한 검색 범위 설정을 제공. "프로젝트 간 교차 인사이트"가 가능한 이유.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 시나리오 3: 전체 흐름 ═══ -->
+<div class="section">
+  <span class="step-label step-3">전체 흐름</span>
+  <h2>RAG 질문 → 출처 확인 → 소스 열람 전체 흐름</h2>
+
+  <div style="display:flex;gap:12px;align-items:stretch">
+    <div style="flex:1;background:#141416;border:1px solid #2A2A2E;border-radius:8px;padding:16px;text-align:center">
+      <div style="font-size:24px;margin-bottom:8px">⌘K</div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:4px;color:#EDEDEF">1. 질문</div>
+      <div style="font-size:11px;color:#5C5C63">검색바 클릭 or<br>Cmd+K로 RAG 호출</div>
+    </div>
+    <div style="display:flex;align-items:center;color:#3ECFB4;font-size:18px">→</div>
+    <div style="flex:1;background:#141416;border:1px solid #2A2A2E;border-radius:8px;padding:16px;text-align:center">
+      <div style="font-size:24px;margin-bottom:8px">🎯</div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:4px;color:#EDEDEF">2. 스코프 선택</div>
+      <div style="font-size:11px;color:#5C5C63">전체 / 현재 프로젝트<br>/ 소스 직접 선택</div>
+    </div>
+    <div style="display:flex;align-items:center;color:#3ECFB4;font-size:18px">→</div>
+    <div style="flex:1;background:#141416;border:1px solid #2A2A2E;border-radius:8px;padding:16px;text-align:center">
+      <div style="font-size:24px;margin-bottom:8px">💬</div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:4px;color:#EDEDEF">3. AI 응답</div>
+      <div style="font-size:11px;color:#5C5C63">인라인 출처 [1][2][3]<br>포함된 답변</div>
+    </div>
+    <div style="display:flex;align-items:center;color:#3ECFB4;font-size:18px">→</div>
+    <div style="flex:1;background:#141416;border:1px solid rgba(62,207,180,0.3);border-radius:8px;padding:16px;text-align:center">
+      <div style="font-size:24px;margin-bottom:8px">📄</div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:4px;color:#3ECFB4">4. [1] 클릭</div>
+      <div style="font-size:11px;color:#5C5C63">메인에 소스 뷰어 열림<br>원문 하이라이트</div>
+    </div>
+    <div style="display:flex;align-items:center;color:#3ECFB4;font-size:18px">→</div>
+    <div style="flex:1;background:#141416;border:1px solid #2A2A2E;border-radius:8px;padding:16px;text-align:center">
+      <div style="font-size:24px;margin-bottom:8px">💾</div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:4px;color:#EDEDEF">5. 액션</div>
+      <div style="font-size:11px;color:#5C5C63">복사 / 노트 저장<br>/ 내보내기</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
