@@ -1,10 +1,14 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Search, Users } from "lucide-react";
 import { useUIStore } from "@/store/ui";
+import { useMembers } from "@/features/members/hooks";
+import { useWorkspaceStore } from "@/features/workspaces/store";
 
 export function Header() {
   const { toggleSidebar, toggleRagOverlay } = useUIStore();
+  const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const { data: members } = useMembers(wid ?? undefined);
 
   return (
     <header
@@ -31,6 +35,18 @@ export function Header() {
         <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Kairos
         </span>
+        {members && members.length > 0 && (
+          <span
+            className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full"
+            style={{
+              background: "var(--surface-active)",
+              color: "var(--text-muted)",
+            }}
+          >
+            <Users size={10} />
+            {members.length}
+          </span>
+        )}
       </div>
 
       {/* 중앙: RAG 검색바 스타일 (클릭 시 RAG 오버레이 열기) */}

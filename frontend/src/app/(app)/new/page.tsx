@@ -32,6 +32,7 @@ type ContentType = (typeof CONTENT_TYPES)[number]["id"];
 export default function NewContentPage() {
   const router = useRouter();
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const hasRole = useWorkspaceStore((s) => s.hasRole);
 
   const [selected, setSelected] = useState<ContentType>("meeting");
   const [title, setTitle] = useState("");
@@ -79,6 +80,25 @@ export default function NewContentPage() {
       setUploadStep(null);
     }
   };
+
+  // Viewer는 콘텐츠 생성 불가
+  if (!hasRole("member")) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center h-full gap-2"
+        style={{ color: "var(--text-muted)" }}
+      >
+        <p className="text-sm">콘텐츠를 추가하려면 Member 이상 권한이 필요합니다</p>
+        <button
+          onClick={() => router.back()}
+          className="text-xs underline cursor-pointer"
+          style={{ color: "var(--accent)" }}
+        >
+          돌아가기
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-3xl mx-auto">

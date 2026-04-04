@@ -16,6 +16,7 @@ import {
   fetchInviteInfo,
   acceptInvite,
 } from "./api";
+import { toast } from "sonner";
 import type {
   CreateInviteRequest,
   UpdateMemberRoleRequest,
@@ -73,10 +74,14 @@ export function useUpdateMemberRole(wid: string | undefined) {
       if (!token) throw new Error("인증이 필요합니다");
       return updateMemberRole(token, wid!, memberId, data);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      toast.success(`역할이 ${variables.data.role}로 변경되었습니다`);
       if (wid) {
         queryClient.invalidateQueries({ queryKey: memberKeys.list(wid) });
       }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "역할 변경에 실패했습니다");
     },
   });
 }
@@ -92,9 +97,13 @@ export function useRemoveMember(wid: string | undefined) {
       return removeMember(token, wid!, memberId);
     },
     onSuccess: () => {
+      toast.success("멤버가 제거되었습니다");
       if (wid) {
         queryClient.invalidateQueries({ queryKey: memberKeys.list(wid) });
       }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "멤버 제거에 실패했습니다");
     },
   });
 }
@@ -126,9 +135,13 @@ export function useCreateInvite(wid: string | undefined) {
       return createInvite(token, wid!, data);
     },
     onSuccess: () => {
+      toast.success("초대 링크가 생성되었습니다");
       if (wid) {
         queryClient.invalidateQueries({ queryKey: inviteKeys.list(wid) });
       }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "초대 링크 생성에 실패했습니다");
     },
   });
 }
@@ -144,9 +157,13 @@ export function useDeactivateInvite(wid: string | undefined) {
       return deactivateInvite(token, wid!, inviteId);
     },
     onSuccess: () => {
+      toast.success("초대 링크가 비활성화되었습니다");
       if (wid) {
         queryClient.invalidateQueries({ queryKey: inviteKeys.list(wid) });
       }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "초대 링크 비활성화에 실패했습니다");
     },
   });
 }

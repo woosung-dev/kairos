@@ -11,8 +11,10 @@ interface NoteListProps {
 
 export function NoteList({ projectId, onSelect }: NoteListProps) {
   const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const hasRole = useWorkspaceStore((s) => s.hasRole);
   const { data, isLoading } = useNotes(wid ?? undefined, projectId);
   const createNote = useCreateNote(wid ?? undefined);
+  const canWrite = hasRole("member");
 
   const handleCreate = async () => {
     const result = await createNote.mutateAsync({
@@ -47,18 +49,20 @@ export function NoteList({ projectId, onSelect }: NoteListProps) {
         >
           노트
         </h3>
-        <button
-          onClick={handleCreate}
-          disabled={createNote.isPending}
-          className="text-xs px-2 py-1 rounded transition-colors"
-          style={{
-            background: "var(--accent)",
-            color: "var(--background)",
-            borderRadius: "var(--radius-sm)",
-          }}
-        >
-          + 새 노트
-        </button>
+        {canWrite && (
+          <button
+            onClick={handleCreate}
+            disabled={createNote.isPending}
+            className="text-xs px-2 py-1 rounded transition-colors"
+            style={{
+              background: "var(--accent)",
+              color: "var(--background)",
+              borderRadius: "var(--radius-sm)",
+            }}
+          >
+            + 새 노트
+          </button>
+        )}
       </div>
       {notes.length === 0 ? (
         <div
