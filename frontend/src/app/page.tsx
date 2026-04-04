@@ -15,7 +15,7 @@ export default async function RootPage() {
     <>
       <script
         dangerouslySetInnerHTML={{
-          __html: `document.documentElement.setAttribute('data-theme','light')`,
+          __html: `document.documentElement.setAttribute('data-theme','landing')`,
         }}
       />
       <LandingPage />

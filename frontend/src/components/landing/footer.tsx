@@ -1,31 +1,14 @@
 export function Footer() {
   return (
     <footer
-      className="px-6 py-8 border-t"
+      className="px-6 py-8 text-center"
       style={{
-        background: "var(--surface-hover)",
-        borderColor: "var(--border-subtle)",
+        fontFamily: "var(--font-mono)",
+        fontSize: 12,
+        color: "var(--text-muted)",
       }}
     >
-      <div className="max-w-5xl mx-auto flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <span
-            className="text-sm font-bold"
-            style={{
-              fontFamily: "var(--font-display)",
-              color: "var(--accent)",
-            }}
-          >
-            Kairos
-          </span>
-          <span
-            className="text-xs"
-            style={{ color: "var(--text-muted)" }}
-          >
-            &copy; 2026 Kairos. All rights reserved.
-          </span>
-        </div>
-      </div>
+      &copy; 2026 Kairos &mdash; Team Second Brain
     </footer>
   );
 }

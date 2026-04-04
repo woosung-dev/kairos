@@ -1,76 +1,78 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 
 export function LandingNav() {
-  const [isScrolled, setIsScrolled] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
   return (
     <nav
-      className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
+      className="fixed top-0 right-0 left-0 z-50 flex items-center justify-between px-8 py-3.5 md:px-8"
       style={{
-        background: isScrolled
-          ? "rgba(250,250,250,0.8)"
-          : "transparent",
-        backdropFilter: isScrolled ? "blur(12px)" : "none",
-        borderBottom: isScrolled
-          ? "1px solid var(--border-subtle)"
-          : "1px solid transparent",
+        background: "color-mix(in srgb, var(--background) 88%, transparent)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        borderBottom: "1px solid var(--border-subtle)",
+        padding: "14px 32px",
       }}
     >
-      <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
-        <Link
-          href="/"
-          className="text-xl font-bold"
+      {/* 로고 */}
+      <Link
+        href="/"
+        style={{
+          fontFamily: "var(--font-display)",
+          fontWeight: 700,
+          fontSize: 18,
+          color: "var(--text-primary)",
+        }}
+      >
+        Kairos
+      </Link>
+
+      {/* 오른쪽 */}
+      <div className="flex items-center gap-5">
+        <a
+          href="#pipe"
+          className="hidden cursor-pointer transition-colors sm:block"
           style={{
-            fontFamily: "var(--font-display)",
-            color: "var(--accent)",
+            fontSize: 13,
+            color: "var(--text-secondary)",
           }}
         >
-          Kairos
+          기능
+        </a>
+        <a
+          href="#cta"
+          className="hidden cursor-pointer transition-colors sm:block"
+          style={{
+            fontSize: 13,
+            color: "var(--text-secondary)",
+          }}
+        >
+          요금
+        </a>
+        <Link
+          href="/sign-in"
+          className="cursor-pointer transition-colors"
+          style={{
+            fontSize: 13,
+            color: "var(--text-secondary)",
+          }}
+        >
+          로그인
         </Link>
-
-        <div className="flex items-center gap-4">
-          <a
-            href="#features"
-            className="text-sm hidden sm:block"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            기능
-          </a>
-          <a
-            href="#pricing"
-            className="text-sm hidden sm:block"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            가격
-          </a>
-          <Link
-            href="/sign-in"
-            className="text-sm"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            로그인
-          </Link>
-          <Link
-            href="/sign-up"
-            className="px-4 py-2 rounded text-sm font-medium"
-            style={{
-              background: "var(--accent)",
-              color: "#FFFFFF",
-              borderRadius: "var(--radius-sm)",
-            }}
-          >
-            무료로 시작하기
-          </Link>
-        </div>
+        <Link
+          href="/sign-up"
+          className="inline-flex cursor-pointer items-center justify-center rounded-lg font-semibold text-white transition-all active:scale-[0.97]"
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 13,
+            minHeight: 36,
+            padding: "0 16px",
+            background: "var(--accent)",
+            borderRadius: "var(--radius-lg)",
+          }}
+        >
+          시작하기
+        </Link>
       </div>
     </nav>
   );

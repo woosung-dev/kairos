@@ -16,7 +16,7 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider>
-      <html lang="ko" data-theme="dark">
+      <html lang="ko" data-theme="dark" suppressHydrationWarning>
         <head>
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link

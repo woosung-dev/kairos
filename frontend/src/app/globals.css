@@ -172,6 +172,111 @@
   --sidebar-ring: #0FA889;
 }
 
+/* ═══ Landing Theme — OS 다크/라이트 자동 전환 ═══ */
+[data-theme="landing"] {
+  /* 라이트 기본 (DESIGN.md Light) */
+  --background: #FAFAFA;
+  --surface: #FFFFFF;
+  --surface-hover: #F5F5F5;
+  --surface-active: #EFEFEF;
+  --border: #E5E5E5;
+  --border-subtle: #F0F0F0;
+  --text-primary: #111111;
+  --text-secondary: #6B6B73;
+  --text-muted: #9E9EA6;
+  --accent: #0FA889;
+  --accent-hover: #0D9478;
+  --accent-subtle: rgba(15,168,137,0.05);
+  --accent-bd: rgba(15,168,137,0.18);
+
+  /* 카테고리 색상 (L1-L4 배지) */
+  --cat-project: #0FA889;
+  --cat-area: #D97706;
+  --cat-resource: #7C3AED;
+  --cat-archive: #6B6B73;
+  --cat-project-bg: rgba(15,168,137,0.06);
+  --cat-area-bg: rgba(217,119,6,0.06);
+  --cat-resource-bg: rgba(124,58,237,0.06);
+  --cat-archive-bg: rgba(107,107,115,0.06);
+
+  /* 그림자 */
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+  --shadow-card-hover: 0 8px 24px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.03);
+
+  /* CTA 박스 */
+  --cta-box-bg: #111111;
+  --cta-box-btn-bg: #FFFFFF;
+  --cta-box-btn-color: #111111;
+
+  /* 모션 */
+  --ease: cubic-bezier(0, 0, 0.2, 1);
+
+  /* shadcn 호환 매핑 (라이트) */
+  --foreground: #111111;
+  --card: #FFFFFF;
+  --card-foreground: #111111;
+  --popover: #FFFFFF;
+  --popover-foreground: #111111;
+  --primary: #0FA889;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F5F5F5;
+  --secondary-foreground: #111111;
+  --muted: #F5F5F5;
+  --muted-foreground: #6B6B73;
+  --accent-foreground: #FFFFFF;
+  --input: #E5E5E5;
+  --ring: #0FA889;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="landing"] {
+    --background: #0A0A0B;
+    --surface: #141416;
+    --surface-hover: #1A1A1E;
+    --surface-active: #222226;
+    --border: #2A2A2E;
+    --border-subtle: #1E1E22;
+    --text-primary: #EDEDEF;
+    --text-secondary: #8E8E93;
+    --text-muted: #5C5C63;
+    --accent: #3ECFB4;
+    --accent-hover: #35B39C;
+    --accent-subtle: rgba(62,207,180,0.08);
+    --accent-bd: rgba(62,207,180,0.18);
+
+    --cat-project: #3ECFB4;
+    --cat-area: #FBBF24;
+    --cat-resource: #A78BFA;
+    --cat-archive: #6B6B73;
+    --cat-project-bg: rgba(62,207,180,0.08);
+    --cat-area-bg: rgba(251,191,36,0.08);
+    --cat-resource-bg: rgba(167,139,250,0.08);
+    --cat-archive-bg: rgba(107,107,115,0.08);
+
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.2);
+    --shadow-card-hover: 0 8px 24px rgba(0,0,0,0.35);
+
+    --cta-box-bg: #1A1A1E;
+    --cta-box-btn-bg: #3ECFB4;
+    --cta-box-btn-color: #0A0A0B;
+
+    --foreground: #EDEDEF;
+    --card: #141416;
+    --card-foreground: #EDEDEF;
+    --popover: #141416;
+    --popover-foreground: #EDEDEF;
+    --primary: #3ECFB4;
+    --primary-foreground: #0A0A0B;
+    --secondary: #1A1A1E;
+    --secondary-foreground: #EDEDEF;
+    --muted: #1A1A1E;
+    --muted-foreground: #8E8E93;
+    --accent-foreground: #0A0A0B;
+    --input: #2A2A2E;
+    --ring: #3ECFB4;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -184,5 +289,36 @@
   }
   html {
     font-family: var(--font-body);
+  }
+
+  /* 접근성 */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  ::selection {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* 랜딩 입장 애니메이션 */
+  .landing-reveal {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.4s var(--ease, cubic-bezier(0,0,0.2,1)),
+                transform 0.4s var(--ease, cubic-bezier(0,0,0.2,1));
+  }
+  .landing-reveal.visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .landing-reveal {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+    }
   }
 }
