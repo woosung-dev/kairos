@@ -12,6 +12,7 @@ class Workspace(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     name: str
     owner_id: uuid.UUID = Field(foreign_key="users.id")
+    inbox_threshold: float = Field(default=0.9)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
