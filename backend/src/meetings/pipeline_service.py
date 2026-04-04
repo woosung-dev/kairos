@@ -22,6 +22,7 @@ from src.inbox.models import InboxItem
 from src.inbox.repository import InboxRepository
 from src.meetings.repository import MeetingRepository
 from src.projects.repository import ProjectRepository
+from src.workspaces.repository import WorkspaceRepository
 from src.services.ai_processing import AIProcessingService
 from src.embeddings.service import EmbeddingService
 from src.services.transcription import TranscriptionService
@@ -38,6 +39,7 @@ class MeetingPipelineService:
         project_repo: ProjectRepository,
         action_repo: ActionItemRepository,
         inbox_repo: InboxRepository,
+        workspace_repo: WorkspaceRepository,
         r2_service: R2Service,
         transcription_service: TranscriptionService,
         ai_service: AIProcessingService,
@@ -47,6 +49,7 @@ class MeetingPipelineService:
         self.project_repo = project_repo
         self.action_repo = action_repo
         self.inbox_repo = inbox_repo
+        self.workspace_repo = workspace_repo
         self.r2_service = r2_service
         self.transcription_service = transcription_service
         self.ai_service = ai_service
@@ -58,6 +61,10 @@ class MeetingPipelineService:
             meeting = await self.meeting_repo.find_by_id(meeting_id)
             if meeting is None:
                 return
+
+            # workspace에서 임계값 조회
+            workspace = await self.workspace_repo.find_by_id(meeting.workspace_id)
+            threshold = workspace.inbox_threshold if workspace else 0.9
 
             # [1] STT
             await self.meeting_repo.update_status(meeting_id, "transcribing")
@@ -152,12 +159,12 @@ class MeetingPipelineService:
                 ai_suggested_project_title=suggested.get("newProjectTitle"),
                 ai_suggested_tags=actions_data.get("suggestedTags", []),
                 ai_confidence=confidence,
-                is_processed=confidence >= 0.9,
+                is_processed=confidence >= threshold,
             )
             await self.inbox_repo.save(inbox_item)
 
-            # [2-5] 자동 확정: confidence >= 0.9이고 기존 프로젝트가 있으면 MeetingProjectLink 생성
-            if confidence >= 0.9 and existing_project_id_str:
+            # [2-5] 자동 확정: confidence >= threshold이고 기존 프로젝트가 있으면 MeetingProjectLink 생성
+            if confidence >= threshold and existing_project_id_str:
                 await self.project_repo.add_meeting_link(
                     meeting.id, uuid.UUID(existing_project_id_str)
                 )
@@ -171,7 +178,7 @@ class MeetingPipelineService:
             # [2-6] 임베딩 생성 (비치명적 — 실패해도 파이프라인은 완료)
             try:
                 project_id = None
-                if confidence >= 0.9 and existing_project_id_str:
+                if confidence >= threshold and existing_project_id_str:
                     project_id = uuid.UUID(existing_project_id_str)
 
                 segments_data = [

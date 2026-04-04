@@ -59,6 +59,10 @@ async def test_pipeline_success():
 
     mock_action_repo = AsyncMock()
     mock_inbox_repo = AsyncMock()
+    mock_workspace_repo = AsyncMock()
+    mock_workspace = MagicMock()
+    mock_workspace.inbox_threshold = 0.9
+    mock_workspace_repo.find_by_id.return_value = mock_workspace
     mock_embedding_service = AsyncMock()
     mock_embedding_service.embed_meeting.return_value = 3
     mock_embedding_service.invalidate_cache.return_value = None
@@ -68,6 +72,7 @@ async def test_pipeline_success():
         project_repo=mock_project_repo,
         action_repo=mock_action_repo,
         inbox_repo=mock_inbox_repo,
+        workspace_repo=mock_workspace_repo,
         r2_service=mock_r2,
         transcription_service=mock_transcription,
         ai_service=mock_ai,
@@ -149,6 +154,10 @@ async def test_pipeline_auto_confirm():
 
     mock_action_repo = AsyncMock()
     mock_inbox_repo = AsyncMock()
+    mock_workspace_repo = AsyncMock()
+    mock_workspace = MagicMock()
+    mock_workspace.inbox_threshold = 0.9
+    mock_workspace_repo.find_by_id.return_value = mock_workspace
     mock_embedding_service = AsyncMock()
     mock_embedding_service.embed_meeting.return_value = 3
     mock_embedding_service.invalidate_cache.return_value = None
@@ -158,6 +167,7 @@ async def test_pipeline_auto_confirm():
         project_repo=mock_project_repo,
         action_repo=mock_action_repo,
         inbox_repo=mock_inbox_repo,
+        workspace_repo=mock_workspace_repo,
         r2_service=mock_r2,
         transcription_service=mock_transcription,
         ai_service=mock_ai,
@@ -198,6 +208,8 @@ async def test_pipeline_failure_sets_failed():
     mock_project_repo = AsyncMock()
     mock_action_repo = AsyncMock()
     mock_inbox_repo = AsyncMock()
+    mock_workspace_repo = AsyncMock()
+    mock_workspace_repo.find_by_id.return_value = None
     mock_embedding_service = AsyncMock()
 
     pipeline = MeetingPipelineService(
@@ -205,6 +217,7 @@ async def test_pipeline_failure_sets_failed():
         project_repo=mock_project_repo,
         action_repo=mock_action_repo,
         inbox_repo=mock_inbox_repo,
+        workspace_repo=mock_workspace_repo,
         r2_service=mock_r2,
         transcription_service=mock_transcription,
         ai_service=mock_ai,
