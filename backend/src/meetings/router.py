@@ -2,7 +2,10 @@
 """Meeting 라우터 — HTTP 전용."""
 import uuid
 
+from urllib.parse import quote
+
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from fastapi.responses import Response
 
 from src.auth.rbac import require_member, require_viewer
 from src.workspaces.models import WorkspaceMember
@@ -54,6 +57,23 @@ async def get_meeting(
     service: MeetingService = Depends(get_meeting_service),
 ):
     return await service.get_meeting_detail(meeting_id)
+
+
+@router.get("/{meeting_id}/export")
+async def export_meeting(
+    workspace_id: uuid.UUID,
+    meeting_id: uuid.UUID,
+    format: str = Query(default="md", pattern="^(md|json)$"),
+    member: WorkspaceMember = Depends(require_viewer),
+    service: MeetingService = Depends(get_meeting_service),
+):
+    content, filename, media_type = await service.export_meeting(meeting_id, format)
+    encoded = quote(filename)
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
+    )
 
 
 @router.get("/{meeting_id}/status")
