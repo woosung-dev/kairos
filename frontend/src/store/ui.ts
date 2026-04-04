@@ -3,11 +3,11 @@ import { create } from "zustand";
 interface UIState {
   sidebarOpen: boolean;
   sidebarCollapsed: boolean;
-  ragPanelOpen: boolean;
+  ragOverlayOpen: boolean;
   cmdKOpen: boolean;
   isMobile: boolean;
   toggleSidebar: () => void;
-  toggleRagPanel: () => void;
+  toggleRagOverlay: () => void;
   toggleCmdK: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setIsMobile: (mobile: boolean) => void;
@@ -16,11 +16,11 @@ interface UIState {
 export const useUIStore = create<UIState>((set) => ({
   sidebarOpen: true,
   sidebarCollapsed: false,
-  ragPanelOpen: true,
+  ragOverlayOpen: false,
   cmdKOpen: false,
   isMobile: false,
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
-  toggleRagPanel: () => set((s) => ({ ragPanelOpen: !s.ragPanelOpen })),
+  toggleRagOverlay: () => set((s) => ({ ragOverlayOpen: !s.ragOverlayOpen })),
   toggleCmdK: () => set((s) => ({ cmdKOpen: !s.cmdKOpen })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   setIsMobile: (mobile) => set({ isMobile: mobile }),

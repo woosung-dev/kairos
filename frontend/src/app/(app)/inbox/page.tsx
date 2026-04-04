@@ -1,5 +1,5 @@
-import { InboxList } from "@/features/inbox/components/inbox-list";
+import { SmartInbox } from "@/features/inbox/components/smart-inbox";
 
 export default function InboxPage() {
-  return <InboxList />;
+  return <SmartInbox />;
 }

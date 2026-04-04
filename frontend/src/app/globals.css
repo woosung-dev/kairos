@@ -52,7 +52,8 @@
   /* 반응형 레이아웃 */
   --sidebar-width: 220px;
   --sidebar-collapsed-width: 48px;
-  --rag-panel-width: 320px;
+  --rag-overlay-width: 380px;
+  --backdrop-color: rgba(0,0,0,0.3);
   --bottom-nav-height: 56px;
 
   /* Kairos Dark Mode (기본) — DESIGN.md 토큰 */

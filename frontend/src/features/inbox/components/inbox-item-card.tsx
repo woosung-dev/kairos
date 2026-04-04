@@ -1,14 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import type { InboxItem } from "../types";
-import { useClassifyInbox, useDismissInbox } from "../hooks";
-import { useWorkspaceStore } from "@/features/workspaces/store";
-import { ProjectCombobox } from "@/features/projects/components/project-combobox";
+import type { UUID } from "@/types";
 
-interface InboxItemCardProps {
-  item: InboxItem;
+/* ── 타입 ── */
+
+interface SmartInboxItemData {
+  id: UUID;
+  title: string;
+  sourceType: "meeting" | "note" | "attachment";
+  aiSuggestedProject: string;
+  aiConfidence: number;
+  aiSuggestedTags: string[];
+  summary: string | null;
+  isAutoProcessed: boolean;
 }
+
+interface SmartInboxItemCardProps {
+  item: SmartInboxItemData;
+}
+
+/* ── 라벨/아이콘 맵 ── */
 
 const SOURCE_LABELS: Record<string, string> = {
   meeting: "회의",
@@ -22,51 +34,109 @@ const SOURCE_ICONS: Record<string, string> = {
   attachment: "📎",
 };
 
-export function InboxItemCard({ item }: InboxItemCardProps) {
-  const [isComboboxOpen, setIsComboboxOpen] = useState(false);
-  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const classifyInbox = useClassifyInbox(activeWorkspaceId ?? undefined);
-  const dismissInbox = useDismissInbox(activeWorkspaceId ?? undefined);
+/* ── 컴포넌트 ── */
 
-  const isActioning = classifyInbox.isPending || dismissInbox.isPending;
+export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
+  const [status, setStatus] = useState<"idle" | "confirmed" | "dismissed" | "editing">("idle");
 
-  /** AI 추천 프로젝트로 확정 */
+  const confidencePercent = Math.round(item.aiConfidence * 100);
+
   function handleConfirm() {
-    if (!item.aiSuggestedProjectId) return;
-    classifyInbox.mutate({ id: item.id, projectIds: [item.aiSuggestedProjectId] });
+    setStatus("confirmed");
   }
 
-  /** 무시 */
   function handleDismiss() {
-    dismissInbox.mutate(item.id);
+    setStatus("dismissed");
   }
 
-  /** ProjectCombobox에서 선택 시 */
-  function handleProjectSelect(projectId: string) {
-    classifyInbox.mutate({ id: item.id, projectIds: [projectId] });
-    setIsComboboxOpen(false);
+  function handleEdit() {
+    setStatus("editing");
+  }
+
+  function handleRevert() {
+    setStatus("idle");
+  }
+
+  /* 확정/무시된 상태이면 축약 표시 */
+  if (status === "confirmed") {
+    return (
+      <div
+        className="px-4 py-3 rounded-lg border flex items-center gap-3"
+        style={{
+          background: "var(--surface)",
+          borderColor: "var(--border-subtle)",
+          borderRadius: "var(--radius-lg)",
+          opacity: 0.7,
+        }}
+      >
+        <span className="text-sm">✅</span>
+        <span className="text-sm flex-1" style={{ color: "var(--text-secondary)" }}>
+          {item.title} &rarr; <strong style={{ color: "var(--accent)" }}>{item.aiSuggestedProject}</strong>
+        </span>
+        <button
+          onClick={handleRevert}
+          className="text-xs px-2 py-1 rounded border transition-colors"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--text-muted)",
+            borderRadius: "var(--radius-sm)",
+            cursor: "pointer",
+            minHeight: "44px",
+          }}
+        >
+          ↩ 되돌리기
+        </button>
+      </div>
+    );
+  }
+
+  if (status === "dismissed") {
+    return (
+      <div
+        className="px-4 py-3 rounded-lg border flex items-center gap-3"
+        style={{
+          background: "var(--surface)",
+          borderColor: "var(--border-subtle)",
+          borderRadius: "var(--radius-lg)",
+          opacity: 0.5,
+        }}
+      >
+        <span className="text-sm">🗑</span>
+        <span className="text-sm flex-1 line-through" style={{ color: "var(--text-muted)" }}>
+          {item.title}
+        </span>
+        <button
+          onClick={handleRevert}
+          className="text-xs px-2 py-1 rounded border transition-colors"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--text-muted)",
+            borderRadius: "var(--radius-sm)",
+            cursor: "pointer",
+            minHeight: "44px",
+          }}
+        >
+          ↩ 되돌리기
+        </button>
+      </div>
+    );
   }
 
   return (
     <div
-      className="p-4 rounded border transition-colors"
+      className="p-4 rounded-lg border transition-colors"
       style={{
         background: "var(--surface)",
         borderColor: "var(--border-subtle)",
-        borderRadius: "var(--radius-md)",
-        opacity: isActioning ? 0.6 : 1,
-        pointerEvents: isActioning ? "none" : "auto",
+        borderRadius: "var(--radius-lg)",
       }}
     >
-      {/* 상단: 소스 뱃지 + 제목 */}
+      {/* 상단: 소스 아이콘 + 제목 */}
       <div className="flex items-start gap-3 mb-2">
         <span className="text-lg shrink-0">{SOURCE_ICONS[item.sourceType]}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h3
-              className="text-sm font-semibold truncate"
-              style={{ color: "var(--text-primary)" }}
-            >
+            <h3 className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
               {item.title}
             </h3>
             <span
@@ -106,95 +176,142 @@ export function InboxItemCard({ item }: InboxItemCardProps) {
       )}
 
       {/* AI 추천 프로젝트 */}
-      {item.aiSuggestedProjectTitle && (
-        <div
-          className="flex items-center gap-2 px-3 py-2 rounded mb-3"
-          style={{
-            background: "var(--accent-subtle)",
-            borderRadius: "var(--radius-sm)",
-          }}
+      <div
+        className="flex items-center gap-2 px-3 py-2 rounded mb-3"
+        style={{
+          background: "var(--accent-subtle)",
+          borderRadius: "var(--radius-sm)",
+        }}
+      >
+        <span className="text-xs" style={{ color: "var(--accent)" }}>
+          AI 추천:
+        </span>
+        <span className="text-xs font-medium" style={{ color: "var(--accent)" }}>
+          {item.aiSuggestedProject}
+        </span>
+        <span
+          className="text-[10px] ml-auto"
+          style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
         >
-          <span className="text-xs" style={{ color: "var(--accent)" }}>
-            AI 추천:
-          </span>
-          <span className="text-xs font-medium" style={{ color: "var(--accent)" }}>
-            {item.aiSuggestedProjectTitle}
-          </span>
-          {item.aiConfidence !== null && (
-            <span
-              className="text-[10px] ml-auto"
-              style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
-            >
-              {Math.round(item.aiConfidence * 100)}%
-            </span>
-          )}
-        </div>
-      )}
+          {confidencePercent}%
+        </span>
+      </div>
 
       {/* 액션 버튼 */}
-      {!item.isProcessed && (
-        <div className="flex items-center gap-2 relative">
-          {/* AI 추천이 있으면 확정 버튼 */}
-          {item.aiSuggestedProjectId && (
-            <button
-              onClick={handleConfirm}
-              disabled={isActioning}
-              className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-              style={{
-                background: "var(--accent)",
-                color: "var(--background)",
-                borderRadius: "var(--radius-sm)",
-              }}
-            >
-              확정
-            </button>
-          )}
-
-          {/* 변경 (다른 프로젝트 선택) */}
+      {!item.isAutoProcessed ? (
+        /* 확인 필요 아이템: 확정 / 다른 프로젝트 / 무시 */
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setIsComboboxOpen(!isComboboxOpen)}
+            onClick={handleConfirm}
+            className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+            style={{
+              background: "var(--accent)",
+              color: "var(--background)",
+              borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              minHeight: "44px",
+            }}
+          >
+            ✅ 확정
+          </button>
+          <button
+            onClick={handleEdit}
             className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
             style={{
               borderColor: "var(--accent)",
               color: "var(--accent)",
               borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              minHeight: "44px",
             }}
           >
-            {item.aiSuggestedProjectId ? "변경" : "프로젝트 선택"}
+            ✏️ 다른 프로젝트
           </button>
-
-          {/* 무시 */}
           <button
             onClick={handleDismiss}
-            disabled={isActioning}
             className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
             style={{
               borderColor: "var(--border)",
               color: "var(--text-muted)",
               borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              minHeight: "44px",
             }}
           >
-            무시
+            🗑 무시
           </button>
-
-          {/* ProjectCombobox 드롭다운 */}
-          {isComboboxOpen && (
-            <div className="absolute top-full left-0 mt-1">
-              <ProjectCombobox
-                onSelect={handleProjectSelect}
-                onClose={() => setIsComboboxOpen(false)}
-              />
-            </div>
-          )}
+        </div>
+      ) : (
+        /* 자동 처리된 아이템: 수정 / 되돌리기 */
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleEdit}
+            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
+            style={{
+              borderColor: "var(--accent)",
+              color: "var(--accent)",
+              borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              minHeight: "44px",
+            }}
+          >
+            ✏️ 수정
+          </button>
+          <button
+            onClick={handleDismiss}
+            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
+            style={{
+              borderColor: "var(--border)",
+              color: "var(--text-muted)",
+              borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              minHeight: "44px",
+            }}
+          >
+            ↩ 되돌리기
+          </button>
         </div>
       )}
 
-      {/* 처리 완료 표시 */}
-      {item.isProcessed && (
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs" style={{ color: "var(--success)" }}>
-            처리 완료
-          </span>
+      {/* "다른 프로젝트" 편집 모드 (간단한 목업) */}
+      {status === "editing" && (
+        <div
+          className="mt-3 p-3 rounded border"
+          style={{
+            background: "var(--surface-hover)",
+            borderColor: "var(--border)",
+            borderRadius: "var(--radius-sm)",
+          }}
+        >
+          <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
+            프로젝트를 선택하세요 (Mock)
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {["Q2 제품 로드맵", "디자인 시스템", "DevOps 개선", "사용자 리서치"].map((proj) => (
+              <button
+                key={proj}
+                onClick={() => setStatus("confirmed")}
+                className="px-2 py-1 rounded text-xs transition-colors border"
+                style={{
+                  borderColor: proj === item.aiSuggestedProject ? "var(--accent)" : "var(--border)",
+                  color: proj === item.aiSuggestedProject ? "var(--accent)" : "var(--text-secondary)",
+                  background: proj === item.aiSuggestedProject ? "var(--accent-subtle)" : "transparent",
+                  borderRadius: "var(--radius-sm)",
+                  cursor: "pointer",
+                  minHeight: "44px",
+                }}
+              >
+                {proj}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setStatus("idle")}
+            className="mt-2 text-xs"
+            style={{ color: "var(--text-muted)", cursor: "pointer", minHeight: "44px" }}
+          >
+            취소
+          </button>
         </div>
       )}
     </div>

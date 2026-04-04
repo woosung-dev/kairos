@@ -4,7 +4,7 @@ import { useState } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { useInbox } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
-import { InboxItemCard } from "./inbox-item-card";
+/* SmartInbox가 이 컴포넌트를 대체합니다. API 연동 시 통합 예정. */
 
 const FILTERS = ["전체", "미처리", "처리완료"] as const;
 
@@ -73,7 +73,17 @@ export function InboxList() {
         !isLoading && (
           <div className="grid gap-3">
             {filteredItems.map((item) => (
-              <InboxItemCard key={item.id} item={item} />
+              <div
+                key={item.id}
+                className="p-3 rounded border text-sm"
+                style={{
+                  background: "var(--surface)",
+                  borderColor: "var(--border-subtle)",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                {item.title}
+              </div>
             ))}
           </div>
         )

@@ -31,7 +31,7 @@ const CMD_GROUPS = [
 ];
 
 export function CmdK() {
-  const { cmdKOpen, toggleCmdK, toggleRagPanel } = useUIStore();
+  const { cmdKOpen, toggleCmdK, toggleRagOverlay } = useUIStore();
   const [search, setSearch] = useState("");
   const [isRagMode, setIsRagMode] = useState(false);
   const { ask } = useRagStream();
@@ -67,7 +67,7 @@ export function CmdK() {
       const question = search.startsWith("?") ? search.slice(1).trim() : search.trim();
       if (question) {
         ask(question);
-        toggleRagPanel();
+        toggleRagOverlay();
       }
     }
 

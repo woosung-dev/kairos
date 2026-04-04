@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useUIStore } from "@/store/ui";
 import { useBreakpoint } from "@/hooks/use-media-query";
 import { Sidebar } from "./sidebar";
@@ -10,8 +10,8 @@ import { CmdK } from "./cmd-k";
 import { BottomNav } from "./bottom-nav";
 
 export function PanelLayout({ children }: { children: React.ReactNode }) {
-  const { isMobile, isCompact, isDesktop } = useBreakpoint();
-  const { sidebarOpen, ragPanelOpen, setSidebarCollapsed, setIsMobile } =
+  const { isMobile, isCompact } = useBreakpoint();
+  const { sidebarOpen, ragOverlayOpen, toggleRagOverlay, setSidebarCollapsed, setIsMobile } =
     useUIStore();
 
   // breakpoint 변경 시 Zustand 동기화
@@ -19,6 +19,21 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
     setIsMobile(isMobile);
     setSidebarCollapsed(isCompact);
   }, [isMobile, isCompact, setIsMobile, setSidebarCollapsed]);
+
+  // ESC 키로 RAG 오버레이 닫기
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Escape" && ragOverlayOpen) {
+        toggleRagOverlay();
+      }
+    },
+    [ragOverlayOpen, toggleRagOverlay],
+  );
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
 
   return (
     <div
@@ -28,7 +43,7 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
       {/* 좌측 사이드바: 모바일 숨김, compact면 아이콘 모드 */}
       {!isMobile && sidebarOpen && <Sidebar collapsed={isCompact} />}
 
-      {/* 중앙 콘텐츠 */}
+      {/* 중앙 콘텐츠 (넓은 메인) */}
       <main className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <div
@@ -39,18 +54,55 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
         </div>
       </main>
 
-      {/* 우측 RAG 패널: 데스크톱은 인라인, Compact는 슬라이드 오버 */}
-      {!isMobile && isDesktop && ragPanelOpen && <RagPanel />}
-      {isCompact && ragPanelOpen && (
-        <div
-          className="fixed right-0 top-0 h-full z-40 shadow-xl"
-          style={{
-            width: "var(--rag-panel-width)",
-            background: "var(--surface)",
-          }}
-        >
-          <RagPanel />
-        </div>
+      {/* RAG 오버레이: 우측에서 슬라이드 인 */}
+      {ragOverlayOpen && (
+        <>
+          {/* 반투명 백드롭 */}
+          <div
+            className="fixed inset-0 z-30"
+            style={{ background: "var(--backdrop-color)" }}
+            onClick={toggleRagOverlay}
+          />
+          {/* 오버레이 패널 */}
+          <div
+            className="fixed right-0 top-0 h-full z-40 flex flex-col shadow-xl"
+            style={{
+              width: "var(--rag-overlay-width)",
+              background: "var(--surface)",
+              borderLeft: "1px solid var(--border-subtle)",
+            }}
+          >
+            {/* 오버레이 헤더 (닫기 버튼) */}
+            <div
+              className="flex items-center justify-between px-4 py-3 border-b shrink-0"
+              style={{ borderColor: "var(--border-subtle)" }}
+            >
+              <span
+                className="text-sm font-semibold"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                지식 검색
+              </span>
+              <button
+                onClick={toggleRagOverlay}
+                className="p-1 rounded transition-colors hover:opacity-80"
+                style={{ color: "var(--text-muted)" }}
+                aria-label="RAG 오버레이 닫기"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M1 1l12 12M13 1L1 13" />
+                </svg>
+              </button>
+            </div>
+            {/* RagPanel 재사용 (헤더 중복되나, RagPanel 내부 헤더는 필터/초기화 역할) */}
+            <div className="flex-1 overflow-hidden">
+              <RagPanel />
+            </div>
+          </div>
+        </>
       )}
 
       {/* Cmd+K 모달 */}

@@ -15,7 +15,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", icon: Home, label: "홈" },
   { href: "/projects", icon: FolderOpen, label: "프로젝트" },
-  { href: "/new", icon: Plus, label: "업로드", isAccent: true },
+  { href: "/new", icon: Plus, label: "추가", isAccent: true },
   { href: "/inbox", icon: Inbox, label: "Inbox" },
   { href: "/search", icon: Search, label: "검색" },
 ];

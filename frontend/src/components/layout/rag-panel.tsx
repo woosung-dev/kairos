@@ -11,11 +11,10 @@ export function RagPanel() {
   const { messages, clearMessages } = useRagStore();
 
   return (
-    <aside
-      className="flex flex-col h-full w-[320px] shrink-0 border-l"
+    <div
+      className="flex flex-col h-full w-full shrink-0"
       style={{
         background: "var(--surface)",
-        borderColor: "var(--border-subtle)",
       }}
     >
       {/* 헤더 */}
@@ -55,6 +54,6 @@ export function RagPanel() {
 
       {/* 입력 */}
       <RagInput onSubmit={ask} />
-    </aside>
+    </div>
   );
 }
