@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Paperclip,
   Plus,
+  Settings,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -24,6 +25,7 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   hasBadge?: boolean;
+  requiresWrite?: boolean;
 }
 
 /* 네비 순서: 홈 → Inbox(배지) → 오늘 할 일 → 구분선 → 빠른 메모 → + 추가 */
@@ -34,8 +36,8 @@ const NAV_TOP: NavItem[] = [
 ];
 
 const NAV_BOTTOM: NavItem[] = [
-  { href: "/notes", label: "빠른 메모", icon: FileText },
-  { href: "/new", label: "+ 추가", icon: Plus },
+  { href: "/notes", label: "빠른 메모", icon: FileText, requiresWrite: true },
+  { href: "/new", label: "+ 추가", icon: Plus, requiresWrite: true },
 ];
 
 interface SidebarProps {
@@ -78,6 +80,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const hasRole = useWorkspaceStore((s) => s.hasRole);
 
   const toggleProject = (projectId: string) => {
     setExpandedProjects((prev) => {
@@ -191,8 +194,10 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
           }}
         />
 
-        {/* 하단 네비: 빠른 메모 / + 추가 */}
-        {NAV_BOTTOM.map(renderNavItem)}
+        {/* 하단 네비: 빠른 메모 / + 추가 (Viewer에게 숨김) */}
+        {NAV_BOTTOM.filter(
+          (item) => !item.requiresWrite || hasRole("member")
+        ).map(renderNavItem)}
       </nav>
 
       {/* 프로젝트 리스트: collapsed에서 숨김 */}
@@ -343,6 +348,25 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
           )}
         </div>
       )}
+
+      {/* 설정 링크 — 하단 고정 */}
+      <div
+        className="mt-auto pt-2 border-t"
+        style={{ borderColor: "var(--border-subtle)" }}
+      >
+        <Link
+          href="/settings"
+          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors duration-150"
+          style={{
+            color: pathname === "/settings" ? "var(--text-primary)" : "var(--text-muted)",
+            background: pathname === "/settings" ? "var(--surface-active)" : "transparent",
+            borderRadius: "var(--radius-sm)",
+          }}
+        >
+          <Settings size={16} />
+          {!collapsed && <span>설정</span>}
+        </Link>
+      </div>
     </aside>
   );
 }

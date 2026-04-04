@@ -9,9 +9,15 @@ import { Header } from "./header";
 import { CmdK } from "./cmd-k";
 import { BottomNav } from "./bottom-nav";
 import { SourceViewer } from "@/features/sources/components/source-viewer";
+import { useSyncWorkspaceRole } from "@/features/members/hooks";
+import { useWorkspaceStore } from "@/features/workspaces/store";
 
 export function PanelLayout({ children }: { children: React.ReactNode }) {
   const { isMobile, isCompact } = useBreakpoint();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+
+  // 워크스페이스 변경 시 역할 동기화
+  useSyncWorkspaceRole(activeWorkspaceId ?? undefined);
   const {
     sidebarOpen,
     ragOverlayOpen,

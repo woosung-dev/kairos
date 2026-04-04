@@ -4,8 +4,8 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 
-from src.auth.dependencies import get_current_user
-from src.auth.models import User
+from src.auth.rbac import require_member, require_viewer
+from src.workspaces.models import WorkspaceMember
 from src.notes.dependencies import get_note_service
 from src.notes.schemas import CreateNoteRequest, UpdateNoteRequest
 from src.notes.service import NoteService
@@ -22,7 +22,7 @@ async def list_notes(
     project_id: str | None = Query(default=None, alias="projectId"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100, alias="pageSize"),
-    current_user: User = Depends(get_current_user),
+    member: WorkspaceMember = Depends(require_viewer),
     service: NoteService = Depends(get_note_service),
 ):
     pid = uuid.UUID(project_id) if project_id else None
@@ -35,7 +35,7 @@ async def list_notes(
 async def get_note(
     workspace_id: uuid.UUID,
     note_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    member: WorkspaceMember = Depends(require_viewer),
     service: NoteService = Depends(get_note_service),
 ):
     return await service.get_note(note_id)
@@ -46,13 +46,13 @@ async def create_note(
     workspace_id: uuid.UUID,
     data: CreateNoteRequest,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
+    member: WorkspaceMember = Depends(require_member),
     service: NoteService = Depends(get_note_service),
 ):
     pid = uuid.UUID(data.project_id) if data.project_id else None
     result = await service.create_note(
         workspace_id=workspace_id,
-        created_by_id=current_user.id,
+        created_by_id=member.user_id,
         title=data.title,
         content=data.content,
         project_id=pid,
@@ -67,7 +67,7 @@ async def update_note(
     note_id: uuid.UUID,
     data: UpdateNoteRequest,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
+    member: WorkspaceMember = Depends(require_member),
     service: NoteService = Depends(get_note_service),
 ):
     # project_id sentinel 처리: 필드가 없으면 변경 안 함
@@ -90,7 +90,7 @@ async def update_note(
 async def delete_note(
     workspace_id: uuid.UUID,
     note_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    member: WorkspaceMember = Depends(require_member),
     service: NoteService = Depends(get_note_service),
 ):
     await service.delete_note(note_id)

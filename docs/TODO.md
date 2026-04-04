@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-04-04
+> 마지막 업데이트: 2026-04-05
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조
 
@@ -20,6 +20,14 @@
 - [x] Sprint 2: AI 파이프라인 + 프론트엔드 API 연동 [검증됨 2026-04-04]
 - [x] Sprint 3: RAG + 노트 [검증됨 2026-04-04]
 - [x] Sprint 4: 배포 설정 [검증됨 2026-04-04 — BE/FE 프로덕션 헬스체크 OK]
+- [x] Sprint 5: RBAC + 초대 시스템 [검증됨 2026-04-05 — QA 통과, 57 BE 테스트 passed]
+  - [x] RoleChecker RBAC 미들웨어 + 전체 라우터 적용
+  - [x] WorkspaceInvite 모델 + Alembic 마이그레이션
+  - [x] 초대/멤버 관리 API (11개 엔드포인트)
+  - [x] FE: /settings 페이지 (멤버/초대/일반 탭)
+  - [x] FE: /invite/[code] 초대 수락 페이지
+  - [x] FE: 사이드바 설정 링크 + Viewer 쓰기 버튼 숨김
+  - [x] ADR-007: LLM Knowledge Base 인사이트 (연구/Phase 4 적용 예정)
 
 ## In Progress
 
@@ -68,4 +76,7 @@
 - [ ] 프론트엔드 `.env.example` 생성
 - [ ] E2E 테스트 환경 구축
 - [ ] Phase 2 잔여: 프론트엔드 ↔ 백엔드 실제 연동 검증
-- [ ] Sprint 5 계획 (RBAC + 초대 시스템)
+- [ ] Sprint 6 계획 (프로젝트 멤버십 + Private 프로젝트)
+- [ ] 각 도메인 페이지 CRUD 버튼 세밀 역할 분기 (Member vs Admin)
+- [ ] Header 멤버 수 뱃지
+- [ ] mutation 에러 toast 피드백

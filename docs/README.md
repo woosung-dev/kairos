@@ -46,6 +46,7 @@
 - [004: PARA → 팀 세컨드 브레인 방향 전환](dev-log/004-second-brain-pivot.md)
 - [005: 랜딩 페이지 AIDA 리디자인](dev-log/005-landing-redesign-aida.md)
 - [006: 서비스 전면 UI/UX 개편](dev-log/006-app-redesign-brainstorm.md) — C|D 2-Panel, Inbox 2그룹, RAG 오버레이 등 11개 결정
+- [007: LLM Knowledge Base 패턴](dev-log/007-llm-knowledge-base-insight.md) — Karpathy 워크플로우 인사이트 → L3/L4 + 프로액티브 인사이트 구현 방법론
 
 ### superpowers/ (Sprint 실행 기록)
 

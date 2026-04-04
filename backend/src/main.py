@@ -13,6 +13,9 @@ from src.notes.router import router as notes_router
 from src.projects.router import meeting_project_router, router as projects_router
 from src.rag.router import router as rag_router
 from src.upload.router import router as upload_router
+from src.workspaces.invite_router import public_router as invite_public_router
+from src.workspaces.invite_router import router as invite_router
+from src.workspaces.member_router import router as member_router
 from src.workspaces.router import router as workspaces_router
 
 settings = get_settings()
@@ -49,6 +52,9 @@ app.include_router(inbox_router)
 app.include_router(notes_router)
 app.include_router(rag_router)
 app.include_router(upload_router)
+app.include_router(member_router)
+app.include_router(invite_router)
+app.include_router(invite_public_router)
 
 
 @app.get("/api/v1/health")

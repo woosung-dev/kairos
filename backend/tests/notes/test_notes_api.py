@@ -8,17 +8,21 @@ from unittest.mock import AsyncMock, MagicMock
 from httpx import ASGITransport, AsyncClient
 
 from src.main import app
-from src.auth.dependencies import get_current_user
+from src.auth.rbac import require_member, require_viewer
 from src.notes.dependencies import get_note_service
+from src.workspaces.models import WorkspaceMember
+
+WID = "00000000-0000-0000-0000-000000000002"
+USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
-@pytest_asyncio.fixture
-async def mock_user():
-    user = MagicMock()
-    user.id = uuid.UUID("00000000-0000-0000-0000-000000000001")
-    user.clerk_id = "clerk_test"
-    user.email = "test@test.com"
-    return user
+def _make_mock_member(role: str = "member") -> WorkspaceMember:
+    """테스트용 WorkspaceMember mock 생성."""
+    member = MagicMock(spec=WorkspaceMember)
+    member.user_id = USER_ID
+    member.workspace_id = uuid.UUID(WID)
+    member.role = role
+    return member
 
 
 @pytest_asyncio.fixture
@@ -49,8 +53,9 @@ async def mock_service():
 
 
 @pytest_asyncio.fixture
-async def client(mock_user, mock_service):
-    app.dependency_overrides[get_current_user] = lambda: mock_user
+async def client(mock_service):
+    app.dependency_overrides[require_member] = lambda: _make_mock_member("member")
+    app.dependency_overrides[require_viewer] = lambda: _make_mock_member("viewer")
     app.dependency_overrides[get_note_service] = lambda: mock_service
 
     async with AsyncClient(
@@ -60,9 +65,6 @@ async def client(mock_user, mock_service):
         yield c
 
     app.dependency_overrides.clear()
-
-
-WID = "00000000-0000-0000-0000-000000000002"
 
 
 @pytest.mark.asyncio

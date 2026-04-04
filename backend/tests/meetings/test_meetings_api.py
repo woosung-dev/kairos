@@ -7,39 +7,41 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-from src.auth.dependencies import get_current_user
-from src.auth.models import User
+from src.auth.rbac import require_member, require_viewer
 from src.common.database import get_async_session
 from src.main import app
 from src.meetings.dependencies import get_meeting_service, get_pipeline_service
+from src.workspaces.models import WorkspaceMember
+
+WORKSPACE_ID = str(uuid.uuid4())
+USER_ID = uuid.uuid4()
+
+
+def _make_mock_member(role: str = "member") -> WorkspaceMember:
+    """테스트용 WorkspaceMember mock 생성."""
+    member = MagicMock(spec=WorkspaceMember)
+    member.user_id = USER_ID
+    member.workspace_id = uuid.UUID(WORKSPACE_ID)
+    member.role = role
+    return member
 
 
 @pytest_asyncio.fixture
 async def client():
     mock_session = AsyncMock()
     app.dependency_overrides[get_async_session] = lambda: mock_session
+    # RBAC 의존성 override — member 역할
+    app.dependency_overrides[require_member] = lambda: _make_mock_member("member")
+    app.dependency_overrides[require_viewer] = lambda: _make_mock_member("viewer")
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
 
 
-@pytest.fixture
-def mock_user():
-    user = MagicMock(spec=User)
-    user.id = uuid.uuid4()
-    user.clerk_id = "user_test123"
-    return user
-
-
-WORKSPACE_ID = str(uuid.uuid4())
-
-
 @pytest.mark.asyncio
-async def test_create_meeting_returns_202(client, mock_user):
+async def test_create_meeting_returns_202(client):
     """POST /meetings → 202 Accepted."""
-    app.dependency_overrides[get_current_user] = lambda: mock_user
-
     mock_service = AsyncMock()
     meeting_id = str(uuid.uuid4())
     mock_service.create_meeting.return_value = {
@@ -67,10 +69,8 @@ async def test_create_meeting_returns_202(client, mock_user):
 
 
 @pytest.mark.asyncio
-async def test_get_meeting_status(client, mock_user):
+async def test_get_meeting_status(client):
     """GET /meetings/{id}/status → 200."""
-    app.dependency_overrides[get_current_user] = lambda: mock_user
-
     meeting_id = str(uuid.uuid4())
     mock_service = AsyncMock()
     mock_service.get_meeting_status.return_value = {
@@ -88,10 +88,8 @@ async def test_get_meeting_status(client, mock_user):
 
 
 @pytest.mark.asyncio
-async def test_list_meetings(client, mock_user):
+async def test_list_meetings(client):
     """GET /meetings → 200 + PaginatedResponse."""
-    app.dependency_overrides[get_current_user] = lambda: mock_user
-
     mock_service = AsyncMock()
     mock_service.list_meetings.return_value = {
         "items": [],
