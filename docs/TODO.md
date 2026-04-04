@@ -33,13 +33,23 @@
   - [x] 회의 상세 3뷰 (요약/트랜스크립트/액션)
   - [x] 빠른 메모 + 소스 가져오기 모달
   - [x] 모바일 BottomNav
-  - [ ] **⚠️ 사이드바 소스 트리 펼침** — 프로젝트 클릭 시 하위 회의/노트/파일 목록
-  - [ ] **⚠️ [1] 클릭 → 소스 뷰어 열림 flow 연결** — 컴포넌트 있으나 호출 미연결
+  - [x] 사이드바 소스 트리 펼침 — 프로젝트 클릭 시 하위 회의/노트/파일 목록 (mock)
+  - [x] [1] 클릭 → 소스 뷰어 열림 flow 연결 — CitationBadge → UI Store → SourceViewer
   - [ ] Inbox 신뢰도 임계값 설정 UI (하드코딩 상태)
   - [ ] 온보딩 템플릿 프로젝트 자동 생성 (백엔드 필요)
   - [ ] 내보내기 포맷 (MD/PDF/JSON)
 - [/] 랜딩 페이지 QA — 다크 모드 하이드레이션 미스매치 수정 필요
-- [/] 워크플로우 · 문서 체계 고도화
+- [x] 문서 정합성 통합 정리 (ADR-006 기준 전체 문서 정렬)
+  - [x] cross-domain-pipeline.md: Claude → Gemini 수정
+  - [x] para-methodology.md: deprecated 배너 추가
+  - [x] ui-ux-spec.md: ADR-006 기준 전면 재작성 (C|D 2-Panel, Today 피드, Inbox 2그룹, RAG 오버레이)
+  - [x] directory-map.md: PARA 라우트 제거, [paraId]→[projectId]
+  - [x] 001-tech-stack-decisions.md: PARA 섹션 superseded 표시
+  - [x] mvp-phase1.md + second-brain.md: Inbox 정책 ADR-006 통일 (0.8→0.9)
+  - [x] DESIGN.md: C|D 2-Panel 레이아웃 + Project Status Colors 전환
+  - [x] erd.md: camelCase → snake_case 통일
+  - [x] prd.md: Inbox 임계값 + Phase/Sprint/Stage 용어 매핑 추가
+  - [x] README.md: ADR-006 문서 목록 추가
 
 ## Blocked
 
@@ -52,7 +62,10 @@
 
 ## Next Actions
 
+- [x] ~~ADR-006 핵심 UX 마무리 (P0)~~
+  - [x] ~~사이드바 소스 트리 펼침~~
+  - [x] ~~[1] 클릭 → 소스 뷰어 열림 flow 연결~~
 - [ ] 프론트엔드 `.env.example` 생성
 - [ ] E2E 테스트 환경 구축
 - [ ] Phase 2 잔여: 프론트엔드 ↔ 백엔드 실제 연동 검증
-- [ ] 다음 Sprint 계획 (Stage 4)
+- [ ] Sprint 5 계획 (RBAC + 초대 시스템)

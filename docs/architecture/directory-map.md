@@ -14,15 +14,11 @@ frontend/
     │   ├── inbox/
     │   ├── weekly-review/
     │   └── workspace/[workspaceId]/
-    │       ├── projects/[paraId]/
-    │       │   ├── meetings/[meetingId]/
-    │       │   ├── notes/
-    │       │   ├── actions/
-    │       │   ├── files/
-    │       │   └── ask/               # RAG 채팅
-    │       ├── areas/[paraId]/
-    │       ├── resources/[paraId]/
-    │       └── archives/
+    │       └── projects/[projectId]/
+    │           ├── meetings/[meetingId]/
+    │           ├── notes/
+    │           ├── actions/
+    │           └── files/
     │
     ├── components/                    # 도메인 무관 공통 UI
     │   ├── ui/                        # shadcn/ui v4 (수정 금지)
@@ -79,7 +75,7 @@ backend/
     ├── meetings/                      # 회의 인제스트, STT, AI 파이프라인
     ├── actions/                       # 액션 아이템
     ├── notes/                         # Tiptap 노트
-    ├── rag/                           # RAG 검색 + Claude 답변
+    ├── rag/                           # RAG 검색 + Gemini 답변
     ├── common/
     │   ├── database.py                # AsyncSession 팩토리
     │   ├── exceptions.py              # 전역 예외 핸들러

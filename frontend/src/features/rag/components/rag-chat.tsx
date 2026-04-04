@@ -2,9 +2,12 @@
 
 import { useEffect, useRef, useCallback, useState, type ReactNode } from "react";
 import { useRagStore } from "../store";
+import { useUIStore } from "@/store/ui";
 import { RagSources } from "./rag-sources";
 import { CitationBadge } from "./citation-badge";
 import { MessageActions } from "./message-actions";
+import type { RagSource } from "../types";
+import type { SourceDocument, HighlightChunk } from "@/features/sources/types";
 
 /** [1], [2] 등 인라인 출처 표기를 감지하여 CitationBadge로 변환 */
 function renderContentWithCitations(
@@ -42,8 +45,31 @@ function renderContentWithCitations(
   return parts;
 }
 
+/** RagSource → SourceDocument 변환 (snippet을 content로 사용, 추후 full doc fetch) */
+function toSourceDocument(source: RagSource): SourceDocument {
+  return {
+    id: source.id,
+    title: source.source,
+    type: source.sourceType,
+    content: source.text,
+    projectId: "",
+    createdAt: source.date,
+  };
+}
+
+/** RagSource snippet에서 HighlightChunk 생성 (전체 텍스트가 하이라이트) */
+function toHighlightChunk(source: RagSource, citationNumber: number): HighlightChunk {
+  return {
+    citationNumber,
+    startOffset: 0,
+    endOffset: source.text.length,
+    text: source.text,
+  };
+}
+
 export function RagChat() {
   const { messages, isStreaming } = useRagStore();
+  const openSourceViewer = useUIStore((s) => s.openSourceViewer);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [activeCitation, setActiveCitation] = useState<number | null>(null);
 
@@ -51,9 +77,21 @@ export function RagChat() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isStreaming]);
 
-  const handleCitationClick = useCallback((num: number) => {
-    setActiveCitation((prev) => (prev === num ? null : num));
-  }, []);
+  const handleCitationClick = useCallback(
+    (num: number, sources?: RagSource[]) => {
+      setActiveCitation((prev) => (prev === num ? null : num));
+
+      // 소스가 있으면 소스 뷰어 열기
+      const source = sources?.[num - 1];
+      if (source) {
+        openSourceViewer(
+          toSourceDocument(source),
+          [toHighlightChunk(source, num)],
+        );
+      }
+    },
+    [openSourceViewer],
+  );
 
   if (messages.length === 0) {
     return (
@@ -90,7 +128,7 @@ export function RagChat() {
               {msg.role === "assistant"
                 ? renderContentWithCitations(
                     msg.content,
-                    handleCitationClick,
+                    (num) => handleCitationClick(num, msg.sources),
                     activeCitation,
                   )
                 : msg.content}

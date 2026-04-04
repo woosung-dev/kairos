@@ -13,6 +13,8 @@ import {
   FileText,
   Home,
   Inbox,
+  MessageSquare,
+  Paperclip,
   Plus,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -40,10 +42,54 @@ interface SidebarProps {
   collapsed?: boolean;
 }
 
+/** 프로젝트 하위 소스 아이템 (mock — 추후 API 연동) */
+interface SourceItem {
+  id: string;
+  type: "meeting" | "note" | "file";
+  title: string;
+  href: string;
+}
+
+const SOURCE_ICON = {
+  meeting: MessageSquare,
+  note: FileText,
+  file: Paperclip,
+} as const;
+
+/** 프로젝트별 하위 소스 mock 데이터 */
+const MOCK_PROJECT_SOURCES: Record<string, SourceItem[]> = {
+  "proj-001": [
+    { id: "mt-001", type: "meeting", title: "주간 스프린트 리뷰", href: "/meetings/mt-001" },
+    { id: "mt-002", type: "meeting", title: "보안 검토 회의", href: "/meetings/mt-002" },
+    { id: "nt-001", type: "note", title: "경쟁사 분석 메모", href: "/notes/nt-001" },
+  ],
+  "proj-002": [
+    { id: "mt-003", type: "meeting", title: "인프라 주간 리뷰", href: "/meetings/mt-003" },
+    { id: "nt-002", type: "note", title: "AWS 전환 계획", href: "/notes/nt-002" },
+    { id: "fl-001", type: "file", title: "보안 감사 보고서.pdf", href: "#" },
+  ],
+  "proj-003": [
+    { id: "mt-004", type: "meeting", title: "디자인 킥오프", href: "/meetings/mt-004" },
+  ],
+};
+
 export function Sidebar({ collapsed = false }: SidebarProps) {
   const pathname = usePathname();
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+
+  const toggleProject = (projectId: string) => {
+    setExpandedProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
+      return next;
+    });
+  };
 
   const { data: activeData } = useProjects(activeWorkspaceId ?? undefined, {
     status: "active",
@@ -173,24 +219,74 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
           ) : (
             <div className="space-y-0.5">
               {projects.map((project) => {
-                const isActive = pathname === `/projects/${project.id}`;
+                const isActive = pathname === `/projects/${project.id}` ||
+                  pathname.startsWith(`/projects/${project.id}/`);
+                const isExpanded = expandedProjects.has(project.id);
+                const sources = MOCK_PROJECT_SOURCES[project.id] ?? [];
+
                 return (
-                  <Link
-                    key={project.id}
-                    href={`/projects/${project.id}`}
-                    className="block px-2 py-1.5 rounded text-xs truncate transition-colors"
-                    style={{
-                      background: isActive
-                        ? "var(--surface-active)"
-                        : "transparent",
-                      color: isActive
-                        ? "var(--text-primary)"
-                        : "var(--text-secondary)",
-                      borderRadius: "var(--radius-sm)",
-                    }}
-                  >
-                    {project.title}
-                  </Link>
+                  <div key={project.id}>
+                    {/* 프로젝트 행: 펼침 토글 + 링크 */}
+                    <div
+                      className="flex items-center rounded text-xs transition-colors"
+                      style={{
+                        background: isActive ? "var(--surface-active)" : "transparent",
+                        borderRadius: "var(--radius-sm)",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleProject(project.id)}
+                        className="shrink-0 p-1 rounded transition-colors hover:opacity-80"
+                        style={{ color: "var(--text-muted)" }}
+                        aria-label={isExpanded ? "접기" : "펼치기"}
+                      >
+                        {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                      </button>
+                      <Link
+                        href={`/projects/${project.id}`}
+                        className="flex-1 py-1.5 pr-2 truncate"
+                        style={{
+                          color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
+                        }}
+                      >
+                        {project.title}
+                      </Link>
+                      {sources.length > 0 && (
+                        <span
+                          className="shrink-0 mr-2 text-[10px]"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          {sources.length}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 하위 소스 트리 */}
+                    {isExpanded && sources.length > 0 && (
+                      <div className="ml-4 space-y-px">
+                        {sources.map((item) => {
+                          const ItemIcon = SOURCE_ICON[item.type];
+                          const isItemActive = pathname === item.href;
+                          return (
+                            <Link
+                              key={item.id}
+                              href={item.href}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] truncate transition-colors"
+                              style={{
+                                background: isItemActive ? "var(--surface-active)" : "transparent",
+                                color: isItemActive ? "var(--text-primary)" : "var(--text-muted)",
+                                borderRadius: "var(--radius-sm)",
+                              }}
+                            >
+                              <ItemIcon size={12} className="shrink-0" />
+                              <span className="truncate">{item.title}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>

@@ -6,144 +6,144 @@
 erDiagram
     User {
         uuid id PK
-        string clerkId UK
-        string displayName
+        string clerk_id UK
+        string display_name
         string email
-        string avatarUrl
+        string avatar_url
     }
 
     Workspace {
         uuid id PK
         string name
-        uuid ownerId FK
-        timestamp createdAt
-        timestamp updatedAt
+        uuid owner_id FK
+        timestamp created_at
+        timestamp updated_at
     }
 
     WorkspaceMember {
         uuid id PK
-        uuid workspaceId FK
-        uuid userId FK
+        uuid workspace_id FK
+        uuid user_id FK
         enum role "owner | admin | member | viewer"
     }
 
     InboxItem {
         uuid id PK
-        uuid workspaceId FK
+        uuid workspace_id FK
         string title
         string summary
-        enum sourceType "meeting | note | attachment"
-        uuid sourceId
-        uuid aiSuggestedProjectId
-        string aiSuggestedProjectTitle
-        jsonb aiSuggestedTags "AI 자동 부여 태그"
-        float aiConfidence
-        boolean isProcessed
-        timestamp createdAt
-        timestamp updatedAt
+        enum source_type "meeting | note | attachment"
+        uuid source_id
+        uuid ai_suggested_project_id
+        string ai_suggested_project_title
+        jsonb ai_suggested_tags "AI 자동 부여 태그"
+        float ai_confidence
+        boolean is_processed
+        timestamp created_at
+        timestamp updated_at
     }
 
     Project {
         uuid id PK
-        uuid workspaceId FK
+        uuid workspace_id FK
         string title
         string description
         enum status "active | completed | archived"
         jsonb tags "AI 자동 분류 + 사용자 태그"
-        int sortOrder
-        uuid createdById FK
-        timestamp createdAt
-        timestamp updatedAt
+        int sort_order
+        uuid created_by_id FK
+        timestamp created_at
+        timestamp updated_at
     }
 
     Meeting {
         uuid id PK
-        uuid workspaceId FK
+        uuid workspace_id FK
         string title
-        timestamp recordedAt
-        int durationSec
+        timestamp recorded_at
+        int duration_sec
         enum status "uploading | transcribing | summarizing | completed | failed"
-        boolean hasTranscript
-        boolean hasSummary
-        int actionItemCount
-        uuid createdById FK
-        timestamp createdAt
-        timestamp updatedAt
+        boolean has_transcript
+        boolean has_summary
+        int action_item_count
+        uuid created_by_id FK
+        timestamp created_at
+        timestamp updated_at
     }
 
     MeetingProjectLink {
         uuid id PK
-        uuid meetingId FK
-        uuid projectId FK
+        uuid meeting_id FK
+        uuid project_id FK
     }
 
     TranscriptSegment {
         uuid id PK
-        uuid meetingId FK
+        uuid meeting_id FK
         string speaker
-        float startSec
-        float endSec
+        float start_sec
+        float end_sec
         string text
     }
 
     MeetingSummary {
         uuid id PK
-        uuid meetingId FK
+        uuid meeting_id FK
         string summary
-        json keyDecisions
+        json key_decisions
         json topics
     }
 
     ActionItem {
         uuid id PK
-        uuid meetingId FK
-        uuid projectId FK
+        uuid meeting_id FK
+        uuid project_id FK
         string title
         string description
-        uuid assigneeId FK
-        date dueDate
+        uuid assignee_id FK
+        date due_date
         enum priority "high | medium | low"
         enum status "todo | in_progress | done | cancelled"
-        timestamp createdAt
-        timestamp updatedAt
+        timestamp created_at
+        timestamp updated_at
     }
 
     Note {
         uuid id PK
-        uuid projectId FK
+        uuid project_id FK
         string title
         json content "Tiptap JSON"
-        uuid createdById FK
-        timestamp createdAt
-        timestamp updatedAt
+        uuid created_by_id FK
+        timestamp created_at
+        timestamp updated_at
     }
 
     EmbeddingChunk {
         uuid id PK
-        uuid workspaceId FK
-        uuid projectId FK "프로젝트 범위 검색용"
-        uuid sourceId
-        enum sourceType "meeting | note | action"
+        uuid workspace_id FK
+        uuid project_id FK "프로젝트 범위 검색용"
+        uuid source_id
+        enum source_type "meeting | note | action"
         vector embedding "1536차원"
-        string chunkText
-        int chunkIndex
-        int chunkLevel "0:document 1:section 2:paragraph"
-        uuid parentChunkId FK "계층적 청킹 부모 참조"
+        string chunk_text
+        int chunk_index
+        int chunk_level "0:document 1:section 2:paragraph"
+        uuid parent_chunk_id FK "계층적 청킹 부모 참조"
         jsonb metadata "speaker, date, topic 등"
-        timestamp createdAt
+        timestamp created_at
     }
 
     SemanticCache {
         uuid id PK
-        uuid workspaceId FK
-        uuid projectId FK "범위별 캐시"
+        uuid workspace_id FK
+        uuid project_id FK "범위별 캐시"
         string question
-        vector questionEmbedding "1536차원"
+        vector question_embedding "1536차원"
         string answer
         jsonb sources "출처 목록"
-        int hitCount
-        timestamp createdAt
-        timestamp expiresAt "TTL 7일"
+        int hit_count
+        timestamp created_at
+        timestamp expires_at "TTL 7일"
     }
 
     User ||--o{ Workspace : "소유"

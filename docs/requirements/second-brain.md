@@ -108,19 +108,20 @@ Layer 2: 팀 지식 베이스 (프로젝트)
 - 모든 생성 콘텐츠는 Inbox에 먼저 적재
 - AI가 **프로젝트 연결 + 태그**를 자동 추천
 - 기존 PARA와 다른 점: **분류 확정이 필수가 아닌 선택**
-  - AI confidence가 높으면 자동 확정 (사용자는 잘못된 것만 수정)
+  - AI confidence가 높으면 자동 확정 (사용자는 잘못된 것만 수정/되돌리기)
   - confidence가 낮으면 사용자 확인 요청
-- AI 추천 정보: `aiSuggestedProjectId`, `aiSuggestedTags`, `aiConfidence`
+- AI 추천 정보: `ai_suggested_project_id`, `ai_suggested_tags`, `ai_confidence`
 
-### Inbox 처리 흐름
+### Inbox 처리 흐름 (ADR-006 §7 기준)
 
 ```
 콘텐츠 생성 (회의 업로드, 노트 작성 등)
   → Inbox 적재
   → AI가 프로젝트 연결 + 태그 추천
-  → confidence ≥ 0.8: 자동 확정 (사용자에게 알림만)
-  → confidence < 0.8: 사용자 확인 요청
-  → 사용자 조정 가능 (프로젝트 변경, 태그 수정)
+  → 2그룹 분리:
+     ├── confidence ≥ 0.9: ✅ AI 자동 확정 (수정/되돌리기 가능)
+     └── confidence < 0.9: ⚠️ 사용자 확인 요청
+  → 임계값은 사용자 조절 가능 (기본 90%)
 ```
 
 ---

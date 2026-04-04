@@ -56,10 +56,13 @@ Form 검증 라이브러리로 Zod v4를 채택한다.
 
 ---
 
-## 4. PARA 방법론 기반 지식 관리 구조
+## 4. ~~PARA 방법론 기반 지식 관리 구조~~ (Superseded by ADR-004)
 
-### 결정
-Tiago Forte의 PARA 방법론(Projects / Areas / Resources / Archives + Inbox)을 핵심 지식 관리 구조로 채택한다.
+> **⚠️ ADR-004 (2026-04-01)에 의해 대체됨.** PARA → 프로젝트 + 태그 구조로 전환.
+> 상세: [`ADR-004`](004-second-brain-pivot.md), [`second-brain.md`](../requirements/second-brain.md)
+
+### ~~결정~~
+~~Tiago Forte의 PARA 방법론(Projects / Areas / Resources / Archives + Inbox)을 핵심 지식 관리 구조로 채택한다.~~
 
 ### 배경
 - 회의록이 단순 저장이 아닌 조직의 지식 자산으로 변환되어야 함

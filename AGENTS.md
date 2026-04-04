@@ -197,28 +197,25 @@ TranscriptSegment, ActionItem, Note, EmbeddingChunk(계층적), SemanticCache
 
 ### 현재 진행 상태
 
-| Phase | 상태 | 범위 |
-|-------|------|------|
-| Phase 1 (프론트엔드 스캐폴딩) | **방향 전환 중** | 3-Panel, Inbox 완료. PARA→프로젝트 구조 전환 필요 (ADR-004) |
-| Phase 2 (백엔드 + AI 파이프라인) | 미착수 | `backend/` 디렉토리 미존재 |
-| Phase 3 (RAG + 고급 UI) | 설계 완료 | `docs/architecture/rag-pipeline.md` |
-| Phase 4 (권한 + 보고서) | 계획 | |
-
+→ `docs/TODO.md` 참조 (현재 작업 상태 — 항상 최신)
 → `docs/requirements/prd.md` Phase 로드맵 참조
 
 ### 실제 코드 현황
 
 ```
 kairos/
-├── frontend/          # Next.js 16 (56 TS/TSX, pnpm)
+├── frontend/          # Next.js 16 (101 TS/TSX, pnpm)
 │   └── src/
 │       ├── app/       # 라우트 (dashboard, inbox, workspace/[id]/...)
-│       ├── components/# ui/ (shadcn), layout/ (sidebar, header, rag-panel)
-│       ├── features/  # inbox/, para/, meetings/(types만), actions/(types만)
+│       ├── components/# ui/ (shadcn), layout/, landing/ (13개)
+│       ├── features/  # inbox/, meetings/, actions/, projects/
 │       ├── mocks/     # mock data (Phase 1)
 │       └── store/     # Zustand (ui.ts)
-├── backend/           # 미존재 (Phase 2에서 생성)
-├── docs/              # 13개 문서
+├── backend/           # FastAPI (12 도메인 모듈)
+│   └── src/           # actions, auth, inbox, meetings, notes,
+│                      # projects, rag, embeddings, upload, workspaces
+│                      # + common/, core/, services/
+├── docs/              # 18+ 문서, 5 ADR
 └── .ai/               # 규칙 파일
 ```
 

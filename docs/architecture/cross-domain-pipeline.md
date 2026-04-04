@@ -119,9 +119,9 @@ async def get_meeting_pipeline_service(
 [BackgroundTask]
   MeetingPipelineService.process_meeting(id)
     → TranscriptionService.transcribe()        # 외부 API (Whisper)
-    → AIProcessingService.summarize()           # 외부 API (Claude)
-    → AIProcessingService.extract_actions()     # 외부 API (Claude)
-    → AIProcessingService.classify_project()    # 외부 API (Claude)
+    → AIProcessingService.summarize()           # 외부 API (Gemini)
+    → AIProcessingService.extract_actions()     # 외부 API (Gemini)
+    → AIProcessingService.classify_project()    # 외부 API (Gemini)
     → InboxService.create_from_meeting()        # DB 쓰기
     → EmbeddingService.embed_transcript()       # 외부 API (OpenAI) + DB 쓰기
     → MeetingRepository.update_status()         # DB 쓰기

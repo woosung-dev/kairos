@@ -61,11 +61,10 @@
 - **Accent Hover:** #35B39C
 - **Accent Subtle:** rgba(62,207,180,0.1)
 
-### Project Category Colors
-- **Project:** #3ECFB4 (청록) — 실행 중, 마감이 있는 업무
-- **Area:** #F0963C (주황) — 지속 관리 영역
-- **Resource:** #A78BFA (보라) — 참고 자료
-- **Archive:** #6B6B73 (회색) — 완료/비활성
+### Project Status Colors
+- **Active:** #3ECFB4 (청록) — 진행 중 프로젝트
+- **Completed:** #F0963C (주황) — 완료된 프로젝트
+- **Archived:** #6B6B73 (회색) — 비활성/보관
 
 ### Semantic
 - **Success:** #34D399
@@ -84,11 +83,11 @@
 - **Scale:** 2xs(2px) xs(4px) sm(8px) md(16px) lg(24px) xl(32px) 2xl(48px) 3xl(64px)
 
 ## Layout
-- **Approach:** Grid-disciplined (3-Panel)
+- **Approach:** C|D 2-Panel (ADR-006 §3)
 - **구조:**
-  - 좌측 사이드바: 고정 220px (프로젝트 네비게이션)
+  - 좌측 사이드바: 고정 220px (프로젝트 네비게이션 + 소스 트리)
   - 중앙 콘텐츠: flex-1 (메인 작업 영역)
-  - 우측 RAG 패널: 320px (지식 검색, 상시 노출 옵션)
+  - RAG: 상단 검색바 상시 + Cmd+K 슬라이드 오버레이 380px (상시 패널 아님)
 - **Max content width:** 제한 없음 (패널 기반)
 - **Border radius:**
   - sm: 4px (버튼, 인풋, 뱃지)
@@ -99,13 +98,13 @@
 ### Responsive Breakpoints
 | 이름 | 범위 | Tailwind | 레이아웃 |
 |------|------|----------|----------|
-| Desktop | ≥1280px | `xl:` (기본) | 3-Panel 풀: 사이드바 220px + 메인 + RAG 320px |
-| Compact | 768~1279px | `md:` | 사이드바 아이콘 48px + 메인 + RAG 접힘(토글) |
+| Desktop | ≥1280px | `xl:` (기본) | 2-Panel: 사이드바 220px + 메인 + RAG 오버레이 |
+| Compact | 768~1279px | `md:` | 사이드바 아이콘 48px + 메인 + RAG 오버레이 |
 | Mobile | <768px | 기본 | 단일 패널 + 하단 네비게이션 바 |
 
 - **Sidebar:** Desktop=220px 텍스트+아이콘, Compact=48px 아이콘만, Mobile=숨김
-- **RAG Panel:** Desktop=320px 상시, Compact=토글 슬라이드, Mobile=`/search` 라우트
-- **Bottom Nav (Mobile):** [홈] [프로젝트] [업로드+] [Inbox] [검색] — `md:hidden`
+- **RAG:** Desktop/Compact=Cmd+K 슬라이드 오버레이, Mobile=`/search` 라우트
+- **Bottom Nav (Mobile):** [홈] [프로젝트] [+추가] [Inbox] [검색] — `md:hidden`
 
 ## Motion
 - **Approach:** Minimal-functional — 상태 전환과 패널 토글만.
@@ -114,7 +113,7 @@
 - **특이사항:** RAG 응답 스트리밍이 유일한 "애니메이션". 타이핑 효과가 아닌 자연스러운 텍스트 흐름.
 
 ## Design Risks (의도적 차별화)
-1. **RAG 패널 상시 노출** — 대부분 도구는 채팅을 숨기지만, Kairos는 지식 검색이 핵심이므로 항상 보이게. 화면의 ~30% 차지.
+1. **RAG 오버레이 (Cmd+K)** — 상시 패널 대신 검색바+오버레이로 전환 (ADR-006). 메인 콘텐츠 영역을 넓게 확보하면서도 RAG 접근성 유지.
 2. **액센트 #3ECFB4 (청록)** — SaaS 표준(파란/보라) 대신 "시간의 포착"이라는 컨셉에 맞는 색상. Color-blind safe.
 
 ## Decisions Log
@@ -122,5 +121,7 @@
 |------|----------|-----------|
 | 2026-04-01 | Initial design system created | /design-consultation. Linear + NotebookLM 리서치 기반. Industrial/Utilitarian 방향. |
 | 2026-04-01 | RAG 패널 상시 노출 결정 | 지식 탐색이 핵심 가치. 숨겨두면 사용 빈도 저하. |
+| 2026-04-04 | RAG 상시 패널 → 오버레이 전환 (ADR-006) | C\|D 2-Panel 채택. 메인 콘텐츠 영역 확보 + 검색바/Cmd+K로 접근성 유지. |
+| 2026-04-04 | Project Category → Status Colors 전환 | PARA 제거(ADR-004). Area/Resource 색상 → Active/Completed/Archived. |
 | 2026-04-01 | 청록 액센트 #3ECFB4 채택 | "결정적 순간의 포착" 컨셉. 다크 배경 대비 우수. |
 | 2026-04-01 | Pretendard 한국어 본문 | Apple SD Gothic Neo 대비 가독성, 자간, 웨이트 다양성 우위. |

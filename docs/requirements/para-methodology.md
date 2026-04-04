@@ -1,3 +1,13 @@
+# ~~PARA 방법론 구현 상세~~ (Deprecated)
+
+> **⚠️ 이 문서는 ADR-004에 의해 대체되었습니다.**
+> 현재 Kairos는 PARA 대신 **프로젝트 + 태그** 구조를 사용합니다.
+> 최신 문서: [`second-brain.md`](second-brain.md) | 결정 근거: [`ADR-004`](../dev-log/004-second-brain-pivot.md)
+>
+> 아래 내용은 **기록 보존 목적**으로만 유지됩니다.
+
+---
+
 # PARA 방법론 구현 상세
 
 > Tiago Forte의 PARA 방법론을 기반으로, **실행도(Actionability)**를 기준으로 정보를 분류한다.

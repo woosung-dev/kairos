@@ -179,7 +179,7 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 - [ ] Project CRUD API (`GET/POST/PATCH/DELETE /projects`, `POST /projects/{id}/archive`)
 - [ ] ActionItem CRUD API (`GET/POST/PATCH /action-items`)
 - [ ] 오케스트레이터 통합 (MeetingPipelineService)
-- [ ] Inbox 자동 적재 (AI confidence ≥ 0.8 자동 확정)
+- [ ] Inbox 자동 적재 (AI confidence ≥ 0.9 자동 확정, 임계값 사용자 조절 가능 — ADR-006 §7)
 
 #### 프론트엔드
 - [ ] Mock → Real API 전환 (Inbox, Project, ActionItem)
@@ -304,7 +304,16 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 - **Sprint 3:** 임베딩(pgvector) + Hybrid Search + SSE RAG + Tiptap 노트 + Semantic Cache
 - **Sprint 4:** GCP Cloud Run + Vercel + Neon prod 배포, GitHub Actions CI
 - **프로덕션 URL:** BE `https://kairos-api-467254555861.asia-northeast3.run.app` / FE `https://kairos-zeta-ebon.vercel.app`
-- **다음 작업:** Sprint 5 — RBAC + 초대 시스템
+- **ADR-006:** 서비스 전면 UI/UX 개편 — 7/11 구현 완료, 4/11 미완료
+- **다음 작업:** ADR-006 미완료 마무리 → Sprint 5 (RBAC + 초대 시스템)
+
+### Phase/Sprint/Stage 용어 매핑
+
+| 체계 | 의미 | 출처 |
+|------|------|------|
+| **Phase 0~4** | 제품 로드맵 단계 (장기) | 이 문서 §5 |
+| **Sprint 1~5** | 2주 단위 실행 주기 (Phase 내부) | 이 문서 §5 |
+| **8 Stage** | 세션 워크플로우 (설계→구현→마무리) | `guides/development-methodology.md` |
 
 ---
 

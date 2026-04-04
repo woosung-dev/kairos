@@ -8,11 +8,20 @@ import { RagPanel } from "./rag-panel";
 import { Header } from "./header";
 import { CmdK } from "./cmd-k";
 import { BottomNav } from "./bottom-nav";
+import { SourceViewer } from "@/features/sources/components/source-viewer";
 
 export function PanelLayout({ children }: { children: React.ReactNode }) {
   const { isMobile, isCompact } = useBreakpoint();
-  const { sidebarOpen, ragOverlayOpen, toggleRagOverlay, setSidebarCollapsed, setIsMobile } =
-    useUIStore();
+  const {
+    sidebarOpen,
+    ragOverlayOpen,
+    toggleRagOverlay,
+    setSidebarCollapsed,
+    setIsMobile,
+    sourceViewerSource,
+    sourceViewerHighlights,
+    closeSourceViewer,
+  } = useUIStore();
 
   // breakpoint 변경 시 Zustand 동기화
   useEffect(() => {
@@ -105,10 +114,35 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
         </>
       )}
 
+      {/* 소스 뷰어 모달 */}
+      {sourceViewerSource && (
+        <>
+          <div
+            className="fixed inset-0 z-50"
+            style={{ background: "var(--backdrop-color)" }}
+            onClick={closeSourceViewer}
+          />
+          <div
+            className="fixed right-0 top-0 h-full z-50 flex flex-col shadow-xl"
+            style={{
+              width: isMobile ? "100%" : "var(--rag-overlay-width)",
+              background: "var(--background)",
+              borderLeft: isMobile ? "none" : "1px solid var(--border-subtle)",
+            }}
+          >
+            <SourceViewer
+              source={sourceViewerSource}
+              highlightChunks={sourceViewerHighlights}
+              onClose={closeSourceViewer}
+            />
+          </div>
+        </>
+      )}
+
       {/* Cmd+K 모달 */}
       <CmdK />
 
-      {/* 모바일 하단 네비게이션 */}
+      {/* 모바일 하단 네비게이�� */}
       {isMobile && <BottomNav />}
     </div>
   );
