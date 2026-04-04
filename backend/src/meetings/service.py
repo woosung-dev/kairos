@@ -3,14 +3,16 @@
 import json
 import uuid
 
+from src.actions.repository import ActionItemRepository
 from src.meetings.exceptions import MeetingNotFoundError
 from src.meetings.models import Meeting
 from src.meetings.repository import MeetingRepository
 
 
 class MeetingService:
-    def __init__(self, repo: MeetingRepository) -> None:
+    def __init__(self, repo: MeetingRepository, action_repo: ActionItemRepository | None = None) -> None:
         self.repo = repo
+        self.action_repo = action_repo
 
     async def create_meeting(
         self,
@@ -110,16 +112,31 @@ class MeetingService:
         segments = await self.repo.get_segments(meeting_id)
         summary = await self.repo.get_summary(meeting_id)
 
+        # 액션 아이템 조회
+        actions = []
+        if self.action_repo:
+            actions = await self.action_repo.find_by_meeting(meeting_id)
+
         if fmt == "md":
-            content = self._to_markdown(meeting, summary, segments)
+            content = self._to_markdown(meeting, summary, segments, actions)
             return content, f"{meeting.title}.md", "text/markdown; charset=utf-8"
         else:
             detail = await self.get_meeting_detail(meeting_id)
+            detail["actionItems"] = [
+                {
+                    "title": a.title,
+                    "description": a.description,
+                    "status": a.status,
+                    "priority": a.priority,
+                    "dueDate": a.due_date.isoformat() if a.due_date else None,
+                }
+                for a in actions
+            ]
             content = json.dumps(detail, ensure_ascii=False, indent=2)
             return content, f"{meeting.title}.json", "application/json; charset=utf-8"
 
     @staticmethod
-    def _to_markdown(meeting, summary, segments) -> str:
+    def _to_markdown(meeting, summary, segments, actions=None) -> str:
         lines = [f"# {meeting.title}"]
         if meeting.recorded_at:
             lines.append(f"> {meeting.recorded_at.strftime('%Y-%m-%d')}")
@@ -134,6 +151,16 @@ class MeetingService:
                 for d in summary.key_decisions:
                     lines.append(f"- {d}")
                 lines.append("")
+
+        if actions:
+            lines.append("## 액션 아이템")
+            for a in actions:
+                checkbox = "[x]" if a.status == "done" else "[ ]"
+                line = f"- {checkbox} {a.title}"
+                if a.due_date:
+                    line += f" (기한: {a.due_date.isoformat()})"
+                lines.append(line)
+            lines.append("")
 
         if segments:
             lines.append("## 트랜스크립트")

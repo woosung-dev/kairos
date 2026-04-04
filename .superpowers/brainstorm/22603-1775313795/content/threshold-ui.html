@@ -1,0 +1,80 @@
+<h2>Inbox 임계값 설정 — UI 방식</h2>
+<p class="subtitle">/settings 일반 탭에 들어갈 임계값 조절 UI. 어떤 방식이 적절할까요?</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="padding:24px;background:#141416;border-radius:8px;">
+        <div style="margin-bottom:12px;">
+          <span style="color:#EDEDEF;font-size:14px;font-weight:500;">AI 자동 확정 임계값</span>
+          <span style="color:#3ECFB4;font-size:14px;font-weight:600;float:right;">90%</span>
+        </div>
+        <div style="background:#222226;border-radius:4px;height:6px;position:relative;">
+          <div style="background:#3ECFB4;border-radius:4px;height:6px;width:90%;"></div>
+          <div style="position:absolute;top:-4px;left:calc(90% - 7px);width:14px;height:14px;background:#3ECFB4;border-radius:50%;border:2px solid #0A0A0B;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;">
+          <span style="color:#5C5C63;font-size:11px;">50% (느슨)</span>
+          <span style="color:#5C5C63;font-size:11px;">100% (엄격)</span>
+        </div>
+        <p style="color:#8E8E93;font-size:12px;margin-top:12px;line-height:1.5;">
+          이 값 이상의 신뢰도를 가진 Inbox 항목은 AI가 자동으로 프로젝트에 연결합니다.<br>
+          낮출수록 자동 확정이 많아지고, 높일수록 사용자 확인이 많아집니다.
+        </p>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 슬라이더</h3>
+      <p>드래그로 직관적 조절. 실시간 미리보기 가능. 값의 범위를 시각적으로 인지</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="padding:24px;background:#141416;border-radius:8px;">
+        <div style="margin-bottom:12px;">
+          <span style="color:#EDEDEF;font-size:14px;font-weight:500;">AI 자동 확정 임계값</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button style="padding:6px 16px;border-radius:6px;background:#222226;color:#8E8E93;border:1px solid #333;font-size:13px;cursor:pointer;">70%</button>
+          <button style="padding:6px 16px;border-radius:6px;background:#222226;color:#8E8E93;border:1px solid #333;font-size:13px;cursor:pointer;">80%</button>
+          <button style="padding:6px 16px;border-radius:6px;background:#3ECFB4;color:#0A0A0B;border:1px solid #3ECFB4;font-size:13px;font-weight:600;cursor:pointer;">90%</button>
+          <button style="padding:6px 16px;border-radius:6px;background:#222226;color:#8E8E93;border:1px solid #333;font-size:13px;cursor:pointer;">95%</button>
+        </div>
+        <p style="color:#8E8E93;font-size:12px;margin-top:12px;line-height:1.5;">
+          90% 이상 신뢰도의 항목이 자동 확정됩니다.<br>
+          낮은 값 = 자동 처리 많음 · 높은 값 = 수동 확인 많음
+        </p>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 프리셋 버튼</h3>
+      <p>미리 정해진 4개 값(70/80/90/95) 중 선택. 사용자가 잘못된 값을 넣을 위험 없음</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="padding:24px;background:#141416;border-radius:8px;">
+        <div style="margin-bottom:12px;">
+          <span style="color:#EDEDEF;font-size:14px;font-weight:500;">AI 자동 확정 임계값</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <input type="number" value="90" style="width:80px;padding:8px 12px;background:#222226;border:1px solid #333;border-radius:6px;color:#EDEDEF;font-size:14px;text-align:center;" readonly>
+          <span style="color:#8E8E93;font-size:14px;">%</span>
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <button style="padding:0 8px;background:#222226;border:1px solid #333;border-radius:3px;color:#8E8E93;font-size:10px;cursor:pointer;">▲</button>
+            <button style="padding:0 8px;background:#222226;border:1px solid #333;border-radius:3px;color:#8E8E93;font-size:10px;cursor:pointer;">▼</button>
+          </div>
+        </div>
+        <p style="color:#8E8E93;font-size:12px;margin-top:12px;line-height:1.5;">
+          직접 숫자를 입력하거나 ▲▼ 버튼으로 5% 단위 조절
+        </p>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. 숫자 입력</h3>
+      <p>정확한 값 입력 가능. 하지만 범위 인지가 어렵고, 잘못된 값(예: 200%) 입력 위험</p>
+    </div>
+  </div>
+</div>

@@ -10,16 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import { triggerDownload } from "@/lib/download";
 import { exportMeeting } from "../api";
-
-function triggerDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 interface MeetingExportButtonProps {
   meetingId: string;

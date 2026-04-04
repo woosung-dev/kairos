@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api-client";
+import { apiClient, API_BASE_URL } from "@/lib/api-client";
 import type { PaginatedResponse } from "@/types";
 import type { Note, CreateNoteRequest, UpdateNoteRequest } from "./types";
 
@@ -65,7 +65,6 @@ export async function exportNote(
   id: string,
   format: "md" | "json"
 ): Promise<Blob> {
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const res = await fetch(
     `${API_BASE_URL}/api/v1/workspaces/${wid}/notes/${id}/export?format=${format}`,
     { headers: { Authorization: `Bearer ${token}` } }
