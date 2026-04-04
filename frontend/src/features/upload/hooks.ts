@@ -14,11 +14,11 @@ interface UploadState {
 /**
  * Presigned URL을 이용한 R2 직접 업로드 훅.
  *
- * 1. POST /upload/presigned-url -> { uploadUrl, fileKey }
+ * 1. POST /workspaces/{wid}/upload/presigned-url -> { uploadUrl, fileKey }
  * 2. PUT uploadUrl (R2 직접 업로드)
  * 3. fileKey 반환
  */
-export function usePresignedUpload() {
+export function usePresignedUpload(wid: string | undefined) {
   const { getToken } = useAuth();
   const [state, setState] = useState<UploadState>({
     isUploading: false,
@@ -34,8 +34,10 @@ export function usePresignedUpload() {
       const token = await getToken();
       if (!token) throw new Error("인증이 필요합니다");
 
+      if (!wid) throw new Error("워크스페이스가 선택되지 않았습니다");
+
       const presigned = await apiClient<PresignedUrlResponse>(
-        "/upload/presigned-url",
+        `/workspaces/${wid}/upload/presigned-url`,
         {
           token,
           method: "POST",

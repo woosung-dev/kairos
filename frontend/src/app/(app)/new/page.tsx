@@ -41,7 +41,7 @@ export default function NewContentPage() {
   const [error, setError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const presignedUpload = usePresignedUpload();
+  const presignedUpload = usePresignedUpload(activeWorkspaceId ?? undefined);
   const createMeeting = useCreateMeeting(activeWorkspaceId ?? undefined);
 
   const isUploading = !!uploadStep;
