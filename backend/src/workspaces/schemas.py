@@ -61,6 +61,10 @@ class InviteResponse(BaseModel):
     created_at: datetime
 
 
+class UpdateWorkspaceSettingsRequest(BaseModel):
+    inbox_threshold: float = Field(ge=0.5, le=1.0)
+
+
 class InviteInfoResponse(BaseModel):
     """초대 링크 공개 정보 (인증 불필요)."""
     workspace_name: str

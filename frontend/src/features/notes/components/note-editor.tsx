@@ -6,6 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { CharacterCount } from "@tiptap/extension-character-count";
 import { useUpdateNote } from "../hooks";
+import { NoteExportButton } from "./export-button";
 
 interface NoteEditorProps {
   noteId: string;
@@ -64,17 +65,22 @@ export function NoteEditor({
 
   return (
     <div className="flex flex-col h-full">
-      <input
-        defaultValue={initialTitle}
-        onChange={handleTitleChange}
-        placeholder="제목 없음"
-        className="w-full bg-transparent text-xl font-semibold outline-none px-4 py-3 border-b"
-        style={{
-          color: "var(--text-primary)",
-          fontFamily: "var(--font-display)",
-          borderColor: "var(--border-subtle)",
-        }}
-      />
+      <div
+        className="flex items-center gap-2 px-4 py-3 border-b"
+        style={{ borderColor: "var(--border-subtle)" }}
+      >
+        <input
+          defaultValue={initialTitle}
+          onChange={handleTitleChange}
+          placeholder="제목 없음"
+          className="flex-1 bg-transparent text-xl font-semibold outline-none"
+          style={{
+            color: "var(--text-primary)",
+            fontFamily: "var(--font-display)",
+          }}
+        />
+        <NoteExportButton noteId={noteId} noteTitle={initialTitle || "Untitled"} />
+      </div>
       <div className="flex-1 overflow-y-auto px-4 py-3">
         <EditorContent
           editor={editor}

@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api-client";
+import { apiClient, API_BASE_URL } from "@/lib/api-client";
 import type { PaginatedResponse } from "@/types";
 import type { Note, CreateNoteRequest, UpdateNoteRequest } from "./types";
 
@@ -57,6 +57,20 @@ export async function updateNote(
     method: "PATCH",
     body: JSON.stringify(data),
   });
+}
+
+export async function exportNote(
+  token: string,
+  wid: string,
+  id: string,
+  format: "md" | "json"
+): Promise<Blob> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/v1/workspaces/${wid}/notes/${id}/export?format=${format}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) throw new Error("내보내기에 실패했습니다");
+  return res.blob();
 }
 
 export async function deleteNote(

@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api-client";
+import { apiClient, API_BASE_URL } from "@/lib/api-client";
 import type { PaginatedResponse } from "@/types";
 import type {
   Meeting,
@@ -47,6 +47,20 @@ export async function fetchMeetingStatus(
     `/workspaces/${wid}/meetings/${id}/status`,
     { token }
   );
+}
+
+export async function exportMeeting(
+  token: string,
+  wid: string,
+  id: string,
+  format: "md" | "json"
+): Promise<Blob> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/v1/workspaces/${wid}/meetings/${id}/export?format=${format}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) throw new Error("내보내기에 실패했습니다");
+  return res.blob();
 }
 
 export async function createMeeting(

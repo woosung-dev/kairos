@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MeetingSummaryView } from "./meeting-summary-view";
 import { TranscriptView } from "./transcript-view";
 import { ActionView } from "./action-view";
+import { MeetingExportButton } from "./export-button";
 
 /* ── Mock 데이터 ── */
 
@@ -59,6 +60,7 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
           >
             완료
           </span>
+          <MeetingExportButton meetingId={meetingId} meetingTitle={meeting.title} />
         </div>
 
         {/* 메타 정보 */}

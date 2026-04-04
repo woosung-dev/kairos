@@ -1,6 +1,8 @@
 # backend/src/workspaces/repository.py
 """Workspace Repository — AsyncSession 유일 보유자."""
 import uuid
+from datetime import UTC, datetime
+
 from sqlalchemy import func, select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,6 +40,15 @@ class WorkspaceRepository:
             .where(WorkspaceMember.workspace_id == workspace_id)
         )
         return result.scalar_one()
+
+    async def update_threshold(
+        self, workspace_id: uuid.UUID, threshold: float
+    ) -> None:
+        await self.session.execute(
+            update(Workspace)
+            .where(Workspace.id == workspace_id)
+            .values(inbox_threshold=threshold, updated_at=datetime.now(UTC))
+        )
 
     # --- 멤버 관리 ---
 

@@ -15,6 +15,7 @@ from src.meetings.service import MeetingService
 from src.projects.repository import ProjectRepository
 from src.services.ai_processing import AIProcessingService
 from src.services.transcription import TranscriptionService
+from src.workspaces.repository import WorkspaceRepository
 
 
 async def get_meeting_repository(
@@ -24,9 +25,12 @@ async def get_meeting_repository(
 
 
 async def get_meeting_service(
-    repo: MeetingRepository = Depends(get_meeting_repository),
+    session: AsyncSession = Depends(get_async_session),
 ) -> MeetingService:
-    return MeetingService(repo)
+    return MeetingService(
+        repo=MeetingRepository(session),
+        action_repo=ActionItemRepository(session),
+    )
 
 
 async def get_pipeline_service(
@@ -38,6 +42,7 @@ async def get_pipeline_service(
         project_repo=ProjectRepository(session),
         action_repo=ActionItemRepository(session),
         inbox_repo=InboxRepository(session),
+        workspace_repo=WorkspaceRepository(session),
         r2_service=R2Service(),
         transcription_service=TranscriptionService(),
         ai_service=AIProcessingService(),

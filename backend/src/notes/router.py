@@ -2,7 +2,10 @@
 """노트 CRUD 엔드포인트."""
 import uuid
 
+from urllib.parse import quote
+
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from fastapi.responses import Response
 
 from src.auth.rbac import require_member, require_viewer
 from src.workspaces.models import WorkspaceMember
@@ -39,6 +42,23 @@ async def get_note(
     service: NoteService = Depends(get_note_service),
 ):
     return await service.get_note(note_id)
+
+
+@router.get("/{note_id}/export")
+async def export_note(
+    workspace_id: uuid.UUID,
+    note_id: uuid.UUID,
+    format: str = Query(default="md", pattern="^(md|json)$"),
+    member: WorkspaceMember = Depends(require_viewer),
+    service: NoteService = Depends(get_note_service),
+):
+    content, filename, media_type = await service.export_note(note_id, format)
+    encoded = quote(filename)
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
+    )
 
 
 @router.post("", status_code=201)

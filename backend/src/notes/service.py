@@ -1,5 +1,6 @@
 # backend/src/notes/service.py
 """노트 비즈니스 로직."""
+import json
 import uuid
 from datetime import datetime
 
@@ -130,6 +131,29 @@ class NoteService:
         await self.embedding_service.invalidate_cache(
             note.workspace_id, note.project_id
         )
+
+    async def export_note(self, note_id: uuid.UUID, fmt: str) -> tuple[str, str, str]:
+        """노트 내보내기. (content, filename, media_type) 반환."""
+        note = await self.repo.find_by_id(note_id)
+        if note is None:
+            raise NoteNotFoundError()
+
+        title = note.title or "Untitled"
+
+        if fmt == "md":
+            content = f"# {title}\n\n{note.plain_text}"
+            return content, f"{title}.md", "text/markdown; charset=utf-8"
+        else:
+            data = {
+                "id": str(note.id),
+                "title": title,
+                "content": note.content,
+                "plainText": note.plain_text,
+                "createdAt": note.created_at.isoformat(),
+                "updatedAt": note.updated_at.isoformat(),
+            }
+            content = json.dumps(data, ensure_ascii=False, indent=2)
+            return content, f"{title}.json", "application/json; charset=utf-8"
 
     @staticmethod
     def _to_dict(note: Note) -> dict:
