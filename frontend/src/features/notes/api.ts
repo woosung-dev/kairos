@@ -59,6 +59,21 @@ export async function updateNote(
   });
 }
 
+export async function exportNote(
+  token: string,
+  wid: string,
+  id: string,
+  format: "md" | "json"
+): Promise<Blob> {
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const res = await fetch(
+    `${API_BASE_URL}/api/v1/workspaces/${wid}/notes/${id}/export?format=${format}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) throw new Error("내보내기에 실패했습니다");
+  return res.blob();
+}
+
 export async function deleteNote(
   token: string,
   wid: string,

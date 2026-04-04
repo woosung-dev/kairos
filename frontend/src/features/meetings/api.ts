@@ -49,6 +49,21 @@ export async function fetchMeetingStatus(
   );
 }
 
+export async function exportMeeting(
+  token: string,
+  wid: string,
+  id: string,
+  format: "md" | "json"
+): Promise<Blob> {
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const res = await fetch(
+    `${API_BASE_URL}/api/v1/workspaces/${wid}/meetings/${id}/export?format=${format}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) throw new Error("내보내기에 실패했습니다");
+  return res.blob();
+}
+
 export async function createMeeting(
   token: string,
   wid: string,
