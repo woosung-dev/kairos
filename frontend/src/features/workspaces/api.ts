@@ -21,3 +21,22 @@ export async function createWorkspace(
     body: JSON.stringify({ name }),
   });
 }
+
+export async function fetchWorkspace(
+  token: string,
+  wid: string
+): Promise<{ id: string; name: string; inboxThreshold: number; memberCount: number }> {
+  return apiClient(`/workspaces/${wid}`, { token });
+}
+
+export async function updateWorkspaceSettings(
+  token: string,
+  wid: string,
+  data: { inbox_threshold: number }
+): Promise<{ inboxThreshold: number }> {
+  return apiClient(`/workspaces/${wid}/settings`, {
+    token,
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
