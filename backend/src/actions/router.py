@@ -4,8 +4,8 @@ import uuid
 
 from fastapi import APIRouter, Depends, Query
 
-from src.auth.dependencies import get_current_user
-from src.auth.models import User
+from src.auth.rbac import require_member, require_viewer
+from src.workspaces.models import WorkspaceMember
 from src.actions.dependencies import get_action_service
 from src.actions.schemas import CreateActionItemRequest, UpdateActionItemRequest
 from src.actions.service import ActionItemService
@@ -24,7 +24,7 @@ async def list_action_items(
     project_id: uuid.UUID | None = Query(default=None, alias="projectId"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100, alias="pageSize"),
-    current_user: User = Depends(get_current_user),
+    member: WorkspaceMember = Depends(require_viewer),
     service: ActionItemService = Depends(get_action_service),
 ):
     return await service.list_action_items(
@@ -36,7 +36,7 @@ async def list_action_items(
 async def create_action_item(
     workspace_id: uuid.UUID,
     data: CreateActionItemRequest,
-    current_user: User = Depends(get_current_user),
+    member: WorkspaceMember = Depends(require_member),
     service: ActionItemService = Depends(get_action_service),
 ):
     return await service.create_action_item(
@@ -56,7 +56,7 @@ async def update_action_item(
     workspace_id: uuid.UUID,
     action_id: uuid.UUID,
     data: UpdateActionItemRequest,
-    current_user: User = Depends(get_current_user),
+    member: WorkspaceMember = Depends(require_member),
     service: ActionItemService = Depends(get_action_service),
 ):
     return await service.update_action_item(

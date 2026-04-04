@@ -5,8 +5,8 @@ import uuid
 from fastapi import APIRouter, Depends
 from sse_starlette.sse import EventSourceResponse
 
-from src.auth.dependencies import get_current_user
-from src.auth.models import User
+from src.auth.rbac import require_viewer
+from src.workspaces.models import WorkspaceMember
 from src.rag.dependencies import get_rag_service
 from src.rag.schemas import RagAskRequest
 from src.rag.service import RagService
@@ -21,7 +21,7 @@ router = APIRouter(
 async def ask_rag(
     workspace_id: uuid.UUID,
     data: RagAskRequest,
-    current_user: User = Depends(get_current_user),
+    member: WorkspaceMember = Depends(require_viewer),
     service: RagService = Depends(get_rag_service),
 ):
     """RAG 질문 → SSE 스트리밍 답변."""
