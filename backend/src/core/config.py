@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     # CORS (쉼표 구분, 예: "http://localhost:3000,https://kairos.vercel.app")
     cors_origins: str = "http://localhost:3000"
 
+    # 프론트엔드 URL (초대 링크 등에서 사용)
+    frontend_url: str = "http://localhost:3000"
+
     # DB
     database_url: str
 
