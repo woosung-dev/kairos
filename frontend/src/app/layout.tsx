@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { QueryProvider } from "@/lib/query-client";
+import { ThemeProvider } from "@/components/layout/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -16,7 +17,7 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider>
-      <html lang="ko" data-theme="dark" suppressHydrationWarning>
+      <html lang="ko" suppressHydrationWarning>
         <head>
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link
@@ -38,10 +39,12 @@ export default function RootLayout({
           />
         </head>
         <body>
-          <QueryProvider>
-            {children}
-            <Toaster />
-          </QueryProvider>
+          <ThemeProvider>
+            <QueryProvider>
+              {children}
+              <Toaster />
+            </QueryProvider>
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

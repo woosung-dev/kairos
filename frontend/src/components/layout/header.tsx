@@ -1,14 +1,29 @@
 "use client";
 
-import { Search, Users } from "lucide-react";
+import { Search, Users, LogOut, Settings } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useMembers } from "@/features/members/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import { useClerk, useUser } from "@clerk/nextjs";
+import { ThemeToggle } from "./theme-toggle";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 export function Header() {
   const { toggleSidebar, toggleRagOverlay } = useUIStore();
   const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
   const { data: members } = useMembers(wid ?? undefined);
+  const { signOut } = useClerk();
+  const { user } = useUser();
+
+  const displayName = user?.fullName ?? user?.firstName ?? "User";
+  const email = user?.primaryEmailAddress?.emailAddress ?? "";
+  const avatarInitial = (user?.firstName?.[0] ?? "U").toUpperCase();
 
   return (
     <header
@@ -75,19 +90,86 @@ export function Header() {
         </kbd>
       </button>
 
-      {/* 우측: 아바타만 (RAG 토글 버튼 제거 — 검색바가 대체) */}
+      {/* 우측: 유저 드롭다운 메뉴 */}
       <div className="flex items-center gap-2 shrink-0">
-        {/* Clerk UserButton 자리 — Clerk 없이도 빌드되도록 플레이스홀더 */}
-        <div
-          className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium"
-          style={{
-            background: "var(--accent-subtle)",
-            color: "var(--accent)",
-            borderRadius: "var(--radius-full)",
-          }}
-        >
-          U
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="flex items-center gap-2 p-1 rounded-lg transition-colors cursor-pointer outline-none"
+            style={{ WebkitTapHighlightColor: "transparent" }}
+          >
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-opacity hover:opacity-80"
+              style={{
+                background: "var(--accent-subtle)",
+                color: "var(--accent)",
+                borderRadius: "var(--radius-full)",
+              }}
+            >
+              {avatarInitial}
+            </div>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent
+            align="end"
+            side="bottom"
+            sideOffset={8}
+            className="w-[240px]"
+          >
+            {/* 유저 정보 */}
+            <div className="px-3 py-2.5">
+              <div className="flex flex-col gap-0.5">
+                <span
+                  className="text-sm font-medium truncate"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {displayName}
+                </span>
+                {email && (
+                  <span
+                    className="text-xs truncate"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {email}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <DropdownMenuSeparator />
+
+            {/* 테마 토글 */}
+            <div className="px-3 py-2">
+              <ThemeToggle />
+            </div>
+
+            <DropdownMenuSeparator />
+
+            {/* 설정 */}
+            <DropdownMenuItem
+              className="px-3 py-2 cursor-pointer"
+              onSelect={() => {
+                if (wid) {
+                  window.location.href = `/workspace/${wid}/settings`;
+                }
+              }}
+            >
+              <Settings size={14} />
+              <span>설정</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            {/* 로그아웃 */}
+            <DropdownMenuItem
+              variant="destructive"
+              className="px-3 py-2 cursor-pointer"
+              onSelect={() => signOut({ redirectUrl: "/" })}
+            >
+              <LogOut size={14} />
+              <span>로그아웃</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );
