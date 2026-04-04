@@ -152,12 +152,12 @@ class MeetingPipelineService:
                 ai_suggested_project_title=suggested.get("newProjectTitle"),
                 ai_suggested_tags=actions_data.get("suggestedTags", []),
                 ai_confidence=confidence,
-                is_processed=confidence >= 0.8,
+                is_processed=confidence >= 0.9,
             )
             await self.inbox_repo.save(inbox_item)
 
-            # [2-5] 자동 확정: confidence >= 0.8이고 기존 프로젝트가 있으면 MeetingProjectLink 생성
-            if confidence >= 0.8 and existing_project_id_str:
+            # [2-5] 자동 확정: confidence >= 0.9이고 기존 프로젝트가 있으면 MeetingProjectLink 생성
+            if confidence >= 0.9 and existing_project_id_str:
                 await self.project_repo.add_meeting_link(
                     meeting.id, uuid.UUID(existing_project_id_str)
                 )
@@ -171,7 +171,7 @@ class MeetingPipelineService:
             # [2-6] 임베딩 생성 (비치명적 — 실패해도 파이프라인은 완료)
             try:
                 project_id = None
-                if confidence >= 0.8 and existing_project_id_str:
+                if confidence >= 0.9 and existing_project_id_str:
                     project_id = uuid.UUID(existing_project_id_str)
 
                 segments_data = [

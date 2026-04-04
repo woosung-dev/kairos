@@ -16,10 +16,10 @@
 - [x] ADR-005: 랜딩 페이지 AIDA 리디자인
 - [x] Phase 1 FE: 3-Panel 레이아웃, Inbox 목록, Dashboard 스캐폴딩
 - [x] Phase 1 FE: 랜딩 페이지 리디자인 (13개 컴포넌트)
-- [x] Sprint 1 BE: 백엔드 스캐폴딩 + 핵심 도메인 CRUD + Auth [가정]
-- [x] Sprint 2: AI 파이프라인 + 프론트엔드 API 연동 [가정]
-- [x] Sprint 3: RAG + 노트 [가정]
-- [x] Sprint 4: 배포 설정 [가정]
+- [x] Sprint 1 BE: 백엔드 스캐폴딩 + 핵심 도메인 CRUD + Auth [검증됨 2026-04-04]
+- [x] Sprint 2: AI 파이프라인 + 프론트엔드 API 연동 [검증됨 2026-04-04]
+- [x] Sprint 3: RAG + 노트 [검증됨 2026-04-04]
+- [x] Sprint 4: 배포 설정 [검증됨 2026-04-04 — BE/FE 프로덕션 헬스체크 OK]
 
 ## In Progress
 

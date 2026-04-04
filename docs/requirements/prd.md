@@ -299,13 +299,13 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 ## 8. 현재 컨텍스트
 
 - **방향 전환:** PARA → 팀 세컨드 브레인 (ADR-004, 2026-04-02)
-- **현재 Phase:** Sprint 4 완료 (배포)
-- **Sprint 1-2:** 회의 업로드 → STT → AI 요약 → 액션 → Inbox → 프로젝트 연결
-- **Sprint 3:** 임베딩(pgvector) + Hybrid Search + SSE RAG + Tiptap 노트 + Semantic Cache
-- **Sprint 4:** GCP Cloud Run + Vercel + Neon prod 배포, GitHub Actions CI
-- **프로덕션 URL:** BE `https://kairos-api-467254555861.asia-northeast3.run.app` / FE `https://kairos-zeta-ebon.vercel.app`
-- **ADR-006:** 서비스 전면 UI/UX 개편 — 7/11 구현 완료, 4/11 미완료
-- **다음 작업:** ADR-006 미완료 마무리 → Sprint 5 (RBAC + 초대 시스템)
+- **현재 Phase:** Sprint 4 완료 (배포) — **Sprint 1~4 전체 코드 검증 완료 (2026-04-04)**
+- **Sprint 1-2:** 회의 업로드 → STT → AI 요약 → 액션 → Inbox → 프로젝트 연결 ✅
+- **Sprint 3:** 임베딩(pgvector) + Hybrid Search + SSE RAG + 노트 + Semantic Cache ✅
+- **Sprint 4:** GCP Cloud Run + Vercel + Neon prod 배포, GitHub Actions CI ✅
+- **프로덕션 URL:** BE `https://kairos-api-467254555861.asia-northeast3.run.app` / FE `https://kairos-zeta-ebon.vercel.app` (둘 다 라이브 확인)
+- **ADR-006:** 서비스 전면 UI/UX 개편 — 9/11 구현 완료, 2/11 부분 (임계값 UI, 내보내기)
+- **다음 작업:** Sprint 5 (RBAC + 초대 시스템)
 
 ### Phase/Sprint/Stage 용어 매핑
 

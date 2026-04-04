@@ -97,13 +97,13 @@ async def test_pipeline_success():
     # Inbox 저장 확인
     mock_inbox_repo.save.assert_called_once()
 
-    # 자동 확정 안 됨 (confidence < 0.8)
+    # 자동 확정 안 됨 (confidence < 0.9)
     mock_project_repo.add_meeting_link.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_pipeline_auto_confirm():
-    """confidence >= 0.8이고 기존 프로젝트 있으면 자동 확정."""
+    """confidence >= 0.9이고 기존 프로젝트 있으면 자동 확정."""
     from src.meetings.pipeline_service import MeetingPipelineService
 
     meeting_id = uuid.uuid4()
