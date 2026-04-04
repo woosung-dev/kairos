@@ -6,8 +6,10 @@ from fastapi import APIRouter, Depends
 
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
+from src.auth.rbac import require_owner
 from src.workspaces.dependencies import get_workspace_service
-from src.workspaces.schemas import CreateWorkspaceRequest
+from src.workspaces.models import WorkspaceMember
+from src.workspaces.schemas import CreateWorkspaceRequest, UpdateWorkspaceSettingsRequest
 from src.workspaces.service import WorkspaceService
 
 router = APIRouter(prefix="/api/v1/workspaces", tags=["workspaces"])
@@ -37,3 +39,13 @@ async def get_workspace(
     service: WorkspaceService = Depends(get_workspace_service),
 ):
     return await service.get_workspace(workspace_id)
+
+
+@router.patch("/{workspace_id}/settings")
+async def update_workspace_settings(
+    workspace_id: uuid.UUID,
+    data: UpdateWorkspaceSettingsRequest,
+    member: WorkspaceMember = Depends(require_owner),
+    service: WorkspaceService = Depends(get_workspace_service),
+):
+    return await service.update_settings(workspace_id, data.inbox_threshold)

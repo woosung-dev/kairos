@@ -67,9 +67,21 @@ class WorkspaceService:
             "name": workspace.name,
             "ownerId": str(workspace.owner_id),
             "memberCount": member_count,
+            "inboxThreshold": workspace.inbox_threshold,
             "createdAt": workspace.created_at.isoformat(),
             "updatedAt": workspace.updated_at.isoformat(),
         }
+
+    async def update_settings(
+        self, workspace_id: uuid.UUID, inbox_threshold: float
+    ) -> dict:
+        """워크스페이스 설정 업데이트 (임계값 등)."""
+        workspace = await self.repo.find_by_id(workspace_id)
+        if workspace is None:
+            raise WorkspaceNotFoundError()
+        await self.repo.update_threshold(workspace_id, inbox_threshold)
+        await self.repo.commit()
+        return {"inboxThreshold": inbox_threshold}
 
     async def add_member(
         self, workspace_id: uuid.UUID, email: str
