@@ -10,6 +10,7 @@ import {
   createMeeting,
 } from "./api";
 import type { CreateMeetingRequest, MeetingStatus } from "./types";
+import { toast } from "sonner";
 
 /**
  * 워크스페이스 내 회의 목록 조회
@@ -91,9 +92,13 @@ export function useCreateMeeting(wid: string | undefined) {
       return createMeeting(token, wid!, data);
     },
     onSuccess: () => {
+      toast.success("회의가 업로드되었습니다. 처리 중...");
       if (wid) {
         queryClient.invalidateQueries({ queryKey: meetingKeys.list(wid) });
       }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "회의 업로드에 실패했습니다");
     },
   });
 }

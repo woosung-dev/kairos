@@ -17,6 +17,8 @@ export function ProjectCombobox({ onSelect, onClose, excludeIds = [] }: ProjectC
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const hasRole = useWorkspaceStore((s) => s.hasRole);
+  const canWrite = hasRole("member");
   const { data } = useProjects(activeWorkspaceId ?? undefined, { status: "active" });
   const createProject = useCreateProject(activeWorkspaceId ?? undefined);
 
@@ -123,7 +125,7 @@ export function ProjectCombobox({ onSelect, onClose, excludeIds = [] }: ProjectC
         ))}
 
         {/* 새 프로젝트 만들기 */}
-        {search.trim() && !hasExactMatch && (
+        {canWrite && search.trim() && !hasExactMatch && (
           <button
             onClick={handleCreateAndSelect}
             disabled={isCreating}

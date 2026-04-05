@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-04-05
+> 마지막 업데이트: 2026-04-05 (Sprint 6 완료)
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조
 
@@ -28,6 +28,12 @@
   - [x] FE: /invite/[code] 초대 수락 페이지
   - [x] FE: 사이드바 설정 링크 + Viewer 쓰기 버튼 숨김
   - [x] ADR-007: LLM Knowledge Base 인사이트 (연구/Phase 4 적용 예정)
+- [x] Sprint 6: 온보딩 준비 — 실사용 품질 달성 [검증됨 2026-04-05 — 빌드 통과]
+  - [x] 전 도메인 mutation toast (notes/actions/projects/meetings)
+  - [x] Quick Memo mock→Real API 전환 (useNotes + useCreateNote)
+  - [x] Viewer 역할 차단 — 액션 칸반 드래그, 회의 액션 체크박스
+  - [x] Viewer 역할 차단 — 프로젝트 생성/추가/온보딩 버튼 숨김
+  - [x] Viewer 역할 차단 — Inbox 확정/수정/무시 버튼 숨김
 
 ## In Progress
 
@@ -43,10 +49,10 @@
   - [x] 모바일 BottomNav
   - [x] 사이드바 소스 트리 펼침 — 프로젝트 클릭 시 하위 회의/노트/파일 목록 (mock)
   - [x] [1] 클릭 → 소스 뷰어 열림 flow 연결 — CitationBadge → UI Store → SourceViewer
-  - [ ] Inbox 신뢰도 임계값 설정 UI (하드코딩 상태)
+  - [x] Inbox 신뢰도 임계값 설정 UI (Settings 페이지 완료)
   - [ ] 온보딩 템플릿 프로젝트 자동 생성 (백엔드 필요)
-  - [ ] 내보내기 포맷 (MD/PDF/JSON)
-- [/] 랜딩 페이지 QA — 다크 모드 하이드레이션 미스매치 수정 필요
+  - [x] 내보내기 포맷 (MD/JSON — 회의/노트 완료, PDF는 P2)
+- [x] 랜딩 페이지 QA — suppressHydrationWarning 이미 적용 확인, 빌드 통과
 - [x] 문서 정합성 통합 정리 (ADR-006 기준 전체 문서 정렬)
   - [x] cross-domain-pipeline.md: Claude → Gemini 수정
   - [x] para-methodology.md: deprecated 배너 추가
@@ -73,10 +79,12 @@
 - [x] ~~ADR-006 핵심 UX 마무리 (P0)~~
   - [x] ~~사이드바 소스 트리 펼침~~
   - [x] ~~[1] 클릭 → 소스 뷰어 열림 flow 연결~~
-- [ ] 프론트엔드 `.env.example` 생성
+- [x] ~~프론트엔드 `.env.example` 생성~~ (이미 존재 확인)
 - [ ] E2E 테스트 환경 구축
-- [ ] Phase 2 잔여: 프론트엔드 ↔ 백엔드 실제 연동 검증
-- [ ] Sprint 6 계획 (프로젝트 멤버십 + Private 프로젝트)
-- [ ] 각 도메인 페이지 CRUD 버튼 세밀 역할 분기 (Member vs Admin)
+- [ ] Phase 2 잔여: 프론트엔드 ↔ 백엔드 실제 연동 검증 (Quick Memo 완료, 나머지 도메인)
+- [ ] Sprint 7 계획 (프로젝트 멤버십 + Private 프로젝트)
+- [x] ~~각 도메인 페이지 CRUD 버튼 세밀 역할 분기 (Member vs Admin)~~ Sprint 6 완료
 - [ ] Header 멤버 수 뱃지
-- [ ] mutation 에러 toast 피드백
+- [x] ~~mutation 에러 toast 피드백~~ Sprint 6 완료
+- [ ] 온보딩 템플릿 프로젝트 자동 생성 (백엔드 필요)
+- [ ] PDF 내보내기

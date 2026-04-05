@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { InsightCard } from "./insight-card";
+import { useWorkspaceStore } from "@/features/workspaces/store";
 import type { UUID } from "@/types";
 
 /* ── Mock 타입 ── */
@@ -99,6 +100,8 @@ interface ProjectDashboardProps {
 
 export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
   const [actions, setActions] = useState(MOCK_ACTIONS);
+  const hasRole = useWorkspaceStore((s) => s.hasRole);
+  const canWrite = hasRole("member");
 
   /* Mock 기반이므로 projectId는 향후 API 연동 시 활용 */
   void projectId;
@@ -117,7 +120,7 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
     return (
       <div className="p-6">
         <DashboardHeader project={project} />
-        <OnboardingView />
+        <OnboardingView canWrite={canWrite} />
       </div>
     );
   }
@@ -155,12 +158,14 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
             >
               이번 주 액션
             </h2>
-            <button
-              className="text-xs transition-colors"
-              style={{ color: "var(--accent)", cursor: "pointer", minHeight: "44px" }}
-            >
-              내보내기
-            </button>
+            {canWrite && (
+              <button
+                className="text-xs transition-colors"
+                style={{ color: "var(--accent)", cursor: "pointer", minHeight: "44px" }}
+              >
+                내보내기
+              </button>
+            )}
           </div>
           <div className="space-y-2">
             {actions.map((action) => (
@@ -168,6 +173,7 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
                 key={action.id}
                 action={action}
                 onToggle={() => handleToggleAction(action.id)}
+                disabled={!canWrite}
               />
             ))}
           </div>
@@ -272,7 +278,7 @@ function RecentItemCard({ item }: { item: MockMeetingNote }) {
   );
 }
 
-function ActionRow({ action, onToggle }: { action: MockAction; onToggle: () => void }) {
+function ActionRow({ action, onToggle, disabled }: { action: MockAction; onToggle: () => void; disabled?: boolean }) {
   return (
     <div
       className="flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors"
@@ -286,8 +292,15 @@ function ActionRow({ action, onToggle }: { action: MockAction; onToggle: () => v
         type="checkbox"
         checked={action.isDone}
         onChange={onToggle}
+        disabled={disabled}
         className="shrink-0 w-4 h-4 rounded accent-current"
-        style={{ accentColor: "var(--accent)", cursor: "pointer", minHeight: "44px", minWidth: "16px" }}
+        style={{
+          accentColor: "var(--accent)",
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.5 : 1,
+          minHeight: "44px",
+          minWidth: "16px",
+        }}
       />
       <div className="flex-1 min-w-0">
         <p
@@ -309,7 +322,7 @@ function ActionRow({ action, onToggle }: { action: MockAction; onToggle: () => v
   );
 }
 
-function OnboardingView() {
+function OnboardingView({ canWrite }: { canWrite: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
       <span className="text-5xl mb-6">🚀</span>
@@ -322,38 +335,40 @@ function OnboardingView() {
       <p className="text-sm mb-8 max-w-md" style={{ color: "var(--text-muted)" }}>
         첫 회의를 녹음하거나 노트를 작성해보세요. AI가 자동으로 요약하고 지식을 구조화합니다.
       </p>
-      <div className="flex items-center gap-3">
-        <a
-          href="/new"
-          className="px-5 py-2.5 rounded text-sm font-medium transition-colors"
-          style={{
-            background: "var(--accent)",
-            color: "var(--background)",
-            borderRadius: "var(--radius-sm)",
-            minHeight: "44px",
-            display: "inline-flex",
-            alignItems: "center",
-            cursor: "pointer",
-          }}
-        >
-          🎙️ 회의 녹음
-        </a>
-        <a
-          href="/notes"
-          className="px-5 py-2.5 rounded text-sm font-medium transition-colors border"
-          style={{
-            borderColor: "var(--border)",
-            color: "var(--text-primary)",
-            borderRadius: "var(--radius-sm)",
-            minHeight: "44px",
-            display: "inline-flex",
-            alignItems: "center",
-            cursor: "pointer",
-          }}
-        >
-          📝 노트 작성
-        </a>
-      </div>
+      {canWrite && (
+        <div className="flex items-center gap-3">
+          <a
+            href="/new"
+            className="px-5 py-2.5 rounded text-sm font-medium transition-colors"
+            style={{
+              background: "var(--accent)",
+              color: "var(--background)",
+              borderRadius: "var(--radius-sm)",
+              minHeight: "44px",
+              display: "inline-flex",
+              alignItems: "center",
+              cursor: "pointer",
+            }}
+          >
+            🎙️ 회의 녹음
+          </a>
+          <a
+            href="/notes"
+            className="px-5 py-2.5 rounded text-sm font-medium transition-colors border"
+            style={{
+              borderColor: "var(--border)",
+              color: "var(--text-primary)",
+              borderRadius: "var(--radius-sm)",
+              minHeight: "44px",
+              display: "inline-flex",
+              alignItems: "center",
+              cursor: "pointer",
+            }}
+          >
+            📝 노트 작성
+          </a>
+        </div>
+      )}
     </div>
   );
 }

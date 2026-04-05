@@ -9,6 +9,7 @@ import {
   updateActionItem,
 } from "./api";
 import type { FetchActionItemsParams, CreateActionItemRequest, UpdateActionItemRequest } from "./api";
+import { toast } from "sonner";
 
 /**
  * 워크스페이스 내 액션 아이템 목록 조회
@@ -41,9 +42,13 @@ export function useCreateActionItem(wid: string | undefined) {
       return createActionItem(token, wid!, data);
     },
     onSuccess: () => {
+      toast.success("액션 아이템이 생성되었습니다");
       if (wid) {
         queryClient.invalidateQueries({ queryKey: actionKeys.list(wid) });
       }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "액션 아이템 생성에 실패했습니다");
     },
   });
 }
@@ -62,9 +67,13 @@ export function useUpdateActionItem(wid: string | undefined) {
       return updateActionItem(token, wid!, id, data);
     },
     onSuccess: () => {
+      toast.success("액션 아이템이 수정되었습니다");
       if (wid) {
         queryClient.invalidateQueries({ queryKey: actionKeys.list(wid) });
       }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "액션 아이템 수정에 실패했습니다");
     },
   });
 }

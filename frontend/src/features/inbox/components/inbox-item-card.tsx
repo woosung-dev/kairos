@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useWorkspaceStore } from "@/features/workspaces/store";
 import type { UUID } from "@/types";
 
 /* ── 타입 ── */
@@ -37,6 +38,8 @@ const SOURCE_ICONS: Record<string, string> = {
 /* ── 컴포넌트 ── */
 
 export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
+  const hasRole = useWorkspaceStore((s) => s.hasRole);
+  const canWrite = hasRole("member");
   const [status, setStatus] = useState<"idle" | "confirmed" | "dismissed" | "editing">("idle");
 
   const confidencePercent = Math.round(item.aiConfidence * 100);
@@ -198,79 +201,85 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
       </div>
 
       {/* 액션 버튼 */}
-      {!item.isAutoProcessed ? (
-        /* 확인 필요 아이템: 확정 / 다른 프로젝트 / 무시 */
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleConfirm}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-            style={{
-              background: "var(--accent)",
-              color: "var(--background)",
-              borderRadius: "var(--radius-sm)",
-              cursor: "pointer",
-              minHeight: "44px",
-            }}
-          >
-            ✅ 확정
-          </button>
-          <button
-            onClick={handleEdit}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
-            style={{
-              borderColor: "var(--accent)",
-              color: "var(--accent)",
-              borderRadius: "var(--radius-sm)",
-              cursor: "pointer",
-              minHeight: "44px",
-            }}
-          >
-            ✏️ 다른 프로젝트
-          </button>
-          <button
-            onClick={handleDismiss}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
-            style={{
-              borderColor: "var(--border)",
-              color: "var(--text-muted)",
-              borderRadius: "var(--radius-sm)",
-              cursor: "pointer",
-              minHeight: "44px",
-            }}
-          >
-            🗑 무시
-          </button>
-        </div>
+      {canWrite ? (
+        !item.isAutoProcessed ? (
+          /* 확인 필요 아이템: 확정 / 다른 프로젝트 / 무시 */
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleConfirm}
+              className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+              style={{
+                background: "var(--accent)",
+                color: "var(--background)",
+                borderRadius: "var(--radius-sm)",
+                cursor: "pointer",
+                minHeight: "44px",
+              }}
+            >
+              ✅ 확정
+            </button>
+            <button
+              onClick={handleEdit}
+              className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
+              style={{
+                borderColor: "var(--accent)",
+                color: "var(--accent)",
+                borderRadius: "var(--radius-sm)",
+                cursor: "pointer",
+                minHeight: "44px",
+              }}
+            >
+              ✏️ 다른 프로젝트
+            </button>
+            <button
+              onClick={handleDismiss}
+              className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
+              style={{
+                borderColor: "var(--border)",
+                color: "var(--text-muted)",
+                borderRadius: "var(--radius-sm)",
+                cursor: "pointer",
+                minHeight: "44px",
+              }}
+            >
+              🗑 무시
+            </button>
+          </div>
+        ) : (
+          /* 자동 처리된 아이템: 수정 / 되돌리기 */
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleEdit}
+              className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
+              style={{
+                borderColor: "var(--accent)",
+                color: "var(--accent)",
+                borderRadius: "var(--radius-sm)",
+                cursor: "pointer",
+                minHeight: "44px",
+              }}
+            >
+              ✏️ 수정
+            </button>
+            <button
+              onClick={handleDismiss}
+              className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
+              style={{
+                borderColor: "var(--border)",
+                color: "var(--text-muted)",
+                borderRadius: "var(--radius-sm)",
+                cursor: "pointer",
+                minHeight: "44px",
+              }}
+            >
+              ↩ 되돌리기
+            </button>
+          </div>
+        )
       ) : (
-        /* 자동 처리된 아이템: 수정 / 되돌리기 */
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleEdit}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
-            style={{
-              borderColor: "var(--accent)",
-              color: "var(--accent)",
-              borderRadius: "var(--radius-sm)",
-              cursor: "pointer",
-              minHeight: "44px",
-            }}
-          >
-            ✏️ 수정
-          </button>
-          <button
-            onClick={handleDismiss}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
-            style={{
-              borderColor: "var(--border)",
-              color: "var(--text-muted)",
-              borderRadius: "var(--radius-sm)",
-              cursor: "pointer",
-              minHeight: "44px",
-            }}
-          >
-            ↩ 되돌리기
-          </button>
-        </div>
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          읽기 전용
+        </span>
       )}
 
       {/* "다른 프로젝트" 편집 모드 (간단한 목업) */}

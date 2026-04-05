@@ -10,6 +10,7 @@ import {
   updateNote,
   deleteNote,
 } from "./api";
+import { toast } from "sonner";
 import type { CreateNoteRequest, UpdateNoteRequest } from "./types";
 
 export function useNotes(wid: string | undefined, projectId?: string) {
@@ -48,7 +49,11 @@ export function useCreateNote(wid: string | undefined) {
       return createNote(token, wid!, data);
     },
     onSuccess: () => {
+      toast.success("노트가 생성되었습니다");
       if (wid) queryClient.invalidateQueries({ queryKey: noteKeys.all });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "노트 생성에 실패했습니다");
     },
   });
 }
@@ -70,6 +75,9 @@ export function useUpdateNote(wid: string | undefined) {
         queryClient.invalidateQueries({ queryKey: noteKeys.all });
       }
     },
+    onError: (error: Error) => {
+      toast.error(error.message || "노트 수정에 실패했습니다");
+    },
   });
 }
 
@@ -83,7 +91,11 @@ export function useDeleteNote(wid: string | undefined) {
       return deleteNote(token, wid!, id);
     },
     onSuccess: () => {
+      toast.success("노트가 삭제되었습니다");
       if (wid) queryClient.invalidateQueries({ queryKey: noteKeys.all });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "노트 삭제에 실패했습니다");
     },
   });
 }

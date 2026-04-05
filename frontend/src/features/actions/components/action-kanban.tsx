@@ -51,6 +51,8 @@ const PRIORITY_OPTIONS: { value: ActionPriority | "all"; label: string }[] = [
 
 export function ActionKanban() {
   const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const hasRole = useWorkspaceStore((s) => s.hasRole);
+  const canWrite = hasRole("member");
   const { data, isLoading, error } = useActionItems(wid ?? undefined);
   const updateAction = useUpdateActionItem(wid ?? undefined);
 
@@ -101,6 +103,7 @@ export function ActionKanban() {
 
   function handleDragEnd(event: DragEndEvent) {
     setActiveId(null);
+    if (!canWrite) return;
     const { active, over } = event;
     if (!over) return;
 
@@ -188,6 +191,7 @@ export function ActionKanban() {
               label={column.label}
               color={column.color}
               items={grouped[column.id]}
+              canWrite={canWrite}
             />
           ))}
         </div>
@@ -207,9 +211,10 @@ interface KanbanColumnProps {
   label: string;
   color: string;
   items: ActionItem[];
+  canWrite: boolean;
 }
 
-function KanbanColumn({ id, label, color, items }: KanbanColumnProps) {
+function KanbanColumn({ id, label, color, items, canWrite }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
@@ -248,7 +253,7 @@ function KanbanColumn({ id, label, color, items }: KanbanColumnProps) {
       {/* 카드 목록 */}
       <div className="space-y-2">
         {items.map((item) => (
-          <KanbanCard key={item.id} item={item} />
+          <KanbanCard key={item.id} item={item} canWrite={canWrite} />
         ))}
       </div>
     </div>
@@ -259,11 +264,13 @@ function KanbanColumn({ id, label, color, items }: KanbanColumnProps) {
 
 interface KanbanCardProps {
   item: ActionItem;
+  canWrite: boolean;
 }
 
-function KanbanCard({ item }: KanbanCardProps) {
+function KanbanCard({ item, canWrite }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: item.id,
+    disabled: !canWrite,
   });
 
   return (
@@ -271,7 +278,7 @@ function KanbanCard({ item }: KanbanCardProps) {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className="p-3 rounded border cursor-grab active:cursor-grabbing transition-opacity"
+      className={`p-3 rounded border transition-opacity${canWrite ? " cursor-grab active:cursor-grabbing" : ""}`}
       style={{
         background: "var(--surface)",
         borderColor: "var(--border-subtle)",

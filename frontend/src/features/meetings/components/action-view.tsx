@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useWorkspaceStore } from "@/features/workspaces/store";
 
 /* ── 출처 색상 시스템 ── */
 
@@ -66,6 +67,8 @@ const MOCK_ACTIONS: MeetingAction[] = [
 /* ── 컴포넌트 ── */
 
 export function ActionView() {
+  const hasRole = useWorkspaceStore((s) => s.hasRole);
+  const canWrite = hasRole("member");
   const [actions, setActions] = useState(MOCK_ACTIONS);
 
   function handleToggle(actionId: string) {
@@ -105,6 +108,7 @@ export function ActionView() {
             key={action.id}
             action={action}
             onToggle={() => handleToggle(action.id)}
+            disabled={!canWrite}
           />
         ))}
       </div>
@@ -114,7 +118,15 @@ export function ActionView() {
 
 /* ── 서브 컴포넌트 ── */
 
-function ActionRow({ action, onToggle }: { action: MeetingAction; onToggle: () => void }) {
+function ActionRow({
+  action,
+  onToggle,
+  disabled,
+}: {
+  action: MeetingAction;
+  onToggle: () => void;
+  disabled: boolean;
+}) {
   const sourceStyle = SOURCE_STYLES[action.sourceRef] ?? SOURCE_STYLES[1];
 
   return (
@@ -131,8 +143,13 @@ function ActionRow({ action, onToggle }: { action: MeetingAction; onToggle: () =
         type="checkbox"
         checked={action.isDone}
         onChange={onToggle}
+        disabled={disabled}
         className="shrink-0 w-4 h-4 mt-0.5 rounded accent-current"
-        style={{ accentColor: "var(--accent)", cursor: "pointer" }}
+        style={{
+          accentColor: "var(--accent)",
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.5 : 1,
+        }}
       />
 
       {/* 내용 */}

@@ -39,6 +39,8 @@ const STAT_ITEMS = [
 export function ProjectDetail({ projectId }: ProjectDetailProps) {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("전체");
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const hasRole = useWorkspaceStore((s) => s.hasRole);
+  const canWrite = hasRole("member");
   const { data: project, isLoading, error } = useProject(activeWorkspaceId ?? undefined, projectId);
 
   if (isLoading) {
@@ -160,7 +162,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
         icon="📄"
         title="콘텐츠를 추가하세요"
         description="회의, 노트, 자료를 추가하면 여기에 표시됩니다"
-        action={{ label: "콘텐츠 추가", href: "/new" }}
+        action={canWrite ? { label: "콘텐츠 추가", href: "/new" } : undefined}
       />
     </div>
   );

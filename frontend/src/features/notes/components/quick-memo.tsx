@@ -2,50 +2,22 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-
-/* ── Mock 프로젝트 목록 ── */
-
-const MOCK_PROJECTS = [
-  { id: "proj-001", title: "Q2 제품 로드맵" },
-  { id: "proj-002", title: "디자인 시스템" },
-  { id: "proj-003", title: "DevOps 개선" },
-  { id: "proj-004", title: "사용자 리서치" },
-];
-
-/* ── Mock 저장된 메모 ── */
-
-interface SavedMemo {
-  id: string;
-  title: string;
-  content: string;
-  projectTitle: string | null;
-  createdAt: string;
-}
-
-const INITIAL_MEMOS: SavedMemo[] = [
-  {
-    id: "memo-001",
-    title: "RAG 성능 개선 아이디어",
-    content: "Semantic cache를 도입하면 반복 쿼리 응답 시간을 80% 줄일 수 있을 것 같다.",
-    projectTitle: "Q2 제품 로드맵",
-    createdAt: "2026-03-30",
-  },
-  {
-    id: "memo-002",
-    title: "사용자 피드백 요약",
-    content: "검색 기능은 만족하지만, 필터링 옵션이 부족하다는 의견이 많음.",
-    projectTitle: "사용자 리서치",
-    createdAt: "2026-03-28",
-  },
-];
-
-/* ── 컴포넌트 ── */
+import { useWorkspaceStore } from "@/features/workspaces/store";
+import { useProjects } from "@/features/projects/hooks";
+import { useNotes, useCreateNote } from "@/features/notes/hooks";
 
 export function QuickMemo() {
+  const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const hasRole = useWorkspaceStore((s) => s.hasRole);
+  const canWrite = hasRole("member");
+
+  const { data: projects } = useProjects(wid ?? undefined);
+  const { data: notesData } = useNotes(wid ?? undefined);
+  const createNote = useCreateNote(wid ?? undefined);
+
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [memos, setMemos] = useState<SavedMemo[]>(INITIAL_MEMOS);
   const [isComposing, setIsComposing] = useState(false);
 
   function handleSave() {
@@ -54,23 +26,33 @@ export function QuickMemo() {
       return;
     }
 
-    const selectedProject = MOCK_PROJECTS.find((p) => p.id === selectedProjectId);
-
-    const newMemo: SavedMemo = {
-      id: `memo-${Date.now()}`,
-      title: title.trim() || "제목 없음",
-      content: content.trim(),
-      projectTitle: selectedProject?.title ?? null,
-      createdAt: new Date().toISOString().split("T")[0],
-    };
-
-    setMemos((prev) => [newMemo, ...prev]);
-    setTitle("");
-    setContent("");
-    setSelectedProjectId("");
-    setIsComposing(false);
-    toast.success("메모가 저장되었습니다");
+    createNote.mutate(
+      {
+        title: title.trim() || "제목 없음",
+        content: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: content.trim() }],
+            },
+          ],
+        },
+        projectId: selectedProjectId || null,
+      },
+      {
+        onSuccess: () => {
+          setTitle("");
+          setContent("");
+          setSelectedProjectId("");
+          setIsComposing(false);
+        },
+      },
+    );
   }
+
+  const notes = notesData?.items ?? [];
+  const projectList = projects?.items ?? [];
 
   return (
     <div className="p-6">
@@ -79,7 +61,10 @@ export function QuickMemo() {
         <div>
           <h1
             className="text-2xl font-bold mb-1"
-            style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}
+            style={{
+              fontFamily: "var(--font-display)",
+              color: "var(--text-primary)",
+            }}
           >
             빠른 메모
           </h1>
@@ -87,7 +72,7 @@ export function QuickMemo() {
             아이디어를 빠르게 기록하세요. 마크다운 문법을 지원합니다.
           </p>
         </div>
-        {!isComposing && (
+        {canWrite && !isComposing && (
           <button
             onClick={() => setIsComposing(true)}
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
@@ -114,7 +99,6 @@ export function QuickMemo() {
             borderRadius: "var(--radius-lg)",
           }}
         >
-          {/* 제목 */}
           <input
             type="text"
             placeholder="메모 제목"
@@ -127,7 +111,6 @@ export function QuickMemo() {
             }}
           />
 
-          {/* 본문 */}
           <textarea
             placeholder="내용을 입력하세요... (마크다운 지원)"
             value={content}
@@ -139,13 +122,15 @@ export function QuickMemo() {
             }}
           />
 
-          {/* 하단: 프로젝트 선택 + 저장 */}
           <div
             className="flex items-center justify-between mt-4 pt-3 border-t"
             style={{ borderColor: "var(--border-subtle)" }}
           >
             <div className="flex items-center gap-2">
-              <label className="text-xs" style={{ color: "var(--text-muted)" }}>
+              <label
+                className="text-xs"
+                style={{ color: "var(--text-muted)" }}
+              >
                 프로젝트:
               </label>
               <select
@@ -161,7 +146,7 @@ export function QuickMemo() {
                 }}
               >
                 <option value="">선택 안 함</option>
-                {MOCK_PROJECTS.map((proj) => (
+                {projectList.map((proj) => (
                   <option key={proj.id} value={proj.id}>
                     {proj.title}
                   </option>
@@ -190,27 +175,68 @@ export function QuickMemo() {
               </button>
               <button
                 onClick={handleSave}
+                disabled={createNote.isPending}
                 className="px-4 py-1.5 rounded text-xs font-medium transition-colors"
                 style={{
-                  background: "var(--accent)",
+                  background: createNote.isPending
+                    ? "var(--text-muted)"
+                    : "var(--accent)",
                   color: "var(--background)",
                   borderRadius: "var(--radius-sm)",
-                  cursor: "pointer",
+                  cursor: createNote.isPending ? "not-allowed" : "pointer",
                   minHeight: "44px",
                 }}
               >
-                저장
+                {createNote.isPending ? "저장 중..." : "저장"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 저장된 메모 목록 */}
-      {memos.length > 0 ? (
+      {/* 저장된 메모 목록 — API 데이터 */}
+      {notes.length > 0 ? (
         <div className="grid gap-3">
-          {memos.map((memo) => (
-            <MemoCard key={memo.id} memo={memo} />
+          {notes.map((note) => (
+            <div
+              key={note.id}
+              className="p-4 rounded-lg border transition-colors"
+              style={{
+                background: "var(--surface)",
+                borderColor: "var(--border-subtle)",
+                borderRadius: "var(--radius-lg)",
+                cursor: "pointer",
+              }}
+              onMouseOver={(e) =>
+                (e.currentTarget.style.borderColor = "var(--accent)")
+              }
+              onMouseOut={(e) =>
+                (e.currentTarget.style.borderColor = "var(--border-subtle)")
+              }
+            >
+              <div className="flex items-start justify-between mb-1">
+                <h3
+                  className="text-sm font-semibold"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {note.title || "제목 없음"}
+                </h3>
+                <span
+                  className="text-[10px] shrink-0 ml-2"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {new Date(note.createdAt).toLocaleDateString("ko-KR")}
+                </span>
+              </div>
+              {note.plainText && (
+                <p
+                  className="text-xs line-clamp-2 mb-2"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {note.plainText}
+                </p>
+              )}
+            </div>
           ))}
         </div>
       ) : (
@@ -218,7 +244,10 @@ export function QuickMemo() {
           <span className="text-4xl mb-4">📝</span>
           <h3
             className="text-lg font-semibold mb-2"
-            style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}
+            style={{
+              color: "var(--text-primary)",
+              fontFamily: "var(--font-display)",
+            }}
           >
             아직 메모가 없습니다
           </h3>
@@ -226,47 +255,6 @@ export function QuickMemo() {
             빠른 메모를 작성하면 AI가 자동으로 프로젝트에 연결합니다
           </p>
         </div>
-      )}
-    </div>
-  );
-}
-
-/* ── 서브 컴포넌트 ── */
-
-function MemoCard({ memo }: { memo: SavedMemo }) {
-  return (
-    <div
-      className="p-4 rounded-lg border transition-colors"
-      style={{
-        background: "var(--surface)",
-        borderColor: "var(--border-subtle)",
-        borderRadius: "var(--radius-lg)",
-        cursor: "pointer",
-      }}
-      onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent)")}
-      onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
-    >
-      <div className="flex items-start justify-between mb-1">
-        <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-          {memo.title}
-        </h3>
-        <span className="text-[10px] shrink-0 ml-2" style={{ color: "var(--text-muted)" }}>
-          {memo.createdAt}
-        </span>
-      </div>
-      <p className="text-xs line-clamp-2 mb-2" style={{ color: "var(--text-secondary)" }}>
-        {memo.content}
-      </p>
-      {memo.projectTitle && (
-        <span
-          className="px-1.5 py-0.5 rounded text-[10px]"
-          style={{
-            background: "var(--accent-subtle)",
-            color: "var(--accent)",
-          }}
-        >
-          {memo.projectTitle}
-        </span>
       )}
     </div>
   );

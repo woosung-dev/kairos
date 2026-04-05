@@ -7,6 +7,8 @@ import { EmptyState } from "@/components/empty-state";
 
 export function ProjectList() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const hasRole = useWorkspaceStore((s) => s.hasRole);
+  const canWrite = hasRole("member");
   const { data, isLoading, error } = useProjects(activeWorkspaceId ?? undefined);
 
   if (isLoading) {
@@ -37,7 +39,7 @@ export function ProjectList() {
         icon="📁"
         title="프로젝트가 없습니다"
         description="첫 번째 프로젝트를 만들어 콘텐츠를 정리하세요"
-        action={{ label: "프로젝트 만들기", href: "/new" }}
+        action={canWrite ? { label: "프로젝트 만들기", href: "/new" } : undefined}
       />
     );
   }
