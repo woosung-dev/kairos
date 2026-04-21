@@ -1,95 +1,68 @@
 "use client";
 
-import { useState } from "react";
-import { InsightCard } from "./insight-card";
-import type { UUID } from "@/types";
-
-/* ── Mock 타입 ── */
-
-interface MockMeetingNote {
-  id: UUID;
-  type: "meeting" | "note";
-  title: string;
-  summary: string;
-  date: string;
-  participants: number;
-}
-
-interface MockAction {
-  id: UUID;
-  title: string;
-  assignee: string;
-  dueDate: string;
-  isDone: boolean;
-}
-
-/* ── Mock 데이터 ── */
-
-const MOCK_PROJECT = {
-  id: "proj-001",
-  title: "Q2 제품 로드맵",
-  description: "2분기 제품 전략 및 로드맵 수립",
-  status: "active" as const,
-  sourceCount: 12,
-  meetingCount: 5,
-  actionCount: 8,
-};
-
-const MOCK_INSIGHT = "보안통신 주제가 최근 회의에서 3회 반복 언급되었습니다. Q1 교훈 문서와 유사한 패턴이 감지되어 별도 프로젝트 분리를 제안합니다.";
-
-const MOCK_RECENT_ITEMS: MockMeetingNote[] = [
-  {
-    id: "mt-001",
-    type: "meeting",
-    title: "주간 스프린트 리뷰",
-    summary: "Sprint 4 배포 완료 및 Sprint 5 계획 논의. 인프라 비용 최적화 안건 추가.",
-    date: "2026-03-31",
-    participants: 4,
-  },
-  {
-    id: "mt-002",
-    type: "meeting",
-    title: "디자인 시스템 워크숍",
-    summary: "컴포넌트 라이브러리 통합 방안 결정. Figma 토큰 자동 동기화 도입 합의.",
-    date: "2026-03-28",
-    participants: 3,
-  },
-  {
-    id: "nt-001",
-    type: "note",
-    title: "경쟁사 분석 메모",
-    summary: "Notion AI, Mem, Reflect 기능 비교. RAG 기반 검색이 차별점으로 작용할 수 있음.",
-    date: "2026-03-27",
-    participants: 0,
-  },
-];
-
-const MOCK_ACTIONS: MockAction[] = [
-  { id: "act-001", title: "RAG 파이프라인 성능 테스트", assignee: "김민수", dueDate: "2026-04-05", isDone: false },
-  { id: "act-002", title: "디자인 시스템 문서 업데이트", assignee: "이지은", dueDate: "2026-04-03", isDone: true },
-  { id: "act-003", title: "인프라 비용 보고서 작성", assignee: "박현우", dueDate: "2026-04-07", isDone: false },
-  { id: "act-004", title: "사용자 피드백 분석", assignee: "최수진", dueDate: "2026-04-04", isDone: false },
-];
+import Link from "next/link";
+import { useProject } from "../hooks";
+import { useActionItems, useUpdateActionItem } from "@/features/actions/hooks";
+import { useMeetings } from "@/features/meetings/hooks";
+import { useNotes } from "@/features/notes/hooks";
+import { useWorkspaceStore } from "@/features/workspaces/store";
+import type { Project, ProjectStatus } from "../types";
+import type { ActionItem, ActionStatus } from "@/features/actions/types";
+import type { Meeting } from "@/features/meetings/types";
+import type { Note } from "@/features/notes/types";
 
 /* ── 상태 라벨 ── */
 
-const STATUS_LABELS: Record<string, string> = {
+const STATUS_LABELS: Record<ProjectStatus, string> = {
   active: "진행 중",
   completed: "완료",
   archived: "보관",
 };
 
-const STATUS_BG: Record<string, string> = {
+const STATUS_BG: Record<ProjectStatus, string> = {
   active: "var(--accent-subtle)",
   completed: "rgba(52,211,153,0.1)",
   archived: "rgba(156,163,175,0.1)",
 };
 
-const STATUS_COLOR: Record<string, string> = {
+const STATUS_COLOR: Record<ProjectStatus, string> = {
   active: "var(--accent)",
   completed: "var(--success)",
   archived: "var(--text-muted)",
 };
+
+/* ── 날짜 오버듀 확인 ── */
+
+function isOverdue(dateStr: string | null): boolean {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return d < today;
+}
+
+/* ── 로딩 스켈레톤 ── */
+
+function DashboardSkeleton() {
+  return (
+    <div className="p-6 animate-pulse space-y-6">
+      <div className="h-8 rounded w-1/3" style={{ background: "var(--surface-active)" }} />
+      <div className="h-4 rounded w-2/3" style={{ background: "var(--surface-active)" }} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-20 rounded-lg" style={{ background: "var(--surface-active)" }} />
+          ))}
+        </div>
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-12 rounded-lg" style={{ background: "var(--surface-active)" }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ── 컴포넌트 ── */
 
@@ -98,22 +71,81 @@ interface ProjectDashboardProps {
 }
 
 export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
-  const [actions, setActions] = useState(MOCK_ACTIONS);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const wid = activeWorkspaceId ?? undefined;
 
-  /* Mock 기반이므로 projectId는 향후 API 연동 시 활용 */
-  void projectId;
+  const { data: project, isLoading: projectLoading, error: projectError } = useProject(wid, projectId);
 
-  const project = MOCK_PROJECT;
-  const hasContent = MOCK_RECENT_ITEMS.length >= 3;
+  /* 액션 아이템: projectId 필터 지원 */
+  const { data: actionsData, isLoading: actionsLoading } = useActionItems(wid, {
+    projectId,
+    page: 1,
+    pageSize: 20,
+  });
 
-  function handleToggleAction(actionId: string) {
-    setActions((prev) =>
-      prev.map((a) => (a.id === actionId ? { ...a, isDone: !a.isDone } : a))
+  /* 회의 목록: projectId 필터 미지원 → 전체 fetch 후 클라이언트 필터 */
+  const { data: meetingsData, isLoading: meetingsLoading } = useMeetings(wid);
+
+  /* 노트 목록: projectId 필터 지원 */
+  const { data: notesData, isLoading: notesLoading } = useNotes(wid, projectId);
+
+  const updateAction = useUpdateActionItem(wid);
+
+  /* 로딩 */
+  if (projectLoading) return <DashboardSkeleton />;
+
+  /* 에러 */
+  if (projectError || !project) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center py-20 text-center">
+        <span className="text-4xl mb-4">⚠️</span>
+        <p className="text-sm" style={{ color: "var(--error)" }}>
+          프로젝트 데이터를 불러올 수 없습니다.
+        </p>
+      </div>
     );
   }
 
-  /* 온보딩 뷰: 콘텐츠 3개 미만 시 */
-  if (!hasContent) {
+  const actions = actionsData?.items ?? [];
+
+  /* 회의: projectId 기준 클라이언트 필터 */
+  /* Meeting 타입엔 projectId 필드 없음 — BE API가 projectId 필터 미지원이므로 전체 목록 상위 5개 표시 */
+  const projectMeetings = (meetingsData?.items ?? []).slice(0, 5);
+
+  const notes = notesData?.items ?? [];
+
+  /* 최근 아이템: 회의 + 노트 합쳐 날짜순 정렬, 5개 */
+  type RecentItem =
+    | { kind: "meeting"; data: Meeting }
+    | { kind: "note"; data: Note };
+
+  const recentItems: RecentItem[] = [
+    ...projectMeetings.map((m): RecentItem => ({ kind: "meeting", data: m })),
+    ...notes.slice(0, 5).map((n): RecentItem => ({ kind: "note", data: n })),
+  ]
+    .sort((a, b) => {
+      const aDate = a.kind === "meeting"
+        ? (a.data.recordedAt ?? a.data.createdAt)
+        : a.data.createdAt;
+      const bDate = b.kind === "meeting"
+        ? (b.data.recordedAt ?? b.data.createdAt)
+        : b.data.createdAt;
+      return new Date(bDate).getTime() - new Date(aDate).getTime();
+    })
+    .slice(0, 5);
+
+  const isContentLoading = actionsLoading || meetingsLoading || notesLoading;
+
+  /* 콘텐츠 3개 미만이면 온보딩 뷰 */
+  const hasContent = !isContentLoading && recentItems.length >= 3;
+
+  function handleToggleAction(action: ActionItem) {
+    const nextStatus: ActionStatus =
+      action.status === "done" ? "todo" : "done";
+    updateAction.mutate({ id: action.id, data: { status: nextStatus } });
+  }
+
+  if (!isContentLoading && !hasContent && recentItems.length < 3) {
     return (
       <div className="p-6">
         <DashboardHeader project={project} />
@@ -126,66 +158,84 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
     <div className="p-6">
       <DashboardHeader project={project} />
 
-      {/* 프로액티브 인사이트 */}
-      <div className="mb-6">
-        <InsightCard text={MOCK_INSIGHT} />
-      </div>
+      {/* 프로액티브 인사이트 — BE 미지원, 섹션 숨김 */}
+      {/* project 응답에 insight 필드가 추가되면 여기서 렌더링 */}
 
-      {/* 2컬럼 그리드 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* 좌: 최근 회의/노트 */}
-        <div className="space-y-3">
-          <h2
-            className="text-sm font-semibold mb-1"
-            style={{ color: "var(--text-secondary)", fontFamily: "var(--font-display)" }}
-          >
-            최근 회의 &middot; 노트
-          </h2>
-          {MOCK_RECENT_ITEMS.map((item) => (
-            <RecentItemCard key={item.id} item={item} />
-          ))}
-        </div>
-
-        {/* 우: 이번 주 액션 */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <h2
-              className="text-sm font-semibold"
-              style={{ color: "var(--text-secondary)", fontFamily: "var(--font-display)" }}
-            >
-              이번 주 액션
-            </h2>
-            <button
-              className="text-xs transition-colors"
-              style={{ color: "var(--accent)", cursor: "pointer", minHeight: "44px" }}
-            >
-              내보내기
-            </button>
+      {/* 로딩 중이면 스켈레톤 */}
+      {isContentLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-pulse">
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 rounded-lg" style={{ background: "var(--surface-active)" }} />
+            ))}
           </div>
           <div className="space-y-2">
-            {actions.map((action) => (
-              <ActionRow
-                key={action.id}
-                action={action}
-                onToggle={() => handleToggleAction(action.id)}
-              />
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-12 rounded-lg" style={{ background: "var(--surface-active)" }} />
             ))}
           </div>
         </div>
-      </div>
+      ) : (
+        /* 2컬럼 그리드 */
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* 좌: 최근 회의/노트 */}
+          <div className="space-y-3">
+            <h2
+              className="text-sm font-semibold mb-1"
+              style={{ color: "var(--text-secondary)", fontFamily: "var(--font-display)" }}
+            >
+              최근 회의 &middot; 노트
+            </h2>
+            {recentItems.length === 0 ? (
+              <p className="text-xs py-4" style={{ color: "var(--text-muted)" }}>
+                최근 항목이 없습니다
+              </p>
+            ) : (
+              recentItems.map((item) =>
+                item.kind === "meeting" ? (
+                  <MeetingCard key={`m-${item.data.id}`} meeting={item.data} />
+                ) : (
+                  <NoteCard key={`n-${item.data.id}`} note={item.data} />
+                )
+              )
+            )}
+          </div>
+
+          {/* 우: 이번 주 액션 */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <h2
+                className="text-sm font-semibold"
+                style={{ color: "var(--text-secondary)", fontFamily: "var(--font-display)" }}
+              >
+                이번 주 액션
+              </h2>
+            </div>
+            {actions.length === 0 ? (
+              <p className="text-xs py-4" style={{ color: "var(--text-muted)" }}>
+                액션 아이템이 없습니다
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {actions.map((action) => (
+                  <ActionRow
+                    key={action.id}
+                    action={action}
+                    onToggle={() => handleToggleAction(action)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 /* ── 서브 컴포넌트 ── */
 
-function DashboardHeader({ project }: { project: typeof MOCK_PROJECT }) {
-  const metaItems = [
-    { label: "소스", value: project.sourceCount },
-    { label: "회의", value: project.meetingCount },
-    { label: "액션", value: project.actionCount },
-  ];
-
+function DashboardHeader({ project }: { project: Project }) {
   return (
     <div className="mb-6">
       <div className="flex items-center gap-3 mb-2">
@@ -198,11 +248,11 @@ function DashboardHeader({ project }: { project: typeof MOCK_PROJECT }) {
         <span
           className="px-2 py-0.5 rounded-full text-xs font-medium"
           style={{
-            background: STATUS_BG[project.status] ?? "var(--accent-subtle)",
-            color: STATUS_COLOR[project.status] ?? "var(--accent)",
+            background: STATUS_BG[project.status],
+            color: STATUS_COLOR[project.status],
           }}
         >
-          {STATUS_LABELS[project.status] ?? project.status}
+          {STATUS_LABELS[project.status]}
         </span>
       </div>
       {project.description && (
@@ -210,42 +260,47 @@ function DashboardHeader({ project }: { project: typeof MOCK_PROJECT }) {
           {project.description}
         </p>
       )}
-      <div className="flex items-center gap-4">
-        {metaItems.map((m) => (
-          <span key={m.label} className="text-xs" style={{ color: "var(--text-muted)" }}>
-            {m.label}{" "}
-            <strong style={{ color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>
-              {m.value}
-            </strong>
-          </span>
-        ))}
-      </div>
+      {project.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {project.tags.map((tag) => (
+            <span
+              key={tag}
+              className="px-1.5 py-0.5 rounded text-[10px]"
+              style={{
+                background: "var(--surface-active)",
+                color: "var(--text-muted)",
+              }}
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function RecentItemCard({ item }: { item: MockMeetingNote }) {
-  const icon = item.type === "meeting" ? "🎙️" : "📝";
-  const typeLabel = item.type === "meeting" ? "회의" : "노트";
+function MeetingCard({ meeting }: { meeting: Meeting }) {
+  const displayDate = meeting.recordedAt
+    ? new Date(meeting.recordedAt).toLocaleDateString("ko-KR")
+    : new Date(meeting.createdAt).toLocaleDateString("ko-KR");
 
   return (
-    <div
-      className="p-4 rounded-lg border transition-colors"
+    <Link
+      href={`/meetings/${meeting.id}`}
+      className="block p-4 rounded-lg border transition-colors"
       style={{
         background: "var(--surface)",
         borderColor: "var(--border-subtle)",
         borderRadius: "var(--radius-lg)",
-        cursor: "pointer",
       }}
-      onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent)")}
-      onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
     >
       <div className="flex items-start gap-3">
-        <span className="text-base shrink-0 mt-0.5">{icon}</span>
+        <span className="text-base shrink-0 mt-0.5">🎙️</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
-              {item.title}
+              {meeting.title}
             </h3>
             <span
               className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px]"
@@ -254,25 +309,68 @@ function RecentItemCard({ item }: { item: MockMeetingNote }) {
                 color: "var(--text-muted)",
               }}
             >
-              {typeLabel}
+              회의
             </span>
           </div>
-          <p className="text-xs line-clamp-2 mb-2" style={{ color: "var(--text-secondary)" }}>
-            {item.summary}
-          </p>
-          <div className="flex items-center gap-3 text-[10px]" style={{ color: "var(--text-muted)" }}>
-            <span>{item.date}</span>
-            {item.type === "meeting" && item.participants > 0 && (
-              <span>참석자 {item.participants}명</span>
+          <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+            {displayDate}
+            {meeting.actionItemCount > 0 && (
+              <span className="ml-2">액션 {meeting.actionItemCount}개</span>
             )}
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
-function ActionRow({ action, onToggle }: { action: MockAction; onToggle: () => void }) {
+function NoteCard({ note }: { note: Note }) {
+  const displayDate = new Date(note.createdAt).toLocaleDateString("ko-KR");
+
+  return (
+    <Link
+      href={`/notes/${note.id}`}
+      className="block p-4 rounded-lg border transition-colors"
+      style={{
+        background: "var(--surface)",
+        borderColor: "var(--border-subtle)",
+        borderRadius: "var(--radius-lg)",
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <span className="text-base shrink-0 mt-0.5">📝</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
+              {note.title}
+            </h3>
+            <span
+              className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px]"
+              style={{
+                background: "var(--surface-active)",
+                color: "var(--text-muted)",
+              }}
+            >
+              노트
+            </span>
+          </div>
+          {note.plainText && (
+            <p className="text-xs line-clamp-1 mb-1" style={{ color: "var(--text-secondary)" }}>
+              {note.plainText}
+            </p>
+          )}
+          <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+            {displayDate}
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function ActionRow({ action, onToggle }: { action: ActionItem; onToggle: () => void }) {
+  const isDone = action.status === "done";
+
   return (
     <div
       className="flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors"
@@ -284,7 +382,7 @@ function ActionRow({ action, onToggle }: { action: MockAction; onToggle: () => v
     >
       <input
         type="checkbox"
-        checked={action.isDone}
+        checked={isDone}
         onChange={onToggle}
         className="shrink-0 w-4 h-4 rounded accent-current"
         style={{ accentColor: "var(--accent)", cursor: "pointer", minHeight: "44px", minWidth: "16px" }}
@@ -293,16 +391,26 @@ function ActionRow({ action, onToggle }: { action: MockAction; onToggle: () => v
         <p
           className="text-sm truncate"
           style={{
-            color: action.isDone ? "var(--text-muted)" : "var(--text-primary)",
-            textDecoration: action.isDone ? "line-through" : "none",
+            color: isDone ? "var(--text-muted)" : "var(--text-primary)",
+            textDecoration: isDone ? "line-through" : "none",
           }}
         >
           {action.title}
         </p>
         <div className="flex items-center gap-2 text-[10px]" style={{ color: "var(--text-muted)" }}>
-          <span>{action.assignee}</span>
-          <span>&middot;</span>
-          <span>{action.dueDate}</span>
+          {action.assignee && <span>{action.assignee.displayName}</span>}
+          {action.dueDate && (
+            <>
+              <span>&middot;</span>
+              <span
+                style={{
+                  color: isOverdue(action.dueDate) && !isDone ? "var(--error)" : "var(--text-muted)",
+                }}
+              >
+                {action.dueDate}
+              </span>
+            </>
+          )}
         </div>
       </div>
     </div>

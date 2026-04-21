@@ -1,24 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { UUID } from "@/types";
-
-/* ── 타입 ── */
-
-interface SmartInboxItemData {
-  id: UUID;
-  title: string;
-  sourceType: "meeting" | "note" | "attachment";
-  aiSuggestedProject: string;
-  aiConfidence: number;
-  aiSuggestedTags: string[];
-  summary: string | null;
-  isAutoProcessed: boolean;
-}
-
-interface SmartInboxItemCardProps {
-  item: SmartInboxItemData;
-}
+import type { InboxItem } from "../types";
 
 /* ── 라벨/아이콘 맵 ── */
 
@@ -34,12 +17,24 @@ const SOURCE_ICONS: Record<string, string> = {
   attachment: "📎",
 };
 
+/* ── Props ── */
+
+interface SmartInboxItemCardProps {
+  item: InboxItem;
+}
+
 /* ── 컴포넌트 ── */
 
 export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
   const [status, setStatus] = useState<"idle" | "confirmed" | "dismissed" | "editing">("idle");
 
-  const confidencePercent = Math.round(item.aiConfidence * 100);
+  /* aiConfidence가 null일 때 0으로 폴백 */
+  const confidencePercent = item.aiConfidence !== null
+    ? Math.round(item.aiConfidence * 100)
+    : null;
+
+  /* isProcessed === true → 자동 처리된 아이템 */
+  const isAutoProcessed = item.isProcessed;
 
   function handleConfirm() {
     setStatus("confirmed");
@@ -71,7 +66,10 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
       >
         <span className="text-sm">✅</span>
         <span className="text-sm flex-1" style={{ color: "var(--text-secondary)" }}>
-          {item.title} &rarr; <strong style={{ color: "var(--accent)" }}>{item.aiSuggestedProject}</strong>
+          {item.title} &rarr;{" "}
+          <strong style={{ color: "var(--accent)" }}>
+            {item.aiSuggestedProjectTitle ?? "프로젝트"}
+          </strong>
         </span>
         <button
           onClick={handleRevert}
@@ -133,7 +131,7 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
     >
       {/* 상단: 소스 아이콘 + 제목 */}
       <div className="flex items-start gap-3 mb-2">
-        <span className="text-lg shrink-0">{SOURCE_ICONS[item.sourceType]}</span>
+        <span className="text-lg shrink-0">{SOURCE_ICONS[item.sourceType] ?? "📌"}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
@@ -146,7 +144,7 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
                 color: "var(--text-muted)",
               }}
             >
-              {SOURCE_LABELS[item.sourceType]}
+              {SOURCE_LABELS[item.sourceType] ?? item.sourceType}
             </span>
           </div>
           {item.summary && (
@@ -176,29 +174,33 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
       )}
 
       {/* AI 추천 프로젝트 */}
-      <div
-        className="flex items-center gap-2 px-3 py-2 rounded mb-3"
-        style={{
-          background: "var(--accent-subtle)",
-          borderRadius: "var(--radius-sm)",
-        }}
-      >
-        <span className="text-xs" style={{ color: "var(--accent)" }}>
-          AI 추천:
-        </span>
-        <span className="text-xs font-medium" style={{ color: "var(--accent)" }}>
-          {item.aiSuggestedProject}
-        </span>
-        <span
-          className="text-[10px] ml-auto"
-          style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
+      {item.aiSuggestedProjectTitle && (
+        <div
+          className="flex items-center gap-2 px-3 py-2 rounded mb-3"
+          style={{
+            background: "var(--accent-subtle)",
+            borderRadius: "var(--radius-sm)",
+          }}
         >
-          {confidencePercent}%
-        </span>
-      </div>
+          <span className="text-xs" style={{ color: "var(--accent)" }}>
+            AI 추천:
+          </span>
+          <span className="text-xs font-medium" style={{ color: "var(--accent)" }}>
+            {item.aiSuggestedProjectTitle}
+          </span>
+          {confidencePercent !== null && (
+            <span
+              className="text-[10px] ml-auto"
+              style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
+            >
+              {confidencePercent}%
+            </span>
+          )}
+        </div>
+      )}
 
       {/* 액션 버튼 */}
-      {!item.isAutoProcessed ? (
+      {!isAutoProcessed ? (
         /* 확인 필요 아이템: 확정 / 다른 프로젝트 / 무시 */
         <div className="flex items-center gap-2">
           <button
@@ -273,7 +275,7 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
         </div>
       )}
 
-      {/* "다른 프로젝트" 편집 모드 (간단한 목업) */}
+      {/* "다른 프로젝트" 편집 모드 (P2: 실제 프로젝트 콤보박스 연동 예정) */}
       {status === "editing" && (
         <div
           className="mt-3 p-3 rounded border"
@@ -284,27 +286,11 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
           }}
         >
           <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-            프로젝트를 선택하세요 (Mock)
+            프로젝트를 선택하세요
           </p>
-          <div className="flex flex-wrap gap-2">
-            {["Q2 제품 로드맵", "디자인 시스템", "DevOps 개선", "사용자 리서치"].map((proj) => (
-              <button
-                key={proj}
-                onClick={() => setStatus("confirmed")}
-                className="px-2 py-1 rounded text-xs transition-colors border"
-                style={{
-                  borderColor: proj === item.aiSuggestedProject ? "var(--accent)" : "var(--border)",
-                  color: proj === item.aiSuggestedProject ? "var(--accent)" : "var(--text-secondary)",
-                  background: proj === item.aiSuggestedProject ? "var(--accent-subtle)" : "transparent",
-                  borderRadius: "var(--radius-sm)",
-                  cursor: "pointer",
-                  minHeight: "44px",
-                }}
-              >
-                {proj}
-              </button>
-            ))}
-          </div>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            프로젝트 선택 기능은 준비 중입니다.
+          </p>
           <button
             onClick={() => setStatus("idle")}
             className="mt-2 text-xs"

@@ -292,6 +292,14 @@
     font-family: var(--font-body);
   }
 
+  /* 랜딩 테마 wrapper — body가 :root(dark) 기본값을 쓰므로
+     div[data-theme="landing"] 자체에 배경/색상 직접 적용 */
+  [data-theme="landing"] {
+    background: var(--background);
+    color: var(--text-primary);
+    min-height: 100vh;
+  }
+
   /* 접근성 */
   :focus-visible {
     outline: 2px solid var(--accent);

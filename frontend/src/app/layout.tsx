@@ -1,8 +1,5 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { QueryProvider } from "@/lib/query-client";
-import { ThemeProvider } from "@/components/layout/theme-provider";
-import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -39,12 +36,7 @@ export default function RootLayout({
           />
         </head>
         <body>
-          <ThemeProvider>
-            <QueryProvider>
-              {children}
-              <Toaster />
-            </QueryProvider>
-          </ThemeProvider>
+          {children}
         </body>
       </html>
     </ClerkProvider>

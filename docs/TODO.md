@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-04-05
+> 마지막 업데이트: 2026-04-22
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조
 
@@ -28,10 +28,7 @@
   - [x] FE: /invite/[code] 초대 수락 페이지
   - [x] FE: 사이드바 설정 링크 + Viewer 쓰기 버튼 숨김
   - [x] ADR-007: LLM Knowledge Base 인사이트 (연구/Phase 4 적용 예정)
-
-## In Progress
-
-- [/] **ADR-006 서비스 전면 UI/UX 개편 — 부분 구현 (7/11 완료, 4/11 부분)**
+- [x] ADR-006 서비스 전면 UI/UX 개편 — 완료 (11/11)
   - [x] 홈 Today 피드 + 온보딩 배너
   - [x] 인라인 출처 [1][2][3] citation-badge
   - [x] C|D 2-Panel 레이아웃 (RAG 오버레이 전환)
@@ -43,10 +40,13 @@
   - [x] 모바일 BottomNav
   - [x] 사이드바 소스 트리 펼침 — 프로젝트 클릭 시 하위 회의/노트/파일 목록 (mock)
   - [x] [1] 클릭 → 소스 뷰어 열림 flow 연결 — CitationBadge → UI Store → SourceViewer
-  - [ ] Inbox 신뢰도 임계값 설정 UI (하드코딩 상태)
-  - [ ] 온보딩 템플릿 프로젝트 자동 생성 (백엔드 필요)
-  - [ ] 내보내기 포맷 (MD/PDF/JSON)
-- [/] 랜딩 페이지 QA — 다크 모드 하이드레이션 미스매치 수정 필요
+  - [x] Inbox 신뢰도 임계값 설정 UI (프리셋 70/80/90/95%)
+  - [x] 내보내기 포맷 MD/JSON (회의/노트)
+  - [ ] 내보내기 포맷 PDF (향후 구현)
+
+## In Progress
+
+- [/] 랜딩 페이지 QA — 다크 모드 하이드레이션 수정 중
 - [x] 문서 정합성 통합 정리 (ADR-006 기준 전체 문서 정렬)
   - [x] cross-domain-pipeline.md: Claude → Gemini 수정
   - [x] para-methodology.md: deprecated 배너 추가
@@ -73,10 +73,13 @@
 - [x] ~~ADR-006 핵심 UX 마무리 (P0)~~
   - [x] ~~사이드바 소스 트리 펼침~~
   - [x] ~~[1] 클릭 → 소스 뷰어 열림 flow 연결~~
-- [ ] 프론트엔드 `.env.example` 생성
+- [x] 프론트엔드 `.env.example` 생성
+- [x] Header 멤버 수 뱃지
+- [x] mutation 에러 toast 피드백
+- [ ] 랜딩 페이지 다크 모드 하이드레이션 수정 (route group 분리)
+- [ ] FE ↔ BE 연동 검증 — Smart Inbox, 회의 상세, 프로젝트 대시보드 실제 API 전환
+- [ ] 온보딩 템플릿 프로젝트 자동 생성 (백엔드 필요)
 - [ ] E2E 테스트 환경 구축
-- [ ] Phase 2 잔여: 프론트엔드 ↔ 백엔드 실제 연동 검증
+- [ ] 내보내기 포맷 PDF (향후)
 - [ ] Sprint 6 계획 (프로젝트 멤버십 + Private 프로젝트)
 - [ ] 각 도메인 페이지 CRUD 버튼 세밀 역할 분기 (Member vs Admin)
-- [ ] Header 멤버 수 뱃지
-- [ ] mutation 에러 toast 피드백

@@ -10,15 +10,6 @@ export default async function RootPage() {
     redirect("/dashboard");
   }
 
-  // 비인증: 라이트모드 랜딩 페이지
-  return (
-    <>
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `document.documentElement.setAttribute('data-theme','landing')`,
-        }}
-      />
-      <LandingPage />
-    </>
-  );
+  // 비인증: 랜딩 페이지 — (landing)/layout.tsx의 data-theme="landing" wrapper에서 테마 적용
+  return <LandingPage />;
 }

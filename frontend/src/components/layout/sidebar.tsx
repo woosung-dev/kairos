@@ -58,22 +58,11 @@ const SOURCE_ICON = {
   file: Paperclip,
 } as const;
 
-/** 프로젝트별 하위 소스 mock 데이터 */
-const MOCK_PROJECT_SOURCES: Record<string, SourceItem[]> = {
-  "proj-001": [
-    { id: "mt-001", type: "meeting", title: "주간 스프린트 리뷰", href: "/meetings/mt-001" },
-    { id: "mt-002", type: "meeting", title: "보안 검토 회의", href: "/meetings/mt-002" },
-    { id: "nt-001", type: "note", title: "경쟁사 분석 메모", href: "/notes/nt-001" },
-  ],
-  "proj-002": [
-    { id: "mt-003", type: "meeting", title: "인프라 주간 리뷰", href: "/meetings/mt-003" },
-    { id: "nt-002", type: "note", title: "AWS 전환 계획", href: "/notes/nt-002" },
-    { id: "fl-001", type: "file", title: "보안 감사 보고서.pdf", href: "#" },
-  ],
-  "proj-003": [
-    { id: "mt-004", type: "meeting", title: "디자인 킥오프", href: "/meetings/mt-004" },
-  ],
-};
+/**
+ * 프로젝트 하위 소스(회의/노트) 트리 — P2 예정
+ * 현재는 빈 배열로 유지하며, 추후 별도 hook으로 연동 예정
+ */
+const EMPTY_SOURCES: SourceItem[] = [];
 
 export function Sidebar({ collapsed = false }: SidebarProps) {
   const pathname = usePathname();
@@ -227,7 +216,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                 const isActive = pathname === `/projects/${project.id}` ||
                   pathname.startsWith(`/projects/${project.id}/`);
                 const isExpanded = expandedProjects.has(project.id);
-                const sources = MOCK_PROJECT_SOURCES[project.id] ?? [];
+                const sources = EMPTY_SOURCES;
 
                 return (
                   <div key={project.id}>
