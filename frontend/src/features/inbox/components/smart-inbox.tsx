@@ -2,106 +2,100 @@
 
 import { useState } from "react";
 import { SmartInboxItemCard } from "./inbox-item-card";
-import type { UUID } from "@/types";
+import { useInbox } from "../hooks";
+import { useWorkspaceStore } from "@/features/workspaces/store";
+import type { InboxItem } from "../types";
 
-/* ── Mock 타입 ── */
+/* ── 로딩 스켈레톤 ── */
 
-interface SmartInboxItem {
-  id: UUID;
-  title: string;
-  sourceType: "meeting" | "note" | "attachment";
-  aiSuggestedProject: string;
-  aiConfidence: number;
-  aiSuggestedTags: string[];
-  summary: string | null;
-  isAutoProcessed: boolean;
+function InboxSkeleton() {
+  return (
+    <div className="space-y-3">
+      {[1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className="p-4 rounded-lg border animate-pulse"
+          style={{
+            background: "var(--surface)",
+            borderColor: "var(--border-subtle)",
+            borderRadius: "var(--radius-lg)",
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-6 h-6 rounded" style={{ background: "var(--surface-active)" }} />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 rounded w-2/3" style={{ background: "var(--surface-active)" }} />
+              <div className="h-3 rounded w-full" style={{ background: "var(--surface-active)" }} />
+              <div className="h-3 rounded w-3/4" style={{ background: "var(--surface-active)" }} />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
-
-/* ── Mock 데이터 ── */
-
-const MOCK_NEEDS_REVIEW: SmartInboxItem[] = [
-  {
-    id: "inbox-001",
-    title: "경쟁사 제품 분석 미팅",
-    sourceType: "meeting",
-    aiSuggestedProject: "Q2 제품 로드맵",
-    aiConfidence: 0.72,
-    aiSuggestedTags: ["경쟁분석", "전략"],
-    summary: "Notion AI, Mem, Reflect 기능 비교 분석. 차별화 전략 논의 필요.",
-    isAutoProcessed: false,
-  },
-  {
-    id: "inbox-002",
-    title: "인프라 비용 절감 메모",
-    sourceType: "note",
-    aiSuggestedProject: "DevOps 개선",
-    aiConfidence: 0.65,
-    aiSuggestedTags: ["인프라", "비용"],
-    summary: "Cloud Run 스케일링 정책 조정으로 월 $200 절감 가능성 파악.",
-    isAutoProcessed: false,
-  },
-];
-
-const MOCK_AUTO_PROCESSED: SmartInboxItem[] = [
-  {
-    id: "inbox-003",
-    title: "주간 스프린트 리뷰",
-    sourceType: "meeting",
-    aiSuggestedProject: "Q2 제품 로드맵",
-    aiConfidence: 0.98,
-    aiSuggestedTags: ["스프린트", "리뷰"],
-    summary: "Sprint 4 배포 완료 확인. Sprint 5 백로그 우선순위 결정.",
-    isAutoProcessed: true,
-  },
-  {
-    id: "inbox-004",
-    title: "디자인 시스템 문서",
-    sourceType: "attachment",
-    aiSuggestedProject: "디자인 시스템",
-    aiConfidence: 0.95,
-    aiSuggestedTags: ["디자인", "문서"],
-    summary: "Figma 토큰 명세서 PDF. 컴포넌트 라이브러리 v2 기준.",
-    isAutoProcessed: true,
-  },
-  {
-    id: "inbox-005",
-    title: "사용자 인터뷰 녹음",
-    sourceType: "meeting",
-    aiSuggestedProject: "사용자 리서치",
-    aiConfidence: 0.93,
-    aiSuggestedTags: ["UX", "인터뷰"],
-    summary: "베타 사용자 3명 심층 인터뷰. 검색 기능 만족도 높음.",
-    isAutoProcessed: true,
-  },
-  {
-    id: "inbox-006",
-    title: "API 성능 테스트 결과",
-    sourceType: "attachment",
-    aiSuggestedProject: "DevOps 개선",
-    aiConfidence: 0.91,
-    aiSuggestedTags: ["API", "성능"],
-    summary: "RAG 엔드포인트 p95 응답시간 320ms. 목표 대비 양호.",
-    isAutoProcessed: true,
-  },
-  {
-    id: "inbox-007",
-    title: "팀 회고 미팅",
-    sourceType: "meeting",
-    aiSuggestedProject: "Q2 제품 로드맵",
-    aiConfidence: 0.90,
-    aiSuggestedTags: ["회고", "팀"],
-    summary: "Sprint 3-4 회고. 코드 리뷰 프로세스 개선 합의.",
-    isAutoProcessed: true,
-  },
-];
 
 /* ── 컴포넌트 ── */
 
 export function SmartInbox() {
   const [isAutoExpanded, setIsAutoExpanded] = useState(false);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
-  const needsReviewCount = MOCK_NEEDS_REVIEW.length;
-  const autoProcessedCount = MOCK_AUTO_PROCESSED.length;
+  /* isProcessed 미지정 → 전체 목록 fetch 후 클라이언트 분기 */
+  const { data, isLoading, error } = useInbox(activeWorkspaceId ?? undefined);
+
+  /* 로딩 상태 */
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="mb-6">
+          <h1
+            className="text-2xl font-bold mb-1"
+            style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}
+          >
+            Inbox
+          </h1>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            AI가 분류한 항목을 확인하고 프로젝트에 연결하세요
+          </p>
+        </div>
+        <InboxSkeleton />
+      </div>
+    );
+  }
+
+  /* 에러 상태 */
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="mb-6">
+          <h1
+            className="text-2xl font-bold mb-1"
+            style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}
+          >
+            Inbox
+          </h1>
+        </div>
+        <div
+          className="flex flex-col items-center justify-center py-16 text-center"
+        >
+          <span className="text-4xl mb-4">⚠️</span>
+          <p className="text-sm" style={{ color: "var(--error)" }}>
+            데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const items: InboxItem[] = data?.items ?? [];
+
+  /* isProcessed === false → 확인 필요, isProcessed === true → AI 자동 처리 */
+  const needsReview = items.filter((item) => !item.isProcessed);
+  const autoProcessed = items.filter((item) => item.isProcessed);
+
+  const needsReviewCount = needsReview.length;
+  const autoProcessedCount = autoProcessed.length;
 
   return (
     <div className="p-6">
@@ -140,7 +134,7 @@ export function SmartInbox() {
             </span>
           </div>
           <div className="grid gap-3">
-            {MOCK_NEEDS_REVIEW.map((item) => (
+            {needsReview.map((item) => (
               <SmartInboxItemCard key={item.id} item={item} />
             ))}
           </div>
@@ -184,7 +178,7 @@ export function SmartInbox() {
 
           {isAutoExpanded && (
             <div className="grid gap-3">
-              {MOCK_AUTO_PROCESSED.map((item) => (
+              {autoProcessed.map((item) => (
                 <SmartInboxItemCard key={item.id} item={item} />
               ))}
             </div>

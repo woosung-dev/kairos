@@ -1,13 +1,12 @@
-import { PanelLayout } from "@/components/layout/panel-layout";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { QueryProvider } from "@/lib/query-client";
 import { Toaster } from "@/components/ui/sonner";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <QueryProvider>
-        <PanelLayout>{children}</PanelLayout>
+        {children}
         <Toaster />
       </QueryProvider>
     </ThemeProvider>
