@@ -54,7 +54,8 @@
 - [x] Smart Inbox · 회의 상세 3뷰 · 프로젝트 대시보드 실 API 훅 전환 (커밋 `13d5041`)
 - [x] Today 피드 mock→실 API 전환 + Dashboard 상단 병합 (커밋 `d8a6d27`)
 - [x] 온보딩 템플릿 프로젝트 자동 시딩 — `create_workspace()` 가 🚀 시작하기 · 💡 아이디어 · 📋 회의록 3개 프로젝트 자동 생성 + OnboardingBanner 안내 개편 (커밋 `1e54a5c`)
-- [x] 사이드바 소스 트리 + Source Viewer 실 API 연동 — meetings 엔드포인트에 projectId 필터 추가, 펼침 시 하위 회의/노트 실 데이터 렌더, SourceViewer가 `useMeetingDetail`/`useNote`로 풀콘텐츠 보강 (이번 커밋)
+- [x] 사이드바 소스 트리 + Source Viewer 실 API 연동 — meetings 엔드포인트에 projectId 필터 추가, 펼침 시 하위 회의/노트 실 데이터 렌더, SourceViewer가 `useMeetingDetail`/`useNote`로 풀콘텐츠 보강 (커밋 `7aea79b`)
+- [x] **DevEx 이니셔티브 (ADR-008)** — Playwright E2E 환경(골든패스 2개), BE 배포 자동화(deploy.yml + WIF + Secret Manager 가이드), `test.yml` 에 e2e 잡 추가 (이번 커밋)
 - [x] 문서 정합성 통합 정리 (ADR-006 기준 전체 문서 정렬)
   - [x] cross-domain-pipeline.md: Claude → Gemini 수정
   - [x] para-methodology.md: deprecated 배너 추가
@@ -84,8 +85,9 @@
 - [x] 프론트엔드 `.env.example` 생성
 - [x] Header 멤버 수 뱃지
 - [x] mutation 에러 toast 피드백
+- [ ] **GCP WIF 초기 설정 + Secret Manager 9개 이관** (사용자 작업) — `docs/guides/deployment.md` §2.5.1 참조
+- [ ] Clerk testing mode 계정 생성 + GitHub `E2E_*` Secrets 등록 (E2E 활성화)
 - [ ] FE ↔ BE 실제 프로덕션 E2E 시나리오 검증 (신규 계정 → 템플릿 프로젝트 3개 확인 → 업로드 → STT → Inbox → 프로젝트 → RAG → `[1]` 클릭 → Source Viewer 풀콘텐츠 렌더)
-- [ ] E2E 테스트 환경 구축 (Playwright)
 - [ ] 내보내기 포맷 PDF (향후)
 - [ ] Sprint 6 계획 (프로젝트 멤버십 + Private 프로젝트)
 - [ ] 각 도메인 페이지 CRUD 버튼 세밀 역할 분기 (Member vs Admin)
