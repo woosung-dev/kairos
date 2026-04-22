@@ -43,10 +43,11 @@ async def list_meetings(
     workspace_id: uuid.UUID,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100, alias="pageSize"),
+    project_id: uuid.UUID | None = Query(default=None, alias="projectId"),
     member: WorkspaceMember = Depends(require_viewer),
     service: MeetingService = Depends(get_meeting_service),
 ):
-    return await service.list_meetings(workspace_id, page, page_size)
+    return await service.list_meetings(workspace_id, page, page_size, project_id)
 
 
 @router.get("/{meeting_id}")

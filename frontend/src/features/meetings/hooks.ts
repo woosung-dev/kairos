@@ -12,17 +12,21 @@ import {
 import type { CreateMeetingRequest, MeetingStatus } from "./types";
 
 /**
- * 워크스페이스 내 회의 목록 조회
+ * 워크스페이스 내 회의 목록 조회 (projectId로 필터 가능)
  */
-export function useMeetings(wid: string | undefined, page = 1) {
+export function useMeetings(
+  wid: string | undefined,
+  page = 1,
+  projectId?: string,
+) {
   const { getToken } = useAuth();
 
   return useQuery({
-    queryKey: meetingKeys.list(wid ?? ""),
+    queryKey: meetingKeys.list(wid ?? "", projectId),
     queryFn: async () => {
       const token = await getToken();
       if (!token) throw new Error("인증이 필요합니다");
-      return fetchMeetings(token, wid!, page);
+      return fetchMeetings(token, wid!, page, projectId);
     },
     enabled: !!wid,
   });

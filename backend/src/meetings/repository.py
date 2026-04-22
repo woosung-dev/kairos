@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.meetings.models import Meeting, MeetingSummary, TranscriptSegment
+from src.projects.models import MeetingProjectLink
 
 
 class MeetingRepository:
@@ -28,22 +29,34 @@ class MeetingRepository:
         workspace_id: uuid.UUID,
         offset: int = 0,
         limit: int = 20,
+        project_id: uuid.UUID | None = None,
     ) -> list[Meeting]:
-        result = await self.session.execute(
-            select(Meeting)
-            .where(Meeting.workspace_id == workspace_id)
-            .order_by(Meeting.created_at.desc())
-            .offset(offset)
-            .limit(limit)
-        )
+        stmt = select(Meeting).where(Meeting.workspace_id == workspace_id)
+        if project_id is not None:
+            stmt = stmt.join(
+                MeetingProjectLink,
+                MeetingProjectLink.meeting_id == Meeting.id,
+            ).where(MeetingProjectLink.project_id == project_id)
+        stmt = stmt.order_by(Meeting.created_at.desc()).offset(offset).limit(limit)
+        result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def count_by_workspace(self, workspace_id: uuid.UUID) -> int:
-        result = await self.session.execute(
+    async def count_by_workspace(
+        self,
+        workspace_id: uuid.UUID,
+        project_id: uuid.UUID | None = None,
+    ) -> int:
+        stmt = (
             select(func.count())
             .select_from(Meeting)
             .where(Meeting.workspace_id == workspace_id)
         )
+        if project_id is not None:
+            stmt = stmt.join(
+                MeetingProjectLink,
+                MeetingProjectLink.meeting_id == Meeting.id,
+            ).where(MeetingProjectLink.project_id == project_id)
+        result = await self.session.execute(stmt)
         return result.scalar_one()
 
     async def update_status(

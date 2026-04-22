@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useProjects } from "@/features/projects/hooks";
+import { useMeetings } from "@/features/meetings/hooks";
+import { useNotes } from "@/features/notes/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import {
   Archive,
@@ -44,7 +46,7 @@ interface SidebarProps {
   collapsed?: boolean;
 }
 
-/** 프로젝트 하위 소스 아이템 (mock — 추후 API 연동) */
+/** 프로젝트 하위 소스 아이템 */
 interface SourceItem {
   id: string;
   type: "meeting" | "note" | "file";
@@ -58,11 +60,79 @@ const SOURCE_ICON = {
   file: Paperclip,
 } as const;
 
+const SOURCES_LIMIT = 20;
+
 /**
- * 프로젝트 하위 소스(회의/노트) 트리 — P2 예정
- * 현재는 빈 배열로 유지하며, 추후 별도 hook으로 연동 예정
+ * 프로젝트 하위 소스(회의/노트) 트리 — 실 API 연동.
+ * 펼쳤을 때만 렌더링되도록 상위에서 mount 제어한다 (불필요한 쿼리 방지).
  */
-const EMPTY_SOURCES: SourceItem[] = [];
+function ProjectSources({
+  workspaceId,
+  projectId,
+}: {
+  workspaceId: string;
+  projectId: string;
+}) {
+  const pathname = usePathname();
+  const { data: meetingsData } = useMeetings(workspaceId, 1, projectId);
+  const { data: notesData } = useNotes(workspaceId, projectId);
+
+  const items = useMemo<SourceItem[]>(() => {
+    const merged: SourceItem[] = [];
+    for (const m of meetingsData?.items ?? []) {
+      merged.push({
+        id: m.id,
+        type: "meeting",
+        title: m.title,
+        href: `/meetings/${m.id}`,
+      });
+    }
+    for (const n of notesData?.items ?? []) {
+      merged.push({
+        id: n.id,
+        type: "note",
+        title: n.title || "(제목 없음)",
+        href: `/notes/${n.id}`,
+      });
+    }
+    return merged.slice(0, SOURCES_LIMIT);
+  }, [meetingsData, notesData]);
+
+  if (items.length === 0) {
+    return (
+      <div
+        className="ml-4 px-2 py-1 text-[11px]"
+        style={{ color: "var(--text-muted)" }}
+      >
+        소스 없음
+      </div>
+    );
+  }
+
+  return (
+    <div className="ml-4 space-y-px">
+      {items.map((item) => {
+        const ItemIcon = SOURCE_ICON[item.type];
+        const isItemActive = pathname === item.href;
+        return (
+          <Link
+            key={`${item.type}-${item.id}`}
+            href={item.href}
+            className="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] truncate transition-colors"
+            style={{
+              background: isItemActive ? "var(--surface-active)" : "transparent",
+              color: isItemActive ? "var(--text-primary)" : "var(--text-muted)",
+              borderRadius: "var(--radius-sm)",
+            }}
+          >
+            <ItemIcon size={12} className="shrink-0" />
+            <span className="truncate">{item.title}</span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
 
 export function Sidebar({ collapsed = false }: SidebarProps) {
   const pathname = usePathname();
@@ -216,7 +286,6 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                 const isActive = pathname === `/projects/${project.id}` ||
                   pathname.startsWith(`/projects/${project.id}/`);
                 const isExpanded = expandedProjects.has(project.id);
-                const sources = EMPTY_SOURCES;
 
                 return (
                   <div key={project.id}>
@@ -246,39 +315,14 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                       >
                         {project.title}
                       </Link>
-                      {sources.length > 0 && (
-                        <span
-                          className="shrink-0 mr-2 text-[10px]"
-                          style={{ color: "var(--text-muted)" }}
-                        >
-                          {sources.length}
-                        </span>
-                      )}
                     </div>
 
-                    {/* 하위 소스 트리 */}
-                    {isExpanded && sources.length > 0 && (
-                      <div className="ml-4 space-y-px">
-                        {sources.map((item) => {
-                          const ItemIcon = SOURCE_ICON[item.type];
-                          const isItemActive = pathname === item.href;
-                          return (
-                            <Link
-                              key={item.id}
-                              href={item.href}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] truncate transition-colors"
-                              style={{
-                                background: isItemActive ? "var(--surface-active)" : "transparent",
-                                color: isItemActive ? "var(--text-primary)" : "var(--text-muted)",
-                                borderRadius: "var(--radius-sm)",
-                              }}
-                            >
-                              <ItemIcon size={12} className="shrink-0" />
-                              <span className="truncate">{item.title}</span>
-                            </Link>
-                          );
-                        })}
-                      </div>
+                    {/* 하위 소스 트리 — 펼쳐졌을 때만 mount (불필요한 쿼리 방지) */}
+                    {isExpanded && activeWorkspaceId && (
+                      <ProjectSources
+                        workspaceId={activeWorkspaceId}
+                        projectId={project.id}
+                      />
                     )}
                   </div>
                 );

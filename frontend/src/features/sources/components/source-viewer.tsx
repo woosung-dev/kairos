@@ -3,6 +3,9 @@
 import { useEffect, useRef, useMemo, useState, type ReactNode } from "react";
 import { X, Copy, ExternalLink, Check } from "lucide-react";
 import { getCitationColor } from "@/features/rag/components/citation-badge";
+import { useMeetingDetail } from "@/features/meetings/hooks";
+import { useNote } from "@/features/notes/hooks";
+import { useWorkspaceStore } from "@/features/workspaces/store";
 import type { SourceDocument, HighlightChunk } from "../types";
 
 interface SourceViewerProps {
@@ -85,51 +88,49 @@ function renderHighlightedContent(
   return parts;
 }
 
-/** mock 소스 데이터 */
-export const MOCK_SOURCES: SourceDocument[] = [
-  {
-    id: "src-1",
-    title: "Sprint 3 회고 회의",
-    type: "meeting",
-    content:
-      "이번 Sprint 3에서는 RAG 파이프라인 통합과 노트 기능을 완료했습니다. 주요 성과로는 6-Layer RAG 아키텍처 구현, 하이브리드 검색(키워드+벡터), 시맨틱 캐시 적용이 있습니다. 다음 Sprint에서는 배포 인프라 구축에 집중할 예정입니다. Cloud Run과 Vercel을 활용한 프로덕션 환경 구성이 핵심 과제입니다.",
-    projectId: "proj-1",
-    createdAt: "2026-03-28T10:00:00Z",
-  },
-  {
-    id: "src-2",
-    title: "RAG 파이프라인 설계 노트",
-    type: "note",
-    content:
-      "RAG 6-Layer 아키텍처: Cache Layer -> Query Processing -> Hybrid Search -> Re-ranking -> Generation -> Cache Store. 임베딩 모델은 OpenAI text-embedding-3-small (1536d)을 사용합니다. 쿼리 처리 단계에서 의도 분석과 키워드 추출을 수행하고, 하이브리드 검색으로 BM25와 벡터 검색을 결합합니다. Re-ranking은 cross-encoder를 통해 정밀도를 높입니다.",
-    projectId: "proj-1",
-    createdAt: "2026-03-25T14:30:00Z",
-  },
-  {
-    id: "src-3",
-    title: "배포 가이드.md",
-    type: "file",
-    content:
-      "Kairos 배포 가이드\n\n1. Backend: GCP Cloud Run\n- Docker 이미지 빌드 후 Artifact Registry 푸시\n- Cloud Run 서비스 배포 (min-instances: 0, max: 10)\n- 환경변수: DATABASE_URL, CLERK_SECRET_KEY 등\n\n2. Frontend: Vercel\n- GitHub 연동 자동 배포\n- 환경변수: NEXT_PUBLIC_API_URL, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY\n\n3. Database: Neon PostgreSQL\n- 프로덕션 브랜치 사용\n- Connection pooling 활성화",
-    projectId: "proj-2",
-    createdAt: "2026-04-01T09:00:00Z",
-  },
-];
+/**
+ * source.type이 meeting/note일 때 풀콘텐츠를 조회한다.
+ * 로딩 중이거나 API 실패 시 RAG 응답의 스니펫(source.content)으로 폴백.
+ */
+function useFullSourceContent(source: SourceDocument): {
+  content: string;
+  isLoading: boolean;
+} {
+  const wid = useWorkspaceStore((s) => s.activeWorkspaceId) ?? undefined;
 
-export const MOCK_HIGHLIGHTS: HighlightChunk[] = [
-  {
-    citationNumber: 1,
-    startOffset: 0,
-    endOffset: 64,
-    text: "이번 Sprint 3에서는 RAG 파이프라인 통합과 노트 기능을 완료했습니다.",
-  },
-  {
-    citationNumber: 2,
-    startOffset: 0,
-    endOffset: 45,
-    text: "RAG 6-Layer 아키텍처: Cache Layer -> Query Processing",
-  },
-];
+  const isMeeting = source.type === "meeting";
+  const isNote = source.type === "note";
+
+  const meetingDetail = useMeetingDetail(
+    isMeeting ? wid : undefined,
+    source.id,
+  );
+  const noteDetail = useNote(isNote ? wid : undefined, source.id);
+
+  if (isMeeting) {
+    const transcript = meetingDetail.data?.transcript;
+    if (transcript && transcript.length > 0) {
+      return {
+        content: transcript
+          .map((seg) => `[${seg.speaker}] ${seg.text}`)
+          .join("\n\n"),
+        isLoading: false,
+      };
+    }
+    const summary = meetingDetail.data?.summary?.summary;
+    if (summary) return { content: summary, isLoading: false };
+    return { content: source.content, isLoading: meetingDetail.isLoading };
+  }
+
+  if (isNote) {
+    const plain = noteDetail.data?.plainText;
+    if (plain) return { content: plain, isLoading: false };
+    return { content: source.content, isLoading: noteDetail.isLoading };
+  }
+
+  // file 타입은 전용 API가 없어 RAG 스니펫 그대로
+  return { content: source.content, isLoading: false };
+}
 
 export function SourceViewer({
   source,
@@ -138,6 +139,8 @@ export function SourceViewer({
 }: SourceViewerProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [isCopied, setIsCopied] = useState(false);
+
+  const { content, isLoading } = useFullSourceContent(source);
 
   // 첫 번째 하이라이트 위치로 자동 스크롤
   useEffect(() => {
@@ -149,16 +152,16 @@ export function SourceViewer({
       }
     }, 100);
     return () => clearTimeout(timer);
-  }, [highlightChunks]);
+  }, [highlightChunks, content]);
 
   const renderedContent = useMemo(
-    () => renderHighlightedContent(source.content, highlightChunks),
-    [source.content, highlightChunks],
+    () => renderHighlightedContent(content, highlightChunks),
+    [content, highlightChunks],
   );
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(source.content);
+      await navigator.clipboard.writeText(content);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     } catch {
@@ -277,6 +280,14 @@ export function SourceViewer({
         ref={contentRef}
         className="flex-1 overflow-y-auto px-4 py-4"
       >
+        {isLoading && (
+          <div
+            className="mb-3 text-[11px]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            전체 내용 불러오는 중...
+          </div>
+        )}
         <div
           className="text-sm leading-relaxed whitespace-pre-wrap"
           style={{ color: "var(--text-primary)" }}
