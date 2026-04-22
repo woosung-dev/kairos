@@ -47,6 +47,7 @@
 - [005: 랜딩 페이지 AIDA 리디자인](dev-log/005-landing-redesign-aida.md)
 - [006: 서비스 전면 UI/UX 개편](dev-log/006-app-redesign-brainstorm.md) — C|D 2-Panel, Inbox 2그룹, RAG 오버레이 등 11개 결정
 - [007: LLM Knowledge Base 패턴](dev-log/007-llm-knowledge-base-insight.md) — Karpathy 워크플로우 인사이트 → L3/L4 + 프로액티브 인사이트 구현 방법론
+- [008: DevEx 이니셔티브](dev-log/008-devex-initiative.md) — Playwright E2E 골든패스 + GitHub Actions + WIF + Secret Manager 기반 BE 배포 자동화
 
 ### superpowers/ (Sprint 실행 기록)
 

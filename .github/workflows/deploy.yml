@@ -1,0 +1,90 @@
+name: Deploy Backend (Cloud Run)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: woosung-dev
+  GCP_REGION: asia-northeast3
+  AR_REPO: kairos
+  IMAGE_NAME: api
+  SERVICE_NAME: kairos-api
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation용
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOYER_SA }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push image
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          IMAGE_URI="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.AR_REPO }}/${{ env.IMAGE_NAME }}"
+          SHA_TAG="${IMAGE_URI}:${{ github.sha }}"
+          LATEST_TAG="${IMAGE_URI}:latest"
+
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag "$SHA_TAG" \
+            --tag "$LATEST_TAG" \
+            --push \
+            .
+
+          echo "IMAGE_URI=$SHA_TAG" >> "$GITHUB_ENV"
+
+      - name: Deploy to Cloud Run
+        run: |
+          set -euo pipefail
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image "${{ env.IMAGE_URI }}" \
+            --region ${{ env.GCP_REGION }} \
+            --project ${{ env.GCP_PROJECT }} \
+            --port 8000 \
+            --memory 1Gi \
+            --min-instances 0 \
+            --max-instances 3 \
+            --allow-unauthenticated \
+            --set-env-vars="APP_ENV=production,LOG_LEVEL=INFO,CORS_ORIGINS=${{ secrets.CORS_ORIGINS }},FRONTEND_URL=${{ secrets.FRONTEND_URL }}" \
+            --set-secrets="DATABASE_URL=database-url:latest,CLERK_SECRET_KEY=clerk-secret-key:latest,CLERK_WEBHOOK_SECRET=clerk-webhook-secret:latest,R2_ACCOUNT_ID=r2-account-id:latest,R2_ACCESS_KEY_ID=r2-access-key-id:latest,R2_SECRET_ACCESS_KEY=r2-secret-access-key:latest,R2_BUCKET_NAME=r2-bucket-name:latest,GEMINI_API_KEY=gemini-api-key:latest,OPENAI_API_KEY=openai-api-key:latest" \
+            --quiet
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.GCP_REGION }} --format="value(status.url)")
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${URL}/docs")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ $URL/docs → 200 (attempt $i)"
+              exit 0
+            fi
+            echo "⏳ attempt $i: got $STATUS, retrying in 10s"
+            sleep 10
+          done
+          echo "❌ Smoke test failed after 5 attempts"
+          exit 1
