@@ -1,95 +1,61 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Inbox,
   CheckCircle2,
-  Lightbulb,
   Activity,
   Mic,
   FileText,
   ArrowRight,
   GraduationCap,
 } from "lucide-react";
+import { useInbox } from "@/features/inbox/hooks";
+import { useActionItems } from "@/features/actions/hooks";
+import { useMeetings } from "@/features/meetings/hooks";
+import { useNotes } from "@/features/notes/hooks";
+import { useProjects } from "@/features/projects/hooks";
+import type { ActionItem } from "@/features/actions/types";
 
-/* ─── Mock 데이터 ─── */
+/* ─── 타입 ─── */
 
-interface InboxAlert {
-  count: number;
-}
-
-interface ActionDue {
+interface ActionDueEntry {
   id: string;
   title: string;
   projectName: string;
-  isCompleted: boolean;
 }
 
-interface Insight {
-  id: string;
-  text: string;
-  sourceLabel: string;
-}
+type ActivityType = "meeting" | "note" | "action";
 
 interface RecentActivity {
   id: string;
-  type: "meeting" | "note" | "action";
+  type: ActivityType;
   title: string;
+  /** 정렬용 원본 ISO 타임스탬프 */
+  rawTime: string;
+  /** 표시용 상대 시간 */
   timestamp: string;
 }
 
-const MOCK_INBOX: InboxAlert | null = { count: 5 };
+/* ─── Utils ─── */
 
-const MOCK_ACTIONS_DUE: ActionDue[] = [
-  {
-    id: "a1",
-    title: "RAG 캐시 TTL 조정",
-    projectName: "Kairos",
-    isCompleted: false,
-  },
-  {
-    id: "a2",
-    title: "배포 모니터링 대시보드 설정",
-    projectName: "Kairos",
-    isCompleted: false,
-  },
-  {
-    id: "a3",
-    title: "사용자 피드백 정리",
-    projectName: "사이드 프로젝트",
-    isCompleted: true,
-  },
-];
+const MS_PER_MIN = 60 * 1000;
+const MS_PER_HOUR = 60 * MS_PER_MIN;
+const MS_PER_DAY = 24 * MS_PER_HOUR;
 
-const MOCK_INSIGHTS: Insight[] = [
-  {
-    id: "i1",
-    text: "지난주 대비 회의 시간이 30% 감소했습니다. 비동기 커뮤니케이션이 증가하고 있습니다.",
-    sourceLabel: "Sprint 3 회고",
-  },
-];
-
-const MOCK_ACTIVITIES: RecentActivity[] = [
-  {
-    id: "r1",
-    type: "meeting",
-    title: "Sprint 4 킥오프",
-    timestamp: "2시간 전",
-  },
-  {
-    id: "r2",
-    type: "note",
-    title: "배포 체크리스트 작성",
-    timestamp: "4시간 전",
-  },
-  {
-    id: "r3",
-    type: "action",
-    title: "CI/CD 파이프라인 구성 완료",
-    timestamp: "어제",
-  },
-];
+function formatRelative(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < MS_PER_MIN) return "방금 전";
+  if (diff < MS_PER_HOUR) return `${Math.floor(diff / MS_PER_MIN)}분 전`;
+  if (diff < MS_PER_DAY) return `${Math.floor(diff / MS_PER_HOUR)}시간 전`;
+  if (diff < 2 * MS_PER_DAY) return "어제";
+  if (diff < 7 * MS_PER_DAY) return `${Math.floor(diff / MS_PER_DAY)}일 전`;
+  return new Date(iso).toLocaleDateString("ko-KR", {
+    month: "short",
+    day: "numeric",
+  });
+}
 
 /* ─── 서브 컴포넌트 ─── */
 
@@ -233,10 +199,8 @@ function InboxCard({ count }: { count: number }) {
   );
 }
 
-function ActionsDueList({ actions }: { actions: ActionDue[] }) {
-  const pending = actions.filter((a) => !a.isCompleted);
-
-  if (pending.length === 0) return null;
+function ActionsDueList({ actions }: { actions: ActionDueEntry[] }) {
+  if (actions.length === 0) return null;
 
   return (
     <div
@@ -256,11 +220,11 @@ function ActionsDueList({ actions }: { actions: ActionDue[] }) {
             fontFamily: "var(--font-display)",
           }}
         >
-          오늘 마감 액션 ({pending.length})
+          진행 중 액션 ({actions.length})
         </h3>
       </div>
       <div className="space-y-2">
-        {pending.map((action) => (
+        {actions.map((action) => (
           <div
             key={action.id}
             className="flex items-center gap-2 text-sm"
@@ -281,52 +245,6 @@ function ActionsDueList({ actions }: { actions: ActionDue[] }) {
               }}
             >
               {action.projectName}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function InsightsCard({ insights }: { insights: Insight[] }) {
-  if (insights.length === 0) return null;
-
-  return (
-    <div
-      className="rounded-lg border p-4"
-      style={{
-        background: "var(--surface)",
-        borderColor: "var(--border-subtle)",
-        borderRadius: "var(--radius-md)",
-      }}
-    >
-      <div className="flex items-center gap-2 mb-3">
-        <Lightbulb size={14} style={{ color: "#FBBF24" }} />
-        <h3
-          className="text-xs font-semibold uppercase tracking-wider"
-          style={{
-            color: "var(--text-muted)",
-            fontFamily: "var(--font-display)",
-          }}
-        >
-          새 인사이트
-        </h3>
-      </div>
-      <div className="space-y-2">
-        {insights.map((insight) => (
-          <div key={insight.id}>
-            <p
-              className="text-sm leading-relaxed"
-              style={{ color: "var(--text-primary)" }}
-            >
-              {insight.text}
-            </p>
-            <span
-              className="text-[10px] mt-1 inline-block"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {insight.sourceLabel}
             </span>
           </div>
         ))}
@@ -370,7 +288,7 @@ function RecentActivityList({ activities }: { activities: RecentActivity[] }) {
           const Icon = ICON_MAP[act.type];
           return (
             <div
-              key={act.id}
+              key={`${act.type}-${act.id}`}
               className="flex items-center gap-2.5 text-sm"
             >
               <Icon
@@ -398,17 +316,107 @@ function RecentActivityList({ activities }: { activities: RecentActivity[] }) {
   );
 }
 
+/* ─── Placeholder (L3 인사이트 미구현) ─── */
+// L3 프로젝트 인사이트는 ADR-007에 따라 Phase 4에서 도입 예정.
+// 현재는 관련 섹션을 렌더하지 않음.
+function InsightsCard() {
+  return null;
+}
+
 /* ─── TodayFeed 메인 ─── */
 
 interface TodayFeedProps {
-  /** true면 데이터 없는 상태 (온보딩 배너 표시) */
-  isEmpty?: boolean;
+  /** 현재 활성 워크스페이스 ID. 없으면 피드를 표시하지 않음. */
+  workspaceId: string | undefined;
 }
 
-export function TodayFeed({ isEmpty = false }: TodayFeedProps) {
+const RECENT_LIMIT = 5;
+const ACTIONS_LIMIT = 5;
+
+export function TodayFeed({ workspaceId }: TodayFeedProps) {
+  const inboxQuery = useInbox(workspaceId);
+  const actionsQuery = useActionItems(workspaceId);
+  const meetingsQuery = useMeetings(workspaceId);
+  const notesQuery = useNotes(workspaceId);
+  const projectsQuery = useProjects(workspaceId);
+
+  const inboxCount = useMemo(() => {
+    const items = inboxQuery.data?.items ?? [];
+    return items.filter((it) => !it.isProcessed).length;
+  }, [inboxQuery.data]);
+
+  const actionsDue = useMemo<ActionDueEntry[]>(() => {
+    const actions = actionsQuery.data?.items ?? [];
+    const projects = projectsQuery.data?.items ?? [];
+    const projectNameById = new Map(projects.map((p) => [p.id, p.title]));
+
+    return actions
+      .filter((a: ActionItem) => a.status === "todo")
+      .slice(0, ACTIONS_LIMIT)
+      .map((a) => ({
+        id: a.id,
+        title: a.title,
+        projectName: a.projectId
+          ? projectNameById.get(a.projectId) ?? "—"
+          : "—",
+      }));
+  }, [actionsQuery.data, projectsQuery.data]);
+
+  const activities = useMemo<RecentActivity[]>(() => {
+    const entries: RecentActivity[] = [];
+
+    for (const m of meetingsQuery.data?.items ?? []) {
+      const raw = m.updatedAt ?? m.createdAt;
+      entries.push({
+        id: m.id,
+        type: "meeting",
+        title: m.title,
+        rawTime: raw,
+        timestamp: formatRelative(raw),
+      });
+    }
+    for (const n of notesQuery.data?.items ?? []) {
+      entries.push({
+        id: n.id,
+        type: "note",
+        title: n.title || "(제목 없음)",
+        rawTime: n.updatedAt,
+        timestamp: formatRelative(n.updatedAt),
+      });
+    }
+    for (const a of actionsQuery.data?.items ?? []) {
+      entries.push({
+        id: a.id,
+        type: "action",
+        title: a.title,
+        rawTime: a.updatedAt,
+        timestamp: formatRelative(a.updatedAt),
+      });
+    }
+
+    return entries
+      .sort(
+        (x, y) => new Date(y.rawTime).getTime() - new Date(x.rawTime).getTime(),
+      )
+      .slice(0, RECENT_LIMIT);
+  }, [meetingsQuery.data, notesQuery.data, actionsQuery.data]);
+
+  const isReady =
+    !!workspaceId &&
+    !inboxQuery.isLoading &&
+    !actionsQuery.isLoading &&
+    !meetingsQuery.isLoading &&
+    !notesQuery.isLoading;
+
+  const hasContent =
+    inboxCount > 0 ||
+    actionsDue.length > 0 ||
+    activities.length > 0 ||
+    (meetingsQuery.data?.total ?? 0) > 0 ||
+    (notesQuery.data?.total ?? 0) > 0;
+
   return (
     <div className="px-6 py-8 overflow-y-auto max-w-3xl mx-auto">
-      {/* 환영 메시지 */}
       <h1
         className="text-2xl font-bold mb-6"
         style={{
@@ -419,25 +427,21 @@ export function TodayFeed({ isEmpty = false }: TodayFeedProps) {
         오늘의 Kairos
       </h1>
 
-      {isEmpty ? (
-        /* ─── 온보딩 (데이터 없을 때) ─── */
+      {!isReady ? (
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          불러오는 중...
+        </p>
+      ) : !hasContent ? (
         <OnboardingBanner />
       ) : (
-        /* ─── 일반 피드 ─── */
         <div className="space-y-4">
-          {/* Inbox 미분류 알림 */}
-          {MOCK_INBOX && <InboxCard count={MOCK_INBOX.count} />}
-
-          {/* 오늘 마감 액션 */}
-          <ActionsDueList actions={MOCK_ACTIONS_DUE} />
-
-          {/* 새 인사이트 */}
-          <InsightsCard insights={MOCK_INSIGHTS} />
-
-          {/* 최근 활동 요약 */}
-          <RecentActivityList activities={MOCK_ACTIVITIES} />
+          {inboxCount > 0 && <InboxCard count={inboxCount} />}
+          <ActionsDueList actions={actionsDue} />
+          <InsightsCard />
+          <RecentActivityList activities={activities} />
         </div>
       )}
     </div>
   );
 }
+

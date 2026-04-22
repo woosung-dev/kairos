@@ -7,6 +7,7 @@ import { useWorkspaceStore } from "@/features/workspaces/store";
 import { useRagStream } from "@/features/rag/hooks";
 import { useUIStore } from "@/store/ui";
 import { EmptyState } from "@/components/empty-state";
+import { TodayFeed } from "@/features/home/components/today-feed";
 import { Mic, FileText, Inbox, FolderOpen } from "lucide-react";
 
 function CreateWorkspaceDialog({
@@ -97,13 +98,16 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="px-6 py-8 overflow-y-auto">
-      <h1 className="text-2xl font-bold mb-6" style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}>무엇이든 질문하세요</h1>
+    <div className="overflow-y-auto">
+      <TodayFeed workspaceId={currentWid} />
 
-      <button onClick={toggleCmdK} className="w-full flex items-center justify-between px-4 py-3 rounded border text-sm transition-colors mb-10" style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text-muted)", borderRadius: "var(--radius-md)" }}>
-        <span>검색하거나 질문 입력...</span>
-        <kbd className="px-2 py-0.5 rounded text-[10px]" style={{ background: "var(--surface-active)", borderRadius: "var(--radius-sm)", fontFamily: "var(--font-mono)" }}>⌘K</kbd>
-      </button>
+      <div className="px-6 pb-8 max-w-3xl mx-auto">
+        <h2 className="text-lg font-bold mb-4" style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}>무엇이든 질문하세요</h2>
+
+        <button onClick={toggleCmdK} className="w-full flex items-center justify-between px-4 py-3 rounded border text-sm transition-colors mb-10" style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text-muted)", borderRadius: "var(--radius-md)" }}>
+          <span>검색하거나 질문 입력...</span>
+          <kbd className="px-2 py-0.5 rounded text-[10px]" style={{ background: "var(--surface-active)", borderRadius: "var(--radius-sm)", fontFamily: "var(--font-mono)" }}>⌘K</kbd>
+        </button>
 
       <div className="mb-10">
         <h2 className="text-sm font-semibold mb-4 uppercase tracking-wider" style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}>추천 질문</h2>
@@ -126,6 +130,7 @@ export default function DashboardPage() {
             </Link>
           ))}
         </div>
+      </div>
       </div>
 
       <CreateWorkspaceDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} />
