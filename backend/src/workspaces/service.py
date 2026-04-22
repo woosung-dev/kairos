@@ -4,9 +4,12 @@ import uuid
 
 from src.auth.repository import UserRepository
 from src.common.exceptions import NotFoundError
+from src.projects.models import Project
+from src.projects.repository import ProjectRepository
 from src.workspaces.exceptions import MemberAlreadyExistsError, WorkspaceNotFoundError
 from src.workspaces.models import Workspace, WorkspaceMember
 from src.workspaces.repository import WorkspaceRepository
+from src.workspaces.templates import DEFAULT_TEMPLATE_PROJECTS
 
 
 class WorkspaceService:
@@ -14,14 +17,16 @@ class WorkspaceService:
         self,
         repo: WorkspaceRepository,
         user_repo: UserRepository,
+        project_repo: ProjectRepository,
     ) -> None:
         self.repo = repo
         self.user_repo = user_repo
+        self.project_repo = project_repo
 
     async def create_workspace(
         self, name: str, owner_id: uuid.UUID
     ) -> dict:
-        """워크스페이스 생성. 생성자를 owner 멤버로 자동 추가."""
+        """워크스페이스 생성. owner 멤버 + 기본 템플릿 프로젝트를 자동 시딩."""
         workspace = Workspace(name=name, owner_id=owner_id)
         workspace = await self.repo.save(workspace)
 
@@ -32,6 +37,20 @@ class WorkspaceService:
             role="owner",
         )
         await self.repo.add_member(member)
+
+        # 빈 화면 마찰 제거 — 기본 템플릿 프로젝트 시딩
+        for template in DEFAULT_TEMPLATE_PROJECTS:
+            project = Project(
+                workspace_id=workspace.id,
+                title=template.title,
+                description=template.description,
+                tags=list(template.tags),
+                sort_order=template.sort_order,
+                created_by_id=owner_id,
+            )
+            await self.project_repo.save(project)
+
+        # 동일 session을 공유하므로 repo 한 곳에서만 commit
         await self.repo.commit()
 
         return {

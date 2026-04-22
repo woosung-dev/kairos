@@ -46,7 +46,14 @@
 
 ## In Progress
 
-- [/] 랜딩 페이지 QA — 다크 모드 하이드레이션 수정 중
+- (없음 — 다음 Next Actions 참조)
+
+## Recently Completed (온보딩 직전 릴리즈 스프린트)
+
+- [x] 랜딩 페이지 다크 모드 하이드레이션 수정 — `(landing)` · `(app)` · `(auth)` 라우트 그룹 분리 (커밋 `13d5041`, `117f920`)
+- [x] Smart Inbox · 회의 상세 3뷰 · 프로젝트 대시보드 실 API 훅 전환 (커밋 `13d5041`)
+- [x] Today 피드 mock→실 API 전환 + Dashboard 상단 병합 (커밋 `d8a6d27`)
+- [x] 온보딩 템플릿 프로젝트 자동 시딩 — `create_workspace()` 가 🚀 시작하기 · 💡 아이디어 · 📋 회의록 3개 프로젝트 자동 생성 + OnboardingBanner 안내 개편 (이번 커밋)
 - [x] 문서 정합성 통합 정리 (ADR-006 기준 전체 문서 정렬)
   - [x] cross-domain-pipeline.md: Claude → Gemini 수정
   - [x] para-methodology.md: deprecated 배너 추가
@@ -76,10 +83,9 @@
 - [x] 프론트엔드 `.env.example` 생성
 - [x] Header 멤버 수 뱃지
 - [x] mutation 에러 toast 피드백
-- [ ] 랜딩 페이지 다크 모드 하이드레이션 수정 (route group 분리)
-- [ ] FE ↔ BE 연동 검증 — Smart Inbox, 회의 상세, 프로젝트 대시보드 실제 API 전환
-- [ ] 온보딩 템플릿 프로젝트 자동 생성 (백엔드 필요)
-- [ ] E2E 테스트 환경 구축
+- [ ] 사이드바 소스 트리 + Source Viewer 실 API 연동 (mock 잔재 제거 — 플랜 작업 3/3)
+- [ ] FE ↔ BE 실제 프로덕션 E2E 시나리오 검증 (업로드→STT→Inbox→프로젝트→RAG)
+- [ ] E2E 테스트 환경 구축 (Playwright)
 - [ ] 내보내기 포맷 PDF (향후)
 - [ ] Sprint 6 계획 (프로젝트 멤버십 + Private 프로젝트)
 - [ ] 각 도메인 페이지 CRUD 버튼 세밀 역할 분기 (Member vs Admin)

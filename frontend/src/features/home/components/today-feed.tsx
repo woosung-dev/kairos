@@ -10,6 +10,7 @@ import {
   FileText,
   ArrowRight,
   GraduationCap,
+  FolderOpen,
 } from "lucide-react";
 import { useInbox } from "@/features/inbox/hooks";
 import { useActionItems } from "@/features/actions/hooks";
@@ -97,19 +98,32 @@ function OnboardingBanner() {
             className="text-xs leading-relaxed"
             style={{ color: "var(--text-secondary)" }}
           >
-            샘플 데이터로 RAG 기반 지식 검색을 체험해보세요.
-            회의를 녹음하거나 메모를 작성하면 AI가 자동으로 정리합니다.
+            사이드바의 <strong>🚀 시작하기</strong> · <strong>💡 아이디어</strong> · <strong>📋 회의록</strong> 프로젝트에서 바로 시작할 수 있습니다.
+            회의를 녹음하거나 메모를 작성하면 AI가 자동으로 요약·액션·태그를 붙입니다.
           </p>
         </div>
       </div>
 
       <div className="flex items-center gap-2 mb-3">
         <Link
-          href="/new"
+          href="/projects"
           className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium transition-colors cursor-pointer"
           style={{
             background: "var(--accent)",
             color: "var(--background)",
+            borderRadius: "var(--radius-sm)",
+            minHeight: 36,
+          }}
+        >
+          <FolderOpen size={14} />
+          프로젝트 둘러보기
+        </Link>
+        <Link
+          href="/new"
+          className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium border transition-colors cursor-pointer"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--text-secondary)",
             borderRadius: "var(--radius-sm)",
             minHeight: 36,
           }}
