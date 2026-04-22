@@ -45,11 +45,14 @@ class MeetingService:
         workspace_id: uuid.UUID,
         page: int = 1,
         page_size: int = 20,
+        project_id: uuid.UUID | None = None,
     ) -> dict:
-        """워크스페이스 회의 목록 (페이지네이션)."""
+        """워크스페이스 회의 목록 (페이지네이션, project_id 필터 옵션)."""
         offset = (page - 1) * page_size
-        meetings = await self.repo.find_by_workspace(workspace_id, offset, page_size)
-        total = await self.repo.count_by_workspace(workspace_id)
+        meetings = await self.repo.find_by_workspace(
+            workspace_id, offset, page_size, project_id
+        )
+        total = await self.repo.count_by_workspace(workspace_id, project_id)
 
         return {
             "items": [self._to_list_item(m) for m in meetings],

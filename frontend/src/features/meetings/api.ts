@@ -10,7 +10,8 @@ import type {
 
 export const meetingKeys = {
   all: ["meetings"] as const,
-  list: (wid: string) => [...meetingKeys.all, "list", wid] as const,
+  list: (wid: string, projectId?: string) =>
+    [...meetingKeys.all, "list", wid, projectId ?? "all"] as const,
   detail: (wid: string, id: string) =>
     [...meetingKeys.all, "detail", wid, id] as const,
   status: (wid: string, id: string) =>
@@ -20,10 +21,14 @@ export const meetingKeys = {
 export async function fetchMeetings(
   token: string,
   wid: string,
-  page = 1
+  page = 1,
+  projectId?: string,
 ): Promise<PaginatedResponse<Meeting>> {
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  if (projectId) params.set("projectId", projectId);
   return apiClient<PaginatedResponse<Meeting>>(
-    `/workspaces/${wid}/meetings?page=${page}`,
+    `/workspaces/${wid}/meetings?${params.toString()}`,
     { token }
   );
 }
