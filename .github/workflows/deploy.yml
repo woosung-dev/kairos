@@ -69,7 +69,7 @@ jobs:
             --min-instances 0 \
             --max-instances 3 \
             --allow-unauthenticated \
-            --set-env-vars="APP_ENV=production,LOG_LEVEL=INFO,CORS_ORIGINS=${{ secrets.CORS_ORIGINS }},FRONTEND_URL=${{ secrets.FRONTEND_URL }}" \
+            --set-env-vars="^|^APP_ENV=production|LOG_LEVEL=INFO|CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}|FRONTEND_URL=${{ secrets.FRONTEND_URL }}" \
             --set-secrets="DATABASE_URL=database-url:latest,CLERK_SECRET_KEY=clerk-secret-key:latest,CLERK_WEBHOOK_SECRET=clerk-webhook-secret:latest,R2_ACCOUNT_ID=r2-account-id:latest,R2_ACCESS_KEY_ID=r2-access-key-id:latest,R2_SECRET_ACCESS_KEY=r2-secret-access-key:latest,R2_BUCKET_NAME=r2-bucket-name:latest,GEMINI_API_KEY=gemini-api-key:latest,OPENAI_API_KEY=openai-api-key:latest" \
             --quiet
 
