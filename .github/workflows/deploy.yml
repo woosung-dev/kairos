@@ -78,9 +78,9 @@ jobs:
           set -euo pipefail
           URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.GCP_REGION }} --format="value(status.url)")
           for i in 1 2 3 4 5; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${URL}/docs")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${URL}/api/v1/docs")
             if [ "$STATUS" = "200" ]; then
-              echo "✅ $URL/docs → 200 (attempt $i)"
+              echo "✅ $URL/api/v1/docs → 200 (attempt $i)"
               exit 0
             fi
             echo "⏳ attempt $i: got $STATUS, retrying in 10s"
