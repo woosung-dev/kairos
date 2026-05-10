@@ -30,8 +30,14 @@
 ## 3. AI 행동 지침
 
 ### Context Sync
-새 태스크 시작 시 `CLAUDE.md` (또는 `AGENTS.md`) + `docs/README.md`를 먼저 읽어
-전체 아키텍처와 현재 작업 컨텍스트를 파악한다.
+새 태스크 시작 시 다음 순서로 읽어 전체 아키텍처와 현재 작업 컨텍스트를 파악한다.
+
+1. `CONTEXT-MAP.md` (헌법 — 도메인 경계 + 핵심 불변식)
+2. `AGENTS.md` (이 문서, 개발 원칙)
+3. `DESIGN.md` (디자인 시스템)
+4. 작업 도메인의 `CONTEXT.md` (예: `backend/src/meetings/CONTEXT.md`)
+5. `docs/README.md` (상세 문서 색인)
+6. `docs/TODO.md` (현재 상태)
 
 ### Plan Before Code
 코드 작성 전 "어떤 설계 문서를 참고했고, 어떤 방향으로 수정할 것인지" 짧게 브리핑한다.
@@ -68,7 +74,7 @@
 
 ## 4. 개발 워크플로우
 
-새로운 기능이나 주요 변경 사항은 아래 루프를 따른다:
+새로운 기능이나 주요 변경 사항은 아래 루프를 따른다: `.ai/templates/workflow.md` 참조.
 
 1. **계획 (Plan)** — 작업 범위와 영향 분석, 관련 규칙·설계 문서 참조
 2. **문서화 (Docs)** — 구현 계획을 `docs/` 적절한 위치에 작성
