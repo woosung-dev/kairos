@@ -15,6 +15,7 @@ class Project(SQLModel, table=True):
     title: str
     description: str | None = None
     status: str = "active"  # active | completed | archived
+    visibility: str = Field(default="public", index=True)  # public | draft | private
     tags: list[str] = Field(default_factory=list, sa_type=JSON)
     sort_order: int = 0
     created_by_id: uuid.UUID = Field(foreign_key="users.id")

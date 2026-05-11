@@ -18,6 +18,7 @@ class ProjectService:
         title: str,
         created_by_id: uuid.UUID,
         description: str | None = None,
+        visibility: str = "public",
         tags: list[str] | None = None,
     ) -> dict:
         """프로젝트 생성."""
@@ -26,6 +27,7 @@ class ProjectService:
             title=title,
             created_by_id=created_by_id,
             description=description,
+            visibility=visibility,
             tags=tags or [],
         )
         project = await self.repo.save(project)
@@ -68,6 +70,7 @@ class ProjectService:
         title: str | None = None,
         description: str | None = None,
         status: str | None = None,
+        visibility: str | None = None,
         tags: list[str] | None = None,
     ) -> dict:
         """프로젝트 수정."""
@@ -81,6 +84,8 @@ class ProjectService:
             project.description = description
         if status is not None:
             project.status = status
+        if visibility is not None:
+            project.visibility = visibility
         if tags is not None:
             project.tags = tags
 
@@ -141,6 +146,7 @@ class ProjectService:
             "title": project.title,
             "description": project.description,
             "status": project.status,
+            "visibility": project.visibility,
             "tags": project.tags,
             "sortOrder": project.sort_order,
             "createdById": str(project.created_by_id),
