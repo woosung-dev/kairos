@@ -140,7 +140,7 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 ### 약점 인정 + 검증 시그널
 
 - 단기(L4 구현 전, ~Sprint 10 추정)는 M1+M2+M3 中 셋이 차별 anchor. 가치 제안 단기 약함 — ChatGPT memory 누적 격차 risk.
-- Thesis 전제 미충족: L4(ADR-007 Phase 4 예정) + 멤버십·visibility(D-1 미구현) 두 미구현 전제에 thesis 동시 걸림.
+- Thesis 전제 미충족: L4(ADR-007 Phase 4 예정)만 남음. ~~멤버십·visibility(D-1 미구현)~~ **[해소 Sprint 6, 2026-05-11 PR #12]** — Project.visibility 컬럼 + ProjectMember 엔티티 + visibility 권한 분기 모두 구현. ADR-014 옵션 A로 orchestrator 경계까지 정합.
 - 검증: Sprint 7+ 외부 인터뷰 응답자의 ≥60%가 "통합 도구로 대체 어려움" 답변 시 thesis 1차 검증 (ADR-010 AD-8, ADR-009 S5와 동일 임계값).
 
 ---

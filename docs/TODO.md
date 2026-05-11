@@ -48,6 +48,25 @@
 
 - (없음 — 다음 Next Actions 참조)
 
+## Recently Completed — Sprint 6 멤버십 + Private 프로젝트 (2026-05-11, PR #12 머지)
+
+- [x] **Sprint 6 — 멤버십 + Private 프로젝트** (ADR-009 F1 + ADR-014 옵션 A 적용, 11 commits)
+  - [x] BE-T1~T3 Project.visibility 컬럼 + 마이그레이션 c4c5709a4ab4 (commit e779541)
+  - [x] BE-T5~T8 + T15 ProjectMember 엔티티 + 마이그레이션 754f571d5544 + visibility 권한 분기 (commit cecc888)
+  - [x] BE-T9~T14 notes/rag pipeline_service 도입 — D-2/D-3 부채 해소 1차 (commit 8096314)
+  - [x] BE-T17~T19 WorkspaceInvite default_project_visibility + 마이그레이션 2d128def6779 (commit 05957c8)
+  - [x] V-T1 backend test 회귀 fix (commit d5b325d, 65 passed)
+  - [x] T-CONST-1 + T-CONST-2 헌법 §4.2/§7 갱신 + ADR-009 F8 closeout (commit 12f031b)
+  - [x] FE-T1/T2a/T2b/T3/T5 visibility 배지 + 변경 모달 + 초대 default visibility (commit 575c613, 시안 1A+1C / 3A)
+  - [x] FE-T4 Project 멤버 관리 패널 (commit 9a975e7, 시안 2A inline 단순화)
+  - [x] FE-T7 RAG 검색 Private 자동 제외 안내 (commit 6e3f87f)
+  - [x] **ADR-014 신설** (`docs/dev-log/014-service-boundary.md`) — service-to-service 경계 정책 (commit 038fe37, PR #11)
+  - [x] **F10 closeout patch** — ADR-011 §1을 PERSONA- 접두사 권위 출처로 확정 (commit 589a1aa, PR #10)
+  - [x] **docs Atomic Update retrofit** (commit b1b24a4) — Critical 5 + High 3 = 8 문서 동기화 (per-context CONTEXT.md + ERD + endpoints + cross-domain-pipeline + rag-pipeline + directory-map)
+
+**Sprint 6 자의 결정 라벨**: AD-19~35 (`/Users/woosung/.claude/plans/sprint-6-vivid-clarke.md` §5 + ADR-014 §"자의 결정")
+**시안 산출물**: `~/.gstack/projects/woosung-dev-kairos/designs/sprint-6-visibility-20260511/` (9 PNG + design-board.html + approved.json)
+
 ## Recently Completed — Phase A (Stage 0 헌법 retrofit, 2026-05-11)
 
 - [x] **Phase A — Stage 0 헌법 retrofit** (커밋 `cea0be9`) — 워크플로우 `.ai/templates/workflow.md` Stage 0 retrofit 완료.
@@ -103,10 +122,20 @@
 - [ ] Clerk testing mode 계정 생성 + GitHub `E2E_*` Secrets 등록 (E2E 활성화)
 - [ ] FE ↔ BE 실제 프로덕션 E2E 시나리오 검증 (신규 계정 → 템플릿 프로젝트 3개 확인 → 업로드 → STT → Inbox → 프로젝트 → RAG → `[1]` 클릭 → Source Viewer 풀콘텐츠 렌더)
 
-### Sprint 6 진입 (Phase B Stage 1 retrofit 완료 후 정식 워크플로우 사이클 복귀)
+### Sprint 6 잔여 (sprint 7+ 보류, AD-32~35)
 
-- [ ] **Sprint 6 — 멤버십 + Private 프로젝트** (ADR-009 F1) — D-1 visibility 구현, WorkspaceMember 권한 분기, Private 프로젝트.
-- [ ] 각 도메인 페이지 CRUD 버튼 세밀 역할 분기 (Member vs Admin)
+- [ ] **AD-32** BE-T16 Project update 권한 강화 — 현재 require_member 유지 결정. creator-only 또는 admin 강화 필요 시 sprint 7+ 검토 (협업 마찰 우려).
+- [ ] **AD-33** ProjectMember 추가 cross-workspace 차단 — sprint 6 1차 미구현. V-T2 시나리오 3 검증 시 발견되면 patch.
+- [ ] **AD-34** FE RBAC 정밀 분기 — visibility 변경 버튼이 모든 멤버에 활성 + BE-T15 403 위임 (1차). useUser+useMembers 매칭으로 정밀화 = sprint 7+ design-review.
+- [ ] **AD-35** Playwright E2E (V-T2) + schemathesis (V-T4) + RAG 권한 누설 E2E (V-T5) — sprint 7+ devex-review와 묶음.
+- [ ] **사용자 수동 dogfooding** (PR #12 머지 직후) — 2 워크스페이스 × 3 visibility(public/draft/private) × 4 role(viewer/member/admin/owner) 매트릭스 클릭. 발견 issue → small patch.
+
+### Sprint 6 후속 docs (Medium 보류 4개 중 1개 완료)
+
+- [x] **T-CONST-3** TODO.md Sprint 6 완료 마크 (본 patch)
+- [ ] docs/requirements/prd.md — Sprint 6 phase 표 업데이트 (다음 sprint 또는 별도 patch)
+- [ ] docs/requirements/second-brain.md §8 — visibility로 "개인↔팀 경계" 부분 해소 표기
+- [ ] AGENTS.md — visibility 도메인 용어 추가 (작음)
 
 ### Phase B Stage 1 retrofit 후속 (ADR-009 §"후속" F1~F10)
 
