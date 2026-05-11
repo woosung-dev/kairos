@@ -1,0 +1,112 @@
+<!-- Kairos 백엔드 전역 헌법 — FastAPI + SQLModel + 도메인 모듈러 + 오케스트레이터 -->
+
+# Backend CONTEXT (전역)
+
+> 루트 헌법: `/CONTEXT-MAP.md` 우선. 도메인별 상세는 `backend/src/<domain>/CONTEXT.md`.
+
+---
+
+## 1. 책임
+
+- REST API (FastAPI, async) + SSE 스트리밍 (RAG)
+- AI 파이프라인 조율 (STT / Gemini / OpenAI 임베딩)
+- DB 영속화 (Neon Postgres + pgvector)
+- 외부 스토리지 (Cloudflare R2)
+- Clerk JWT 검증
+
+## 2. 비책임
+
+- UI / 렌더링 (FE 책임)
+- 외부 인증 발급 (Clerk SaaS)
+
+---
+
+## 3. 레이어
+
+```
+Router    (router.py)         HTTP I/O — 입력 검증 + 응답 직렬화 (10줄 이하 가이드)
+   ↓
+Service   (service.py)        비즈니스 로직 — 단일 도메인 한정. AsyncSession import 금지
+   ↓
+Repository (repository.py)    데이터 접근 — AsyncSession 보유 유일층. commit()은 service 요청으로만
+   ↓
+Models    (models.py)         SQLModel 테이블
+
+Pipeline Service (pipeline_service.py)  ← 크로스 도메인 오케스트레이터 (도메인 안)
+External Service (services/*.py)        ← 외부 API wrapper (transcription, ai_processing)
+```
+
+---
+
+## 4. 도메인 모듈 12개
+
+| 모듈 | CONTEXT.md | 책임 요약 |
+|---|---|---|
+| auth | 전역 규칙만 (전용 CONTEXT.md 없음) | Clerk JWT 검증 + User 매핑. **prefix 예외**: `/api/v1/users` |
+| workspaces | 전역 규칙만 (전용 CONTEXT.md 없음) | Workspace + WorkspaceMember + WorkspaceInvite + `inbox_threshold` |
+| projects | `src/projects/CONTEXT.md` | Project CRUD, MeetingProjectLink, 태그, 인사이트 |
+| inbox | `src/inbox/CONTEXT.md` | Inbox 적재 + AI 분류 추천 |
+| meetings | `src/meetings/CONTEXT.md` | Meeting 인제스트, STT, 파이프라인 |
+| notes | 전역 규칙만 (전용 CONTEXT.md 없음) | Tiptap Note CRUD + 임베딩 위임 (현재 부채 §7 D-2) |
+| actions | `src/actions/CONTEXT.md` | ActionItem CRUD (nullable 부모) |
+| upload | 전역 규칙만 (전용 CONTEXT.md 없음) | R2 업로드 (presigned URL, aioboto3) |
+| embeddings | 전역 규칙만 (전용 CONTEXT.md 없음) | EmbeddingChunk + SemanticCache 저장/검색 (pgvector) |
+| rag | `src/rag/CONTEXT.md` | RAG 6-Layer + Gemini 답변 (SSE 스트리밍) |
+| common | — | database / r2 / pagination / exceptions / prompts |
+| core | — | config (pydantic-settings) |
+
+> `services/` 폴더는 외부 API wrapper: `transcription.py` (Whisper+pyannote), `ai_processing.py` (Gemini).
+
+---
+
+## 5. 핵심 불변식 (전역)
+
+> 헌법 §6과 정합. 백엔드 특화 보강 포함.
+
+| # | 불변식 | 강제 |
+|---|---|---|
+| B-1 | **AsyncSession은 Repository만 보유** — Service에 `from sqlalchemy.ext.asyncio import AsyncSession` 금지 | code review |
+| B-2 | **모든 Repository는 `workspace_id` 필터 강제** (멀티테넌시) | `.where(... .workspace_id == workspace_id)` |
+| B-3 | **크로스 도메인 트랜잭션은 `pipeline_service.py` 또는 `services/`** — 같은 session 공유, dependencies.py에서 조립. Repository 직접 read는 허용 (CONTEXT-MAP §4.2 #1) | code review |
+| B-4 | **AI 모델 고정**: Gemini `gemini-2.5-flash` | `core/config.py` |
+| B-5 | **임베딩 모델 고정**: OpenAI `text-embedding-3-small` (1536d), 청킹 512토큰/오버랩 50토큰 | `embeddings/service.py` |
+| B-6 | **프롬프트 중앙 관리**: `common/prompts.py` 상수만, 인라인 프롬프트 금지 | code review |
+| B-7 | **장기 작업**: `BackgroundTasks` + `202 Accepted` + `GET .../status` polling | `meetings/router.py` 패턴 |
+| B-8 | **트랜잭션 commit 원칙**: 같은 BackgroundTask 내 단일 commit이 이상. 진행 보고용 status 전이 commit은 현재 예외 (현재 부채 §7 D-9 — 단일 commit 리팩토링 vs 헌법 명시 결정 보류) | `pipeline_service.py` |
+| B-9 | **Pydantic V2**: `.dict()` 대신 `.model_dump()`, `@root_validator` 대신 `@model_validator(mode="after")`, `BaseSettings`는 `pydantic_settings`에서 import | code review |
+| B-10 | **100% async**: `session.exec()` 금지, `await session.execute(select(...))` + `.scalars().all()` / `.scalar_one_or_none()`, N+1 방지 `options(selectinload(...))` | code review |
+| B-11 | **Secret은 `SecretStr`**: 사용 시 `.get_secret_value()` | `core/config.py` |
+| B-12 | **에러는 도메인별 `exceptions.py` + 전역 핸들러** (`common/exceptions.py`) | 도메인 모듈마다 |
+| B-13 | **R2 클라이언트는 aioboto3** (boto3 동기 사용 금지). 불가피한 경우 `run_in_executor` | `common/r2.py` |
+| B-14 | **SSE 스트리밍 응답**: `EventSourceResponse` (`sse_starlette.sse`) — 내부적으로 `text/event-stream` 헤더, `data:` 포맷. `StreamingResponse` 직접 사용하지 않음 (RAG에서 사용) | `rag/router.py:6,40` |
+
+---
+
+## 6. API 컨벤션
+
+- **Prefix 강제 (I-13)**: `/api/v1/workspaces/{workspace_id}/<resource>`
+  - 예외: `auth → /api/v1/users`, `workspaces 루트 → /api/v1/workspaces` (워크스페이스 자체 CRUD)
+  - 리소스 이름은 케밥 케이스 (`action-items`, 단일어는 그대로 `inbox`/`meetings`/`notes`)
+- Status code: 생성 201, 비동기 인제스트 202, 삭제 204
+- 페이지네이션: `common/pagination.py` 표준
+- 인증: 모든 엔드포인트는 Clerk JWT 검증 (auth dependency)
+- **응답 직렬화 (I-16)**: DB snake_case → API camelCase Pydantic alias 변환 (`schemas.py` 책임)
+- 권한: `require_admin` / `require_member` 데코레이터 또는 dependency로 명시 (특히 archive/delete)
+
+---
+
+## 7. 환경
+
+- Python 3.12+, FastAPI, SQLModel, asyncpg, pgvector
+- 패키지 매니저: `uv`
+- 비동기 100% (sync 코드 금지)
+- 외부: Clerk, Gemini, OpenAI, Whisper API, Cloudflare R2, Neon Postgres
+- 상세 규칙: `.ai/stacks/fastapi/backend.md`
+
+---
+
+## 8. 마이그레이션 (Alembic)
+
+- `models.py` 변경 시 반드시 Alembic 마이그레이션 생성 + 커밋 포함
+- 프로덕션 배포 entrypoint에서 `alembic upgrade head` 자동 실행
+- 컬럼 삭제는 2단계 배포 (사용 중단 → 다음 배포에서 삭제)

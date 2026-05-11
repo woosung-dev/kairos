@@ -55,10 +55,45 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 ## 2. 타겟 유저
 
 - **주요:** 사내 전체 직원 (부서 간 협업 프로젝트 진행자)
-- **핵심 페르소나:**
+- **카테고리 라벨:**
   - 매주 3~5회 회의를 주도하는 팀 리더
   - 여러 프로젝트를 동시에 관리하는 PM
   - 과거 의사결정 맥락을 자주 다시 찾아야 하는 구성원
+
+### 페르소나 명세 (1차, Sprint 7+ 인터뷰 후 갱신)
+
+상세는 `docs/requirements/personas.md` 참조. 정의 정책은 ADR-011 (`docs/dev-log/011-persona-definition.md`).
+
+| ID | 이름 (가명) | 역할 | 상태 | 1순위 wedge |
+|---|---|---|---|---|
+| **PERSONA-001** | WS | 1인 풀스택 founder + product owner | `self-confirmed` (도그푸딩 1명, 강도 약함) | W3 (프로젝트 RAG Q&A) |
+| **PERSONA-002** | 김PM | 30대 IT PM, 5-8명 팀 리더 | `[가설]` | W1 (회의 요약·액션 추출) |
+| **PERSONA-003** | 박PM | 40대 컨설팅/에이전시 PM, 3-5개 프로젝트 동시 | `[가설]` | W3 (프로젝트 RAG Q&A) |
+
+> **Wedge 분화 점검**: W3 (PERSONA-001/003 1순위) + W1 (PERSONA-002 1순위) — 1순위 2개로 분화. 3명 모두 W3가 1-2순위 우선 → Sprint 7+ 외부 demand 시그널(ADR-009 S5/S6) ≥60% 집중 시 wedge 우선화 ADR(ADR-009 F6) 트리거.
+
+> **갱신 정책**: PERSONA-002~003 `[가설]`은 Sprint 7+ 외부 인터뷰 5-10명 결과 ADR-011 §4-b (≥60% 응답자가 7필드 중 ≥3개 불일치) 트리거 시 `deprecated` + 신규 페르소나 대체, 미만이면 `interview-confirmed` 전환.
+
+---
+
+## 2.5. 경쟁 분석 (Status Quo)
+
+상세는 `docs/requirements/competitive-analysis.md` 참조. ADR-009 §2 Q2 보강 + ADR-010 thesis moat 검증 입력.
+
+| # | 서비스 `[전부 확인 필요]` | 1줄 요약 | Kairos wedge 매칭 |
+|---|---|---|---|
+| C1 | **Otter** | 실시간 회의 STT + AI 요약 + Slack/Zoom 통합 | W1 직접 경쟁 |
+| C2 | **Granola** | macOS native 회의 요약 (시스템 오디오) | W1 경쟁 (ADR-010 T3 양쪽 등장, AD-17) |
+| C3 | **Reflect** | 노트 + AI 검색 + 백링크 그래프 | W4 경쟁 |
+| C4 | **Mem** | AI 자동 분류 노트 + RAG Q&A | W3 + M2 경쟁 |
+| C5 | **Tana** | 노트 + 데이터베이스 + 슈퍼태그 + AI Q&A | M3 + W3 경쟁 |
+
+**Kairos 차별점 (ADR-010 thesis moat M1~M4 정렬)**:
+
+- **M1 계층 RAG** (中, 단독 약함) — Tana만 워크스페이스 범위 AI Q&A, 계층 청킹·6-Layer·1536d 임베딩·Semantic Cache 깊이는 Kairos 우위.
+- **M2 자동 Inbox** (中) — Mem과 **직접 경쟁** (Mem도 AI 자동 분류). 차별 anchor = `workspace.inbox_threshold` 0.9 (I-10) + 사용자 행동 시그널 S4 80%.
+- **M3 CODE 통합** (中) — Tana가 가장 근접 위험. Capture+Organize+Distill L2+Express 일관성 우위이나 모방 risk 높음.
+- **M4 L4 조직 인사이트** (강, 잠재 — **미구현 timeline risk**) — 5개 경쟁자 누구도 L4 영역 진입 X (단일 사용자·단일 워크스페이스 단기 범위).
 
 ---
 
@@ -72,6 +107,41 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 | "어디 있더라?" 검색 | RAG: 자연어 질문 → 하이브리드 검색 + 소스 신선도 표시 |
 | 새 팀원 = 몇 주간 맥락 파악 | RAG에 "이 프로젝트 배경이 뭐야?" 질문 → 즉시 답변 |
 | 개인 머릿속 암묵지 | 개인 지식 → 팀 승격 → 조직 자산으로 복리 축적 |
+
+---
+
+## 3.5. Future-Fit Thesis (3-year vision)
+
+상세는 ADR-010 (`docs/dev-log/010-future-fit-thesis.md`) 참조.
+
+### Thesis (1줄)
+
+> **"Kairos는 팀의 시간 위에 누적된 조직 인사이트(L4, ADR-007)로 일반 AI 도구와 차별화한다. 단일 사용자 컨텍스트가 아닌 워크스페이스 단위 시간 누적이 moat이며, 자동화된 Inbox + 계층 청킹 RAG가 그 누적을 가능하게 한다."**
+
+### 위협 시나리오 (통합 도구 흡수 risk) `[전부 가설]`
+
+| # | 위협 | 도래 시점 [가설] |
+|---|---|---|
+| T1 | **ChatGPT** (memory + Projects 확장으로 팀 단위 RAG) | 12~24개월 |
+| T2 | **Notion AI** (워크스페이스 안 회의·RAG·인사이트 통합) | 6~12개월 |
+| T3 | **Granola** (회의 single-purpose → RAG·외부 연동 확장) | 6~18개월 |
+
+> 도래 시점 추정 근거는 ADR-010 §"위협 시나리오" 표 아래 단락 — 모두 외부 검증 전 `[가설]`. `competitive-analysis.md` 후속 보강(B2: 공식 문서 WebFetch)으로 출처 라벨 해제 예정.
+
+### Moat 4개 + 강도
+
+| Moat | 강도 |
+|---|---|
+| **M1** 계층 청킹 + 프로젝트 단위 RAG (L1/L2, 1536d, Semantic Cache TTL 7일·0.93) | **中** (단독 약함, 청킹 전략 공개 기술) |
+| **M2** 자동화된 Inbox (`workspace.inbox_threshold` 기본 0.9, I-10) | **中** (메커니즘 모방 가능, 차별은 누적 품질) |
+| **M3** CODE 가치 흐름 통합 (Capture→Organize→Distill→Express 일관) | **中** (일관성 자체가 약점 — 모방 시 전환비용 낮음) |
+| **M4** L4 조직 인사이트 (ADR-007 Phase 4, **미구현**) — 워크스페이스 단위 격리(I-9) + 시간 누적 복리 | **강(잠재)** — 가장 강한 후보이나 timeline risk |
+
+### 약점 인정 + 검증 시그널
+
+- 단기(L4 구현 전, ~Sprint 10 추정)는 M1+M2+M3 中 셋이 차별 anchor. 가치 제안 단기 약함 — ChatGPT memory 누적 격차 risk.
+- Thesis 전제 미충족: L4(ADR-007 Phase 4 예정) + 멤버십·visibility(D-1 미구현) 두 미구현 전제에 thesis 동시 걸림.
+- 검증: Sprint 7+ 외부 인터뷰 응답자의 ≥60%가 "통합 도구로 대체 어려움" 답변 시 thesis 1차 검증 (ADR-010 AD-8, ADR-009 S5와 동일 임계값).
 
 ---
 
@@ -293,6 +363,46 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 - AI 액션 아이템 추출 정확도 **80% 이상** (사용자 체감)
 - RAG 질문 → 답변 스트리밍 시작까지 **2초 이내**
 - Phase 1~2 완료 후 내부 테스트 사용자 **5명 이상** 온보딩
+
+---
+
+## 7.5. Demand Signal Definition (Sprint 6+ 계획)
+
+상세는 ADR-009 §3 (`docs/dev-log/009-stage1-retrofit.md`) 참조. Q1(Demand) product-first 결정 + Sprint 6+ 후 demand 검증 정합.
+
+### Product-first 결정
+
+Sprint 6(멤버십+Private) 완료 후 demand 검증 시작. demand 시그널이 의미 있는 시점은 다음 3개 조건이 모두 충족된 후:
+
+1. Sprint 6 완료 (D-1 visibility 구현·WorkspaceMember 권한 분기 동작).
+2. 도그푸딩 사용자 ≥1명 (본인 + 핵심 사용자 1-2명) 1개월+ 사용.
+3. 외부 인터뷰 가이드 작성 (ADR-009 F3, `docs/requirements/interview-guide.md`).
+
+### Demand 시그널 6개 (S1~S6) 정량 임계값
+
+> 모두 임의 수치 (ADR-009 AD-14) — Sprint 6+ 실측 후 조정 가능.
+
+| 시그널 | 측정 대상 | 임계값 | 측정 시점 | Moat cross-link |
+|---|---|---|---|---|
+| **S1** | DAU (도그푸딩 사용자) | ≥1명 (본인 제외, 1개월+ 지속) | Sprint 6 완료 후 | 1차 핵심 사용자 진입 |
+| **S2** | 회의 업로드 빈도 (사용자당) | 주 ≥2회 | Sprint 6 완료 후 | §3 Capture 정착 |
+| **S3** | RAG 질의 응답 만족도 | ≥70% | Sprint 6 완료 후 | §3 Express 정착, M1 검증 |
+| **S4** | Inbox 자동 분류 수용률 (수정·되돌리기 없는 비율) | ≥80% | Sprint 6 완료 후 | I-10 + M2 검증 (아래 두 임계값 분리 주의) |
+| **S5** | 외부 인터뷰 "통합 도구로 대체 어려움" 응답률 | ≥60% (Sprint 7+ 5-10명) | Sprint 7+ | M4 thesis 검증 |
+| **S6** | 페르소나-Wedge 매트릭스 분화 | PERSONA-001~003 1순위 wedge ≥2개 분화 | Sprint 7+ | ADR-011 §4-c hedge |
+
+> **S4 두 임계값 분리 주의**: I-10 `workspace.inbox_threshold` 0.9 = **AI confidence 자동 확정 임계값(메커니즘)**; S4 80% = 그렇게 자동 확정된 InboxItem 중 **사용자가 수정·되돌리기 없이 수용한 비율(행동 시그널)**. 두 임계값은 다른 측정 대상이며, S4 임계값 조정이 I-10 헌법 불변식 변경을 의미하지 않음.
+
+### 60% 임계값 통일 (ADR-010/011/009)
+
+ADR-010 AD-8(thesis PASS) / ADR-011 §4-b(페르소나 FAIL) / 본 S5(thesis PASS) — **측정 모집단**(Sprint 7+ 외부 인터뷰 5-10명 응답자)은 통일, **트리거 방향은 ADR별 다름**. 같은 응답이 ADR-010 PASS 시그널인 동시에 ADR-011 폐기 시그널일 수 있음.
+
+### 시그널 충족 후 (ADR-009 §3 시그널 해석 정책 정합)
+
+- **S1~S6 모두 PASS**: "demand 검증 완료" 선언 → 별도 ADR로 기록 (ADR-009 후속 F4/F6/F7 연동).
+- **S5 미달 (Sprint 7+ 외부 인터뷰 ≥60% "통합 도구 대체 어려움" 답변률 미달)**: ADR-010 thesis 조정(supersedes 또는 갱신 PR) + ADR-011 §4-b 트리거로 PERSONA-002~003 `deprecated` 또는 wedge 재정의.
+- **S1~S4 미달 (Sprint 6+ 행동 시그널)**: 도그푸딩 시나리오 재설계 + Sprint 6 산출 재검토. ADR-010 thesis 즉시 갱신은 불요(외부 시장 시그널이 아니라 내부 사용 시그널이므로 thesis 직접 영향 X).
+- **S6 미달 (페르소나-Wedge 분화 부재)**: ADR-011 §4-c hedge 트리거 — 페르소나 재정의 vs wedge 우선화 ADR(F6) 신규 분기 결정.
 
 ---
 
