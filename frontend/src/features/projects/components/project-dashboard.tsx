@@ -31,6 +31,7 @@ import type { ActionItem, ActionStatus } from "@/features/actions/types";
 import type { Meeting } from "@/features/meetings/types";
 import type { Note } from "@/features/notes/types";
 import { EditProjectDialog } from "./edit-project-dialog";
+import { ProjectMembersPanel } from "./project-members-panel";
 import { VisibilityBadge } from "./visibility-badge";
 import { VisibilityChangeDialog } from "./visibility-change-dialog";
 
@@ -273,6 +274,15 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
             )}
           </div>
         </div>
+      )}
+
+      {wid && (
+        <ProjectMembersPanel
+          workspaceId={wid}
+          projectId={projectId}
+          visibility={project.visibility}
+          canManage={canManage}
+        />
       )}
 
       {/* 관리 컨트롤 다이얼로그 */}
