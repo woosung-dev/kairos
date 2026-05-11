@@ -7,6 +7,7 @@ import { useWorkspaceStore } from "@/features/workspaces/store";
 
 import { useProject, useUpdateProject } from "../hooks";
 import type { ProjectVisibility } from "../types";
+import { ProjectMembersPanel } from "./project-members-panel";
 import { VisibilityBadge } from "./visibility-badge";
 import { VisibilityChangeDialog } from "./visibility-change-dialog";
 
@@ -189,6 +190,15 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
         description="회의, 노트, 자료를 추가하면 여기에 표시됩니다"
         action={{ label: "콘텐츠 추가", href: "/new" }}
       />
+
+      {/* Sprint 6 FE-T4: Project 멤버 관리 패널 (시안 2A 단순화) */}
+      {project && activeWorkspaceId && (
+        <ProjectMembersPanel
+          workspaceId={activeWorkspaceId}
+          projectId={projectId}
+          visibility={project.visibility}
+        />
+      )}
 
       {/* Sprint 6 FE-T2b: visibility 변경 모달 (시안 1C) */}
       {project && (
