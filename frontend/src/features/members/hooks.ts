@@ -58,6 +58,24 @@ export function useMembers(wid: string | undefined) {
   });
 }
 
+export function useWorkspaceRole(workspaceId: string | undefined) {
+  const { user } = useUser();
+  const { data: members } = useMembers(workspaceId);
+
+  // useSyncWorkspaceRole과 동일하게 email 기반 매칭
+  const role =
+    members?.find(
+      (m) => m.email === user?.primaryEmailAddress?.emailAddress
+    )?.role ?? null;
+
+  return {
+    role,
+    isOwner: role === "owner",
+    isAdmin: role === "admin" || role === "owner",
+    canManage: role === "admin" || role === "owner",
+  };
+}
+
 export function useUpdateMemberRole(wid: string | undefined) {
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
