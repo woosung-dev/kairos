@@ -44,5 +44,5 @@ class MeetingSummary(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     meeting_id: uuid.UUID = Field(foreign_key="meetings.id", unique=True)
     summary: str
-    key_decisions: dict = Field(default_factory=list, sa_type=JSON)
-    topics: dict = Field(default_factory=list, sa_type=JSON)
+    key_decisions: list = Field(default_factory=list, sa_type=JSON)
+    topics: list = Field(default_factory=list, sa_type=JSON)

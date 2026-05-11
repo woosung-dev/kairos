@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-05-11
+> 마지막 업데이트: 2026-05-12
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조
 
@@ -43,6 +43,12 @@
   - [x] Inbox 신뢰도 임계값 설정 UI (프리셋 70/80/90/95%)
   - [x] 내보내기 포맷 MD/JSON (회의/노트)
   - [ ] 내보내기 포맷 PDF (향후 구현)
+
+## Recently Completed — Sprint 9 오디오 파이프라인 수리 (2026-05-12)
+
+- [x] **CRITICAL 버그 수정**: `MeetingPipelineService` BackgroundTask 세션 수명 버그 — request-scoped `AsyncSession`이 HTTP 응답 직후 닫혀 BackgroundTask가 실패하던 문제. `session_factory` 패턴으로 교체 (독립 세션 생성). `database.py` + `dependencies.py` + `pipeline_service.py` + `test_pipeline.py` 수정. 82 테스트 통과.
+- [x] **D-11 해소**: `MeetingSummary.key_decisions / topics` 타입 어노테이션 `dict` → `list` 수정 (`models.py`).
+- [x] **FE 폴링 수정**: `POLLING_STATUSES`에서 `"embedding"` 제거 (백엔드가 설정하지 않는 상태, `hooks.ts`).
 
 ## Recently Completed — Sprint 7 "guarded-doors" 잔여 (2026-05-11)
 
@@ -123,7 +129,7 @@
 
 ## Blocked
 
-- [ ] **오디오 업로드 파이프라인 불안정** — presigned URL 업로드 후 "uploading" 상태로 멈추는 버그. R2 CORS / 콜백 / STT 파이프라인 중 어딘가에서 실패. 인터뷰이-01 피드백 2026-05-12. 수정 전까지 음성 업로드 기능 사용 불가.
+(없음)
 
 ## 미구현 (요청됨)
 

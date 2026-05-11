@@ -38,3 +38,10 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
         raise RuntimeError("DB 엔진이 초기화되지 않았습니다. lifespan을 확인하세요.")
     async with _async_session_factory() as session:
         yield session
+
+
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    """BackgroundTasks용 세션 팩토리 반환. Depends()로 주입 가능."""
+    if _async_session_factory is None:
+        raise RuntimeError("DB 엔진이 초기화되지 않았습니다. lifespan을 확인하세요.")
+    return _async_session_factory

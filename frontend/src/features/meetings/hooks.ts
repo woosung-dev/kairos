@@ -51,12 +51,11 @@ export function useMeetingDetail(wid: string | undefined, id: string) {
   });
 }
 
-// 처리 완료/실패가 아닌 진행 중 상태
+// 처리 완료/실패가 아닌 진행 중 상태 (백엔드 status: uploading → transcribing → analyzing → completed)
 const POLLING_STATUSES: MeetingStatus[] = [
   "uploading",
   "transcribing",
   "analyzing",
-  "embedding",
 ];
 
 /**

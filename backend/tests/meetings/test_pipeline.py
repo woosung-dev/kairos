@@ -1,11 +1,23 @@
 # backend/tests/meetings/test_pipeline.py
 """Meeting 파이프라인 오케스트레이터 테스트."""
 import uuid
+from contextlib import asynccontextmanager
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.meetings.models import TranscriptSegment
+
+
+def _make_session_factory():
+    """테스트용 mock 세션 팩토리: async context manager를 반환한다."""
+    mock_session = AsyncMock()
+
+    @asynccontextmanager
+    async def factory():
+        yield mock_session
+
+    return factory
 
 
 @pytest.mark.asyncio
@@ -16,14 +28,13 @@ async def test_pipeline_success():
     meeting_id = uuid.uuid4()
     workspace_id = uuid.uuid4()
 
-    # Mock meeting
-    mock_repo = AsyncMock()
+    mock_meeting_repo = AsyncMock()
     mock_meeting = MagicMock()
     mock_meeting.id = meeting_id
     mock_meeting.workspace_id = workspace_id
     mock_meeting.title = "테스트 회의"
     mock_meeting.file_key = "uploads/test/audio.mp3"
-    mock_repo.find_by_id.return_value = mock_meeting
+    mock_meeting_repo.find_by_id.return_value = mock_meeting
 
     mock_r2 = AsyncMock()
     mock_r2.get_download_url.return_value = "https://r2.example.com/audio.mp3"
@@ -53,10 +64,8 @@ async def test_pipeline_success():
         "suggestedTags": ["테스트"],
     }
 
-    # Mock project/action/inbox repos
     mock_project_repo = AsyncMock()
     mock_project_repo.find_by_workspace.return_value = []
-
     mock_action_repo = AsyncMock()
     mock_inbox_repo = AsyncMock()
     mock_workspace_repo = AsyncMock()
@@ -67,34 +76,37 @@ async def test_pipeline_success():
     mock_embedding_service.embed_meeting.return_value = 3
     mock_embedding_service.invalidate_cache.return_value = None
 
-    pipeline = MeetingPipelineService(
-        meeting_repo=mock_repo,
-        project_repo=mock_project_repo,
-        action_repo=mock_action_repo,
-        inbox_repo=mock_inbox_repo,
-        workspace_repo=mock_workspace_repo,
-        r2_service=mock_r2,
-        transcription_service=mock_transcription,
-        ai_service=mock_ai,
-        embedding_service=mock_embedding_service,
-    )
-
-    await pipeline.process_meeting(meeting_id)
+    with (
+        patch("src.meetings.pipeline_service.MeetingRepository", return_value=mock_meeting_repo),
+        patch("src.meetings.pipeline_service.ProjectRepository", return_value=mock_project_repo),
+        patch("src.meetings.pipeline_service.ActionItemRepository", return_value=mock_action_repo),
+        patch("src.meetings.pipeline_service.InboxRepository", return_value=mock_inbox_repo),
+        patch("src.meetings.pipeline_service.WorkspaceRepository", return_value=mock_workspace_repo),
+        patch("src.meetings.pipeline_service.EmbeddingRepository", return_value=AsyncMock()),
+        patch("src.meetings.pipeline_service.EmbeddingService", return_value=mock_embedding_service),
+    ):
+        pipeline = MeetingPipelineService(
+            session_factory=_make_session_factory(),
+            r2_service=mock_r2,
+            transcription_service=mock_transcription,
+            ai_service=mock_ai,
+        )
+        await pipeline.process_meeting(meeting_id)
 
     # 임베딩 생성 확인
     mock_embedding_service.embed_meeting.assert_called_once()
 
     # 상태 전이 확인
-    status_calls = [call.args[1] for call in mock_repo.update_status.call_args_list]
+    status_calls = [call.args[1] for call in mock_meeting_repo.update_status.call_args_list]
     assert "transcribing" in status_calls
     assert "analyzing" in status_calls
     assert "completed" in status_calls
 
     # 세그먼트/요약 저장 확인
-    mock_repo.save_segments.assert_called_once()
-    mock_repo.save_summary.assert_called_once()
-    mock_repo.set_has_transcript.assert_called_once_with(meeting_id, True)
-    mock_repo.set_has_summary.assert_called_once_with(meeting_id, True)
+    mock_meeting_repo.save_segments.assert_called_once()
+    mock_meeting_repo.save_summary.assert_called_once()
+    mock_meeting_repo.set_has_transcript.assert_called_once_with(meeting_id, True)
+    mock_meeting_repo.set_has_summary.assert_called_once_with(meeting_id, True)
 
     # 액션 아이템 저장 확인
     mock_action_repo.save.assert_called_once()
@@ -115,13 +127,13 @@ async def test_pipeline_auto_confirm():
     workspace_id = uuid.uuid4()
     project_id = uuid.uuid4()
 
-    mock_repo = AsyncMock()
+    mock_meeting_repo = AsyncMock()
     mock_meeting = MagicMock()
     mock_meeting.id = meeting_id
     mock_meeting.workspace_id = workspace_id
     mock_meeting.title = "설계 리뷰"
     mock_meeting.file_key = "uploads/test/audio.mp3"
-    mock_repo.find_by_id.return_value = mock_meeting
+    mock_meeting_repo.find_by_id.return_value = mock_meeting
 
     mock_r2 = AsyncMock()
     mock_r2.get_download_url.return_value = "https://r2.example.com/audio.mp3"
@@ -151,7 +163,6 @@ async def test_pipeline_auto_confirm():
 
     mock_project_repo = AsyncMock()
     mock_project_repo.find_by_workspace.return_value = []
-
     mock_action_repo = AsyncMock()
     mock_inbox_repo = AsyncMock()
     mock_workspace_repo = AsyncMock()
@@ -162,19 +173,22 @@ async def test_pipeline_auto_confirm():
     mock_embedding_service.embed_meeting.return_value = 3
     mock_embedding_service.invalidate_cache.return_value = None
 
-    pipeline = MeetingPipelineService(
-        meeting_repo=mock_repo,
-        project_repo=mock_project_repo,
-        action_repo=mock_action_repo,
-        inbox_repo=mock_inbox_repo,
-        workspace_repo=mock_workspace_repo,
-        r2_service=mock_r2,
-        transcription_service=mock_transcription,
-        ai_service=mock_ai,
-        embedding_service=mock_embedding_service,
-    )
-
-    await pipeline.process_meeting(meeting_id)
+    with (
+        patch("src.meetings.pipeline_service.MeetingRepository", return_value=mock_meeting_repo),
+        patch("src.meetings.pipeline_service.ProjectRepository", return_value=mock_project_repo),
+        patch("src.meetings.pipeline_service.ActionItemRepository", return_value=mock_action_repo),
+        patch("src.meetings.pipeline_service.InboxRepository", return_value=mock_inbox_repo),
+        patch("src.meetings.pipeline_service.WorkspaceRepository", return_value=mock_workspace_repo),
+        patch("src.meetings.pipeline_service.EmbeddingRepository", return_value=AsyncMock()),
+        patch("src.meetings.pipeline_service.EmbeddingService", return_value=mock_embedding_service),
+    ):
+        pipeline = MeetingPipelineService(
+            session_factory=_make_session_factory(),
+            r2_service=mock_r2,
+            transcription_service=mock_transcription,
+            ai_service=mock_ai,
+        )
+        await pipeline.process_meeting(meeting_id)
 
     # 자동 확정 확인
     mock_project_repo.add_meeting_link.assert_called_once_with(
@@ -193,10 +207,10 @@ async def test_pipeline_failure_sets_failed():
 
     meeting_id = uuid.uuid4()
 
-    mock_repo = AsyncMock()
+    mock_meeting_repo = AsyncMock()
     mock_meeting = MagicMock()
     mock_meeting.file_key = "uploads/test/audio.mp3"
-    mock_repo.find_by_id.return_value = mock_meeting
+    mock_meeting_repo.find_by_id.return_value = mock_meeting
 
     mock_r2 = AsyncMock()
     mock_r2.get_download_url.return_value = "https://example.com"
@@ -212,22 +226,25 @@ async def test_pipeline_failure_sets_failed():
     mock_workspace_repo.find_by_id.return_value = None
     mock_embedding_service = AsyncMock()
 
-    pipeline = MeetingPipelineService(
-        meeting_repo=mock_repo,
-        project_repo=mock_project_repo,
-        action_repo=mock_action_repo,
-        inbox_repo=mock_inbox_repo,
-        workspace_repo=mock_workspace_repo,
-        r2_service=mock_r2,
-        transcription_service=mock_transcription,
-        ai_service=mock_ai,
-        embedding_service=mock_embedding_service,
-    )
-
-    await pipeline.process_meeting(meeting_id)
+    with (
+        patch("src.meetings.pipeline_service.MeetingRepository", return_value=mock_meeting_repo),
+        patch("src.meetings.pipeline_service.ProjectRepository", return_value=mock_project_repo),
+        patch("src.meetings.pipeline_service.ActionItemRepository", return_value=mock_action_repo),
+        patch("src.meetings.pipeline_service.InboxRepository", return_value=mock_inbox_repo),
+        patch("src.meetings.pipeline_service.WorkspaceRepository", return_value=mock_workspace_repo),
+        patch("src.meetings.pipeline_service.EmbeddingRepository", return_value=AsyncMock()),
+        patch("src.meetings.pipeline_service.EmbeddingService", return_value=mock_embedding_service),
+    ):
+        pipeline = MeetingPipelineService(
+            session_factory=_make_session_factory(),
+            r2_service=mock_r2,
+            transcription_service=mock_transcription,
+            ai_service=mock_ai,
+        )
+        await pipeline.process_meeting(meeting_id)
 
     # failed 상태로 업데이트 확인
-    last_call = mock_repo.update_status.call_args_list[-1]
+    last_call = mock_meeting_repo.update_status.call_args_list[-1]
     assert last_call.args[1] == "failed"
     # error_message 확인 (positional 또는 keyword)
     error_msg = last_call.kwargs.get("error_message", "")
