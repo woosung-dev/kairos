@@ -33,6 +33,8 @@ export default function NewContentPage() {
   const router = useRouter();
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const hasRole = useWorkspaceStore((s) => s.hasRole);
+  // workspaceRole을 직접 구독 → 역할 로드 시 리렌더 트리거
+  const workspaceRole = useWorkspaceStore((s) => s.workspaceRole);
 
   const [selected, setSelected] = useState<ContentType>("meeting");
   const [title, setTitle] = useState("");
@@ -102,8 +104,9 @@ export default function NewContentPage() {
     }
   };
 
+  // 역할 로딩 중 (null) = 아직 API 응답 대기, 잠시 대기
   // Viewer는 콘텐츠 생성 불가
-  if (!hasRole("member")) {
+  if (workspaceRole !== null && !hasRole("member")) {
     return (
       <div
         className="flex flex-col items-center justify-center h-full gap-2"
