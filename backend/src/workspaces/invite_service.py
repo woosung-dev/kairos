@@ -3,7 +3,7 @@
 import secrets
 import string
 import uuid
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta
 
 from src.auth.repository import UserRepository
 from src.core.config import get_settings
@@ -58,7 +58,7 @@ class InviteService:
 
         expires_at = None
         if expires_in_days is not None:
-            expires_at = datetime.now(UTC) + timedelta(days=expires_in_days)
+            expires_at = datetime.utcnow() + timedelta(days=expires_in_days)
 
         invite = WorkspaceInvite(
             workspace_id=workspace_id,
@@ -246,7 +246,7 @@ class InviteService:
         """초대 링크 유효성 검증."""
         if not invite.is_active:
             return False, "비활성화된 초대 링크입니다"
-        if invite.expires_at is not None and datetime.now(UTC) > invite.expires_at:
+        if invite.expires_at is not None and datetime.utcnow() > invite.expires_at:
             return False, "만료된 초대 링크입니다"
         if invite.max_uses is not None and invite.use_count >= invite.max_uses:
             return False, "사용 한도에 도달한 초대 링크입니다"
