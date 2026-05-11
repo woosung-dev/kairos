@@ -14,6 +14,7 @@ class Meeting(SQLModel, table=True):
     workspace_id: uuid.UUID = Field(foreign_key="workspaces.id")
     title: str
     file_key: str  # R2 저장 경로
+    source: str | None = None  # None=오디오, "text"=텍스트 캡처
     recorded_at: datetime | None = None
     duration_sec: int | None = None
     status: str = "uploading"  # uploading|transcribing|analyzing|completed|failed
