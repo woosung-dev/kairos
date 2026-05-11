@@ -1,7 +1,9 @@
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from src.actions.router import router as actions_router
 from src.auth.router import router as auth_router
@@ -26,6 +28,9 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 
+# 허용 Origin 목록 (쉼표 구분 문자열에서 파싱)
+ALLOWED_ORIGINS = [o.strip() for o in settings.cors_origins.split(",")]
+
 app = FastAPI(
     title="Kairos API",
     version="0.1.0",
@@ -36,11 +41,59 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origin.strip() for origin in settings.cors_origins.split(",")],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _attach_cors(request: Request, response: JSONResponse) -> JSONResponse:
+    """CORS 헤더 set-once 패턴 부착.
+
+    - append/merge 금지: 단일 대입만
+    - 이미 헤더 있으면 skip
+    - null Origin 거부
+    - allow_credentials=True → wildcard(*) 금지
+    """
+    origin = request.headers.get("origin", "")
+    if origin and origin != "null" and origin in ALLOWED_ORIGINS:
+        if "access-control-allow-origin" not in response.headers:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Vary"] = "Origin"
+    return response
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, _exc: Exception) -> JSONResponse:
+    """BE-T4: 5xx 오류 시 CORS 헤더 강제 (exception_handler 레이어)."""
+    response = JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error"},
+    )
+    return _attach_cors(request, response)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    """BE-T11: 4xx 오류 시 CORS 헤더 포함 (set-once 패턴)."""
+    response = JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+    return _attach_cors(request, response)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """BE-T5(d): 422 RequestValidationError 시 CORS 헤더 포함."""
+    response = JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
+    return _attach_cors(request, response)
+
 
 app.include_router(auth_router)
 app.include_router(workspaces_router)
