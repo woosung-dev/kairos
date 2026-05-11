@@ -44,10 +44,10 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 |---|---|---|
 | auth | 전역 규칙만 (전용 CONTEXT.md 없음) | Clerk JWT 검증 + User 매핑. **prefix 예외**: `/api/v1/users` |
 | workspaces | 전역 규칙만 (전용 CONTEXT.md 없음) | Workspace + WorkspaceMember + WorkspaceInvite + `inbox_threshold` |
-| projects | `src/projects/CONTEXT.md` | Project CRUD, MeetingProjectLink, 태그, 인사이트 |
+| projects | `src/projects/CONTEXT.md` | Project CRUD, MeetingProjectLink, ProjectMember (Sprint 6 L-6), visibility 권한 분기 (Sprint 6 BE-T8), 태그, 인사이트 |
 | inbox | `src/inbox/CONTEXT.md` | Inbox 적재 + AI 분류 추천 |
-| meetings | `src/meetings/CONTEXT.md` | Meeting 인제스트, STT, 파이프라인 |
-| notes | 전역 규칙만 (전용 CONTEXT.md 없음) | Tiptap Note CRUD + 임베딩 위임 (현재 부채 §7 D-2) |
+| meetings | `src/meetings/CONTEXT.md` | Meeting 인제스트, STT, 파이프라인 (orchestrator 표준 패턴) |
+| notes | 전역 규칙만 (전용 CONTEXT.md 없음) | Tiptap Note CRUD + NotePipelineService(embedding 위임 + 권한 검증, Sprint 6 ADR-014 옵션 A) |
 | actions | `src/actions/CONTEXT.md` | ActionItem CRUD (nullable 부모) |
 | upload | 전역 규칙만 (전용 CONTEXT.md 없음) | R2 업로드 (presigned URL, aioboto3) |
 | embeddings | 전역 규칙만 (전용 CONTEXT.md 없음) | EmbeddingChunk + SemanticCache 저장/검색 (pgvector) |
@@ -67,7 +67,7 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 |---|---|---|
 | B-1 | **AsyncSession은 Repository만 보유** — Service에 `from sqlalchemy.ext.asyncio import AsyncSession` 금지 | code review |
 | B-2 | **모든 Repository는 `workspace_id` 필터 강제** (멀티테넌시) | `.where(... .workspace_id == workspace_id)` |
-| B-3 | **크로스 도메인 트랜잭션은 `pipeline_service.py` 또는 `services/`** — 같은 session 공유, dependencies.py에서 조립. Repository 직접 read는 허용 (CONTEXT-MAP §4.2 #1) | code review |
+| B-3 | **크로스 도메인 트랜잭션은 `pipeline_service.py` 또는 `services/`** — 같은 session 공유, dependencies.py에서 조립. Repository 직접 read는 허용 (CONTEXT-MAP §4.2 #1). **embeddings·ai_processing·transcription = cross-domain shared service** — 직접 호출은 orchestrator 경계 내부에서만 (Sprint 6 ADR-014, 헌법 결정 #1) | code review |
 | B-4 | **AI 모델 고정**: Gemini `gemini-2.5-flash` | `core/config.py` |
 | B-5 | **임베딩 모델 고정**: OpenAI `text-embedding-3-small` (1536d), 청킹 512토큰/오버랩 50토큰 | `embeddings/service.py` |
 | B-6 | **프롬프트 중앙 관리**: `common/prompts.py` 상수만, 인라인 프롬프트 금지 | code review |

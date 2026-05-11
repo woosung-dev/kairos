@@ -1,4 +1,4 @@
-<!-- projects 도메인 — 작업 단위 (PARA Replace) + MeetingProjectLink + 인사이트 + 멤버십 (Sprint 6) -->
+<!-- projects 도메인 — 작업 단위 (PARA Replace) + MeetingProjectLink + 인사이트 + 멤버십 + visibility (Sprint 6 완료) -->
 
 # projects CONTEXT
 
@@ -10,9 +10,10 @@
 
 - Project CRUD (생성/조회/수정/삭제/아카이브)
 - **MeetingProjectLink** N:M 관계 소유 (Project ↔ Meeting)
+- **ProjectMember** N:M 관계 소유 (Project ↔ User, Sprint 6 L-6)
 - 태그 (AI 자동 + 사용자 수정)
 - 인사이트 L1~L4 (현재 L1/L2 활용, L3 부분, L4 Phase 4)
-- 멤버십 + visibility (Sprint 6 예정 — 현재 미구현, §7 D-1)
+- visibility 기반 권한 분기 (public/draft/private, Sprint 6 BE-T1~T8 + T15)
 
 ## 2. 비책임
 
@@ -26,10 +27,11 @@
 
 - **Project**
   - `status`: `active` / `completed` / `archived`
+  - `visibility`: `public` / `draft` / `private` (default `public`, indexed) — Sprint 6 BE-T1 (마이그레이션 `c4c5709a4ab4`)
   - `tags`: JSONB (AI 자동 + 사용자)
   - `sort_order`
-  - `visibility`: `public` / `draft` / `private` — **Sprint 6 추가 예정** (현재 미구현, CONTEXT-MAP §7 D-1)
 - **MeetingProjectLink** — N:M (`(meeting_id, project_id)` 유일). meetings 도메인이 아닌 **projects 도메인 소유**.
+- **ProjectMember** — N:M (`(project_id, user_id)` 유일). visibility=Private 시 명시적 멤버 매핑 (Sprint 6 BE-T5, 마이그레이션 `754f571d5544`). `role` 컬럼은 향후 sprint 7+ 확장 여지로 두되 1차는 `"member"` 단일 (AD-27).
 
 ---
 
@@ -55,9 +57,10 @@
 | P-2 | **status 전이**: `active` ↔ `completed` ↔ `archived` (순환 가능) |
 | P-3 | **archived → 자동 인사이트 추출 트리거** (Phase B 또는 Sprint 6 결정) |
 | P-4 | **태그는 정규화 (소문자, 한글 OK)** — 검색 일관성 |
-| P-5 | **visibility 미구현** — 현재 모든 Project는 워크스페이스 멤버 모두 접근 가능 (Sprint 6 격리 도입) |
+| P-5 | **visibility 권한 분기** (Sprint 6 BE-T8, repository.py `_apply_visibility_filter`): `public` = 워크스페이스 멤버 모두 / `draft` = creator + admin/owner / `private` = ProjectMember + admin/owner. admin/owner는 모든 visibility 우회 |
 | P-6 | **삭제는 hard delete + cascade 또는 soft (status=archived)** — UI는 archive 우선 노출 |
-| P-7 | **권한**: `archive` / `delete` / `update settings`는 `admin` 이상. 일반 멤버는 read + N:M 링크만 |
+| P-7 | **권한**: `archive` / `delete`는 `admin` 이상. **`visibility` 변경은 `admin` 이상 (Sprint 6 BE-T15)**. 일반 update(title/description/status/tags)는 require_member 유지 (AD-32). ProjectMember 추가/제거는 `admin` 이상 (BE-T7) |
+| P-8 | **ProjectMember 추가 cross-workspace 차단 미구현** (Sprint 6 1차, AD-33) — Sprint 7+ 검증 추가 예정. 현재는 service에서 project 존재만 확인 |
 
 ---
 
@@ -66,12 +69,15 @@
 > `/api/v1/workspaces/{workspace_id}/projects` prefix.
 
 ```
-GET    /                                                    목록 (워크스페이스 범위)
-GET    /{id}                                                디테일
-POST   /                                                    생성 (201)
-PATCH  /{id}                                                수정
+GET    /                                                    목록 (visibility 필터 적용)
+GET    /{id}                                                디테일 (visibility 검증)
+POST   /                                                    생성 (201, visibility 지정 가능)
+PATCH  /{id}                                                수정 (visibility 변경은 admin+)
 DELETE /{id}                                                삭제 (204, admin+)
 POST   /{id}/archive                                        archive 전환 (admin+)
+GET    /{id}/members                                        프로젝트 멤버 목록 (Sprint 6 BE-T7, viewer+)
+POST   /{id}/members                                        멤버 추가 (Sprint 6, admin+)
+DELETE /{id}/members/{user_id}                              멤버 제거 (Sprint 6, admin+)
 ```
 
 > 추가 prefix `/api/v1/workspaces/{workspace_id}/meetings/{meeting_id}/projects`:
@@ -92,9 +98,15 @@ DELETE /{project_id}                                        Meeting-Project 링�
 
 ---
 
-## 8. Sprint 6 작업 영역 (예정)
+## 8. Sprint 6 [완료]
 
-- `visibility` 칼럼 추가 + 마이그레이션 (Alembic)
-- ProjectMember 엔티티 (또는 visibility=private 시 추가 ACL)
-- 권한 체크 로직 — Repository 레벨에서 강제 (멀티테넌시 패턴 준용)
-- FE: 가시성 토글 UI + 멤버 초대 다이얼로그
+- ✅ `visibility` 컬럼 추가 + 마이그레이션 `c4c5709a4ab4` (BE-T1, commit e779541)
+- ✅ ProjectMember 엔티티 + 마이그레이션 `754f571d5544` (BE-T5, commit cecc888)
+- ✅ Repository visibility 필터 — `_apply_visibility_filter` (BE-T8, public/draft creator/private member 분기)
+- ✅ ProjectMember CRUD endpoint (BE-T7, GET viewer+ / POST·DELETE admin+)
+- ✅ visibility 변경 admin 강제 (BE-T15)
+- ✅ FE 시안 1A+1C/2A/3A 구현 (T-DESIGN-2 + 575c613/9a975e7)
+
+**Sprint 7+ 잔여 (AD-32~33)**:
+- BE-T16: Project update 권한 강화 (creator-only 또는 admin) — 보류 (member 협업 마찰 우려)
+- ProjectMember 추가 cross-workspace 차단 — 보류 (V-T2 검증 후 patch)
