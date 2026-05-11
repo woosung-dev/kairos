@@ -37,17 +37,30 @@ class ProjectService:
     async def list_projects(
         self,
         workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
         status: str | None = None,
         tag: str | None = None,
         page: int = 1,
         page_size: int = 20,
     ) -> dict:
-        """워크스페이스 프로젝트 목록 (페이지네이션)."""
+        """워크스페이스 프로젝트 목록 (페이지네이션 + visibility 권한 분기)."""
         offset = (page - 1) * page_size
         projects = await self.repo.find_by_workspace(
-            workspace_id, status=status, tag=tag, offset=offset, limit=page_size
+            workspace_id,
+            requester_user_id=requester_user_id,
+            requester_role=requester_role,
+            status=status,
+            tag=tag,
+            offset=offset,
+            limit=page_size,
         )
-        total = await self.repo.count_by_workspace(workspace_id, status=status)
+        total = await self.repo.count_by_workspace(
+            workspace_id,
+            requester_user_id=requester_user_id,
+            requester_role=requester_role,
+            status=status,
+        )
 
         return {
             "items": [self._to_dict(p) for p in projects],
@@ -57,12 +70,74 @@ class ProjectService:
             "hasNext": page * page_size < total,
         }
 
-    async def get_project(self, project_id: uuid.UUID) -> dict:
-        """프로젝트 상세."""
+    async def get_project(
+        self,
+        project_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
+    ) -> dict:
+        """프로젝트 상세 (visibility 권한 분기)."""
         project = await self.repo.find_by_id(project_id)
         if project is None:
             raise ProjectNotFoundError()
+        # visibility 권한 검증 (admin 이상 우회, 그 외 visibility별 분기)
+        if requester_role not in ("admin", "owner"):
+            if project.visibility == "draft":
+                if project.created_by_id != requester_user_id:
+                    raise ProjectNotFoundError()
+            elif project.visibility == "private":
+                if requester_user_id is None or not await self.repo.is_member(
+                    project_id, requester_user_id
+                ):
+                    raise ProjectNotFoundError()
         return self._to_dict(project)
+
+    # --- ProjectMember (Sprint 6 L-6) ---
+
+    async def list_members(self, project_id: uuid.UUID) -> list[dict]:
+        """프로젝트 멤버 목록."""
+        members = await self.repo.find_members(project_id)
+        return [
+            {
+                "id": str(m.id),
+                "projectId": str(m.project_id),
+                "userId": str(m.user_id),
+                "role": m.role,
+                "createdAt": m.created_at.isoformat(),
+            }
+            for m in members
+        ]
+
+    async def add_member(
+        self,
+        project_id: uuid.UUID,
+        user_id: uuid.UUID,
+        role: str = "member",
+    ) -> dict:
+        """프로젝트 멤버 추가 (admin 이상 권한 검증은 router decorator + cross-workspace 검증은 호출자 책임)."""
+        # 프로젝트 존재 확인
+        project = await self.repo.find_by_id(project_id)
+        if project is None:
+            raise ProjectNotFoundError()
+        member = await self.repo.add_member(project_id, user_id, role)
+        await self.repo.commit()
+        return {
+            "id": str(member.id),
+            "projectId": str(member.project_id),
+            "userId": str(member.user_id),
+            "role": member.role,
+            "createdAt": member.created_at.isoformat(),
+        }
+
+    async def remove_member(
+        self, project_id: uuid.UUID, user_id: uuid.UUID
+    ) -> None:
+        """프로젝트 멤버 제거."""
+        project = await self.repo.find_by_id(project_id)
+        if project is None:
+            raise ProjectNotFoundError()
+        await self.repo.remove_member(project_id, user_id)
+        await self.repo.commit()
 
     async def update_project(
         self,
