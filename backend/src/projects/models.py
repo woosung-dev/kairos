@@ -43,10 +43,12 @@ class ProjectMember(SQLModel, table=True):
     __tablename__ = "project_members"
     __table_args__ = (
         UniqueConstraint("project_id", "user_id", name="uq_project_member"),
+        UniqueConstraint("id", "workspace_id", name="uq_project_member_ws"),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     project_id: uuid.UUID = Field(foreign_key="projects.id", index=True)
     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+    workspace_id: uuid.UUID = Field(foreign_key="workspaces.id", index=True)
     role: str = "member"  # Sprint 6: member 단일. Sprint 7+: project_admin 등 확장 (AD-27)
     created_at: datetime = Field(default_factory=datetime.utcnow)
