@@ -8,6 +8,8 @@ import {
   fetchMeetingDetail,
   fetchMeetingStatus,
   createMeeting,
+  captureText,
+  type CaptureTextRequest,
 } from "./api";
 import type { CreateMeetingRequest, MeetingStatus } from "./types";
 
@@ -93,6 +95,27 @@ export function useCreateMeeting(wid: string | undefined) {
       const token = await getToken();
       if (!token) throw new Error("인증이 필요합니다");
       return createMeeting(token, wid!, data);
+    },
+    onSuccess: () => {
+      if (wid) {
+        queryClient.invalidateQueries({ queryKey: meetingKeys.list(wid) });
+      }
+    },
+  });
+}
+
+/**
+ * 텍스트 캡처 (202 Accepted, 비동기 파이프라인)
+ */
+export function useCaptureText(wid: string | undefined) {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: CaptureTextRequest) => {
+      const token = await getToken();
+      if (!token) throw new Error("인증이 필요합니다");
+      return captureText(token, wid!, data);
     },
     onSuccess: () => {
       if (wid) {
