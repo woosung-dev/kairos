@@ -1,7 +1,27 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useProject } from "../hooks";
+import { useRouter } from "next/navigation";
+import { MoreHorizontal } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useWorkspaceRole } from "@/features/members/hooks";
+import { useProject, useArchiveProject, useDeleteProject, useUpdateProject } from "../hooks";
 import { useActionItems, useUpdateActionItem } from "@/features/actions/hooks";
 import { useMeetings } from "@/features/meetings/hooks";
 import { useNotes } from "@/features/notes/hooks";
@@ -10,6 +30,9 @@ import type { Project, ProjectStatus } from "../types";
 import type { ActionItem, ActionStatus } from "@/features/actions/types";
 import type { Meeting } from "@/features/meetings/types";
 import type { Note } from "@/features/notes/types";
+import { EditProjectDialog } from "./edit-project-dialog";
+import { VisibilityBadge } from "./visibility-badge";
+import { VisibilityChangeDialog } from "./visibility-change-dialog";
 
 /* ── 상태 라벨 ── */
 
@@ -73,6 +96,16 @@ interface ProjectDashboardProps {
 export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const wid = activeWorkspaceId ?? undefined;
+
+  const router = useRouter();
+  const [visibilityDialogOpen, setVisibilityDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [archiveAlertOpen, setArchiveAlertOpen] = useState(false);
+  const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
+  const { canManage } = useWorkspaceRole(wid);
+  const updateProject = useUpdateProject(wid);
+  const deleteMutation = useDeleteProject(wid);
+  const archiveMutation = useArchiveProject(wid);
 
   const { data: project, isLoading: projectLoading, error: projectError } = useProject(wid, projectId);
 
@@ -146,7 +179,14 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
   if (!isContentLoading && !hasContent && recentItems.length < 3) {
     return (
       <div className="p-6">
-        <DashboardHeader project={project} />
+        <DashboardHeader
+          project={project}
+          canManage={canManage}
+          onVisibilityClick={() => setVisibilityDialogOpen(true)}
+          onEditClick={() => setEditDialogOpen(true)}
+          onArchiveClick={() => setArchiveAlertOpen(true)}
+          onDeleteClick={() => setDeleteAlertOpen(true)}
+        />
         <OnboardingView />
       </div>
     );
@@ -154,7 +194,14 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
 
   return (
     <div className="p-6">
-      <DashboardHeader project={project} />
+      <DashboardHeader
+        project={project}
+        canManage={canManage}
+        onVisibilityClick={() => setVisibilityDialogOpen(true)}
+        onEditClick={() => setEditDialogOpen(true)}
+        onArchiveClick={() => setArchiveAlertOpen(true)}
+        onDeleteClick={() => setDeleteAlertOpen(true)}
+      />
 
       {/* 프로액티브 인사이트 — BE 미지원, 섹션 숨김 */}
       {/* project 응답에 insight 필드가 추가되면 여기서 렌더링 */}
@@ -227,13 +274,102 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
           </div>
         </div>
       )}
+
+      {/* 관리 컨트롤 다이얼로그 */}
+      <VisibilityChangeDialog
+        open={visibilityDialogOpen}
+        onOpenChange={setVisibilityDialogOpen}
+        currentVisibility={project.visibility}
+        isPending={updateProject.isPending}
+        onConfirm={(next) => {
+          updateProject.mutate(
+            { id: projectId, data: { visibility: next } },
+            { onSuccess: () => setVisibilityDialogOpen(false) }
+          );
+        }}
+      />
+
+      {wid && (
+        <EditProjectDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          workspaceId={wid}
+          project={project}
+        />
+      )}
+
+      <AlertDialog open={archiveAlertOpen} onOpenChange={setArchiveAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>프로젝트를 아카이브하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              아카이브된 프로젝트는 목록에서 숨겨지며 나중에 복원할 수 있습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                archiveMutation.mutate(projectId, {
+                  onSuccess: () => setArchiveAlertOpen(false),
+                });
+              }}
+              disabled={archiveMutation.isPending}
+            >
+              아카이브
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>프로젝트를 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              삭제된 프로젝트는 복원할 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                deleteMutation.mutate(projectId, {
+                  onSuccess: () => {
+                    setDeleteAlertOpen(false);
+                    router.push("/dashboard");
+                  },
+                });
+              }}
+              disabled={deleteMutation.isPending}
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
 /* ── 서브 컴포넌트 ── */
 
-function DashboardHeader({ project }: { project: Project }) {
+function DashboardHeader({
+  project,
+  canManage,
+  onVisibilityClick,
+  onEditClick,
+  onArchiveClick,
+  onDeleteClick,
+}: {
+  project: Project;
+  canManage: boolean;
+  onVisibilityClick: () => void;
+  onEditClick: () => void;
+  onArchiveClick: () => void;
+  onDeleteClick: () => void;
+}) {
   return (
     <div className="mb-6">
       <div className="flex items-center gap-3 mb-2">
@@ -252,6 +388,29 @@ function DashboardHeader({ project }: { project: Project }) {
         >
           {STATUS_LABELS[project.status]}
         </span>
+        <VisibilityBadge
+          visibility={project.visibility}
+          onClick={canManage ? onVisibilityClick : undefined}
+        />
+        {canManage && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-[var(--surface-hover)] transition-colors"
+            >
+              <MoreHorizontal className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onEditClick}>편집</DropdownMenuItem>
+              <DropdownMenuItem onClick={onArchiveClick}>아카이브</DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={onDeleteClick}
+              >
+                삭제
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
       {project.description && (
         <p className="text-sm mb-3" style={{ color: "var(--text-secondary)" }}>
