@@ -173,3 +173,41 @@ P0 → P1 → P2 순서로 진행. 결과 메시지 형식:
 
 ### AD-34 결정
 **carry-over** — 본 dogfooding에서 UI 버튼 가시성은 검증 안 함 (자동화 scope 외). AD-34 sprint 7+ design-review 보류 명시 유지. TODO.md L130 유지.
+
+---
+
+## FE UI 검증 결과 (Goal A · 2026-05-11)
+
+> 진행 방식: 표준 포트 8000/3000 + Playwright MCP owner 1 세션. PR #14 timezone fix UI 회귀 + PR #12 FE-T1~T7 컴포넌트 클릭 검증. plan: `/Users/woosung/.claude/plans/plan-users-woosung-claude-plans-sprint-velvety-mochi.md` (velvety-mochi).
+
+### Critical 회귀 (2건) — Sprint 7 carry-over 결정
+
+| ID | 심각도 | 요약 | 원인 | 영향 |
+|---|---|---|---|---|
+| **UI-1** | **Critical** | `/projects/[id]` 라우트에서 Sprint 6 PR #12 visibility 배지 + 변경 모달 + ProjectMember 패널이 사용자에게 영영 노출되지 않음 (FE-T1/T2a/T2b/T4 실효 0) | `app/(app)/projects/[id]/page.tsx`는 `ProjectDashboard`(`project-dashboard.tsx`)를 import. Sprint 6 PR #12 (`575c613` + `9a975e7`)는 `ProjectDetail`(`project-detail.tsx`)에 작업 추가. 라우트 미연결. 회귀 시점: `9c6e660` "서비스 전면 UI/UX 개편"에서 라우트 import가 `ProjectDetail` → `ProjectDashboard`로 전환됨. Sprint 6 작업자가 이전 컴포넌트에 작성. | visibility 시스템 UX 전체 노출 0. Sprint 6 PR #12 사용자 가치 실현 불가. |
+| **UI-2** | **High** | Settings → 초대 탭이 owner 사용자에게도 `if (!isAdmin) return null` 빈 화면 (FE-T3/T5 검증 불가) | BE `GET /workspaces/{ws}/members` 응답에서 `members[].email = ""` 빈 값. FE `useSyncWorkspaceRole`(`src/features/members/hooks.ts:38-39`)이 `user.primaryEmailAddress === member.email` 매칭 → 실패 → `workspaceRole=null` → InviteManager 빈 렌더링. | 초대 default visibility 라디오 검증 불가. owner도 invite 관리 불가능 (영구). |
+
+### Medium 관찰 (1건)
+
+| ID | 심각도 | 요약 | 처리 |
+|---|---|---|---|
+| **UI-3** | Medium | 워크스페이스 1+ 보유 사용자에게 dashboard 워크스페이스 생성 트리거 없음 → PR #14 timezone fix FE UI 회귀 경로 부재 | dashboard `if (!hasWorkspaces)` 분기에서만 dialog 트리거. 헤더 워크스페이스 스위처도 없음. Sprint 7+ polish — 헤더 스위처에 "신규 생성" 추가 권장. PR #14 BE-only 검증은 1차 SETUP:WS-B에서 통과. |
+
+### 검증 결과 매트릭스
+
+| ID | 결과 | 상세 |
+|---|---|---|
+| SETUP:WS-B [UI] | ⚠️ | FE 생성 경로 부재 (UI-3). BE-only 검증은 1차 통과. |
+| 1G [UI] / 3A [UI] / 3B [UI] | ❌ | visibility 변경 trigger가 라우트 화면에 없음 (UI-1 차단). BE 단독 검증은 1차 통과. |
+| 1H [UI] / FE-T3 / FE-T5 | ❌ | 초대 탭이 owner에게도 빈 화면 (UI-2 차단). BE 단독 검증은 1차 통과 (default_project_visibility=draft 3건 invite 정상 생성). |
+| 2A [UI] / FE-T4 | ❌ | ProjectMember 패널이 라우트 화면에 없음 (UI-1 차단). BE 단독 검증은 1차 통과. |
+| FE-T7 (RAG Private 제외) | — | 본 세션 scope 외 (사용자 결정). UI-1/UI-2 발견으로 dogfooding 결론 명확. |
+| AD-34 owner baseline | — | UI-1 차단으로 baseline 의미 없음 (3 buttons all "absent from route"). |
+
+### 발견 issue 처리 결정 (사용자 확정 — 본 plan §Goal A 진행 중)
+
+| ID | 처리 | 이유 |
+|---|---|---|
+| **UI-1** | **Sprint 7 guarded-doors PR carry-over** | AD-33/CORS-1과 함께 Sprint 7에서 처리. 옵션 A (`page.tsx` → `ProjectDetail`) 또는 옵션 B (`ProjectDashboard.DashboardHeader`에 VisibilityBadge + ProjectMembersPanel 통합) Sprint 7 plan healing 시 lock-in. |
+| **UI-2** | **Sprint 7 guarded-doors PR carry-over** | BE-side fix (members 응답에 email 채우기) 또는 FE-side fix (userId 매칭으로 전환). Sprint 7 plan에서 결정. |
+| **UI-3** | Sprint 7+ polish carry-over | dashboard/header 워크스페이스 스위처 신설은 별도 디자인 결정 필요. 본 Sprint 7 묶음 외 보류. |
