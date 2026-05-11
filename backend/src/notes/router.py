@@ -9,7 +9,8 @@ from fastapi.responses import Response
 
 from src.auth.rbac import require_member, require_viewer
 from src.workspaces.models import WorkspaceMember
-from src.notes.dependencies import get_note_service
+from src.notes.dependencies import get_note_pipeline_service, get_note_service
+from src.notes.pipeline_service import NotePipelineService
 from src.notes.schemas import CreateNoteRequest, UpdateNoteRequest
 from src.notes.service import NoteService
 
@@ -68,6 +69,7 @@ async def create_note(
     background_tasks: BackgroundTasks,
     member: WorkspaceMember = Depends(require_member),
     service: NoteService = Depends(get_note_service),
+    pipeline: NotePipelineService = Depends(get_note_pipeline_service),
 ):
     pid = uuid.UUID(data.project_id) if data.project_id else None
     result = await service.create_note(
@@ -77,7 +79,8 @@ async def create_note(
         content=data.content,
         project_id=pid,
     )
-    background_tasks.add_task(service.embed_note_async, uuid.UUID(result["id"]))
+    # embedding은 orchestrator 경유 (ADR-014 옵션 A 정합)
+    background_tasks.add_task(pipeline.embed_note_async, uuid.UUID(result["id"]))
     return result
 
 
@@ -89,6 +92,7 @@ async def update_note(
     background_tasks: BackgroundTasks,
     member: WorkspaceMember = Depends(require_member),
     service: NoteService = Depends(get_note_service),
+    pipeline: NotePipelineService = Depends(get_note_pipeline_service),
 ):
     # project_id sentinel 처리: 필드가 없으면 변경 안 함
     pid = ...  # type: ignore[assignment]
@@ -102,7 +106,7 @@ async def update_note(
         project_id=pid,
     )
     if data.content is not None:
-        background_tasks.add_task(service.embed_note_async, note_id)
+        background_tasks.add_task(pipeline.embed_note_async, note_id)
     return result
 
 
@@ -111,6 +115,7 @@ async def delete_note(
     workspace_id: uuid.UUID,
     note_id: uuid.UUID,
     member: WorkspaceMember = Depends(require_member),
-    service: NoteService = Depends(get_note_service),
+    pipeline: NotePipelineService = Depends(get_note_pipeline_service),
 ):
-    await service.delete_note(note_id)
+    # embedding cleanup 포함 orchestrator 경유 (ADR-014 옵션 A 정합)
+    await pipeline.delete_note_with_cleanup(note_id)
