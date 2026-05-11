@@ -57,6 +57,13 @@ export function RagInput({ onSubmit }: RagInputProps) {
           {isStreaming ? "..." : "전송"}
         </button>
       </div>
+      {/* Sprint 6 FE-T7: RAG 검색 결과에서 권한 없는 프로젝트는 자동 제외됨 안내 */}
+      <p
+        className="mt-1.5 text-[11px]"
+        style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
+      >
+        Private 프로젝트는 명시적 멤버에게만 표시됩니다.
+      </p>
     </div>
   );
 }
