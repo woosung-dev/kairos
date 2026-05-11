@@ -3,14 +3,24 @@
 import uuid
 from datetime import datetime
 
-from src.projects.exceptions import ProjectNotFoundError
+from src.projects.exceptions import (
+    CrossWorkspaceMemberError,
+    ProjectNotFoundError,
+    WorkspaceMismatchError,
+)
 from src.projects.models import Project
 from src.projects.repository import ProjectRepository
+from src.workspaces.repository import WorkspaceRepository
 
 
 class ProjectService:
-    def __init__(self, repo: ProjectRepository) -> None:
+    def __init__(
+        self,
+        repo: ProjectRepository,
+        ws_repo: WorkspaceRepository | None = None,
+    ) -> None:
         self.repo = repo
+        self.ws_repo = ws_repo
 
     async def create_project(
         self,
@@ -72,6 +82,7 @@ class ProjectService:
 
     async def get_project(
         self,
+        workspace_id: uuid.UUID,
         project_id: uuid.UUID,
         requester_user_id: uuid.UUID | None = None,
         requester_role: str | None = None,
@@ -80,6 +91,8 @@ class ProjectService:
         project = await self.repo.find_by_id(project_id)
         if project is None:
             raise ProjectNotFoundError()
+        if project.workspace_id != workspace_id:
+            raise WorkspaceMismatchError()
         # visibility 권한 검증 (admin 이상 우회, 그 외 visibility별 분기)
         if requester_role not in ("admin", "owner"):
             if project.visibility == "draft":
@@ -110,16 +123,29 @@ class ProjectService:
 
     async def add_member(
         self,
+        workspace_id: uuid.UUID,
         project_id: uuid.UUID,
         user_id: uuid.UUID,
         role: str = "member",
     ) -> dict:
-        """프로젝트 멤버 추가 (admin 이상 권한 검증은 router decorator + cross-workspace 검증은 호출자 책임)."""
-        # 프로젝트 존재 확인
+        """프로젝트 멤버 추가. cross-workspace 검증 포함.
+
+        검증 순서 (변경 금지):
+          1. project 없음 → ProjectNotFoundError(404)
+          2. project.workspace_id != workspace_id → WorkspaceMismatchError(404)
+          3. WorkspaceMember(workspace_id, user_id) 없음 → CrossWorkspaceMemberError(403)
+          4. 중복 → repo.add_member (UniqueConstraint 위반 시 DB 레벨 처리)
+        """
         project = await self.repo.find_by_id(project_id)
         if project is None:
             raise ProjectNotFoundError()
-        member = await self.repo.add_member(project_id, user_id, role)
+        if project.workspace_id != workspace_id:
+            raise WorkspaceMismatchError()
+        if self.ws_repo is not None:
+            ws_member = await self.ws_repo.find_member(workspace_id, user_id)
+            if ws_member is None:
+                raise CrossWorkspaceMemberError()
+        member = await self.repo.add_member(project_id, project.workspace_id, user_id, role)
         await self.repo.commit()
         return {
             "id": str(member.id),

@@ -44,6 +44,17 @@
   - [x] 내보내기 포맷 MD/JSON (회의/노트)
   - [ ] 내보내기 포맷 PDF (향후 구현)
 
+## Recently Completed — Sprint 7 "guarded-doors" 잔여 (2026-05-11)
+
+- [x] **BE-T4/T11/T5**: CORS exception handler — 5xx/4xx/422 응답에 CORS 헤더 보장 (c60ad90)
+- [x] **BE-T12**: GET `/workspaces/{wid}/projects/{pid}` workspace mismatch 검증 추가 (2b7c2d4)
+- [x] **BE-T6**: TestContainers PostgreSQL 통합 테스트 6개 시나리오 (d1e65e2)
+  - add_member 성공 / cross-ws 403 / notfound 404 / ws-mismatch 404 / 중복 / GET mismatch
+- [x] **BE-BUG-1**: ProjectRepository.add_member workspace_id 누락 수정 (d1e65e2 포함)
+- [x] **T-DOC-1**: `docs/requirements/interview-guide.md` 신설 — ADR-011 §2 7필드 우회 질문 (c2e5198)
+- [x] **erd.md + endpoints.md Atomic Update**: cross-workspace 주석(I-17) + BE-T12 GET 404 (c2e5198)
+- [x] **AD-33**: cross-workspace ProjectMember 차단 완전 구현 (Sprint 7 BE-T1~T3 + T13 + T12 통합)
+
 ## In Progress
 
 - (없음 — 다음 Next Actions 참조)
@@ -130,7 +141,7 @@
 ### Sprint 6 잔여 (sprint 7+ 보류, AD-32~35) — 2026-05-11 dogfooding 결과 반영
 
 - [ ] **AD-32** BE-T16 Project update 권한 강화 — 현재 require_member 유지 결정. creator-only 또는 admin 강화 필요 시 sprint 7+ 검토 (협업 마찰 우려).
-- [ ] **AD-33** ProjectMember 추가 cross-workspace 차단 — sprint 6 1차 미구현 **확정**. 2026-05-11 dogfooding 자동 검증 결과 1 user 세션 한계로 명시적 검증 불가 (fake UUID는 FK violation 500으로 "우연히" 차단, 의도된 비즈니스 차단 X). AD-35 묶음.
+- [x] **AD-33** ProjectMember 추가 cross-workspace 차단 — **Sprint 7 완료** (BE-T1~T3 + T12 + T13). FK violation 500 → 의도된 403으로 전환. TestContainers 통합 테스트 검증.
 - [ ] **AD-34** FE RBAC 정밀 분기 — visibility 변경 버튼이 모든 멤버에 활성 + BE-T15 403 위임 (1차). useUser+useMembers 매칭으로 정밀화 = sprint 7+ design-review. dogfooding scope 외, sprint 7+ design-review 보류 **확정**.
 - [ ] **AD-35** Playwright E2E (V-T2) + schemathesis (V-T4) + RAG 권한 누설 E2E (V-T5) — sprint 7+ devex-review와 묶음. **2026-05-11 dogfooding으로 1A~1F viewer/member 읽기 + 2D Private RAG 누설 + 2E/2F member/viewer visibility 변경 시도 + CORS-1 (BE 5xx CORS 헤더 누락) + SCHEMA-1 (Project `title` vs ERD `name` 정합성) 추가 묶음**.
 - [x] **사용자 수동 dogfooding** — Playwright MCP 자동화로 진행 (8 케이스 자동 통과 + Critical TZ-1 회귀 발견 PR #14). 결과 `docs/dev-log/sprint-6-dogfooding-matrix.md`.
@@ -145,7 +156,7 @@
 ### Phase B Stage 1 retrofit 후속 (ADR-009 §"후속" F1~F10)
 
 - [ ] **F2** Demand 시그널 S1~S4 측정 (Sprint 6 완료 후 1개월) — usage analytics 도입 + S1(DAU)/S2(회의 빈도)/S3(RAG 만족도)/S4(Inbox 수용률) 실측. 결과물: demand 시그널 1차 보고서.
-- [ ] **F3** 외부 인터뷰 가이드 작성 (Sprint 6 완료 직후) — ADR-011 §2 필수 필드 7개 + 승진/실패 우회 질문. 결과물: `docs/requirements/interview-guide.md`.
+- [x] **F3** 외부 인터뷰 가이드 작성 — `docs/requirements/interview-guide.md` Sprint 7 T-DOC-1 완료 (c2e5198).
 - [ ] **F4** 외부 인터뷰 5-10명 + S5/S6 측정 (Sprint 7+) — ADR-010 AD-8 60% + ADR-011 §4-b 60% + ADR-009 S5/S6. 결과물: `docs/requirements/interview-results.md`.
 - [ ] **F5** 5분 사용자 세션 관찰 도입 (Sprint 7+, Q5) — 도그푸딩 사용자 1-3명 세션 녹화. 결과물: `docs/requirements/observation-notes.md`.
 - [ ] **F6** Wedge 선정 ADR 신규 (Sprint 6 완료 + F2/F4 결과 후) — 페르소나-Wedge 매트릭스 + S5/S6. 결과물: `docs/dev-log/012-wedge-selection.md`.

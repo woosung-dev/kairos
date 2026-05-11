@@ -60,7 +60,7 @@
 | P-5 | **visibility 권한 분기** (Sprint 6 BE-T8, repository.py `_apply_visibility_filter`): `public` = 워크스페이스 멤버 모두 / `draft` = creator + admin/owner / `private` = ProjectMember + admin/owner. admin/owner는 모든 visibility 우회 |
 | P-6 | **삭제는 hard delete + cascade 또는 soft (status=archived)** — UI는 archive 우선 노출 |
 | P-7 | **권한**: `archive` / `delete`는 `admin` 이상. **`visibility` 변경은 `admin` 이상 (Sprint 6 BE-T15)**. 일반 update(title/description/status/tags)는 require_member 유지 (AD-32). ProjectMember 추가/제거는 `admin` 이상 (BE-T7) |
-| P-8 | **ProjectMember 추가 cross-workspace 차단 미구현** (Sprint 6 1차, AD-33) — Sprint 7+ 검증 추가 예정. 현재는 service에서 project 존재만 확인 |
+| P-8 | **ProjectMember 추가 cross-workspace 차단** (Sprint 7 — AD-33): `add_member`는 `workspace_id`를 필수 인자로 받아 cross-workspace 검증 수행. 검증 순서: project 존재(404) → workspace mismatch(404) → ws_member 존재(403) → 중복(DB UniqueConstraint). is_active 검증 없음 (WorkspaceMember.is_active 컬럼 미존재). |
 
 ---
 
@@ -109,4 +109,10 @@ DELETE /{project_id}                                        Meeting-Project 링�
 
 **Sprint 7+ 잔여 (AD-32~33)**:
 - BE-T16: Project update 권한 강화 (creator-only 또는 admin) — 보류 (member 협업 마찰 우려)
-- ProjectMember 추가 cross-workspace 차단 — 보류 (V-T2 검증 후 patch)
+- ✅ ProjectMember 추가 cross-workspace 차단 — Sprint 7 BE-T1~T3 완료 (AD-33)
+
+## 멤버 추가 정책 (Sprint 7 — AD-33)
+
+`add_member` 호출 시 workspace_id를 필수 인자로 받아 cross-workspace 검증 수행.
+검증 순서: project 존재(404) → workspace mismatch(404) → ws_member 존재(403) → 중복(DB UniqueConstraint).
+is_active 검증 없음 (WorkspaceMember.is_active 컬럼 미존재).

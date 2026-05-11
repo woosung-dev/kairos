@@ -24,12 +24,14 @@ interface ProjectMembersPanelProps {
   workspaceId: string;
   projectId: string;
   visibility: ProjectVisibility;
+  canManage: boolean;
 }
 
 export function ProjectMembersPanel({
   workspaceId,
   projectId,
   visibility,
+  canManage,
 }: ProjectMembersPanelProps) {
   const { data: projectMembers, isLoading } = useProjectMembers(
     workspaceId,
@@ -107,52 +109,54 @@ export function ProjectMembersPanel({
         )}
       </div>
 
-      {/* 멤버 추가 (admin 이상만 활성, BE-T7이 검증) */}
-      <div className="flex items-center gap-2 mb-3">
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            className="flex-1 inline-flex items-center justify-between px-3 py-2 text-sm rounded-md border cursor-pointer"
-            style={{
-              borderColor: "var(--border-subtle)",
-              color: selectedUserId
-                ? "var(--text-primary)"
-                : "var(--text-muted)",
-            }}
-          >
-            {selectedUserId
-              ? candidates.find((c) => c.userId === selectedUserId)?.displayName ??
-                "멤버 선택됨"
-              : candidates.length === 0
-                ? "추가 가능한 멤버 없음"
-                : "워크스페이스 멤버 선택..."}
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            {candidates.map((m) => (
-              <DropdownMenuItem
-                key={m.userId}
-                onClick={() => setSelectedUserId(m.userId)}
-                className="cursor-pointer"
-              >
-                {m.displayName ?? m.email ?? m.userId}{" "}
-                <span
-                  className="ml-2 text-xs"
-                  style={{ color: "var(--text-muted)" }}
+      {/* 멤버 추가 (admin 이상만, BE-T7이 검증) */}
+      {canManage && (
+        <div className="flex items-center gap-2 mb-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="flex-1 inline-flex items-center justify-between px-3 py-2 text-sm rounded-md border cursor-pointer"
+              style={{
+                borderColor: "var(--border-subtle)",
+                color: selectedUserId
+                  ? "var(--text-primary)"
+                  : "var(--text-muted)",
+              }}
+            >
+              {selectedUserId
+                ? candidates.find((c) => c.userId === selectedUserId)?.displayName ??
+                  "멤버 선택됨"
+                : candidates.length === 0
+                  ? "추가 가능한 멤버 없음"
+                  : "워크스페이스 멤버 선택..."}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {candidates.map((m) => (
+                <DropdownMenuItem
+                  key={m.userId}
+                  onClick={() => setSelectedUserId(m.userId)}
+                  className="cursor-pointer"
                 >
-                  ({m.role})
-                </span>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Button
-          size="sm"
-          onClick={handleAdd}
-          disabled={!selectedUserId || addMember.isPending}
-        >
-          <UserPlus className="w-4 h-4 mr-1" />
-          추가
-        </Button>
-      </div>
+                  {m.displayName ?? m.email ?? m.userId}{" "}
+                  <span
+                    className="ml-2 text-xs"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    ({m.role})
+                  </span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            size="sm"
+            onClick={handleAdd}
+            disabled={!selectedUserId || addMember.isPending}
+          >
+            <UserPlus className="w-4 h-4 mr-1" />
+            추가
+          </Button>
+        </div>
+      )}
 
       {/* 멤버 리스트 */}
       {isLoading ? (
@@ -194,18 +198,20 @@ export function ProjectMembersPanel({
                     {pm.role}
                   </span>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 hover:opacity-100"
-                  onClick={() => handleRemove(pm.userId)}
-                  disabled={removeMember.isPending}
-                >
-                  <Trash2
-                    className="w-3.5 h-3.5"
-                    style={{ color: "var(--text-muted)" }}
-                  />
-                </Button>
+                {canManage && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 hover:opacity-100"
+                    onClick={() => handleRemove(pm.userId)}
+                    disabled={removeMember.isPending}
+                  >
+                    <Trash2
+                      className="w-3.5 h-3.5"
+                      style={{ color: "var(--text-muted)" }}
+                    />
+                  </Button>
+                )}
               </li>
             );
           })}

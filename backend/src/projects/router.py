@@ -66,7 +66,8 @@ async def get_project(
     service: ProjectService = Depends(get_project_service),
 ):
     return await service.get_project(
-        project_id,
+        workspace_id=workspace_id,
+        project_id=project_id,
         requester_user_id=member.user_id,
         requester_role=member.role,
     )
@@ -134,6 +135,7 @@ async def add_project_member(
 ):
     """프로젝트 멤버 추가 (admin 이상). cross-workspace 검증은 service 책임."""
     return await service.add_member(
+        workspace_id=workspace_id,
         project_id=project_id,
         user_id=uuid.UUID(data.user_id),
         role=data.role,

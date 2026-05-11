@@ -128,11 +128,12 @@ class ProjectRepository:
     async def add_member(
         self,
         project_id: uuid.UUID,
+        workspace_id: uuid.UUID,
         user_id: uuid.UUID,
         role: str = "member",
     ) -> ProjectMember:
         member = ProjectMember(
-            project_id=project_id, user_id=user_id, role=role
+            project_id=project_id, workspace_id=workspace_id, user_id=user_id, role=role
         )
         self.session.add(member)
         await self.session.flush()

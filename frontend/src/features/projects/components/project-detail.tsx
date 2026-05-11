@@ -1,12 +1,37 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { MoreHorizontal } from "lucide-react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/empty-state";
+import { useWorkspaceRole } from "@/features/members/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 
-import { useProject, useUpdateProject } from "../hooks";
+import {
+  useArchiveProject,
+  useDeleteProject,
+  useProject,
+  useUpdateProject,
+} from "../hooks";
 import type { ProjectVisibility } from "../types";
+import { EditProjectDialog } from "./edit-project-dialog";
 import { ProjectMembersPanel } from "./project-members-panel";
 import { VisibilityBadge } from "./visibility-badge";
 import { VisibilityChangeDialog } from "./visibility-change-dialog";
@@ -48,6 +73,13 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const { data: project, isLoading, error } = useProject(activeWorkspaceId ?? undefined, projectId);
   const updateProject = useUpdateProject(activeWorkspaceId ?? undefined);
+  const router = useRouter();
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [archiveAlertOpen, setArchiveAlertOpen] = useState(false);
+  const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
+  const { canManage } = useWorkspaceRole(activeWorkspaceId ?? undefined);
+  const deleteMutation = useDeleteProject(activeWorkspaceId ?? undefined);
+  const archiveMutation = useArchiveProject(activeWorkspaceId ?? undefined);
 
   const handleVisibilityChange = (next: ProjectVisibility) => {
     updateProject.mutate(
@@ -104,12 +136,34 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
           >
             {STATUS_LABELS[status] ?? status}
           </span>
-          {/* Sprint 6 FE-T2a: visibility 배지. 클릭 시 변경 모달 (BE-T15가 admin 검증) */}
           {project && (
             <VisibilityBadge
               visibility={project.visibility}
-              onClick={() => setVisibilityDialogOpen(true)}
+              onClick={canManage ? () => setVisibilityDialogOpen(true) : undefined}
             />
+          )}
+          {canManage && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground focus-visible:outline-none"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
+                  편집
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setArchiveAlertOpen(true)}>
+                  아카이브
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => setDeleteAlertOpen(true)}
+                >
+                  삭제
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
         {project?.description && (
@@ -197,6 +251,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
           workspaceId={activeWorkspaceId}
           projectId={projectId}
           visibility={project.visibility}
+          canManage={canManage}
         />
       )}
 
@@ -210,6 +265,72 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
           onConfirm={handleVisibilityChange}
         />
       )}
+
+      {/* AD-34: 프로젝트 편집 다이얼로그 */}
+      {project && activeWorkspaceId && (
+        <EditProjectDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          workspaceId={activeWorkspaceId}
+          project={project}
+        />
+      )}
+
+      {/* AD-34: 아카이브 확인 */}
+      <AlertDialog open={archiveAlertOpen} onOpenChange={setArchiveAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>프로젝트를 아카이브하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              아카이브된 프로젝트는 목록에서 숨겨지며 나중에 복원할 수 있습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                archiveMutation.mutate(projectId, {
+                  onSuccess: () => setArchiveAlertOpen(false),
+                });
+              }}
+              disabled={archiveMutation.isPending}
+            >
+              아카이브
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* AD-34: 삭제 확인 */}
+      <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>프로젝트를 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              삭제된 프로젝트는 복원할 수 없습니다. 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                deleteMutation.mutate(projectId, {
+                  onSuccess: () => {
+                    setDeleteAlertOpen(false);
+                    if (activeWorkspaceId) {
+                      router.push(`/workspace/${activeWorkspaceId}/projects`);
+                    }
+                  },
+                });
+              }}
+              disabled={deleteMutation.isPending}
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -198,6 +198,7 @@ shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
 | I-14 | **Pydantic V2 + 100% async**: `session.exec()` 금지, `.dict()` 대신 `.model_dump()`, `BaseSettings`는 `pydantic_settings`에서 import | code review |
 | I-15 | **Secret은 `SecretStr`**: 사용 시 `.get_secret_value()` | `core/config.py` |
 | I-16 | **DB snake_case ↔ API camelCase**: Pydantic alias로 변환 | `<domain>/schemas.py` |
+| I-17 | **cross-workspace ProjectMember 추가 차단 = ProjectService 책임**: `ProjectService.add_member`는 반드시 `WorkspaceRepository.find_member(workspace_id, user_id)`를 호출하여 대상 user가 동일 워크스페이스 멤버임을 검증한다. None이면 `CrossWorkspaceMemberError(403)`. I-9(Repository read 필터)와 레이어 분리: I-9는 read 필터, I-17은 write 검증. | `backend/src/projects/service.py:add_member` |
 
 ---
 
