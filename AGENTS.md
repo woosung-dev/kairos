@@ -190,8 +190,10 @@ test: 테스트 추가/수정
 
 ### 핵심 엔티티
 
-Workspace, User, Project, InboxItem, Meeting, MeetingSummary,
-TranscriptSegment, ActionItem, Note, EmbeddingChunk(계층적), SemanticCache
+Workspace, WorkspaceMember, **WorkspaceInvite** (Sprint 6: `default_project_visibility`), User,
+Project (Sprint 6: `visibility` public/draft/private), **ProjectMember** (Sprint 6 L-6),
+InboxItem, Meeting, MeetingSummary, TranscriptSegment, MeetingProjectLink, ActionItem,
+Note, EmbeddingChunk(계층적), SemanticCache
 → `docs/architecture/erd.md`
 
 ### AI 제약사항
