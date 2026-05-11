@@ -1,7 +1,7 @@
 # backend/src/workspaces/models.py
 """Workspace 모델."""
 import uuid
-from datetime import datetime, UTC
+from datetime import datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -13,8 +13,8 @@ class Workspace(SQLModel, table=True):
     name: str
     owner_id: uuid.UUID = Field(foreign_key="users.id")
     inbox_threshold: float = Field(default=0.9)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class WorkspaceMember(SQLModel, table=True):
@@ -40,4 +40,4 @@ class WorkspaceInvite(SQLModel, table=True):
     use_count: int = 0
     expires_at: datetime | None = None  # null = 만료 없음
     is_active: bool = True
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=datetime.utcnow)

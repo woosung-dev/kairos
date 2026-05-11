@@ -48,6 +48,11 @@
 
 - (없음 — 다음 Next Actions 참조)
 
+## Recently Completed — Sprint 6 Dogfooding + Critical 회귀 fix (2026-05-11, PR #14)
+
+- [x] **Sprint 6 dogfooding 자동 검증** — Playwright MCP + BE API 직접 호출. owner 1 user 세션으로 8 케이스 자동 통과 (1G/1H/2A/3A/3B/3G + SETUP). 결과는 `docs/dev-log/sprint-6-dogfooding-matrix.md`.
+- [x] **PR #14 fix(workspaces): timezone-naive 통일** — dogfooding에서 발견한 Critical 회귀 patch. `datetime.now(UTC)` → `datetime.utcnow()` (workspaces 모듈 3 파일). 회귀 시점 `da33af54` (2026-04-04, Sprint 4/5, **Sprint 6 무관**). 다른 도메인 모듈 패턴과 통일. 신규 사용자 가입 직후 워크스페이스 생성 정상화.
+
 ## Recently Completed — Sprint 6 멤버십 + Private 프로젝트 (2026-05-11, PR #12 머지)
 
 - [x] **Sprint 6 — 멤버십 + Private 프로젝트** (ADR-009 F1 + ADR-014 옵션 A 적용, 11 commits)
@@ -122,13 +127,13 @@
 - [ ] Clerk testing mode 계정 생성 + GitHub `E2E_*` Secrets 등록 (E2E 활성화)
 - [ ] FE ↔ BE 실제 프로덕션 E2E 시나리오 검증 (신규 계정 → 템플릿 프로젝트 3개 확인 → 업로드 → STT → Inbox → 프로젝트 → RAG → `[1]` 클릭 → Source Viewer 풀콘텐츠 렌더)
 
-### Sprint 6 잔여 (sprint 7+ 보류, AD-32~35)
+### Sprint 6 잔여 (sprint 7+ 보류, AD-32~35) — 2026-05-11 dogfooding 결과 반영
 
 - [ ] **AD-32** BE-T16 Project update 권한 강화 — 현재 require_member 유지 결정. creator-only 또는 admin 강화 필요 시 sprint 7+ 검토 (협업 마찰 우려).
-- [ ] **AD-33** ProjectMember 추가 cross-workspace 차단 — sprint 6 1차 미구현. V-T2 시나리오 3 검증 시 발견되면 patch.
-- [ ] **AD-34** FE RBAC 정밀 분기 — visibility 변경 버튼이 모든 멤버에 활성 + BE-T15 403 위임 (1차). useUser+useMembers 매칭으로 정밀화 = sprint 7+ design-review.
-- [ ] **AD-35** Playwright E2E (V-T2) + schemathesis (V-T4) + RAG 권한 누설 E2E (V-T5) — sprint 7+ devex-review와 묶음.
-- [ ] **사용자 수동 dogfooding** (PR #12 머지 직후) — 2 워크스페이스 × 3 visibility(public/draft/private) × 4 role(viewer/member/admin/owner) 매트릭스 클릭. 발견 issue → small patch.
+- [ ] **AD-33** ProjectMember 추가 cross-workspace 차단 — sprint 6 1차 미구현 **확정**. 2026-05-11 dogfooding 자동 검증 결과 1 user 세션 한계로 명시적 검증 불가 (fake UUID는 FK violation 500으로 "우연히" 차단, 의도된 비즈니스 차단 X). AD-35 묶음.
+- [ ] **AD-34** FE RBAC 정밀 분기 — visibility 변경 버튼이 모든 멤버에 활성 + BE-T15 403 위임 (1차). useUser+useMembers 매칭으로 정밀화 = sprint 7+ design-review. dogfooding scope 외, sprint 7+ design-review 보류 **확정**.
+- [ ] **AD-35** Playwright E2E (V-T2) + schemathesis (V-T4) + RAG 권한 누설 E2E (V-T5) — sprint 7+ devex-review와 묶음. **2026-05-11 dogfooding으로 1A~1F viewer/member 읽기 + 2D Private RAG 누설 + 2E/2F member/viewer visibility 변경 시도 + CORS-1 (BE 5xx CORS 헤더 누락) + SCHEMA-1 (Project `title` vs ERD `name` 정합성) 추가 묶음**.
+- [x] **사용자 수동 dogfooding** — Playwright MCP 자동화로 진행 (8 케이스 자동 통과 + Critical TZ-1 회귀 발견 PR #14). 결과 `docs/dev-log/sprint-6-dogfooding-matrix.md`.
 
 ### Sprint 6 후속 docs (Medium 보류 4개 중 1개 완료)
 
