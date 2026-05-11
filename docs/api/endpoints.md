@@ -735,6 +735,7 @@ Project
 | 상태 | 응답 |
 |:----:|------|
 | 404 | `{ "detail": "프로젝트을 찾을 수 없습니다" }` |
+| 404 | workspace mismatch — 해당 프로젝트가 path workspace_id에 속하지 않음 (BE-T12) |
 
 ---
 
