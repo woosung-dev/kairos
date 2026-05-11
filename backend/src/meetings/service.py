@@ -21,6 +21,7 @@ class MeetingService:
         file_key: str,
         created_by_id: uuid.UUID,
         recorded_at=None,
+        source: str | None = None,
     ) -> dict:
         """회의 레코드 생성 (status: uploading). 파이프라인은 router에서 BackgroundTasks로."""
         meeting = Meeting(
@@ -30,6 +31,7 @@ class MeetingService:
             created_by_id=created_by_id,
             recorded_at=recorded_at,
             status="uploading",
+            source=source,
         )
         meeting = await self.repo.save(meeting)
         await self.repo.commit()
