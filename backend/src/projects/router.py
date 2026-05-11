@@ -66,7 +66,8 @@ async def get_project(
     service: ProjectService = Depends(get_project_service),
 ):
     return await service.get_project(
-        project_id,
+        workspace_id=workspace_id,
+        project_id=project_id,
         requester_user_id=member.user_id,
         requester_role=member.role,
     )

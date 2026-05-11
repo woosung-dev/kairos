@@ -82,6 +82,7 @@ class ProjectService:
 
     async def get_project(
         self,
+        workspace_id: uuid.UUID,
         project_id: uuid.UUID,
         requester_user_id: uuid.UUID | None = None,
         requester_role: str | None = None,
@@ -90,6 +91,8 @@ class ProjectService:
         project = await self.repo.find_by_id(project_id)
         if project is None:
             raise ProjectNotFoundError()
+        if project.workspace_id != workspace_id:
+            raise WorkspaceMismatchError()
         # visibility 권한 검증 (admin 이상 우회, 그 외 visibility별 분기)
         if requester_role not in ("admin", "owner"):
             if project.visibility == "draft":
