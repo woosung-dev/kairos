@@ -6,6 +6,7 @@ export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
 export interface Member {
   id: UUID;
   userId: UUID;
+  clerkId: string | null;
   email: string | null;
   displayName: string | null;
   role: WorkspaceRole;

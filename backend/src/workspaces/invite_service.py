@@ -201,6 +201,7 @@ class InviteService:
             result.append({
                 "id": str(m.id),
                 "userId": str(m.user_id),
+                "clerkId": user.clerk_id if user else None,
                 "email": user.email if user else None,
                 "displayName": user.display_name if user else None,
                 "role": m.role,

@@ -34,10 +34,8 @@ export function useSyncWorkspaceRole(wid: string | undefined) {
       setWorkspaceRole(null);
       return;
     }
-    // Clerk user.id와 매칭되는 멤버를 이메일로 찾음
-    const me = members.find(
-      (m) => m.email === user.primaryEmailAddress?.emailAddress
-    );
+    // Clerk user.id로 직접 매칭 (email은 JWT claims에 미포함)
+    const me = members.find((m) => m.clerkId === user.id);
     setWorkspaceRole(me?.role ?? null);
   }, [members, user, setWorkspaceRole]);
 }
@@ -62,11 +60,9 @@ export function useWorkspaceRole(workspaceId: string | undefined) {
   const { user } = useUser();
   const { data: members } = useMembers(workspaceId);
 
-  // useSyncWorkspaceRole과 동일하게 email 기반 매칭
+  // clerkId 기반 매칭 (email은 JWT claims에 미포함)
   const role =
-    members?.find(
-      (m) => m.email === user?.primaryEmailAddress?.emailAddress
-    )?.role ?? null;
+    members?.find((m) => m.clerkId === user?.id)?.role ?? null;
 
   return {
     role,
