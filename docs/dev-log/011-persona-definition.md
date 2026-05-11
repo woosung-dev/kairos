@@ -47,7 +47,7 @@ design doc §"The Assignment"에서 사용자에게 "지인 2명 인터뷰" 과�
 - **불변성**: 한 번 부여된 ID는 변경 금지. 폐기된 페르소나의 ID 재사용 금지(`.ai/common/global.md` §2).
 - **상태 라벨**: 각 페르소나는 다음 넷 중 하나 — `interview-confirmed` (외부 인터뷰 ≥1명 검증) / `self-confirmed` (본인 도그푸딩 1명 기록 검증, 강도 약함) / `[가설]` (외부 검증 전 본인 추론) / `deprecated` (검증 실패·폐기).
 - **강도 차이 명시**: `self-confirmed`는 외부 인터뷰 응답자와 의미적 동일 강도 아님. `[가설]` 보다 강하지만 `interview-confirmed` 보다 약함 — wedge 선정 입력 가중치 낮음.
-- **후속**: `.ai/common/global.md` §2 ID 체계 표(현재 SCR/API/ENT/REQ 4개 접두사)에 `PERSONA-` 접두사 추가 PR (본 ADR 머지 후 후속).
+- **후속 (closeout 2026-05-11, ADR-011-vivid-clarke patch)**: `.ai/`가 의도적 `.gitignore` 포함 (커밋 흐름 5adf9f7→231f660 "fix(rest): reset ai rules")로 표 갱신 PR 자체 불가. 로컬 `.ai/common/global.md` 표는 직접 갱신. **본 §1이 `PERSONA-` 접두사 정의의 권위 출처** — 외부 참조 시 ADR-011 §1을 1차 인용. (발견 출처: Sprint 6 plan vivid-clarke §10 T-F10)
 
 ### 2. 페르소나 필수 필드 7개
 
@@ -158,4 +158,4 @@ design doc §"The Assignment"에서 사용자에게 "지인 2명 인터뷰" 과�
 - **Wedge 선정 ADR (신규)** — Sprint 6 완료 후 페르소나-Wedge 매트릭스 + demand 시그널(ADR-009) + thesis 검증(ADR-010)로 W1~W4 중 우선 wedge 결정.
 - **외부 인터뷰 가이드** — Sprint 7+ 진입 시 본 ADR 7개 필수 필드 + AD-8 60% 임계값 + 승진/해고 기준 우회 질문 설계 별도 문서.
 - **페르소나 갱신 사이클** — 매 Sprint 종료 retrospective에 페르소나 검증 5분 항목 추가 (`/retro` 스킬과 정합).
-- **`.ai/common/global.md` §2 ID 체계 표 갱신 PR** — 현재 SCR/API/ENT/REQ 4개 접두사 표에 `PERSONA-` 접두사 추가. 본 ADR 머지 후 별도 docs PR.
+- ~~**`.ai/common/global.md` §2 ID 체계 표 갱신 PR**~~ **(closeout 2026-05-11)** — `.ai/`가 의도적 `.gitignore`(5adf9f7→231f660 reset 흐름)로 PR 불가. 로컬 표는 직접 갱신 완료(git 외부). 본 ADR §1이 `PERSONA-` 접두사 정의의 권위 출처로 확정. 발견 + 결정 출처: Sprint 6 plan vivid-clarke §10 T-F10 차단 → 옵션 (f) 사용자 승인.
