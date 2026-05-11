@@ -44,6 +44,9 @@ class UpdateMemberRoleRequest(BaseModel):
 
 class CreateInviteRequest(BaseModel):
     role: str = Field(default="member", pattern=r"^(admin|member|viewer)$")
+    default_project_visibility: str = Field(
+        default="public", pattern=r"^(public|draft|private)$"
+    )
     max_uses: int | None = Field(default=None, ge=1)
     expires_in_days: int | None = Field(default=7, ge=1, le=30)
 
@@ -53,6 +56,7 @@ class InviteResponse(BaseModel):
     workspace_id: uuid.UUID
     code: str
     role: str
+    default_project_visibility: str = "public"
     invite_url: str
     max_uses: int | None
     use_count: int
