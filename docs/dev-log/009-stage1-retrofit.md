@@ -153,7 +153,7 @@ CONTEXT-MAP §7 부채:
 | F5 | **5분 사용자 세션 관찰 도입 (Q5)** | Sprint 7+ | 도그푸딩 사용자 1-3명 5분 세션 녹화 + "어느 단계에서 ChatGPT/Notion으로 빠지는가" 시그널 | 세션 관찰 raw note (`docs/requirements/observation-notes.md`) |
 | F6 | **Wedge 선정 ADR (신규)** | Sprint 6 완료 + F2/F4 결과 후 | 페르소나-Wedge 매트릭스(ADR-011 §3) + S5/S6 시그널 | `docs/dev-log/012-wedge-selection.md` (예정) |
 | F7 | **L4 우선화 검토 ADR (신규)** | Sprint 6 완료 + F4 결과 후 | ADR-010 §4 O1/O2/O3 옵션 선택 + ADR-007 Phase 4 진입 결정 | `docs/dev-log/013-l4-prioritization.md` (예정) |
-| F8 | **부채 D-2/D-3 처리 ADR (신규)** | Sprint 6 킥오프 시점에 결정: (a) D-2/D-3가 멤버십 권한 검증과 직결되면 Sprint 6 **진입 직전** 선작성, (b) 분리 가능하면 Sprint 6 **완료 후** 작성. 결정 자체는 Sprint 6 킥오프 ADR 또는 본 ADR 후속 패치에서 명시. | service-to-service 경계 정책 결정 (헌법 §4.2 ⚠️ 부채 해소 또는 헌법 갱신) | `docs/dev-log/014-service-boundary.md` (예정) |
+| F8 | ~~**부채 D-2/D-3 처리 ADR (신규)**~~ **(closeout 2026-05-11)** | Sprint 6 진입 직전 (옵션 a) ADR-014 선작성 후 머지(commit 038fe37, PR #11). D-2/D-3 부채는 Sprint 6 BE-T9~T14 commit 8096314로 해소(notes/rag pipeline_service 도입). CONTEXT-MAP §4.2 + §7 갱신은 Sprint 6 머지 PR에 포함 | `docs/dev-log/014-service-boundary.md` (Accepted) + CONTEXT-MAP §4.2/§7 patch |
 | F9 | **본 ADR 갱신 검토** | Sprint 7+ 외부 인터뷰 완료 후 | S1~S6 실측 결과로 임계값 재조정 필요성 평가 | 본 ADR supersedes 또는 갱신 PR |
 | F10 | ~~**`.ai/common/global.md` §2 ID 체계 표 갱신 PR**~~ **(closeout 2026-05-11)** | 본 retrofit 머지 직후 | `.ai/`가 의도적 git ignored(5adf9f7→231f660)로 PR 불가. ADR-011 §1이 `PERSONA-` 정의의 권위 출처로 확정. 로컬 `.ai/common/global.md` 표는 직접 갱신(git 외부) | ADR-011 closeout patch (docs/dev-log/011 §1·§"후속") |
 

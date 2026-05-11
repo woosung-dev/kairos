@@ -121,8 +121,8 @@ graph TD
   inbox -.AI 추천.-> projects
   rag --> embeddings
   rag --> projects
-  notes -.현재 부채.-> embeddings
-  rag -.현재 부채.-> embeddings
+  notes -. orchestrator only .-> embeddings
+  rag -. orchestrator only .-> embeddings
   meetings -. orchestrator only .-> inbox
   meetings -. orchestrator only .-> embeddings
 ```
@@ -132,12 +132,11 @@ graph TD
 | `inbox → projects.repository` (AI 추천 후보 조회) | ✅ Repository 레벨까지 | inbox/service.py:현존 |
 | `meetings → actions.repository` (액션 저장) | ✅ Repository 레벨까지 | meetings/service.py:현존 |
 | `actions → projects.repository`, `actions → workspaces.repository` | ✅ Repository 레벨까지 | actions/service.py:현존 |
-| `rag → embeddings.{models, repository, service}` | ⚠️ 현재 부채 (§7 D-3) | service 레벨까지 도달 — ADR-009 후보 |
-| `notes → embeddings.service` (노트 임베딩) | ⚠️ 현재 부채 (§7 D-2) | notes/service.py:현존 |
+| `embeddings.service` 호출 (cross-domain shared service) | ✅ orchestrator(`*/pipeline_service.py` 또는 `services/`) 내부에서만 (ADR-014) | code review |
 | 도메인 service.py 끼리 직접 호출 (Repository 우회) | ❌ 금지 | code review |
 | 크로스 도메인 트랜잭션 (3개 이상 모듈 + commit) | ❌ orchestrator 필수 | `<domain>/pipeline_service.py` 또는 `services/` |
 
-> **헌법 결정 #1**: Repository는 다른 도메인에서 직접 의존해도 OK (read-only 조회 한정). Service-to-Service는 오케스트레이터 경유 필수. 현재 `notes→embeddings.service`, `rag→embeddings.service` 패턴은 §7 D-2/D-3 부채로 ADR-009 후보.
+> **헌법 결정 #1**: Repository는 다른 도메인에서 직접 의존해도 OK (read-only 조회 한정). Service-to-Service는 오케스트레이터 경유 필수. **embeddings·ai_processing·transcription은 cross-domain shared service**로 분류 — 직접 호출은 orchestrator 경계(`*/pipeline_service.py` 또는 `services/`) 내부에서만 허용 (ADR-014).
 
 ### 4.3 프론트엔드 features (FSD)
 
@@ -208,9 +207,9 @@ shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
 
 | # | 부채 | 발견 근거 | 후속 |
 |---|---|---|---|
-| D-1 | Project `visibility` (Public/Draft/Private)가 ERD에는 있지만 `models.py`에 미구현 | `grep "visibility" backend/src/projects/` → 결과 없음 | Sprint 6 (멤버십 + Private) |
-| D-2 | `notes/service.py → embeddings.service` 직접 의존 (§4.2 ⚠️) | service-to-service 경계 회색지대 | ADR-009 후보 |
-| D-3 | `rag/service.py → embeddings.{models, repository, service}` 직접 의존 (§4.2 ⚠️) | 동일 | ADR-009와 묶음 |
+| ~~D-1~~ | ~~Project `visibility` 미구현~~ | **[해소 2026-05-11]** Sprint 6 BE-T1~T3 (commit e779541) — `backend/src/projects/models.py:18` visibility 컬럼 + alembic c4c5709a4ab4 마이그레이션 | — |
+| ~~D-2~~ | ~~`notes/service.py → embeddings.service` 직접 의존~~ | **[해소 2026-05-11]** Sprint 6 BE-T9~T11 (commit 8096314) — NotePipelineService 도입, NoteService 순수화. ADR-014 옵션 A 적용 | — |
+| ~~D-3~~ | ~~`rag/service.py → embeddings.{models, repository, service}` 직접 의존~~ | **[해소 1차 2026-05-11]** Sprint 6 BE-T12~T14 (commit 8096314) — RagPipelineService 도입 (visibility 검증 + RagService.ask 위임). RagService 내부 embedding 호출은 다음 sprint+ 완전 분리 검토 (ADR-014 §"비용/리스크" R-3) | ADR-014 §"후속" F8.4 |
 | D-4 | EmbeddingChunk L0(document) 미사용 — 코드는 L1/L2만 저장 | `embeddings/service.py:117,140,191,209` | ERD에서 L0 제거 또는 L0 활용 결정 |
 | ~~D-5~~ | ~~Inbox confidence 0.9 임계값 미구현~~ | **[해소]** `workspaces.inbox_threshold` 완전 구현 (`workspaces/models.py:15`, `meetings/pipeline_service.py:67`, PATCH endpoint, FE 설정 UI) — retrofit 사실 오류였음 | — |
 | D-6 | second-brain.md §8 미해결 5건 | 개인↔팀 경계, RAG 검색 범위 UX, 회의 소속, CEO/관리자 접근, 지식 생명주기 | Phase B `/autoplan` 우선순위 |
