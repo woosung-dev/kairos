@@ -145,7 +145,7 @@ class ProjectService:
             ws_member = await self.ws_repo.find_member(workspace_id, user_id)
             if ws_member is None:
                 raise CrossWorkspaceMemberError()
-        member = await self.repo.add_member(project_id, user_id, role)
+        member = await self.repo.add_member(project_id, project.workspace_id, user_id, role)
         await self.repo.commit()
         return {
             "id": str(member.id),
