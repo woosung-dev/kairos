@@ -1,4 +1,5 @@
 import type { UUID } from "@/types";
+import type { ProjectVisibility } from "@/features/projects/types";
 
 export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
 
@@ -21,6 +22,7 @@ export interface Invite {
   workspaceId: UUID;
   code: string;
   role: Exclude<WorkspaceRole, "owner">;
+  defaultProjectVisibility: ProjectVisibility;
   inviteUrl: string;
   maxUses: number | null;
   useCount: number;
@@ -31,6 +33,7 @@ export interface Invite {
 
 export interface CreateInviteRequest {
   role?: Exclude<WorkspaceRole, "owner">;
+  defaultProjectVisibility?: ProjectVisibility;
   maxUses?: number | null;
   expiresInDays?: number | null;
 }

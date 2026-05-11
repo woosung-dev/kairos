@@ -19,6 +19,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  VISIBILITY_LABELS,
+} from "@/features/projects/components/visibility-badge";
+import type { ProjectVisibility } from "@/features/projects/types";
+
 import { useInvites, useCreateInvite, useDeactivateInvite } from "../hooks";
 import type { WorkspaceRole } from "../types";
 
@@ -40,6 +45,8 @@ export function InviteManager({
   const [confirmDeactivateId, setConfirmDeactivateId] = useState<string | null>(null);
   const [newInviteRole, setNewInviteRole] =
     useState<Exclude<WorkspaceRole, "owner">>("member");
+  const [newDefaultVisibility, setNewDefaultVisibility] =
+    useState<ProjectVisibility>("public");
 
   const isAdmin =
     currentUserRole === "admin" || currentUserRole === "owner";
@@ -52,11 +59,16 @@ export function InviteManager({
 
   const handleCreate = () => {
     createInvite.mutate(
-      { role: newInviteRole, expiresInDays: 7 },
+      {
+        role: newInviteRole,
+        defaultProjectVisibility: newDefaultVisibility,
+        expiresInDays: 7,
+      },
       {
         onSuccess: () => {
           setIsCreateOpen(false);
           setNewInviteRole("member");
+          setNewDefaultVisibility("public");
         },
       }
     );
@@ -159,6 +171,45 @@ export function InviteManager({
                     onClick={() => setNewInviteRole("viewer")}
                   >
                     Viewer — 읽기 전용, RAG 질문만
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Sprint 6 FE-T5: default project visibility (시안 3A Two-Stack Radio) */}
+              <label
+                className="text-sm font-medium pt-2"
+                style={{ color: "var(--text-primary)" }}
+              >
+                기본 Project Visibility
+              </label>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  className="inline-flex items-center justify-between w-full px-3 py-2 text-sm rounded-md border cursor-pointer"
+                  style={{
+                    borderColor: "var(--border-subtle)",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  {VISIBILITY_LABELS[newDefaultVisibility]}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onClick={() => setNewDefaultVisibility("public")}
+                  >
+                    공개 — 워크스페이스 모든 멤버 접근
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onClick={() => setNewDefaultVisibility("draft")}
+                  >
+                    작업 중 — 작성자 + admin/owner만 접근
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onClick={() => setNewDefaultVisibility("private")}
+                  >
+                    비공개 — 명시 멤버 + admin/owner만 접근
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

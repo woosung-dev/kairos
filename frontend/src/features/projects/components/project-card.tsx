@@ -1,6 +1,11 @@
 "use client";
 
 import type { Project } from "../types";
+import {
+  VISIBILITY_COLOR_VAR,
+  VISIBILITY_ICON,
+  VISIBILITY_LABELS,
+} from "./visibility-badge";
 
 interface ProjectCardProps {
   project: Project;
@@ -37,7 +42,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
         e.currentTarget.style.background = "var(--surface)";
       }}
     >
-      {/* 제목 + 뱃지 */}
+      {/* 제목 + status + visibility 뱃지 (Sprint 6 FE-T3) */}
       <div className="flex items-center gap-2 mb-2">
         <h3
           className="text-sm font-semibold truncate"
@@ -54,6 +59,19 @@ export function ProjectCard({ project }: ProjectCardProps) {
         >
           {STATUS_LABELS[project.status]}
         </span>
+        {(() => {
+          const Icon = VISIBILITY_ICON[project.visibility];
+          return (
+            <span
+              className="shrink-0 inline-flex items-center gap-1 text-[10px]"
+              style={{ color: VISIBILITY_COLOR_VAR[project.visibility] }}
+              title={VISIBILITY_LABELS[project.visibility]}
+              aria-label={`Visibility: ${VISIBILITY_LABELS[project.visibility]}`}
+            >
+              <Icon size={11} />
+            </span>
+          );
+        })()}
       </div>
 
       {/* 태그 */}
