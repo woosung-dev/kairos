@@ -79,3 +79,20 @@ export async function createMeeting(
     body: JSON.stringify(data),
   });
 }
+
+export interface CaptureTextRequest {
+  title: string;
+  transcriptText: string;
+}
+
+export async function captureText(
+  token: string,
+  wid: string,
+  data: CaptureTextRequest
+): Promise<{ id: string; status: string; message: string }> {
+  return apiClient(`/workspaces/${wid}/meetings/capture`, {
+    token,
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}

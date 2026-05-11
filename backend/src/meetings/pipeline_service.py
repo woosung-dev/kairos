@@ -17,6 +17,7 @@ from datetime import date
 
 from src.actions.models import ActionItem
 from src.actions.repository import ActionItemRepository
+from src.meetings.models import TranscriptSegment
 from src.common.r2 import R2Service
 from src.inbox.models import InboxItem
 from src.inbox.repository import InboxRepository
@@ -216,6 +217,128 @@ class MeetingPipelineService:
 
         except Exception as e:
             logger.exception("파이프라인 실패 (meeting=%s): %s", meeting_id, e)
+            await self.meeting_repo.update_status(
+                meeting_id, "failed", error_message=str(e)
+            )
+            await self.meeting_repo.commit()
+
+    async def capture_text(self, meeting_id: uuid.UUID, transcript_text: str) -> None:
+        """텍스트 캡처 파이프라인 — STT 건너뛰고 분석부터 시작."""
+        try:
+            meeting = await self.meeting_repo.find_by_id(meeting_id)
+            if meeting is None:
+                return
+
+            workspace = await self.workspace_repo.find_by_id(meeting.workspace_id)
+            threshold = workspace.inbox_threshold if workspace else 0.9
+
+            await self.meeting_repo.update_status(meeting_id, "analyzing")
+            await self.meeting_repo.commit()
+
+            # 트랜스크립트 세그먼트 1개로 저장
+            segment = TranscriptSegment(
+                meeting_id=meeting_id,
+                speaker="텍스트",
+                start_sec=0.0,
+                end_sec=0.0,
+                text=transcript_text,
+            )
+            await self.meeting_repo.save_segments(meeting_id, [segment])
+            await self.meeting_repo.set_has_transcript(meeting_id, True)
+
+            # 요약
+            summary_data = await self.ai_service.summarize(transcript_text)
+            await self.meeting_repo.save_summary(meeting_id, summary_data)
+            await self.meeting_repo.set_has_summary(meeting_id, True)
+
+            # 액션 추출 + 프로젝트 연결
+            existing_projects = await self.project_repo.find_by_workspace(meeting.workspace_id)
+            project_list = [
+                {"id": str(p.id), "title": p.title, "status": p.status}
+                for p in existing_projects
+            ]
+            actions_data = await self.ai_service.extract_actions_and_link(
+                transcript_text, summary_data.get("summary", ""), project_list
+            )
+
+            action_count = 0
+            for ai_action in actions_data.get("actionItems", []):
+                action_item = ActionItem(
+                    workspace_id=meeting.workspace_id,
+                    meeting_id=meeting.id,
+                    title=ai_action["title"],
+                    description=ai_action.get("description"),
+                    priority=ai_action.get("priority", "medium"),
+                )
+                due_date_str = ai_action.get("dueDate")
+                if due_date_str:
+                    try:
+                        action_item.due_date = date.fromisoformat(due_date_str)
+                    except ValueError:
+                        pass
+                await self.action_repo.save(action_item)
+                action_count += 1
+
+            meeting = await self.meeting_repo.find_by_id(meeting_id)
+            if meeting:
+                meeting.action_item_count = action_count
+
+            # InboxItem 생성
+            suggested = actions_data.get("suggestedProject", {})
+            confidence = suggested.get("confidence", 0.0)
+            existing_project_id_str = suggested.get("existingProjectId")
+
+            inbox_item = InboxItem(
+                workspace_id=meeting.workspace_id,
+                title=f"{meeting.title} 요약",
+                summary=summary_data.get("summary", ""),
+                source_type="meeting",
+                source_id=meeting.id,
+                ai_suggested_project_id=(
+                    uuid.UUID(existing_project_id_str) if existing_project_id_str else None
+                ),
+                ai_suggested_project_title=suggested.get("newProjectTitle"),
+                ai_suggested_tags=actions_data.get("suggestedTags", []),
+                ai_confidence=confidence,
+                is_processed=confidence >= threshold,
+            )
+            await self.inbox_repo.save(inbox_item)
+
+            if confidence >= threshold and existing_project_id_str:
+                await self.project_repo.add_meeting_link(
+                    meeting.id, uuid.UUID(existing_project_id_str)
+                )
+
+            # 임베딩 (비치명적)
+            try:
+                project_id = (
+                    uuid.UUID(existing_project_id_str)
+                    if (confidence >= threshold and existing_project_id_str)
+                    else None
+                )
+                await self.embedding_service.embed_meeting(
+                    meeting_id=meeting.id,
+                    workspace_id=meeting.workspace_id,
+                    project_id=project_id,
+                    title=meeting.title,
+                    segments=[{
+                        "speaker": "텍스트",
+                        "text": transcript_text,
+                        "start_sec": 0.0,
+                        "end_sec": 0.0,
+                    }],
+                )
+                await self.embedding_service.invalidate_cache(meeting.workspace_id, project_id)
+            except Exception as emb_err:
+                logger.warning(
+                    "임베딩 생성 실패 (비치명적, meeting=%s): %s", meeting_id, emb_err
+                )
+
+            await self.meeting_repo.update_status(meeting_id, "completed")
+            await self.meeting_repo.commit()
+
+        except Exception as e:
+            logger.exception("capture_text 파이프라인 실패 (meeting=%s): %s", meeting_id, e)
             await self.meeting_repo.update_status(
                 meeting_id, "failed", error_message=str(e)
             )

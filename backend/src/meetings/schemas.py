@@ -23,3 +23,10 @@ class MeetingCreatedResponse(BaseModel):
 class MeetingStatusResponse(BaseModel):
     status: str
     error_message: str | None = None
+
+
+class CaptureTextRequest(BaseModel):
+    title: str
+    transcript_text: str = Field(alias="transcriptText", min_length=50)
+
+    model_config = {"populate_by_name": True}

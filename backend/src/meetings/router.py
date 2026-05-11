@@ -11,7 +11,7 @@ from src.auth.rbac import require_member, require_viewer
 from src.workspaces.models import WorkspaceMember
 from src.meetings.dependencies import get_meeting_service, get_pipeline_service
 from src.meetings.pipeline_service import MeetingPipelineService
-from src.meetings.schemas import CreateMeetingRequest
+from src.meetings.schemas import CaptureTextRequest, CreateMeetingRequest
 from src.meetings.service import MeetingService
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}/meetings", tags=["meetings"])
@@ -35,6 +35,28 @@ async def create_meeting(
     )
     # 백그라운드에서 파이프라인 실행
     background_tasks.add_task(pipeline.process_meeting, uuid.UUID(result["id"]))
+    return result
+
+
+@router.post("/capture", status_code=202)
+async def capture_text_meeting(
+    workspace_id: uuid.UUID,
+    data: CaptureTextRequest,
+    background_tasks: BackgroundTasks,
+    member: WorkspaceMember = Depends(require_member),
+    service: MeetingService = Depends(get_meeting_service),
+    pipeline: MeetingPipelineService = Depends(get_pipeline_service),
+):
+    """텍스트 캡처 — STT 없이 직접 AI 분석. 202 Accepted."""
+    result = await service.create_meeting(
+        workspace_id=workspace_id,
+        title=data.title,
+        file_key="",
+        created_by_id=member.user_id,
+        source="text",
+    )
+    meeting_id = uuid.UUID(result["id"])
+    background_tasks.add_task(pipeline.capture_text, meeting_id, data.transcript_text)
     return result
 
 

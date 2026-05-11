@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { usePresignedUpload } from "@/features/upload/hooks";
-import { useCreateMeeting } from "@/features/meetings/hooks";
+import { useCreateMeeting, useCaptureText } from "@/features/meetings/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 
 const CONTENT_TYPES = [
@@ -46,6 +46,13 @@ export default function NewContentPage() {
 
   const isUploading = !!uploadStep;
 
+  const [meetingTab, setMeetingTab] = useState<"audio" | "text">("audio");
+  const [captureTitle, setCaptureTitle] = useState("");
+  const [captureContent, setCaptureContent] = useState("");
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const captureTextMutation = useCaptureText(activeWorkspaceId ?? undefined);
+  const isCapturing = captureTextMutation.isPending;
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
@@ -78,6 +85,20 @@ export default function NewContentPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "업로드 실패");
       setUploadStep(null);
+    }
+  };
+
+  const handleCapture = async () => {
+    if (!captureTitle || captureContent.length < 50 || !activeWorkspaceId) return;
+    setCaptureError(null);
+    try {
+      const result = await captureTextMutation.mutateAsync({
+        title: captureTitle,
+        transcriptText: captureContent,
+      });
+      router.push(`/meetings/${result.id}`);
+    } catch (err) {
+      setCaptureError(err instanceof Error ? err.message : "캡처 실패");
     }
   };
 
@@ -158,112 +179,229 @@ export default function NewContentPage() {
             회의 녹음
           </h2>
 
-          <div className="space-y-4">
-            {/* 제목 */}
-            <div>
-              <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
-                회의 제목
-              </label>
-              <input
-                type="text"
-                placeholder="회의 제목을 입력하세요"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 rounded border text-sm bg-transparent outline-none"
-                style={{
-                  borderColor: "var(--border)",
-                  color: "var(--text-primary)",
-                  borderRadius: "var(--radius-sm)",
-                }}
-              />
-            </div>
-
-            {/* 파일 드롭존 */}
-            <div>
-              <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
-                녹음 파일
-              </label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="audio/*,video/*,.mp3,.wav,.m4a,.mp4,.webm"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
+          {/* 탭 */}
+          <div className="flex gap-1 mb-4 border-b" style={{ borderColor: "var(--border-subtle)" }}>
+            {(["audio", "text"] as const).map((tab) => (
               <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full flex flex-col items-center justify-center h-32 rounded border-2 border-dashed transition-colors"
+                key={tab}
+                onClick={() => setMeetingTab(tab)}
+                className="px-4 py-2 text-sm font-medium transition-colors"
                 style={{
-                  borderColor: file ? "var(--accent)" : "var(--border)",
-                  color: "var(--text-muted)",
-                  background: file ? "var(--accent-subtle)" : "transparent",
+                  color: meetingTab === tab ? "var(--accent)" : "var(--text-muted)",
+                  borderBottom: meetingTab === tab ? "2px solid var(--accent)" : "2px solid transparent",
                 }}
               >
-                {file ? (
-                  <>
-                    <span className="text-2xl mb-1">✅</span>
-                    <p className="text-sm" style={{ color: "var(--text-primary)" }}>
-                      {file.name}
-                    </p>
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      {(file.size / 1024).toFixed(1)} KB — 클릭하여 변경
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-2xl mb-1">🎙️</span>
-                    <p className="text-sm">클릭하여 파일 선택</p>
-                    <p className="text-xs mt-1">MP3, WAV, M4A, MP4, WebM</p>
-                  </>
-                )}
+                {tab === "audio" ? "🎙️ 오디오 업로드" : "📝 텍스트로 입력"}
               </button>
-            </div>
-
-            {/* 에러 */}
-            {error && (
-              <div
-                className="px-3 py-2 rounded text-sm"
-                style={{
-                  background: "rgba(248,113,113,0.1)",
-                  color: "var(--error)",
-                  borderRadius: "var(--radius-sm)",
-                }}
-              >
-                {error}
-              </div>
-            )}
-
-            {/* 업로드 진행 */}
-            {uploadStep && (
-              <div
-                className="px-3 py-2 rounded text-sm"
-                style={{
-                  background: "var(--accent-subtle)",
-                  color: "var(--accent)",
-                  borderRadius: "var(--radius-sm)",
-                }}
-              >
-                ⏳ {uploadStep}
-              </div>
-            )}
-
-            {/* 업로드 버튼 */}
-            <div className="flex justify-end">
-              <button
-                onClick={handleUpload}
-                disabled={!file || !title || isUploading || !activeWorkspaceId}
-                className="px-6 py-2 rounded text-sm font-medium transition-opacity"
-                style={{
-                  background: file && title && !isUploading ? "var(--accent)" : "var(--surface-active)",
-                  color: file && title && !isUploading ? "var(--background)" : "var(--text-muted)",
-                  borderRadius: "var(--radius-sm)",
-                  cursor: !file || !title || isUploading ? "not-allowed" : "pointer",
-                }}
-              >
-                {isUploading ? "업로드 중..." : "업로드 시작"}
-              </button>
-            </div>
+            ))}
           </div>
+
+          {meetingTab === "audio" && (
+            <div className="space-y-4">
+              {/* 제목 */}
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
+                  회의 제목
+                </label>
+                <input
+                  type="text"
+                  placeholder="회의 제목을 입력하세요"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3 py-2 rounded border text-sm bg-transparent outline-none"
+                  style={{
+                    borderColor: "var(--border)",
+                    color: "var(--text-primary)",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                />
+              </div>
+
+              {/* 파일 드롭존 */}
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
+                  녹음 파일
+                </label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="audio/*,video/*,.mp3,.wav,.m4a,.mp4,.webm"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex flex-col items-center justify-center h-32 rounded border-2 border-dashed transition-colors"
+                  style={{
+                    borderColor: file ? "var(--accent)" : "var(--border)",
+                    color: "var(--text-muted)",
+                    background: file ? "var(--accent-subtle)" : "transparent",
+                  }}
+                >
+                  {file ? (
+                    <>
+                      <span className="text-2xl mb-1">✅</span>
+                      <p className="text-sm" style={{ color: "var(--text-primary)" }}>
+                        {file.name}
+                      </p>
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                        {(file.size / 1024).toFixed(1)} KB — 클릭하여 변경
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-2xl mb-1">🎙️</span>
+                      <p className="text-sm">클릭하여 파일 선택</p>
+                      <p className="text-xs mt-1">MP3, WAV, M4A, MP4, WebM</p>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* 에러 */}
+              {error && (
+                <div
+                  className="px-3 py-2 rounded text-sm"
+                  style={{
+                    background: "rgba(248,113,113,0.1)",
+                    color: "var(--error)",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                >
+                  {error}
+                </div>
+              )}
+
+              {/* 업로드 진행 */}
+              {uploadStep && (
+                <div
+                  className="px-3 py-2 rounded text-sm"
+                  style={{
+                    background: "var(--accent-subtle)",
+                    color: "var(--accent)",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                >
+                  ⏳ {uploadStep}
+                </div>
+              )}
+
+              {/* 업로드 버튼 */}
+              <div className="flex justify-end">
+                <button
+                  onClick={handleUpload}
+                  disabled={!file || !title || isUploading || !activeWorkspaceId}
+                  className="px-6 py-2 rounded text-sm font-medium transition-opacity"
+                  style={{
+                    background: file && title && !isUploading ? "var(--accent)" : "var(--surface-active)",
+                    color: file && title && !isUploading ? "var(--background)" : "var(--text-muted)",
+                    borderRadius: "var(--radius-sm)",
+                    cursor: !file || !title || isUploading ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {isUploading ? "업로드 중..." : "업로드 시작"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {meetingTab === "text" && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
+                  회의 제목
+                </label>
+                <input
+                  type="text"
+                  placeholder="회의 제목을 입력하세요"
+                  value={captureTitle}
+                  onChange={(e) => setCaptureTitle(e.target.value)}
+                  className="w-full px-3 py-2 rounded border text-sm bg-transparent outline-none"
+                  style={{
+                    borderColor: "var(--border)",
+                    color: "var(--text-primary)",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
+                  회의 내용 <span style={{ color: "var(--text-muted)" }}>(최소 50자)</span>
+                </label>
+                <textarea
+                  placeholder="회의록, 스크립트, 메모를 붙여넣으세요"
+                  value={captureContent}
+                  onChange={(e) => setCaptureContent(e.target.value)}
+                  rows={10}
+                  className="w-full px-3 py-2 rounded border text-sm bg-transparent outline-none resize-y"
+                  style={{
+                    borderColor: "var(--border)",
+                    color: "var(--text-primary)",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                />
+                <p
+                  className="text-xs mt-1"
+                  style={{ color: captureContent.length < 50 ? "var(--error)" : "var(--text-muted)" }}
+                >
+                  {captureContent.length}자
+                  {captureContent.length < 50 ? ` (${50 - captureContent.length}자 더 필요)` : ""}
+                </p>
+              </div>
+
+              {captureError && (
+                <div
+                  className="px-3 py-2 rounded text-sm"
+                  style={{
+                    background: "rgba(248,113,113,0.1)",
+                    color: "var(--error)",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                >
+                  {captureError}
+                </div>
+              )}
+
+              {isCapturing && (
+                <div
+                  className="px-3 py-2 rounded text-sm"
+                  style={{
+                    background: "var(--accent-subtle)",
+                    color: "var(--accent)",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                >
+                  ⏳ AI가 처리 중입니다...
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <button
+                  onClick={handleCapture}
+                  disabled={!captureTitle || captureContent.length < 50 || isCapturing || !activeWorkspaceId}
+                  className="px-6 py-2 rounded text-sm font-medium"
+                  style={{
+                    background:
+                      captureTitle && captureContent.length >= 50 && !isCapturing
+                        ? "var(--accent)"
+                        : "var(--surface-active)",
+                    color:
+                      captureTitle && captureContent.length >= 50 && !isCapturing
+                        ? "var(--background)"
+                        : "var(--text-muted)",
+                    borderRadius: "var(--radius-sm)",
+                    cursor:
+                      !captureTitle || captureContent.length < 50 || isCapturing
+                        ? "not-allowed"
+                        : "pointer",
+                  }}
+                >
+                  {isCapturing ? "처리 중..." : "AI 분석 시작"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
