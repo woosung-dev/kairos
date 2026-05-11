@@ -43,10 +43,15 @@ class InviteService:
         workspace_id: uuid.UUID,
         created_by_id: uuid.UUID,
         role: str = "member",
+        default_project_visibility: str = "public",
         max_uses: int | None = None,
         expires_in_days: int | None = 7,
     ) -> dict:
-        """초대 링크 생성. Admin 이상만 호출 가능 (라우터에서 검증)."""
+        """초대 링크 생성. Admin 이상만 호출 가능 (라우터에서 검증).
+
+        Sprint 6 L-8: default_project_visibility (public|draft|private) 저장.
+        실제 첫 project 생성 시 적용은 향후 FE 안내 또는 다음 sprint+ 확장.
+        """
         workspace = await self.repo.find_by_id(workspace_id)
         if workspace is None:
             raise WorkspaceNotFoundError()
@@ -59,6 +64,7 @@ class InviteService:
             workspace_id=workspace_id,
             code=_generate_invite_code(),
             role=role,
+            default_project_visibility=default_project_visibility,
             created_by_id=created_by_id,
             max_uses=max_uses,
             expires_at=expires_at,
@@ -74,6 +80,7 @@ class InviteService:
             "workspaceId": str(invite.workspace_id),
             "code": invite.code,
             "role": invite.role,
+            "defaultProjectVisibility": invite.default_project_visibility,
             "inviteUrl": f"{base_url}/invite/{invite.code}",
             "maxUses": invite.max_uses,
             "useCount": invite.use_count,
@@ -94,6 +101,7 @@ class InviteService:
                 "workspaceId": str(inv.workspace_id),
                 "code": inv.code,
                 "role": inv.role,
+                "defaultProjectVisibility": inv.default_project_visibility,
                 "inviteUrl": f"{base_url}/invite/{inv.code}",
                 "maxUses": inv.max_uses,
                 "useCount": inv.use_count,

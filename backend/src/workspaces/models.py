@@ -27,13 +27,14 @@ class WorkspaceMember(SQLModel, table=True):
 
 
 class WorkspaceInvite(SQLModel, table=True):
-    """워크스페이스 초대 링크."""
+    """워크스페이스 초대 링크 (Sprint 6 L-8: default_project_visibility 추가)."""
     __tablename__ = "workspace_invites"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     workspace_id: uuid.UUID = Field(foreign_key="workspaces.id")
     code: str = Field(index=True, unique=True)  # nanoid 12자리
     role: str = "member"  # 초대 시 부여할 역할
+    default_project_visibility: str = "public"  # public | draft | private (Sprint 6 L-8)
     created_by_id: uuid.UUID = Field(foreign_key="users.id")
     max_uses: int | None = None  # null = 무제한
     use_count: int = 0

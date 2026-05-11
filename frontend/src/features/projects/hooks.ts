@@ -12,9 +12,16 @@ import {
   archiveProject,
   addMeetingProject,
   removeMeetingProject,
+  fetchProjectMembers,
+  addProjectMember,
+  removeProjectMember,
 } from "./api";
 import type { FetchProjectsParams } from "./api";
-import type { CreateProjectRequest, UpdateProjectRequest } from "./types";
+import type {
+  AddProjectMemberRequest,
+  CreateProjectRequest,
+  UpdateProjectRequest,
+} from "./types";
 import { meetingKeys } from "../meetings/api";
 
 /**
@@ -189,6 +196,61 @@ export function useRemoveMeetingProject(wid: string | undefined) {
           queryKey: meetingKeys.detail(wid, variables.meetingId),
         });
       }
+    },
+  });
+}
+
+// --- Sprint 6 L-6: ProjectMember hooks ---
+
+/** Project 멤버 목록 조회 */
+export function useProjectMembers(wid: string | undefined, projectId: string) {
+  const { getToken } = useAuth();
+
+  return useQuery({
+    queryKey: projectKeys.members(wid ?? "", projectId),
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("인증이 필요합니다");
+      return fetchProjectMembers(token, wid!, projectId);
+    },
+    enabled: !!wid && !!projectId,
+  });
+}
+
+/** Project 멤버 추가 (admin 이상) */
+export function useAddProjectMember(wid: string | undefined, projectId: string) {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: AddProjectMemberRequest) => {
+      const token = await getToken();
+      if (!token) throw new Error("인증이 필요합니다");
+      return addProjectMember(token, wid!, projectId, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: projectKeys.members(wid ?? "", projectId),
+      });
+    },
+  });
+}
+
+/** Project 멤버 제거 (admin 이상) */
+export function useRemoveProjectMember(wid: string | undefined, projectId: string) {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const token = await getToken();
+      if (!token) throw new Error("인증이 필요합니다");
+      return removeProjectMember(token, wid!, projectId, userId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: projectKeys.members(wid ?? "", projectId),
+      });
     },
   });
 }

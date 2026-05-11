@@ -1,6 +1,12 @@
 import { apiClient } from "@/lib/api-client";
 import type { PaginatedResponse } from "@/types";
-import type { Project, CreateProjectRequest, UpdateProjectRequest } from "./types";
+import type {
+  AddProjectMemberRequest,
+  CreateProjectRequest,
+  Project,
+  ProjectMember,
+  UpdateProjectRequest,
+} from "./types";
 
 // --- Query Key Factory ---
 
@@ -9,6 +15,8 @@ export const projectKeys = {
   list: (wid: string) => [...projectKeys.all, "list", wid] as const,
   detail: (wid: string, id: string) =>
     [...projectKeys.all, "detail", wid, id] as const,
+  members: (wid: string, id: string) =>
+    [...projectKeys.all, "members", wid, id] as const,
 };
 
 // --- API 함수 ---
@@ -110,6 +118,47 @@ export async function removeMeetingProject(
 ): Promise<void> {
   return apiClient<void>(
     `/workspaces/${wid}/meetings/${meetingId}/projects/${projectId}`,
+    { token, method: "DELETE" }
+  );
+}
+
+// --- ProjectMember (Sprint 6 L-6) ---
+
+export async function fetchProjectMembers(
+  token: string,
+  wid: string,
+  projectId: string
+): Promise<ProjectMember[]> {
+  return apiClient<ProjectMember[]>(
+    `/workspaces/${wid}/projects/${projectId}/members`,
+    { token }
+  );
+}
+
+export async function addProjectMember(
+  token: string,
+  wid: string,
+  projectId: string,
+  data: AddProjectMemberRequest
+): Promise<ProjectMember> {
+  return apiClient<ProjectMember>(
+    `/workspaces/${wid}/projects/${projectId}/members`,
+    {
+      token,
+      method: "POST",
+      body: JSON.stringify(data),
+    }
+  );
+}
+
+export async function removeProjectMember(
+  token: string,
+  wid: string,
+  projectId: string,
+  userId: string
+): Promise<void> {
+  return apiClient<void>(
+    `/workspaces/${wid}/projects/${projectId}/members/${userId}`,
     { token, method: "DELETE" }
   );
 }

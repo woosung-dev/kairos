@@ -1,9 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useProject } from "../hooks";
-import { useWorkspaceStore } from "@/features/workspaces/store";
+
 import { EmptyState } from "@/components/empty-state";
+import { useWorkspaceStore } from "@/features/workspaces/store";
+
+import { useProject, useUpdateProject } from "../hooks";
+import type { ProjectVisibility } from "../types";
+import { ProjectMembersPanel } from "./project-members-panel";
+import { VisibilityBadge } from "./visibility-badge";
+import { VisibilityChangeDialog } from "./visibility-change-dialog";
 
 const TABS = ["전체", "회의", "노트", "액션", "자료"] as const;
 
@@ -38,8 +44,23 @@ const STAT_ITEMS = [
 
 export function ProjectDetail({ projectId }: ProjectDetailProps) {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("전체");
+  const [visibilityDialogOpen, setVisibilityDialogOpen] = useState(false);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const { data: project, isLoading, error } = useProject(activeWorkspaceId ?? undefined, projectId);
+  const updateProject = useUpdateProject(activeWorkspaceId ?? undefined);
+
+  const handleVisibilityChange = (next: ProjectVisibility) => {
+    updateProject.mutate(
+      { id: projectId, data: { visibility: next } },
+      {
+        onSuccess: () => setVisibilityDialogOpen(false),
+        onError: (err) => {
+          // BE-T15: admin 미만은 403. 사용자 토스트 안내.
+          alert(err instanceof Error ? err.message : "Visibility 변경 실패");
+        },
+      }
+    );
+  };
 
   if (isLoading) {
     return (
@@ -83,6 +104,13 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
           >
             {STATUS_LABELS[status] ?? status}
           </span>
+          {/* Sprint 6 FE-T2a: visibility 배지. 클릭 시 변경 모달 (BE-T15가 admin 검증) */}
+          {project && (
+            <VisibilityBadge
+              visibility={project.visibility}
+              onClick={() => setVisibilityDialogOpen(true)}
+            />
+          )}
         </div>
         {project?.description && (
           <p className="text-sm mb-1" style={{ color: "var(--text-secondary)" }}>
@@ -162,6 +190,26 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
         description="회의, 노트, 자료를 추가하면 여기에 표시됩니다"
         action={{ label: "콘텐츠 추가", href: "/new" }}
       />
+
+      {/* Sprint 6 FE-T4: Project 멤버 관리 패널 (시안 2A 단순화) */}
+      {project && activeWorkspaceId && (
+        <ProjectMembersPanel
+          workspaceId={activeWorkspaceId}
+          projectId={projectId}
+          visibility={project.visibility}
+        />
+      )}
+
+      {/* Sprint 6 FE-T2b: visibility 변경 모달 (시안 1C) */}
+      {project && (
+        <VisibilityChangeDialog
+          open={visibilityDialogOpen}
+          onOpenChange={setVisibilityDialogOpen}
+          currentVisibility={project.visibility}
+          isPending={updateProject.isPending}
+          onConfirm={handleVisibilityChange}
+        />
+      )}
     </div>
   );
 }

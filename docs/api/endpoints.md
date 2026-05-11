@@ -111,7 +111,19 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 | 31 | 3 | `DELETE` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 삭제 |
 | 32 | 4 | `PATCH` | `/api/v1/workspaces/{id}/members/{uid}/role` | 역할 변경 |
 | 33 | 4 | `DELETE` | `/api/v1/workspaces/{id}/members/{uid}` | 멤버 제거 |
-| 34 | 4 | `POST` | `/api/v1/workspaces/{id}/invite` | 초대 링크 생성 |
+| 34 | 4 | `POST` | `/api/v1/workspaces/{id}/invite` | 초대 링크 생성 (Sprint 6: `defaultProjectVisibility` 필드 추가) |
+| 35 | 6 | `GET` | `/api/v1/workspaces/{wid}/projects/{pid}/members` | 프로젝트 멤버 목록 (viewer+) |
+| 36 | 6 | `POST` | `/api/v1/workspaces/{wid}/projects/{pid}/members` | 프로젝트 멤버 추가 (admin+) |
+| 37 | 6 | `DELETE` | `/api/v1/workspaces/{wid}/projects/{pid}/members/{uid}` | 프로젝트 멤버 제거 (admin+) |
+
+> **Sprint 6 변경 (visibility + ProjectMember)**:
+> - 16/17/18/19: Project 응답에 `visibility` 필드 추가 (`public` | `draft` | `private`).
+> - 18 POST: `visibility` (optional, default `public`) 필드 수신.
+> - 19 PATCH: `visibility` 변경은 admin 이상만 (BE-T15, 403 응답). 일반 update는 require_member.
+> - 16 GET 목록 + 17 GET 상세: visibility 필터링 적용 (admin 우회 / member 본인 작성 draft / private은 ProjectMember 매핑된 사용자만 노출).
+> - 27 RAG: visibility 검증을 SSE 스트리밍 시작 *전*에 수행 (ADR-014 옵션 A, RagPipelineService).
+> - 35/36/37: ProjectMember CRUD endpoint (Sprint 6 BE-T7).
+> - 34 POST invite: `defaultProjectVisibility` 필드 추가 (Sprint 6 L-8, default `public`).
 
 ---
 

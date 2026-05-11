@@ -53,13 +53,16 @@
 
 ---
 
-## 5. 의존 (in/out)
+## 5. 의존 (in/out) — Sprint 6 ADR-014 옵션 A 적용
+
+**진입 = `RagPipelineService.ask` (orchestrator)** → 권한 검증 후 `RagService.ask` 위임. SSE 스트리밍 시작 *전*에 visibility/member 검증 완료 (ADR-014 검증 기준 C-6).
 
 | 방향 | 대상 | 레벨 | 비고 |
 |---|---|---|---|
-| out | `embeddings/{models, repository, service}` | service | CONTEXT-MAP §7 D-3 부채 |
-| out | `services/ai_processing` | external wrapper | Gemini 답변 생성 |
-| out | `projects/repository` | Repository (read-only) | 프로젝트 범위 검색용 권한 검증 |
+| out (pipeline) | `projects/repository` | Repository (read-only) | visibility 권한 검증 (admin 우회 / draft creator / private member) |
+| out (pipeline) | `rag/service` | Service (orchestrator 내부 위임) | RagService.ask AsyncGenerator 위임 |
+| out (service) | `embeddings/{models, repository, service}` | service | RagService 내부 호출 — orchestrator 경유로 헌법 §4.2 정합 (ADR-014). 6-Layer 단계별 호출 다수 |
+| out (service) | `services/ai_processing` | external wrapper | Gemini 답변 생성 |
 
 ---
 
@@ -76,6 +79,7 @@
 | R-7 | **답변은 한국어 우선** — 사용자 질문 언어에 맞춤 |
 | R-8 | **SSE 스트리밍**: `EventSourceResponse` (`sse_starlette.sse`) — 내부적으로 `text/event-stream`. `StreamingResponse` 직접 사용 금지 — 헌법 B-14 |
 | R-9 | **융합 알고리즘은 RRF (Reciprocal Rank Fusion), k=60** — Gemini re-rank 아님. `service.py:152 _reciprocal_rank_fusion` |
+| R-10 | **권한 검증은 `RagPipelineService.ask` 진입에서 SSE 시작 *전* 완료** (Sprint 6 ADR-014 옵션 A). visibility=draft → creator + admin/owner / visibility=private → ProjectMember + admin/owner. 검증 실패 시 `error` + `done` SSE 이벤트로 종료 (스트리밍 시작 안 함). 권한 누락이 ADR-010 M1 RAG 품질 시그널을 오염하지 않도록. |
 
 ---
 
@@ -100,4 +104,4 @@ POST /ask    질문 → 답변 + 출처 (SSE 스트리밍, EventSourceResponse)
 
 ## 9. 부채 (CONTEXT-MAP §7)
 
-- D-3: `rag → embeddings.service` 직접 의존. ADR-009 후보로 service 경계 정합성 결정.
+- ~~D-3: `rag → embeddings.service` 직접 의존~~ **[해소 1차 2026-05-11, ADR-014 옵션 A]** — `RagPipelineService` 신설로 진입 권한 검증 + 위임. `RagService` 내부 6-Layer embedding 호출은 그대로 (cross-domain shared service 정책, ADR-014 §1). 완전 분리는 sprint 7+ 검토 (ADR-014 §"비용/리스크" R-3).

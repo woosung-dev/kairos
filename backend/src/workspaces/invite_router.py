@@ -42,6 +42,7 @@ async def create_invite(
         workspace_id=workspace_id,
         created_by_id=member.user_id,
         role=data.role,
+        default_project_visibility=data.default_project_visibility,
         max_uses=data.max_uses,
         expires_in_days=data.expires_in_days,
     )

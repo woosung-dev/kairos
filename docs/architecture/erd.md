@@ -49,11 +49,34 @@ erDiagram
         string title
         string description
         enum status "active | completed | archived"
+        enum visibility "public | draft | private (Sprint 6, default public, indexed)"
         jsonb tags "AI 자동 분류 + 사용자 태그"
         int sort_order
         uuid created_by_id FK
         timestamp created_at
         timestamp updated_at
+    }
+
+    ProjectMember {
+        uuid id PK
+        uuid project_id FK "indexed"
+        uuid user_id FK "indexed"
+        string role "Sprint 6 1차: member 단일 (AD-27)"
+        timestamp created_at
+    }
+
+    WorkspaceInvite {
+        uuid id PK
+        uuid workspace_id FK
+        string code UK "nanoid 12자리"
+        string role "owner 제외"
+        string default_project_visibility "Sprint 6: public | draft | private (default public)"
+        uuid created_by_id FK
+        int max_uses "null = 무제한"
+        int use_count
+        timestamp expires_at "null = 만료 없음"
+        boolean is_active
+        timestamp created_at
     }
 
     Meeting {
@@ -159,6 +182,10 @@ erDiagram
     Meeting ||--o{ ActionItem : "추출"
     Meeting ||--o{ MeetingProjectLink : "N:M 연결"
     Project ||--o{ MeetingProjectLink : "N:M 연결"
+    Project ||--o{ ProjectMember : "Sprint 6: visibility=private 시 명시 멤버"
+    User ||--o{ ProjectMember : "Sprint 6: 명시 매핑"
+    Workspace ||--o{ WorkspaceInvite : "초대 링크 발급"
+    User ||--o{ WorkspaceInvite : "생성자"
     User ||--o{ Project : "생성"
     User ||--o{ Meeting : "생성"
     User ||--o{ ActionItem : "담당"
@@ -173,6 +200,7 @@ erDiagram
 
 ### N:M 관계
 - **Meeting ↔ Project**: `MeetingProjectLink` 중간 테이블로 다대다 연결. 하나의 회의가 여러 프로젝트에 연결 가능.
+- **Project ↔ User** (Sprint 6 L-6): `ProjectMember` 중간 테이블. visibility=`private` Project에 명시 매핑된 사용자만 read/write. admin/owner는 우회. `(project_id, user_id)` 유일 (마이그레이션 `754f571d5544`).
 
 ### 1:N 관계
 - **Workspace → Project, Meeting, InboxItem**: 모든 콘텐츠는 워크스페이스 소속

@@ -9,7 +9,7 @@ from httpx import ASGITransport, AsyncClient
 
 from src.main import app
 from src.auth.rbac import require_member, require_viewer
-from src.notes.dependencies import get_note_service
+from src.notes.dependencies import get_note_pipeline_service, get_note_service
 from src.workspaces.models import WorkspaceMember
 
 WID = "00000000-0000-0000-0000-000000000002"
@@ -53,10 +53,20 @@ async def mock_service():
 
 
 @pytest_asyncio.fixture
-async def client(mock_service):
+async def mock_pipeline():
+    """Sprint 6 ADR-014 옵션 A: NotePipelineService mock (embed/delete orchestrator)."""
+    pipeline = AsyncMock()
+    pipeline.embed_note_async = AsyncMock(return_value=None)
+    pipeline.delete_note_with_cleanup = AsyncMock(return_value=None)
+    return pipeline
+
+
+@pytest_asyncio.fixture
+async def client(mock_service, mock_pipeline):
     app.dependency_overrides[require_member] = lambda: _make_mock_member("member")
     app.dependency_overrides[require_viewer] = lambda: _make_mock_member("viewer")
     app.dependency_overrides[get_note_service] = lambda: mock_service
+    app.dependency_overrides[get_note_pipeline_service] = lambda: mock_pipeline
 
     async with AsyncClient(
         transport=ASGITransport(app=app),

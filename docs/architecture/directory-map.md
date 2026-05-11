@@ -71,15 +71,20 @@ backend/
 └── src/
     ├── auth/                          # Clerk JWT 검증
     ├── inbox/                         # Inbox 적재 + 분류
-    ├── projects/                      # 프로젝트 CRUD + N:M 링크 + 태그
-    ├── meetings/                      # 회의 인제스트, STT, AI 파이프라인
+    ├── projects/                      # 프로젝트 CRUD + MeetingProjectLink + ProjectMember (Sprint 6) + visibility
+    ├── meetings/                      # 회의 인제스트, STT, AI 파이프라인 (pipeline_service)
     ├── actions/                       # 액션 아이템
-    ├── notes/                         # Tiptap 노트
-    ├── rag/                           # RAG 검색 + Gemini 답변
+    ├── notes/                         # Tiptap 노트 + pipeline_service (Sprint 6 ADR-014)
+    ├── rag/                           # RAG 검색 + Gemini 답변 + pipeline_service (Sprint 6 ADR-014)
+    ├── workspaces/                    # Workspace + Member + Invite (default_project_visibility, Sprint 6)
+    ├── embeddings/                    # EmbeddingChunk + SemanticCache (cross-domain shared service)
+    ├── upload/                        # R2 presigned URL
+    ├── services/                      # 외부 wrapper (transcription, ai_processing) — cross-domain shared service
     ├── common/
     │   ├── database.py                # AsyncSession 팩토리
     │   ├── exceptions.py              # 전역 예외 핸들러
     │   ├── r2.py                      # Cloudflare R2 클라이언트
+    │   ├── prompts.py                 # Gemini 프롬프트 상수
     │   └── pagination.py
     └── core/
         └── config.py                  # pydantic-settings
@@ -87,3 +92,5 @@ backend/
 
 각 도메인 폴더는 다음 파일로 구성:
 `router.py` / `service.py` / `repository.py` / `schemas.py` / `models.py` / `dependencies.py` / `exceptions.py`
+
+**오케스트레이터 (Sprint 6 ADR-014 옵션 A 적용)**: cross-domain 호출 또는 권한 검증 일원화가 필요한 도메인은 추가로 `pipeline_service.py`를 가짐 — 현재 `meetings`, `notes`, `rag` 3 도메인. 진입은 router → pipeline_service → service 위임.

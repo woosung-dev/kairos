@@ -1,10 +1,12 @@
 # backend/src/notes/service.py
-"""노트 비즈니스 로직."""
+"""노트 비즈니스 로직 — 순수 노트 CRUD (ADR-014 옵션 A: embedding 의존 제거).
+
+embeddings.service 호출은 NotePipelineService(orchestrator) 내부에서만 수행 — 헌법 §4.2 정합.
+"""
 import json
 import uuid
 from datetime import datetime
 
-from src.embeddings.service import EmbeddingService
 from src.notes.exceptions import NoteNotFoundError
 from src.notes.models import Note
 from src.notes.repository import NoteRepository
@@ -22,13 +24,8 @@ def extract_plain_text(tiptap_json: dict) -> str:
 
 
 class NoteService:
-    def __init__(
-        self,
-        repo: NoteRepository,
-        embedding_service: EmbeddingService | None = None,
-    ) -> None:
+    def __init__(self, repo: NoteRepository) -> None:
         self.repo = repo
-        self.embedding_service = embedding_service
 
     async def create_note(
         self,
@@ -104,33 +101,12 @@ class NoteService:
         return self._to_dict(note)
 
     async def delete_note(self, note_id: uuid.UUID) -> None:
+        """노트 삭제 (순수). embedding cleanup은 NotePipelineService 책임."""
         note = await self.repo.find_by_id(note_id)
         if note is None:
             raise NoteNotFoundError()
-
-        if self.embedding_service:
-            await self.embedding_service.repo.delete_by_source("note", note_id)
-
         await self.repo.delete(note)
         await self.repo.commit()
-
-    async def embed_note_async(self, note_id: uuid.UUID) -> None:
-        """BackgroundTasks용 임베딩 생성."""
-        if not self.embedding_service:
-            return
-        note = await self.repo.find_by_id(note_id)
-        if not note or not note.plain_text:
-            return
-        await self.embedding_service.embed_note(
-            note_id=note.id,
-            workspace_id=note.workspace_id,
-            project_id=note.project_id,
-            title=note.title,
-            plain_text=note.plain_text,
-        )
-        await self.embedding_service.invalidate_cache(
-            note.workspace_id, note.project_id
-        )
 
     async def export_note(self, note_id: uuid.UUID, fmt: str) -> tuple[str, str, str]:
         """노트 내보내기. (content, filename, media_type) 반환."""

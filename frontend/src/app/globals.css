@@ -75,6 +75,11 @@
   --status-completed: #F0963C;
   --status-archived: #6B6B73;
 
+  /* 프로젝트 가시성 색상 (Sprint 6 AD-31) */
+  --visibility-public: #3ECFB4;
+  --visibility-draft: #FBBF24;
+  --visibility-private: #6B6B73;
+
   /* Semantic */
   --success: #34D399;
   --warning: #FBBF24;

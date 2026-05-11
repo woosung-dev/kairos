@@ -105,6 +105,31 @@ async def get_meeting_pipeline_service(
 | 오케스트레이터만 크로스 도메인 | `pipeline_service.py`만 여러 도메인 서비스를 조합 |
 | DI로 조립 | `dependencies.py`에서 모든 의존성 주입 |
 | 동일 session 공유 | 트랜잭션 일관성을 위해 같은 AsyncSession 사용 |
+| **Cross-domain shared service 호출은 orchestrator 내부에서만** (Sprint 6 ADR-014 옵션 A) | `embeddings.service` / `services/ai_processing` / `services/transcription` 직접 호출은 `pipeline_service.py` 또는 `services/` 안에서만 허용. 일반 도메인 service.py는 cross-domain shared service 호출 금지 |
+| **권한 검증 일원화** (Sprint 6 ADR-014) | 진입 메서드(예: `RagPipelineService.ask`, `NotePipelineService.delete_note_with_cleanup`)에서 visibility/member 검증 후 도메인 service에 위임. SSE 스트리밍 시작 *전*에 검증 완료 |
+
+---
+
+## Sprint 6 추가 적용 (ADR-014 옵션 A, BE-T9~T14)
+
+D-2/D-3 부채 해소 — `notes`와 `rag` 도메인도 meetings 패턴 따라 orchestrator 도입:
+
+```
+notes/                              rag/
+├── service.py     순수 노트 CRUD   ├── service.py     6-Layer 비즈니스 로직
+├── pipeline_service.py             ├── pipeline_service.py
+│   ← embed_note_async              │   ← ask (visibility 검증 + RagService.ask 위임)
+│   ← delete_note_with_cleanup      │   ← AsyncGenerator wrapping
+│   ← check_project_access
+└── dependencies.py                 └── dependencies.py
+    get_note_service                    get_rag_service
+    get_note_pipeline_service           get_rag_pipeline_service
+```
+
+- `notes/router.py`: BackgroundTasks의 embed/delete 호출이 `service.embed_note_async` → `pipeline.embed_note_async`로 변경.
+- `rag/router.py`: `/ask` endpoint가 `service.ask` → `pipeline.ask`로 변경. SSE 스트리밍 시작 전에 visibility 검증.
+- 권한 위반 시 `error` + `done` SSE 이벤트로 종료 (스트리밍 시작 안 함, ADR-014 검증 기준 C-6).
+- 헌법 §4.2 갱신: "embeddings.service 호출은 orchestrator 내부에서만 허용" 행 추가, D-2/D-3 ⚠️ 행 제거.
 
 ---
 
