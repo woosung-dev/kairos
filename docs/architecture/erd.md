@@ -57,6 +57,7 @@ erDiagram
         timestamp updated_at
     }
 
+    %% cross-workspace 차단: ProjectService.add_member가 WorkspaceMember 멤버십 검증 (AD-33)
     ProjectMember {
         uuid id PK
         uuid project_id FK "indexed"

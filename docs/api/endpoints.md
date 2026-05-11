@@ -113,7 +113,7 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 | 33 | 4 | `DELETE` | `/api/v1/workspaces/{id}/members/{uid}` | 멤버 제거 |
 | 34 | 4 | `POST` | `/api/v1/workspaces/{id}/invite` | 초대 링크 생성 (Sprint 6: `defaultProjectVisibility` 필드 추가) |
 | 35 | 6 | `GET` | `/api/v1/workspaces/{wid}/projects/{pid}/members` | 프로젝트 멤버 목록 (viewer+) |
-| 36 | 6 | `POST` | `/api/v1/workspaces/{wid}/projects/{pid}/members` | 프로젝트 멤버 추가 (admin+) |
+| 36 | 6 | `POST` | `/api/v1/workspaces/{wid}/projects/{pid}/members` | 프로젝트 멤버 추가 (admin+). 403 — cross-workspace 차단 (추가 대상 user가 해당 워크스페이스 멤버가 아님, Sprint 7 AD-33) |
 | 37 | 6 | `DELETE` | `/api/v1/workspaces/{wid}/projects/{pid}/members/{uid}` | 프로젝트 멤버 제거 (admin+) |
 
 > **Sprint 6 변경 (visibility + ProjectMember)**:

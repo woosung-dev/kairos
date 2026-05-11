@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.common.database import get_async_session
 from src.projects.repository import ProjectRepository
 from src.projects.service import ProjectService
+from src.workspaces.repository import WorkspaceRepository
 
 
 async def get_project_repository(
@@ -15,6 +16,13 @@ async def get_project_repository(
 
 
 async def get_project_service(
-    repo: ProjectRepository = Depends(get_project_repository),
+    session: AsyncSession = Depends(get_async_session),
 ) -> ProjectService:
-    return ProjectService(repo)
+    """동일 session으로 ProjectRepository + WorkspaceRepository 조립.
+
+    backend.md §3 크로스 레포지토리 트랜잭션 패턴 — commit은 service에서 1회만.
+    """
+    return ProjectService(
+        repo=ProjectRepository(session),
+        ws_repo=WorkspaceRepository(session),
+    )
