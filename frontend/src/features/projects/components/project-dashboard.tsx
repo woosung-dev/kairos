@@ -83,8 +83,8 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
     pageSize: 20,
   });
 
-  /* 회의 목록: projectId 필터 미지원 → 전체 fetch 후 클라이언트 필터 */
-  const { data: meetingsData, isLoading: meetingsLoading } = useMeetings(wid);
+  /* 회의: projectId 필터 지원 */
+  const { data: meetingsData, isLoading: meetingsLoading } = useMeetings(wid, 1, projectId);
 
   /* 노트 목록: projectId 필터 지원 */
   const { data: notesData, isLoading: notesLoading } = useNotes(wid, projectId);
@@ -108,9 +108,7 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
 
   const actions = actionsData?.items ?? [];
 
-  /* 회의: projectId 기준 클라이언트 필터 */
-  /* Meeting 타입엔 projectId 필드 없음 — BE API가 projectId 필터 미지원이므로 전체 목록 상위 5개 표시 */
-  const projectMeetings = (meetingsData?.items ?? []).slice(0, 5);
+  const projectMeetings = meetingsData?.items ?? [];
 
   const notes = notesData?.items ?? [];
 
