@@ -46,6 +46,9 @@ e2e-*.png
 # ai/rules
 .ai/
 .claude/
+
+# gstack
+skills-lock.json
 .agents/
 .gstack/
 .context/
