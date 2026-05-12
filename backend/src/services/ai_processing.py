@@ -8,6 +8,8 @@ from src.common.prompts import (
     MEETING_ACTIONS_AND_LINKING_PROMPT,
     MEETING_SUMMARY_SYSTEM_PROMPT,
     RAG_SYSTEM_PROMPT,
+    MeetingActionsResult,
+    MeetingSummaryResult,
     parse_json_response,
 )
 from src.core.config import get_settings
@@ -42,7 +44,9 @@ class AIProcessingService:
             model=GEMINI_MODEL,
             contents=f"{MEETING_SUMMARY_SYSTEM_PROMPT}\n\n{transcript}",
         )
-        return parse_json_response(response.text)
+        raw = parse_json_response(response.text)
+        MeetingSummaryResult.model_validate(raw)
+        return raw
 
     async def extract_actions_and_link(
         self,
@@ -54,20 +58,9 @@ class AIProcessingService:
 
         반환 형식:
         {
-            "actionItems": [
-                {
-                    "title": str,
-                    "description": str | None,
-                    "priority": "high" | "medium" | "low",
-                    "dueDate": "YYYY-MM-DD" | None,
-                }
-            ],
-            "suggestedProject": {
-                "existingProjectId": str | None,
-                "newProjectTitle": str | None,
-                "confidence": float,
-            },
-            "suggestedTags": list[str],
+            "actionItems": [...],
+            "suggestedProject": {...},
+            "suggestedTags": [...],
         }
         """
         projects_context = "\n".join(
@@ -85,7 +78,9 @@ class AIProcessingService:
             model=GEMINI_MODEL,
             contents=prompt,
         )
-        return parse_json_response(response.text)
+        raw = parse_json_response(response.text)
+        MeetingActionsResult.model_validate(raw)
+        return raw
 
     async def stream_rag_answer(
         self,
