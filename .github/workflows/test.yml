@@ -62,6 +62,13 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_fake"
           NEXT_PUBLIC_API_URL: "http://localhost:8000"
 
+  # ── E2E 잡 활성화 방법 ────────────────────────────────────────────────────────
+  # 1. Repository Settings → Secrets and variables → Variables 탭
+  #    E2E_ENABLED = 'true' 추가
+  # 2. Secrets 탭에서 아래 시크릿 등록:
+  #    E2E_CLERK_PUBLISHABLE_KEY, E2E_CLERK_SECRET_KEY
+  #    E2E_API_URL, E2E_USER_EMAIL, E2E_USER_OTP
+  # ─────────────────────────────────────────────────────────────────────────────
   e2e:
     runs-on: ubuntu-latest
     # Clerk testing credentials 설정된 환경에서만 실행 (secrets 등록 이후 활성화).

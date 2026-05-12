@@ -48,14 +48,22 @@ export function useMeetingDetail(wid: string | undefined, id: string) {
       return fetchMeetingDetail(token, wid!, id);
     },
     enabled: !!wid,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      // 완료/실패 상태에서만 중단 — 네트워크 오류 시에도 재시도 유지
+      if (status === "completed" || status === "failed") return false;
+      if (status && POLLING_STATUSES.includes(status)) return 3000;
+      return 3000;
+    },
   });
 }
 
-// 처리 완료/실패가 아닌 진행 중 상태 (백엔드 status: uploading → transcribing → analyzing → completed)
+// 처리 완료/실패가 아닌 진행 중 상태 (백엔드 status: uploading → transcribing → analyzing → embedding → completed)
 const POLLING_STATUSES: MeetingStatus[] = [
   "uploading",
   "transcribing",
   "analyzing",
+  "embedding",
 ];
 
 /**
