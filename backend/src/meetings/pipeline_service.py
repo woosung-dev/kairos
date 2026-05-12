@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.actions.models import ActionItem
 from src.actions.repository import ActionItemRepository
-from src.meetings.models import TranscriptSegment
+from src.meetings.models import Meeting, TranscriptSegment
 from src.common.r2 import R2Service
 from src.embeddings.repository import EmbeddingRepository
 from src.embeddings.service import EmbeddingService
@@ -46,21 +46,20 @@ class MeetingPipelineService:
     async def _analyze_and_store(
         self,
         *,
-        meeting,
-        meeting_id: uuid.UUID,
+        meeting: Meeting,
         transcript_text: str,
         auto_confirm_threshold: float,
         segments_data: list[dict],
-        meeting_repo,
-        project_repo,
-        action_repo,
-        inbox_repo,
-        embedding_service,
+        meeting_repo: MeetingRepository,
+        project_repo: ProjectRepository,
+        action_repo: ActionItemRepository,
+        inbox_repo: InboxRepository,
+        embedding_service: EmbeddingService,
     ) -> None:
         """요약 → 액션 추출 → Inbox 적재 → 자동 확정 → 임베딩 → 완료 공통 블록."""
         summary_data = await self.ai_service.summarize(transcript_text)
-        await meeting_repo.save_summary(meeting_id, summary_data)
-        await meeting_repo.set_has_summary(meeting_id, True)
+        await meeting_repo.save_summary(meeting.id, summary_data)
+        await meeting_repo.set_has_summary(meeting.id, True)
 
         existing_projects = await project_repo.find_by_workspace(meeting.workspace_id)
         project_list = [
@@ -86,14 +85,14 @@ class MeetingPipelineService:
                 try:
                     action_item.due_date = date.fromisoformat(due_date_str)
                 except ValueError:
-                    logger.warning("dueDate 파싱 실패: %s (meeting=%s)", due_date_str, meeting_id)
+                    logger.warning("dueDate 파싱 실패: %s (meeting=%s)", due_date_str, meeting.id)
             await action_repo.save(action_item)
             action_count += 1
 
-        meeting = await meeting_repo.find_by_id(meeting_id)
-        if meeting:
-            meeting.action_item_count = action_count
-        logger.info("액션 아이템 %d개 추출 완료 (meeting=%s)", action_count, meeting_id)
+        refreshed = await meeting_repo.find_by_id(meeting.id)
+        if refreshed:
+            refreshed.action_item_count = action_count
+        logger.info("액션 아이템 %d개 추출 완료 (meeting=%s)", action_count, meeting.id)
 
         # InboxItem 생성 + 자동 확정
         suggested = actions_data.get("suggestedProject", {})
@@ -120,7 +119,7 @@ class MeetingPipelineService:
             await project_repo.add_meeting_link(meeting.id, uuid.UUID(existing_project_id_str))
             logger.info(
                 "자동 확정: meeting=%s → project=%s (confidence=%.2f)",
-                meeting_id, existing_project_id_str, confidence,
+                meeting.id, existing_project_id_str, confidence,
             )
 
         # 임베딩 (비치명적 — 실패해도 파이프라인은 완료)
@@ -138,11 +137,11 @@ class MeetingPipelineService:
                 segments=segments_data,
             )
             await embedding_service.invalidate_cache(meeting.workspace_id, project_id)
-            logger.info("임베딩 %d개 생성 (meeting=%s)", chunk_count, meeting_id)
+            logger.info("임베딩 %d개 생성 (meeting=%s)", chunk_count, meeting.id)
         except Exception as emb_err:
-            logger.warning("임베딩 생성 실패 (비치명적, meeting=%s): %s", meeting_id, emb_err)
+            logger.warning("임베딩 생성 실패 (비치명적, meeting=%s): %s", meeting.id, emb_err)
 
-        await meeting_repo.update_status(meeting_id, "completed")
+        await meeting_repo.update_status(meeting.id, "completed")
         await meeting_repo.commit()
 
     async def process_meeting(self, meeting_id: uuid.UUID) -> None:
@@ -192,7 +191,6 @@ class MeetingPipelineService:
                 ]
                 await self._analyze_and_store(
                     meeting=meeting,
-                    meeting_id=meeting_id,
                     transcript_text=transcript_text,
                     auto_confirm_threshold=threshold,
                     segments_data=segments_data,
@@ -242,7 +240,6 @@ class MeetingPipelineService:
 
                 await self._analyze_and_store(
                     meeting=meeting,
-                    meeting_id=meeting_id,
                     transcript_text=transcript_text,
                     auto_confirm_threshold=threshold,
                     segments_data=[{"speaker": "텍스트", "text": transcript_text,
