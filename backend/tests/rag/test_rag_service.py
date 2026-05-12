@@ -112,3 +112,73 @@ async def test_cache_miss_no_results():
 
     # Gemini 호출 안 됨
     mock_ai.stream_rag_answer.assert_not_called()
+
+
+# ── BL-003: _enrich_context 배치 쿼리 테스트 ──
+import uuid as _uuid
+from unittest.mock import MagicMock
+
+
+@pytest.mark.asyncio
+async def test_enrich_context_uses_batch_query():
+    """parent_chunk_id가 있는 결과 → find_chunks_by_ids 1회 호출."""
+    parent_id = _uuid.uuid4()
+    mock_chunk = MagicMock()
+    mock_chunk.chunk_text = "부모 청크 텍스트"
+
+    mock_repo = AsyncMock()
+    mock_repo.find_chunks_by_ids.return_value = {parent_id: mock_chunk}
+
+    service = RagService(
+        embedding_repo=mock_repo,
+        embedding_service=AsyncMock(),
+        ai_service=AsyncMock(),
+    )
+
+    results = [
+        {"id": str(_uuid.uuid4()), "chunk_text": "자식1", "parent_chunk_id": str(parent_id)},
+        {"id": str(_uuid.uuid4()), "chunk_text": "자식2", "parent_chunk_id": str(parent_id)},
+    ]
+    enriched = await service._enrich_context(results)
+
+    mock_repo.find_chunks_by_ids.assert_called_once()
+    mock_repo.find_chunk_by_id.assert_not_called()
+    assert enriched[0]["parent_text"] == "부모 청크 텍스트"
+    assert enriched[1]["parent_text"] == "부모 청크 텍스트"
+
+
+@pytest.mark.asyncio
+async def test_enrich_context_no_parent_ids():
+    """parent_chunk_id 없는 결과 → DB 호출 없음, parent_text 빈 문자열."""
+    mock_repo = AsyncMock()
+
+    service = RagService(
+        embedding_repo=mock_repo,
+        embedding_service=AsyncMock(),
+        ai_service=AsyncMock(),
+    )
+
+    results = [
+        {"id": str(_uuid.uuid4()), "chunk_text": "부모 없는 청크"},
+    ]
+    enriched = await service._enrich_context(results)
+
+    mock_repo.find_chunks_by_ids.assert_not_called()
+    assert enriched[0]["parent_text"] == ""
+
+
+@pytest.mark.asyncio
+async def test_enrich_context_empty_results():
+    """빈 결과 → DB 미호출."""
+    mock_repo = AsyncMock()
+
+    service = RagService(
+        embedding_repo=mock_repo,
+        embedding_service=AsyncMock(),
+        ai_service=AsyncMock(),
+    )
+
+    enriched = await service._enrich_context([])
+
+    mock_repo.find_chunks_by_ids.assert_not_called()
+    assert enriched == []
