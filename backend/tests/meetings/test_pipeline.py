@@ -251,3 +251,90 @@ async def test_pipeline_failure_sets_failed():
     if not error_msg and len(last_call.args) > 2:
         error_msg = last_call.args[2]
     assert "네트워크 오류" in error_msg
+
+
+@pytest.mark.asyncio
+async def test_capture_text_success():
+    """capture_text: STT 없이 텍스트→분석→완료 경로."""
+    from src.meetings.pipeline_service import MeetingPipelineService
+
+    meeting_id = uuid.uuid4()
+    workspace_id = uuid.uuid4()
+    transcript_text = "오늘 회의에서 신규 기능 개발을 결정했습니다."
+
+    mock_meeting_repo = AsyncMock()
+    mock_meeting = MagicMock()
+    mock_meeting.id = meeting_id
+    mock_meeting.workspace_id = workspace_id
+    mock_meeting.title = "텍스트 캡처 테스트"
+    mock_meeting_repo.find_by_id.return_value = mock_meeting
+
+    mock_r2 = AsyncMock()
+    mock_transcription = AsyncMock()
+
+    mock_ai = AsyncMock()
+    mock_ai.summarize.return_value = {
+        "summary": "기능 개발 결정",
+        "key_decisions": ["신규 기능 개발"],
+        "topics": ["개발"],
+    }
+    mock_ai.extract_actions_and_link.return_value = {
+        "actionItems": [{"title": "기능 설계서 작성", "priority": "high"}],
+        "suggestedProject": {
+            "existingProjectId": None,
+            "newProjectTitle": "신규 기능",
+            "confidence": 0.6,
+        },
+        "suggestedTags": ["개발"],
+    }
+
+    mock_project_repo = AsyncMock()
+    mock_project_repo.find_by_workspace.return_value = []
+    mock_action_repo = AsyncMock()
+    mock_inbox_repo = AsyncMock()
+    mock_workspace_repo = AsyncMock()
+    mock_workspace = MagicMock()
+    mock_workspace.inbox_threshold = 0.9
+    mock_workspace_repo.find_by_id.return_value = mock_workspace
+    mock_embedding_service = AsyncMock()
+    mock_embedding_service.embed_meeting.return_value = 1
+    mock_embedding_service.invalidate_cache.return_value = None
+
+    with (
+        patch("src.meetings.pipeline_service.MeetingRepository", return_value=mock_meeting_repo),
+        patch("src.meetings.pipeline_service.ProjectRepository", return_value=mock_project_repo),
+        patch("src.meetings.pipeline_service.ActionItemRepository", return_value=mock_action_repo),
+        patch("src.meetings.pipeline_service.InboxRepository", return_value=mock_inbox_repo),
+        patch("src.meetings.pipeline_service.WorkspaceRepository", return_value=mock_workspace_repo),
+        patch("src.meetings.pipeline_service.EmbeddingRepository", return_value=AsyncMock()),
+        patch("src.meetings.pipeline_service.EmbeddingService", return_value=mock_embedding_service),
+    ):
+        pipeline = MeetingPipelineService(
+            session_factory=_make_session_factory(),
+            r2_service=mock_r2,
+            transcription_service=mock_transcription,
+            ai_service=mock_ai,
+        )
+        await pipeline.capture_text(meeting_id, transcript_text)
+
+    # STT 메서드 호출 안 됨
+    mock_r2.get_download_url.assert_not_called()
+    mock_transcription.transcribe.assert_not_called()
+
+    # 상태 전이 확인 (transcribing 없이 analyzing → completed)
+    status_calls = [call.args[1] for call in mock_meeting_repo.update_status.call_args_list]
+    assert "transcribing" not in status_calls
+    assert "analyzing" in status_calls
+    assert "completed" in status_calls
+
+    # 트랜스크립트/요약 저장 확인
+    mock_meeting_repo.save_segments.assert_called_once()
+    mock_meeting_repo.save_summary.assert_called_once()
+    mock_meeting_repo.set_has_transcript.assert_called_once_with(meeting_id, True)
+    mock_meeting_repo.set_has_summary.assert_called_once_with(meeting_id, True)
+
+    # 액션 저장 확인
+    mock_action_repo.save.assert_called_once()
+
+    # Inbox 저장 확인
+    mock_inbox_repo.save.assert_called_once()

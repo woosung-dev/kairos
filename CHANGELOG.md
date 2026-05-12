@@ -4,6 +4,17 @@ All notable changes to Kairos are documented here.
 
 ---
 
+## [0.1.0.2] - 2026-05-12
+
+### Refactored
+- `MeetingPipelineService._analyze_and_store` private 메서드 추출 — `process_meeting`과 `capture_text`의 공통 분석 블록(요약→액션→Inbox→자동확정→임베딩→완료) 통합
+- `pipeline_service.py` 361 → 261 LOC (28% 감소)
+
+### Tests
+- `capture_text` 경로 테스트 추가 — 텍스트 캡처 파이프라인 골든패스 검증 (STT 미호출, 분석→완료 상태 전이)
+
+---
+
 ## [0.1.0.1] - 2026-05-12
 
 ### Added
