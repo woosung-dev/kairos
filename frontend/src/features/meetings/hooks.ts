@@ -48,14 +48,22 @@ export function useMeetingDetail(wid: string | undefined, id: string) {
       return fetchMeetingDetail(token, wid!, id);
     },
     enabled: !!wid,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status && POLLING_STATUSES.includes(status)) {
+        return 3000;
+      }
+      return false;
+    },
   });
 }
 
-// 처리 완료/실패가 아닌 진행 중 상태 (백엔드 status: uploading → transcribing → analyzing → completed)
+// 처리 완료/실패가 아닌 진행 중 상태 (백엔드 status: uploading → transcribing → analyzing → embedding → completed)
 const POLLING_STATUSES: MeetingStatus[] = [
   "uploading",
   "transcribing",
   "analyzing",
+  "embedding",
 ];
 
 /**
