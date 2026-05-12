@@ -1,8 +1,8 @@
 # backend/src/upload/router.py
-"""Upload 라우터 — R2 presigned URL 발급."""
+"""Upload 라우터 — R2 presigned URL 발급 + 프록시 업로드 (CORS 우회)."""
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, File
 from pydantic import BaseModel
 
 from src.auth.rbac import require_member
@@ -37,3 +37,20 @@ async def get_presigned_url(
         "fileKey": result["file_key"],
         "expiresIn": result["expires_in"],
     }
+
+
+@router.post("/file", status_code=201)
+async def upload_file_proxy(
+    workspace_id: uuid.UUID,
+    file: UploadFile = File(...),
+    member: WorkspaceMember = Depends(require_member),
+):
+    """브라우저 CORS 우회용 백엔드 프록시 업로드.
+
+    FE → BE → R2 경로로 업로드하여 R2 직접 PUT의 CORS 문제를 해결한다.
+    """
+    content_type = file.content_type or "application/octet-stream"
+    file_bytes = await file.read()
+    r2 = R2Service()
+    file_key = await r2.upload_file_bytes(file.filename or "upload", content_type, file_bytes)
+    return {"fileKey": file_key}
