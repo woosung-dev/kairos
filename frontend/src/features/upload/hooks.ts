@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { apiClient } from "@/lib/api-client";
-import type { PresignedUrlResponse } from "./types";
 
 interface UploadState {
   isUploading: boolean;
@@ -12,11 +10,9 @@ interface UploadState {
 }
 
 /**
- * Presigned URL을 이용한 R2 직접 업로드 훅.
+ * 백엔드 프록시를 통한 파일 업로드 훅. (R2 CORS 우회)
  *
- * 1. POST /workspaces/{wid}/upload/presigned-url -> { uploadUrl, fileKey }
- * 2. PUT uploadUrl (R2 직접 업로드)
- * 3. fileKey 반환
+ * POST /workspaces/{wid}/upload/file (multipart) → { fileKey }
  */
 export function usePresignedUpload(wid: string | undefined) {
   const { getToken } = useAuth();
@@ -30,43 +26,36 @@ export function usePresignedUpload(wid: string | undefined) {
     setState({ isUploading: true, progress: 0, error: null });
 
     try {
-      // 1. presigned URL 발급
       const token = await getToken();
       if (!token) throw new Error("인증이 필요합니다");
-
       if (!wid) throw new Error("워크스페이스가 선택되지 않았습니다");
 
-      const presigned = await apiClient<PresignedUrlResponse>(
-        `/workspaces/${wid}/upload/presigned-url`,
+      setState((prev) => ({ ...prev, progress: 20 }));
+
+      // 백엔드 프록시 업로드 (FE→BE→R2, CORS 불필요)
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
+      const res = await fetch(
+        `${apiBase}/api/v1/workspaces/${wid}/upload/file`,
         {
-          token,
           method: "POST",
-          body: JSON.stringify({
-            filename: file.name,
-            contentType: file.type || "application/octet-stream",
-          }),
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
         }
       );
 
-      setState((prev) => ({ ...prev, progress: 30 }));
-
-      // 2. R2 직접 업로드 (presigned URL)
-      const uploadRes = await fetch(presigned.uploadUrl, {
-        method: "PUT",
-        body: file,
-        headers: {
-          "Content-Type": file.type || "application/octet-stream",
-        },
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error("파일 업로드에 실패했습니다");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(
+          (errBody as { detail?: string }).detail ?? "파일 업로드에 실패했습니다"
+        );
       }
 
+      const data = (await res.json()) as { fileKey: string };
       setState({ isUploading: false, progress: 100, error: null });
-
-      // 3. fileKey 반환
-      return presigned.fileKey;
+      return data.fileKey;
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "알 수 없는 오류";
