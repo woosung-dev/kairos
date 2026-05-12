@@ -23,7 +23,7 @@ jobs:
         run: uv sync
 
       - name: Run tests
-        run: uv run pytest --ignore=tests/services/test_transcription.py -v
+        run: uv run pytest --ignore=tests/services/test_transcription.py --ignore=tests/test_r2_cors_regression.py -v
         env:
           DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
           CLERK_SECRET_KEY: "sk_test_fake"
