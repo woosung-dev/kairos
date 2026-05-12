@@ -179,7 +179,7 @@
 - [ ] **F7** L4 우선화 검토 ADR 신규 (Sprint 6 완료 + F4 결과 후) — ADR-010 §4 O1/O2/O3 옵션 선택 + ADR-007 Phase 4 진입 결정. 결과물: `docs/dev-log/013-l4-prioritization.md`.
 - [ ] **F8** 부채 D-2/D-3 처리 ADR 신규 (Sprint 6 킥오프 시 결정 — 진입 직전 vs 완료 후) — service-to-service 경계 정책. 결과물: `docs/dev-log/014-service-boundary.md`.
 - [ ] **F9** ADR-009 본 ADR 갱신 검토 (Sprint 7+ 외부 인터뷰 완료 후) — S1~S6 실측 결과로 임계값 재조정.
-- [ ] **F10** `.ai/common/global.md` §2 ID 체계 표 갱신 PR (본 retrofit 머지 직후) — `PERSONA-` 접두사 추가.
+- [x] **F10** `.ai/common/global.md` §2 ID 체계 표 갱신 — `PERSONA-` 접두사 추가. Sprint 10 확인 (global.md line 47에 이미 존재, git-ignored 로컬 파일).
 
 ### `[가설]` 페르소나 패치 일정
 

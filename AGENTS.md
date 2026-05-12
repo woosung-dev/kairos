@@ -196,6 +196,15 @@ InboxItem, Meeting, MeetingSummary, TranscriptSegment, MeetingProjectLink, Actio
 Note, EmbeddingChunk(계층적), SemanticCache
 → `docs/architecture/erd.md`
 
+### visibility 도메인 용어 (Sprint 6, ADR-014)
+
+- **Project.visibility**: `public` / `draft` / `private`
+  - `public` — Workspace 내 모든 멤버 조회 가능
+  - `draft` — ProjectMember만 조회 가능 (작업 중 상태)
+  - `private` — ProjectMember만 조회 + RAG 검색 자동 제외
+- **WorkspaceInvite.default_project_visibility**: 초대로 가입한 사용자의 기본 프로젝트 visibility
+- 별칭 금지: `hidden` / `secret` / `closed` (모두 `private`로 통일)
+
 ### AI 제약사항
 
 - Gemini 모델 고정: `gemini-2.5-flash` (임의 변경 금지)
