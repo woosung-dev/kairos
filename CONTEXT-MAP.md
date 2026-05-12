@@ -183,7 +183,7 @@ shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
 | # | 불변식 | 강제 위치 |
 |---|---|---|
 | I-1 | **AsyncSession은 Repository만 보유** — Service에 `from sqlalchemy.ext.asyncio import AsyncSession` 금지 | `backend/src/<domain>/service.py` |
-| I-2 | **크로스 도메인 트랜잭션은 orchestrator 경유** — 같은 session 공유, 마지막 1회 commit 원칙 (status 전이 보고용 commit은 예외 — §7 D-9 참조) | `<domain>/pipeline_service.py` 또는 `services/` |
+| I-2 | **크로스 도메인 트랜잭션은 orchestrator 경유** — 같은 session 공유, 마지막 1회 commit 원칙. **예외: 장기 파이프라인 진행 보고용 status commit 허용** — BackgroundTask에서 클라이언트 polling을 지원하려면 status 전이마다 commit이 필요. 이 경우 부분 커밋 상태 모델이 생성됨: `transcribing`(세그먼트 없음) / `analyzing`(세그먼트 있음) / `completed`(요약+임베딩 있음) / `failed`(error_message 있음). | `<domain>/pipeline_service.py` 또는 `services/` |
 | I-3 | **AI 모델 고정**: Gemini `gemini-2.5-flash` | `core/config.py` |
 | I-4 | **프롬프트 중앙 관리**: `common/prompts.py` 상수만, 인라인 프롬프트 금지 | code review |
 | I-5 | **장기 작업**: `BackgroundTasks` + `202 Accepted` + `GET .../status` polling | meetings 패턴 |
@@ -216,7 +216,7 @@ shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
 | D-6 | second-brain.md §8 미해결 5건 | 개인↔팀 경계, RAG 검색 범위 UX, 회의 소속, CEO/관리자 접근, 지식 생명주기 | Phase B `/autoplan` 우선순위 |
 | D-7 | actions 텍스트 유사도 dedupe 부재 — 같은 회의 중복 추출 가능 | `actions/CONTEXT.md §7` | 텍스트 임계값 기반 dedupe |
 | D-8 | 회의 R2 hash 중복 검출 부재 — 같은 파일 재업로드 시 새 Meeting 생성 | `meetings/CONTEXT.md §8` | upload 단계에서 hash 비교 |
-| D-9 | meetings 파이프라인 commit 5회 (status 전이 4회 + duration 보고 1회) vs I-2 "마지막 1회" 원칙 일부 어긋남 | `meetings/pipeline_service.py:71/86/90/215/222` (86=duration 업데이트, 222=failure-path) | 단일 commit으로 리팩토링 또는 헌법에 "진행 보고용 commit 허용" 명시 |
+| D-9 | meetings 파이프라인 commit 8회 (process_meeting 4회 + capture_text 4회) — I-2 예외 조항으로 **현 상태 허용 결정 (Sprint 10 deepen-modules)**. 장기 개선: status progress를 별도 테이블로 분리하면 단일 commit 가능 (Sprint 11+ BL-001). | `meetings/pipeline_service.py` (process_meeting + capture_text 동일 패턴) | BL-001 등재 (Sprint 11+) |
 | D-10 | orphan ActionItem 분류 워크플로우 부재 — `project_id=null`로 생성 가능하지만 UI/분류 흐름 미정 | `actions/models.py:15` + `pipeline_service.py:114-132` | Sprint 6+ |
 | D-11 | meetings `MeetingSummary.key_decisions`/`topics` 타입 어노테이션과 default 불일치 — 둘 다 `dict = Field(default_factory=list, ...)`. 런타임은 list로 동작하지만 타입 힌트는 dict | `meetings/models.py:46-47` | 타입 어노테이션을 `list`로 정정 (코드 2줄) |
 
