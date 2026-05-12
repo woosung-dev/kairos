@@ -312,14 +312,10 @@ export default function NewContentPage() {
           {meetingTab === "record" && (
             <RecordingView
               workspaceId={activeWorkspaceId ?? undefined}
-              onComplete={(fileKey, recTitle) => {
+              onComplete={async (fileKey, recTitle) => {
                 if (!activeWorkspaceId) return;
-                void createMeeting
-                  .mutateAsync({ title: recTitle, fileKey })
-                  .then((meeting) => router.push(`/meetings/${meeting.id}`))
-                  .catch((err) => {
-                    setError(err instanceof Error ? err.message : '회의 생성 실패');
-                  });
+                const meeting = await createMeeting.mutateAsync({ title: recTitle, fileKey });
+                router.push(`/meetings/${meeting.id}`);
               }}
             />
           )}
@@ -449,7 +445,7 @@ function RecordingView({
   onComplete,
 }: {
   workspaceId: string | undefined;
-  onComplete: (fileKey: string, title: string) => void;
+  onComplete: (fileKey: string, title: string) => Promise<void>;
 }) {
   const { state, duration, startRecording, stopRecording, recordedBlob, objectUrl, error, reset } =
     useRecording();
@@ -479,7 +475,7 @@ function RecordingView({
       });
       const fileKey = await presignedUpload.upload(file);
       const title = recordTitle.trim() || `녹음_${new Date().toLocaleDateString()}`;
-      onComplete(fileKey, title);
+      await onComplete(fileKey, title);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : '업로드 실패');
     } finally {

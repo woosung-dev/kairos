@@ -42,6 +42,8 @@ export function useRecording(): UseRecordingReturn {
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  // getUserMedia 비동기 완료 전 중복 호출 방지
+  const isStartingRef = useRef(false);
 
   const revokeObjectUrl = () => {
     if (objectUrlRef.current) {
@@ -51,7 +53,9 @@ export function useRecording(): UseRecordingReturn {
   };
 
   const startRecording = useCallback(async () => {
-    if (mediaRecorderRef.current?.state === 'recording') return;
+    // getUserMedia resolve 이전 중복 호출 방지 (in-flight guard)
+    if (isStartingRef.current || mediaRecorderRef.current?.state === 'recording') return;
+    isStartingRef.current = true;
 
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setError('이 브라우저는 마이크 녹음을 지원하지 않습니다');
@@ -95,11 +99,13 @@ export function useRecording(): UseRecordingReturn {
       recorder.start(100);
       setState('recording');
       setDuration(0);
+      isStartingRef.current = false;
 
       timerRef.current = setInterval(() => {
         setDuration((d) => d + 1);
       }, 1000);
     } catch (err) {
+      isStartingRef.current = false;
       stream?.getTracks().forEach((t) => t.stop());
       setError(err instanceof Error ? err.message : '마이크 접근 실패');
     }
