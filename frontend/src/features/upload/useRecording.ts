@@ -105,6 +105,12 @@ export function useRecording(): UseRecordingReturn {
         setRecordedBlob(blob);
         setObjectUrl(url);
         stream?.getTracks().forEach((t) => t.stop());
+        // 명시적 stop 버튼 외에 브라우저가 마이크를 회수한 경우도 처리
+        setState('stopped');
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
       };
 
       recorder.start(100);
@@ -126,11 +132,7 @@ export function useRecording(): UseRecordingReturn {
     if (mediaRecorderRef.current?.state === 'recording') {
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current = null;
-      setState('stopped');
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+      // setState('stopped')과 timer 정리는 onstop에서 처리 (브라우저 회수 케이스도 커버)
     }
   }, []);
 
