@@ -173,13 +173,19 @@ class RagService:
         return [result_map[rid] for rid in sorted_ids[:top_n]]
 
     async def _enrich_context(self, results: list[dict]) -> list[dict]:
-        """Level 2 검색 결과에 parent Level 1 컨텍스트 추가."""
+        """Level 2 검색 결과에 parent Level 1 컨텍스트 추가. 배치 쿼리 1회."""
+        # uuid.UUID(str(...)) — DB에서 UUID 객체로 올 수도 있고 문자열로 올 수도 있어 str 경유
+        parent_ids = [
+            uuid.UUID(str(r["parent_chunk_id"]))
+            for r in results if r.get("parent_chunk_id")
+        ]
+        parents = await self.embedding_repo.find_chunks_by_ids(parent_ids) if parent_ids else {}
         enriched = []
         for r in results:
             parent_text = ""
-            parent_id = r.get("parent_chunk_id")
-            if parent_id:
-                parent = await self.embedding_repo.find_chunk_by_id(parent_id)
+            pid = r.get("parent_chunk_id")
+            if pid:
+                parent = parents.get(uuid.UUID(str(pid)))
                 if parent:
                     parent_text = parent.chunk_text
             enriched.append({**r, "parent_text": parent_text})

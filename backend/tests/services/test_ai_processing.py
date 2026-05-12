@@ -4,6 +4,8 @@ import json
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from pydantic import ValidationError
+from src.common.prompts import MeetingSummaryResult, MeetingActionsResult
 
 MOCK_SUMMARY_RESPONSE = json.dumps({
     "summary": "CMS 고도화 프로젝트 킥오프 회의. 3월 내 완료 목표 확정.",
@@ -80,3 +82,39 @@ async def test_summarize_uses_correct_model():
 
             call_kwargs = mock_client.aio.models.generate_content.call_args.kwargs
             assert call_kwargs["model"] == "gemini-2.5-flash"
+
+
+# ── BL-004: 스키마 검증 테스트 ──
+def test_meeting_summary_result_valid():
+    """유효한 요약 응답 → 검증 통과."""
+    data = {
+        "summary": "CMS 고도화 킥오프.",
+        "key_decisions": ["3월 내 완료"],
+        "risks_and_issues": [],
+        "participants": ["김철수"],
+        "topics": ["CMS"],
+        "next_meeting_agenda": [],
+    }
+    result = MeetingSummaryResult.model_validate(data)
+    assert result.summary == "CMS 고도화 킥오프."
+    assert result.key_decisions == ["3월 내 완료"]
+
+
+def test_meeting_summary_result_missing_summary():
+    """summary 필드 누락 → ValidationError."""
+    with pytest.raises(ValidationError):
+        MeetingSummaryResult.model_validate({})
+
+
+def test_meeting_summary_result_defaults():
+    """선택 필드 누락 시 빈 리스트 기본값."""
+    result = MeetingSummaryResult.model_validate({"summary": "요약"})
+    assert result.key_decisions == []
+    assert result.topics == []
+
+
+def test_meeting_actions_result_defaults():
+    """actionItems 없어도 기본값으로 처리."""
+    result = MeetingActionsResult.model_validate({})
+    assert result.actionItems == []
+    assert result.suggestedTags == []

@@ -129,6 +129,17 @@ class EmbeddingRepository:
         )
         return result.scalar_one_or_none()
 
+    async def find_chunks_by_ids(
+        self, ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, EmbeddingChunk]:
+        """여러 청크를 한 번의 쿼리로 조회한다."""
+        if not ids:
+            return {}
+        result = await self.session.execute(
+            select(EmbeddingChunk).where(EmbeddingChunk.id.in_(ids))
+        )
+        return {c.id: c for c in result.scalars().all()}
+
     # --- 캐시 ---
 
     async def find_similar_cache(

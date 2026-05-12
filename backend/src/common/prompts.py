@@ -3,6 +3,8 @@
 import json
 import re
 
+from pydantic import BaseModel
+
 # ── 회의 요약 생성 프롬프트 ──
 MEETING_SUMMARY_SYSTEM_PROMPT = """당신은 회의 트랜스크립트를 구조화된 요약으로 변환하는 전문가입니다.
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요.
@@ -86,3 +88,20 @@ def parse_json_response(text: str) -> dict:
         return json.loads(clean)
     except json.JSONDecodeError as e:
         raise ValueError(f"AI 응답 JSON 파싱 실패: {e}\n원본:\n{text}") from e
+
+
+# ── LLM 응답 계약 스키마 ──
+# 프롬프트 출력 스키마 텍스트와 동기화 유지. 키 변경 시 프롬프트 텍스트와 함께 수정할 것.
+class MeetingSummaryResult(BaseModel):
+    summary: str
+    key_decisions: list[str] = []
+    risks_and_issues: list[str] = []
+    participants: list[str] = []
+    topics: list[str] = []
+    next_meeting_agenda: list[str] = []
+
+
+class MeetingActionsResult(BaseModel):
+    actionItems: list[dict] = []
+    suggestedProject: dict = {}
+    suggestedTags: list[str] = []
