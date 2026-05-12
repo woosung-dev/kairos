@@ -44,6 +44,11 @@
   - [x] 내보내기 포맷 MD/JSON (회의/노트)
   - [ ] 내보내기 포맷 PDF (향후 구현)
 
+## Recently Completed — Sprint 10 E2E 검증 + R2 CORS 수정 (2026-05-12)
+
+- [x] **E2E 검증 완료 (2026-05-12)**: 실제 오디오 파일 업로드 → status=completed → 트랜스크립트 세그먼트 + InboxItem 생성 확인. **검증 범위: 오디오 업로드 → STT → 요약 → Inbox 적재까지. RAG/Source Viewer E2E는 ADR-008 후속.**
+- [x] **ISSUE-R2-CORS-001 수정**: R2 CORS 정책 미설정으로 브라우저 직접 PUT 차단 → 백엔드 프록시 업로드(`POST /upload/file`, BE→R2 경유)로 수정. TDD 3 테스트 추가 + FE 훅 전환 (commit 9a62d02 + 08cae59).
+
 ## Recently Completed — Sprint 9 오디오 파이프라인 수리 (2026-05-12)
 
 - [x] **CRITICAL 버그 수정**: `MeetingPipelineService` BackgroundTask 세션 수명 버그 — request-scoped `AsyncSession`이 HTTP 응답 직후 닫혀 BackgroundTask가 실패하던 문제. `session_factory` 패턴으로 교체 (독립 세션 생성). `database.py` + `dependencies.py` + `pipeline_service.py` + `test_pipeline.py` 수정. 82 테스트 통과.
@@ -146,7 +151,8 @@
 
 - [ ] **GCP WIF 초기 설정 + Secret Manager 9개 이관** (사용자 작업) — `docs/guides/deployment.md` §2.5.1 참조
 - [ ] Clerk testing mode 계정 생성 + GitHub `E2E_*` Secrets 등록 (E2E 활성화)
-- [ ] FE ↔ BE 실제 프로덕션 E2E 시나리오 검증 (신규 계정 → 템플릿 프로젝트 3개 확인 → 업로드 → STT → Inbox → 프로젝트 → RAG → `[1]` 클릭 → Source Viewer 풀콘텐츠 렌더)
+- [x] **FE ↔ BE 오디오 파이프라인 E2E 검증** (업로드 → STT → Inbox — Sprint 9/10 완료, 2026-05-12)
+- [ ] FE ↔ BE 전체 E2E 시나리오 (신규 계정 → 템플릿 프로젝트 3개 → RAG → `[1]` → Source Viewer 풀콘텐츠 렌더) — ADR-008 후속
 
 ### Sprint 6 잔여 (sprint 7+ 보류, AD-32~35) — 2026-05-11 dogfooding 결과 반영
 
