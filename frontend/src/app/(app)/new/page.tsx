@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { usePresignedUpload } from "@/features/upload/hooks";
+import { useRecording, type RecordingState } from "@/features/upload/useRecording";
 import { useCreateMeeting, useCaptureText } from "@/features/meetings/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 
@@ -48,7 +49,7 @@ export default function NewContentPage() {
 
   const isUploading = !!uploadStep;
 
-  const [meetingTab, setMeetingTab] = useState<"audio" | "text">("audio");
+  const [meetingTab, setMeetingTab] = useState<"audio" | "record" | "text">("audio");
   const [captureTitle, setCaptureTitle] = useState("");
   const [captureContent, setCaptureContent] = useState("");
   const [captureError, setCaptureError] = useState<string | null>(null);
@@ -184,7 +185,7 @@ export default function NewContentPage() {
 
           {/* 탭 */}
           <div className="flex gap-1 mb-4 border-b" style={{ borderColor: "var(--border-subtle)" }}>
-            {(["audio", "text"] as const).map((tab) => (
+            {(["audio", "record", "text"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setMeetingTab(tab)}
@@ -194,7 +195,7 @@ export default function NewContentPage() {
                   borderBottom: meetingTab === tab ? "2px solid var(--accent)" : "2px solid transparent",
                 }}
               >
-                {tab === "audio" ? "🎙️ 오디오 업로드" : "📝 텍스트로 입력"}
+                {tab === "audio" ? "🎙️ 오디오 업로드" : tab === "record" ? "🔴 직접 녹음" : "📝 텍스트로 입력"}
               </button>
             ))}
           </div>
@@ -306,6 +307,17 @@ export default function NewContentPage() {
                 </button>
               </div>
             </div>
+          )}
+
+          {meetingTab === "record" && (
+            <RecordingView
+              workspaceId={activeWorkspaceId ?? undefined}
+              onComplete={async (fileKey, recTitle) => {
+                if (!activeWorkspaceId) return;
+                const meeting = await createMeeting.mutateAsync({ title: recTitle, fileKey });
+                router.push(`/meetings/${meeting.id}`);
+              }}
+            />
           )}
 
           {meetingTab === "text" && (
@@ -423,6 +435,138 @@ export default function NewContentPage() {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+// 직접 녹음 탭 UI — useRecording + usePresignedUpload 조합 (독립 title 상태)
+function RecordingView({
+  workspaceId,
+  onComplete,
+}: {
+  workspaceId: string | undefined;
+  onComplete: (fileKey: string, title: string) => Promise<void>;
+}) {
+  const { state, duration, startRecording, stopRecording, recordedBlob, objectUrl, error, reset } =
+    useRecording();
+  const presignedUpload = usePresignedUpload(workspaceId);
+  const [recordTitle, setRecordTitle] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const formatDuration = (sec: number) => {
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = (sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
+  const handleUpload = async () => {
+    if (!recordedBlob || !workspaceId) return;
+    if (recordedBlob.size === 0) {
+      setUploadError('녹음 데이터가 비어 있습니다. 다시 녹음해 주세요.');
+      return;
+    }
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const ext = recordedBlob.type.includes('mp4') ? 'mp4' : 'webm';
+      const file = new File([recordedBlob], `recording-${Date.now()}.${ext}`, {
+        type: recordedBlob.type,
+      });
+      const fileKey = await presignedUpload.upload(file);
+      const title = recordTitle.trim() || `녹음_${new Date().toLocaleDateString()}`;
+      await onComplete(fileKey, title);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : '업로드 실패');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const stateLabel: Record<RecordingState, string> = {
+    idle: '버튼을 눌러 마이크 녹음을 시작하세요',
+    recording: '녹음 중… 버튼을 눌러 중지',
+    stopped: '녹음 완료. 미리 듣고 업로드하세요',
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>
+          회의 제목
+        </label>
+        <input
+          type="text"
+          placeholder="회의 제목을 입력하세요"
+          value={recordTitle}
+          onChange={(e) => setRecordTitle(e.target.value)}
+          className="w-full px-3 py-2 rounded border text-sm bg-transparent outline-none"
+          style={{ borderColor: 'var(--border)', color: 'var(--text-primary)', borderRadius: 'var(--radius-sm)' }}
+        />
+      </div>
+
+      <div className="flex flex-col items-center gap-4 py-6">
+        <div className="text-4xl font-mono tabular-nums" style={{ color: 'var(--text-primary)' }}>
+          {formatDuration(duration)}
+        </div>
+
+        {(error ?? uploadError) && (
+          <p className="text-sm" style={{ color: 'var(--error)' }}>{error ?? uploadError}</p>
+        )}
+
+        {state === 'idle' && (
+          <button
+            type="button"
+            onClick={() => void startRecording()}
+            className="w-16 h-16 rounded-full flex items-center justify-center transition-colors"
+            style={{ background: 'var(--accent)' }}
+            aria-label="녹음 시작"
+          >
+            <span className="w-6 h-6 rounded-full bg-white" />
+          </button>
+        )}
+
+        {state === 'recording' && (
+          <button
+            type="button"
+            onClick={stopRecording}
+            className="w-16 h-16 rounded-full flex items-center justify-center transition-colors animate-pulse"
+            style={{ background: 'var(--error, #ef4444)' }}
+            aria-label="녹음 중지"
+          >
+            <span className="w-5 h-5 rounded-sm bg-white" />
+          </button>
+        )}
+
+        {state === 'stopped' && recordedBlob && (
+          <div className="flex flex-col items-center gap-3 w-full max-w-sm">
+            {objectUrl && <audio controls src={objectUrl} className="w-full" />}
+            <div className="flex gap-2 w-full">
+              <button
+                type="button"
+                onClick={reset}
+                className="flex-1 px-4 py-2 rounded border text-sm"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+              >
+                다시 녹음
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleUpload()}
+                disabled={isUploading}
+                className="flex-1 px-4 py-2 rounded text-sm disabled:opacity-50"
+                style={{ background: 'var(--accent)', color: 'var(--accent-foreground, white)' }}
+              >
+                {isUploading ? '업로드 중…' : '업로드 & 분석'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {stateLabel[state]}
+        </p>
+      </div>
     </div>
   );
 }

@@ -409,13 +409,15 @@ ADR-010 AD-8(thesis PASS) / ADR-011 §4-b(페르소나 FAIL) / 본 S5(thesis PAS
 ## 8. 현재 컨텍스트
 
 - **방향 전환:** PARA → 팀 세컨드 브레인 (ADR-004, 2026-04-02)
-- **현재 Phase:** Sprint 4 완료 (배포) — **Sprint 1~4 전체 코드 검증 완료 (2026-04-04)**
+- **현재 Phase:** Sprint 10 완료 (E2E 검증) — **Sprint 1~10 진행 중 (2026-05-12)**
 - **Sprint 1-2:** 회의 업로드 → STT → AI 요약 → 액션 → Inbox → 프로젝트 연결 ✅
 - **Sprint 3:** 임베딩(pgvector) + Hybrid Search + SSE RAG + 노트 + Semantic Cache ✅
 - **Sprint 4:** GCP Cloud Run + Vercel + Neon prod 배포, GitHub Actions CI ✅
+- **Sprint 5-6:** RBAC + 초대 시스템 + Visibility 권한 분기 + ProjectMember 신설 ✅
+- **Sprint 7-10:** 도그푸딩 8 자동 케이스 + E2E 검증 + R2 CORS 수정 ✅
+- **Sprint 11:** E2E 자동화 + 마이크 녹음 + (선택) BL-002 리팩토링 (진행 중, 2026-05-12~)
 - **프로덕션 URL:** BE `https://kairos-api-467254555861.asia-northeast3.run.app` / FE `https://kairos-zeta-ebon.vercel.app` (둘 다 라이브 확인)
-- **ADR-006:** 서비스 전면 UI/UX 개편 — 9/11 구현 완료, 2/11 부분 (임계값 UI, 내보내기)
-- **다음 작업:** Sprint 5 (RBAC + 초대 시스템)
+- **다음 작업:** Sprint 11 (E2E + 마이크 녹음)
 
 ### Phase/Sprint/Stage 용어 매핑
 
