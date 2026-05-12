@@ -44,6 +44,8 @@ export function useRecording(): UseRecordingReturn {
   const objectUrlRef = useRef<string | null>(null);
   // getUserMedia 비동기 완료 전 중복 호출 방지
   const isStartingRef = useRef(false);
+  // 언마운트 후 getUserMedia resolve 시 마이크 누수 방지
+  const isMountedRef = useRef(true);
 
   const revokeObjectUrl = () => {
     if (objectUrlRef.current) {
@@ -58,6 +60,7 @@ export function useRecording(): UseRecordingReturn {
     isStartingRef.current = true;
 
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      isStartingRef.current = false;
       setError('이 브라우저는 마이크 녹음을 지원하지 않습니다');
       return;
     }
@@ -71,10 +74,18 @@ export function useRecording(): UseRecordingReturn {
     let stream: MediaStream | null = null;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // getUserMedia resolve 후 언마운트된 경우 마이크 즉시 해제
+      if (!isMountedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        isStartingRef.current = false;
+        return;
+      }
       streamRef.current = stream;
 
       const mimeType = getSupportedMimeType();
       if (!mimeType) {
+        isStartingRef.current = false;
         stream.getTracks().forEach((t) => t.stop());
         setError('이 브라우저에서 지원하는 오디오 포맷이 없습니다');
         return;
@@ -138,7 +149,9 @@ export function useRecording(): UseRecordingReturn {
   }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       if (timerRef.current) clearInterval(timerRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       revokeObjectUrl();
