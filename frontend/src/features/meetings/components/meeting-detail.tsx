@@ -141,6 +141,7 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
             {meeting.title}
           </h1>
           <span
+            data-testid="meeting-status"
             className="px-2 py-0.5 rounded-full text-xs font-medium"
             style={{
               background: statusStyle.background,
@@ -217,10 +218,12 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
 
           {/* 탭 콘텐츠 */}
           {activeTab === "요약" && (
-            <MeetingSummaryView
-              summary={meeting.summary}
-              onSwitchToTranscript={handleSwitchToTranscript}
-            />
+            <div data-testid="meeting-summary">
+              <MeetingSummaryView
+                summary={meeting.summary}
+                onSwitchToTranscript={handleSwitchToTranscript}
+              />
+            </div>
           )}
           {activeTab === "트랜스크립트" && (
             <TranscriptView transcript={meeting.transcript} />

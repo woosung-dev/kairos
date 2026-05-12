@@ -48,3 +48,4 @@ e2e-*.png
 .claude/
 .agents/
 .gstack/
+.context/

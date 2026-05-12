@@ -227,6 +227,7 @@ export default function NewContentPage() {
                   녹음 파일
                 </label>
                 <input
+                  data-testid="meeting-file-input"
                   ref={fileInputRef}
                   type="file"
                   accept="audio/*,video/*,.mp3,.wav,.m4a,.mp4,.webm"
