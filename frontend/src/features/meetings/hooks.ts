@@ -50,10 +50,10 @@ export function useMeetingDetail(wid: string | undefined, id: string) {
     enabled: !!wid,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      if (status && POLLING_STATUSES.includes(status)) {
-        return 3000;
-      }
-      return false;
+      // 완료/실패 상태에서만 중단 — 네트워크 오류 시에도 재시도 유지
+      if (status === "completed" || status === "failed") return false;
+      if (status && POLLING_STATUSES.includes(status)) return 3000;
+      return 3000;
     },
   });
 }

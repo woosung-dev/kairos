@@ -1,3 +1,4 @@
+// 인증 플로우 E2E — 미인증 리다이렉트 및 로그인 폼 렌더링 검증
 import { test, expect } from "@playwright/test";
 
 /**

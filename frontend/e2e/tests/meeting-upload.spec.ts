@@ -1,3 +1,4 @@
+// 미팅 업로드 E2E — 오디오 업로드 → STT → AI 분석 → 완료 골든패스 검증
 import { test, expect } from "@playwright/test";
 import path from "path";
 
