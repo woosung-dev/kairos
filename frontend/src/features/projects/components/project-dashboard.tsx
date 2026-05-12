@@ -455,6 +455,7 @@ function MeetingCard({ meeting }: { meeting: Meeting }) {
   return (
     <Link
       href={`/meetings/${meeting.id}`}
+      data-testid="meeting-card"
       className="block p-4 rounded-lg border transition-colors"
       style={{
         background: "var(--surface)",
