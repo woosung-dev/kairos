@@ -150,6 +150,8 @@ Layer 2: 팀 지식 베이스 (프로젝트)
   → 다음 프로젝트에서 RAG로 검색 가능
 ```
 
+> **Note (Sprint 6, ADR-014):** `Draft` — 작성자(creator)와 admin/owner만 조회 가능 (작업 중 상태). `Private` — ProjectMember만 조회 가능하며, RAG 검색에서 자동 제외되어 비멤버 응답에 포함되지 않음. 이 두 가지 visibility 모드로 개인↔팀 경계 구분이 완성됨.
+
 ---
 
 ## 6. 지식 신선도 관리 (Slite 참고)
