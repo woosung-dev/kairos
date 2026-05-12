@@ -147,6 +147,20 @@
 
 ## Next Actions
 
+### Sprint 12 — Architecture Deepening (BL 등재, 2026-05-12) ✅ 완료
+
+- [x] **BL-003 등재** (rag/ 도메인) — `RagService._enrich_context` N+1 → `find_chunks_by_ids` 배치화. `docs/REFACTORING-BACKLOG.md` 등재 완료.
+- [x] **BL-004 등재** (services/ 도메인) — co-change 재분석으로 발굴. `ai_processing.py` ↔ `common/prompts.py` 암묵적 JSON 계약 → Pydantic 경계 검증 추가. `docs/REFACTORING-BACKLOG.md` 등재 완료.
+- [x] **meetings/ 도메인 audit** — BL-001 미실행 항목 이미 등재됨. export 중복 쿼리 발견, BL-001과 묶어 처리 결정. 추가 BL 불필요.
+- 발굴 산출물: BL-003/BL-004 신규 등재. BL-002 완료 마킹. rag/services audit dev-log 신설.
+
+### Sprint 13 — BL-003/004 구현 (2026-05-12) ✅ 완료 (PR #21 머지)
+
+- [x] **BL-003 구현** — `EmbeddingRepository.find_chunks_by_ids()` 추가 + `_enrich_context` N+1 → 배치 1회. 테스트 3개 추가.
+- [x] **BL-004 구현** — `MeetingSummaryResult` / `MeetingActionsResult` Pydantic 모델 추가 + `ai_processing.py` 경계 검증. 테스트 4개 추가.
+- [x] **pyrightconfig.json** — backend/ + 루트 추가. IDE Pyright venv 경로 설정.
+- 테스트: 신규 7개 추가 (BL-003: 3, BL-004: 4) / 전체 87 passed
+
 ### 진행 중 (ADR-008 DevEx 후속)
 
 - [ ] **GCP WIF 초기 설정 + Secret Manager 9개 이관** (사용자 작업) — `docs/guides/deployment.md` §2.5.1 참조

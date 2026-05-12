@@ -35,7 +35,7 @@
 ```
 [1] Cache Lookup           SemanticCache (≥0.93 유사도) → hit 시 즉시 스트리밍 반환
 [2] Query Processing       질문 정제 + 임베딩 생성 + 키워드 추출
-[3] Hybrid Search          pgvector (chunk_level=2) + 키워드(검증 필요 — BM25/TS 추정)
+[3] Hybrid Search          pgvector (chunk_level=2) + pg_trgm 키워드 검색 (`embedding_repo.text_search()`)
 [4] Rank Fusion (RRF, k=60) Reciprocal Rank Fusion으로 벡터/키워드 결과 융합 (Gemini re-rank 아님)
 [5] Generation             Gemini 답변 + 인용 (sources) — SSE chunk stream
 [6] Cache Store            결과 SemanticCache에 저장 (TTL 7일)
