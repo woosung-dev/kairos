@@ -36,7 +36,7 @@
 | # | 결정 | 위치 |
 |---|------|------|
 | 1 | Option D (Personal workspace + Promotion flow) | ADR-016 AD-40 |
-| 2 | Promotion = 복제 + tombstone (이동 X) | ADR-016 AD-41, 헌법 I-17 예정 |
+| 2 | Promotion = 복제 + tombstone (이동 X) | ADR-016 AD-41, 헌법 I-18 예정 (I-17 slot은 Sprint 7 BE-T13 cross-ws ProjectMember 차단으로 점유) |
 | 3 | visibility enum 4번째 추가 X | ADR-016 AD-42 |
 | 4 | Personal workspace 항상 1명, 팀 초대 불가 | ADR-016 AD-43 |
 | 5 | Qdrant 미전환 (트리거 5조건 명시) | PRD §부록 B |
@@ -50,7 +50,7 @@
 
 ```
 Stage 0  /grill-with-docs                          [START HERE]
-   ↓     헌법 I-9 강화 / I-17 신설 / R-13 예정 적대적 검증
+   ↓     헌법 I-9 강화 / I-18 신설 (Promotion) / R-13 예정 적대적 검증
    ↓     산출: docs/dev-log/2026-05-14-constitution-grill-v3.md
    ↓     예상 0.5-1일
 
@@ -93,7 +93,7 @@ Stage 6  /retro → /learn
 
 ## 3. Stage 0 grill 1차 대상 (즉시 진입 가능)
 
-### Q1. I-17 신설 (Promotion 복제 + tombstone) edge case
+### Q1. I-18 신설 (Promotion 복제 + tombstone) edge case
 
 - Promote 후 작성자가 원본 수정하면? (복제본 영향 0인가 / sync 정책 / 무관)
 - Team admin이 reject하면 원본 복원? tombstone에 reject 기록?
@@ -148,7 +148,7 @@ Stage 6  /retro → /learn
 |------|------|------|
 | S16-T1 | FE: "Promote to Team..." 액션 모달 | Sprint 15 완료 |
 | S16-T2 | BE: Promotion API — 복제 + 임베딩 신규 생성 + tombstone | S16-T1 |
-| S16-T3 | DOC: 헌법 I-17 신설 + ADR-016 referenced | S16-T2 |
+| S16-T3 | DOC: 헌법 I-18 신설 + ADR-016 referenced | S16-T2 |
 | S16-T4 | FE: `/new`에 "음성 메모" 탭 추가 | — |
 | S16-T5 | BE: Voice note 모델 + STT + Gemini 요약 + 태그 | S16-T4 |
 | S16-T6 | UX: Personal에서 음성 메모 첫 진입 시나리오 | S16-T4, T5 |
@@ -198,7 +198,7 @@ Sprint 15 진입.
 1. docs/dev-log/2026-05-14-sprint15-handoff.md  (본 인계 문서)
 2. docs/requirements/prd.md v3.0 §3.6 IA 2축 로드맵
 3. docs/dev-log/016-personal-team-ia.md  (ADR-016, AD-40~46)
-4. docs/CONTEXT-MAP.md  (헌법 I-9 강화 / I-17 신설 / R-13 예정)
+4. CONTEXT-MAP.md  (repo root, 헌법 I-9 강화 / I-18 신설 Promotion / R-13 예정)
 5. docs/TODO.md Sprint 15-16 후보 (S15-T1~T7, S16-T1~T6)
 
 Stage 0 /grill-with-docs 부터 시작. 5개 grill 대상 (handoff §3)을 적대적으로 검증해서
