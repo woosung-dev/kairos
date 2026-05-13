@@ -23,7 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write  # GHCR push 권한 (GITHUB_TOKEN 자동 사용)
+      id-token: write  # WIF OIDC 토큰 발급용
+      packages: write  # GHCR push용
 
     steps:
       - uses: actions/checkout@v4
@@ -52,11 +53,12 @@ jobs:
 
           echo "IMAGE_URI=$SHA_TAG" >> "$GITHUB_ENV"
 
-      # ── Cloud Run 배포 (GCP SA Key 인증) ─────────────────────────────────
-      - name: Authenticate to Google Cloud (SA Key)
+      # ── GCP 인증 (WIF — 키 파일 없음) ────────────────────────────────────
+      - name: Authenticate to Google Cloud (WIF)
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOYER_SA }}
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2

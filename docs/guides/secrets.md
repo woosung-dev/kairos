@@ -65,11 +65,13 @@ cp frontend/.env.example frontend/.env.local  # Next.js: .env.local 표준
 
 | Secret 이름 | 용도 | 값 |
 |---|---|---|
-| `GCP_SA_KEY` 🔒 | Cloud Run 배포용 SA JSON 키 | GCP Console → SA → 키 생성 → JSON 전체 내용 |
+| `GCP_WIF_PROVIDER` | Workload Identity Federation 인증 | `deployment.md §2.5.1-B` 출력값 |
+| `GCP_DEPLOYER_SA` | Cloud Run 배포 서비스 계정 | `kairos-deployer@woosung-dev.iam.gserviceaccount.com` |
 | `CORS_ORIGINS` | Cloud Run CORS 허용 오리진 | `https://kairos-zeta-ebon.vercel.app` |
 | `FRONTEND_URL` | Cloud Run 프론트엔드 URL | `https://kairos-zeta-ebon.vercel.app` |
 
-> **이미지 푸시 (GHCR)**: `GITHUB_TOKEN` 자동 처리 — 별도 시크릿 불필요.
+> **이미지 (GHCR)**: `GITHUB_TOKEN` 자동 처리 — 별도 시크릿 불필요.
+> **AWS 이동 시**: `GCP_WIF_PROVIDER` + `GCP_DEPLOYER_SA` → `AWS_ROLE_ARN` 하나로 교체.
 
 ---
 
