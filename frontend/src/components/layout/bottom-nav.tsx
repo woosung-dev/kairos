@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, FolderOpen, Plus, Inbox, Search } from "lucide-react";
+import { Home, FolderOpen, Plus, Inbox, FileText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface NavItem {
@@ -12,12 +12,14 @@ interface NavItem {
   isAccent?: boolean;
 }
 
+// Sprint 14 T-11: "검색" 자리에 "빠른 메모" 진입점 (모바일 사용 빈도 높음).
+// 검색은 ⌘K + 헤더 검색바로 접근 (데스크톱과 동일 IA).
 const NAV_ITEMS: NavItem[] = [
   { href: "/", icon: Home, label: "홈" },
   { href: "/projects", icon: FolderOpen, label: "프로젝트" },
   { href: "/new", icon: Plus, label: "추가", isAccent: true },
   { href: "/inbox", icon: Inbox, label: "Inbox" },
-  { href: "/search", icon: Search, label: "검색" },
+  { href: "/notes", icon: FileText, label: "메모" },
 ];
 
 export function BottomNav() {

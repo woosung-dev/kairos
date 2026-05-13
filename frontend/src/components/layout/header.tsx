@@ -42,9 +42,10 @@ export function Header() {
     >
       {/* 좌측: 사이드바 토글 + breadcrumb */}
       <div className="flex items-center gap-3 shrink-0">
+        {/* Sprint 14 T-10: 모바일에서 사이드바 토글 숨김 (BottomNav 1차 내비). md(768)+에서만 노출. */}
         <button
           onClick={toggleSidebar}
-          className="p-1.5 rounded transition-colors hover:opacity-80"
+          className="hidden md:inline-flex p-1.5 rounded transition-colors hover:opacity-80"
           style={{ color: "var(--text-secondary)" }}
           aria-label="사이드바 토글"
         >
