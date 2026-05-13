@@ -34,10 +34,8 @@ setup("authenticate", async ({ page }) => {
   await page.locator('input[type="password"]').fill(password);
   await page.getByRole("button", { name: /continue|sign in|로그인|계속/i }).click();
 
-  // Clerk가 대시보드로 리다이렉트할 때까지 대기
+  // /dashboard 리다이렉트 = 로그인 성공. 대시보드는 폴링 요청이 있어 networkidle 사용 불가.
   await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
-  // 페이지 로드 완료 대기 (CI 환경에서 렌더링 지연 대응)
-  await page.waitForLoadState("networkidle");
 
   // 세션 스토리지 + 쿠키 저장
   await page.context().storageState({ path: AUTH_FILE });
