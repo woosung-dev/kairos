@@ -59,36 +59,20 @@ cp frontend/.env.example frontend/.env.local  # Next.js: .env.local 표준
 
 ---
 
-### CI 전용 — GitHub Secrets (배포 자동화 + 앱 시크릿)
+### CI 전용 — GitHub Secrets (배포 자동화)
 
 > GitHub repo → Settings → Secrets and variables → Actions → **Secrets** 탭
-> 값은 `backend/.env`에서 복사
 
-**배포 인증 (WIF)**
+| Secret 이름 | 용도 | 값 |
+|---|---|---|
+| `GCP_WIF_PROVIDER` | Workload Identity Federation 인증 | `deployment.md §2.5.1-B` 출력값 |
+| `GCP_DEPLOYER_SA` | Cloud Run 배포 서비스 계정 | `kairos-deployer@woosung-dev.iam.gserviceaccount.com` |
+| `CORS_ORIGINS` | Cloud Run CORS 허용 오리진 | `https://kairos-zeta-ebon.vercel.app` |
+| `FRONTEND_URL` | Cloud Run 프론트엔드 URL | `https://kairos-zeta-ebon.vercel.app` |
 
-| Secret 이름 | 값 |
-|---|---|
-| `GCP_WIF_PROVIDER` | `deployment.md §2.5.1-B` 출력값 |
-| `GCP_DEPLOYER_SA` | `kairos-deployer@woosung-dev.iam.gserviceaccount.com` |
-| `CORS_ORIGINS` | `https://kairos-zeta-ebon.vercel.app` |
-| `FRONTEND_URL` | `https://kairos-zeta-ebon.vercel.app` |
-
-**앱 시크릿 (클라우드 무관 — AWS 이동 시 그대로 재사용)**
-
-| Secret 이름 | 값 위치 |
-|---|---|
-| `DATABASE_URL` 🔒 | `backend/.env` |
-| `CLERK_SECRET_KEY` 🔒 | `backend/.env` |
-| `CLERK_WEBHOOK_SECRET` 🔒 | `backend/.env` |
-| `R2_ACCOUNT_ID` 🔒 | `backend/.env` |
-| `R2_ACCESS_KEY_ID` 🔒 | `backend/.env` |
-| `R2_SECRET_ACCESS_KEY` 🔒 | `backend/.env` |
-| `R2_BUCKET_NAME` | `backend/.env` |
-| `GEMINI_API_KEY` 🔒 | `backend/.env` |
-| `OPENAI_API_KEY` 🔒 | `backend/.env` |
-
-> **이미지 (GHCR)**: `GITHUB_TOKEN` 자동 처리 — 시크릿 불필요.
-> **AWS 이동 시**: `GCP_WIF_PROVIDER` + `GCP_DEPLOYER_SA` → `AWS_ROLE_ARN`으로만 교체. 앱 시크릿 9개는 변경 없음.
+> **앱 시크릿 (DATABASE_URL 등 9개)**: GitHub Secrets가 아니라 **GCP Secret Manager**에 저장됨.
+> Cloud Run 콘솔/revision history 평문 노출 회피 + IAM 기반 권한 분리 + Cloud Audit Logs 통합.
+> 자세한 매핑은 아래 "프로덕션 — GCP Secret Manager 등록 이름" 섹션 참조.
 
 ---
 
