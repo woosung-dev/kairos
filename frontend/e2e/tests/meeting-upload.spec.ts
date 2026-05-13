@@ -9,6 +9,9 @@ test.describe.serial("미팅 업로드 파이프라인", () => {
   test("오디오 파일 업로드 후 STT 처리 완료 및 요약이 렌더링된다", async ({
     page,
   }) => {
+    // STT 처리 최대 3분 소요 — 테스트 타임아웃 5분으로 설정
+    test.setTimeout(300_000);
+
     // 1. /new 페이지 이동 (기본: 회의 녹음 + 오디오 업로드 탭 선택됨)
     await page.goto("/new");
 
@@ -24,8 +27,7 @@ test.describe.serial("미팅 업로드 파이프라인", () => {
     // 5. 미팅 상세 페이지 이동 대기 (202 Accepted → redirect)
     await expect(page).toHaveURL(/\/meetings\//, { timeout: 30_000 });
 
-    // 6. status=failed이면 즉시 실패 (180s 낭비 방지)
-    // 폴링: useMeetingDetail에 refetchInterval 추가됨 (Task 0에서 수정)
+    // 6. status=failed이면 즉시 실패 (낭비 방지)
     await page.waitForFunction(
       () => {
         const el = document.querySelector('[data-testid="meeting-status"]');
