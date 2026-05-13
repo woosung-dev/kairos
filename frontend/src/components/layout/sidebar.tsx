@@ -11,7 +11,6 @@ import {
   Archive,
   ChevronDown,
   ChevronRight,
-  CheckSquare,
   FileText,
   Home,
   Inbox,
@@ -30,11 +29,10 @@ interface NavItem {
   requiresWrite?: boolean;
 }
 
-/* 네비 순서: 홈 → Inbox(배지) → 오늘 할 일 → 구분선 → 빠른 메모 → + 추가 */
+/* 네비 순서: 홈 → Inbox(배지) → 구분선 → 빠른 메모 → + 추가 */
 const NAV_TOP: NavItem[] = [
   { href: "/", label: "홈", icon: Home },
   { href: "/inbox", label: "Inbox", icon: Inbox, hasBadge: true },
-  { href: "/today", label: "오늘 할 일", icon: CheckSquare },
 ];
 
 const NAV_BOTTOM: NavItem[] = [
@@ -241,7 +239,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
         className="py-3 space-y-1"
         style={{ padding: collapsed ? "12px 4px" : "12px 8px" }}
       >
-        {/* 상단 네비: 홈 / Inbox / 오늘 할 일 */}
+        {/* 상단 네비: 홈 / Inbox */}
         {NAV_TOP.map(renderNavItem)}
 
         {/* 구분선 */}
