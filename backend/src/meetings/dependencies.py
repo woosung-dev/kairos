@@ -9,6 +9,7 @@ from src.common.r2 import R2Service
 from src.meetings.pipeline_service import MeetingPipelineService
 from src.meetings.repository import MeetingRepository
 from src.meetings.service import MeetingService
+from src.projects.repository import ProjectRepository
 from src.services.ai_processing import AIProcessingService
 from src.services.transcription import TranscriptionService
 
@@ -25,6 +26,7 @@ async def get_meeting_service(
     return MeetingService(
         repo=MeetingRepository(session),
         action_repo=ActionItemRepository(session),
+        project_repo=ProjectRepository(session),
     )
 
 

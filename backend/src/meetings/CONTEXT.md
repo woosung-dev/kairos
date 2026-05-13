@@ -41,6 +41,7 @@
 | 방향 | 대상 | 레벨 | 비고 |
 |---|---|---|---|
 | out | `actions/repository` | Repository | 추출된 액션 저장 |
+| out | `projects/repository` | Repository (read-only) | `get_meeting_detail` projects 필드 채움 (Sprint 14 T-8 BUG-H04, MeetingProjectLink 읽기) |
 | out | `services/transcription` | external wrapper | Whisper + pyannote |
 | out | `services/ai_processing` | external wrapper | Gemini 요약/분류 |
 | out | `inbox/service` | via pipeline | Inbox 적재 (`MeetingPipelineService` 안) |
