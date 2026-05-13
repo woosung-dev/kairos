@@ -77,10 +77,13 @@ jobs:
           region: ${{ env.GCP_REGION }}
           image: ${{ env.IMAGE_URI }}
           flags: --allow-unauthenticated --port=8000 --memory=1Gi --min-instances=0 --max-instances=3
+          # CORS_ORIGINS: deploy-cloudrun@v2의 env_vars: 형식이 콤마를 변수 구분자로
+          # 해석하므로 multi-URL(GH Secret의 "url1,url2")이 깨진다. prod는 vercel URL
+          # 단일이면 충분하므로 FRONTEND_URL을 재사용해 단일 값 보장.
           env_vars: |
             APP_ENV=production
             LOG_LEVEL=INFO
-            CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+            CORS_ORIGINS=${{ secrets.FRONTEND_URL }}
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
             DATABASE_URL=${{ secrets.DATABASE_URL }}
             CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
