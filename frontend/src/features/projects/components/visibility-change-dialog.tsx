@@ -119,7 +119,7 @@ export function VisibilityChangeDialog({
               borderRadius: "var(--radius-sm)",
             }}
           >
-            ⚠️ Private 변경 시 비멤버는 즉시 접근 차단되고 RAG 검색 결과에서도 제외됩니다.
+            ⚠️ Private 변경 시 비멤버는 즉시 접근 차단되고 AI 검색 결과에서도 제외됩니다.
             기존 워크스페이스 멤버를 ProjectMember로 추가하려면 변경 후 멤버 패널을 사용하세요.
           </div>
         )}

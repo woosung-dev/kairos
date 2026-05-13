@@ -64,7 +64,7 @@ const STAT_ITEMS = [
   { label: "회의", value: 0, icon: "🎙️" },
   { label: "노트", value: 0, icon: "📝" },
   { label: "액션", value: 0, icon: "✅" },
-  { label: "RAG 검색", value: 0, icon: "🔍" },
+  { label: "AI 검색", value: 0, icon: "🔍" },
 ];
 
 export function ProjectDetail({ projectId }: ProjectDetailProps) {

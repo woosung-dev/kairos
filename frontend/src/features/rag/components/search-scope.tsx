@@ -30,7 +30,7 @@ interface SelectableSource {
 
 const MOCK_SELECTABLE_SOURCES: SelectableSource[] = [
   { id: "s1", name: "Sprint 3 회고 회의", type: "meeting", projectId: "p1", projectName: "Kairos" },
-  { id: "s2", name: "RAG 파이프라인 설계", type: "note", projectId: "p1", projectName: "Kairos" },
+  { id: "s2", name: "AI 검색 파이프라인 설계", type: "note", projectId: "p1", projectName: "Kairos" },
   { id: "s3", name: "배포 전략 회의", type: "meeting", projectId: "p1", projectName: "Kairos" },
   { id: "s4", name: "사용자 인터뷰 정리", type: "note", projectId: "p2", projectName: "사이드 프로젝트" },
   { id: "s5", name: "MVP 범위 논의", type: "meeting", projectId: "p2", projectName: "사이드 프로젝트" },

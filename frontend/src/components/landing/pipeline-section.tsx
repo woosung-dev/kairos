@@ -35,7 +35,7 @@ const PIPELINE_CARDS: PipelineCard[] = [
   {
     letter: "E",
     title: "Express",
-    description: "축적된 지식을 RAG Q&A로 즉시 꺼냅니다.",
+    description: "축적된 지식을 AI Q&A로 즉시 꺼냅니다.",
     detail: "소스 명시 · 신뢰도",
     isCore: false,
   },

@@ -26,7 +26,7 @@ DEFAULT_TEMPLATE_PROJECTS: tuple[TemplateProject, ...] = (
         description=(
             "Kairos 온보딩 가이드 — 첫 회의 녹음을 여기에 올려보세요. "
             "AI가 자동으로 요약·액션 아이템·태그를 붙이고, "
-            "RAG 검색 범위를 이 프로젝트로 지정하면 관련 답변만 모아볼 수 있습니다."
+            "AI 검색 범위를 이 프로젝트로 지정하면 관련 답변만 모아볼 수 있습니다."
         ),
         tags=["onboarding"],
         sort_order=0,
@@ -35,7 +35,7 @@ DEFAULT_TEMPLATE_PROJECTS: tuple[TemplateProject, ...] = (
         title="💡 아이디어",
         description=(
             "떠오르는 생각·제품 스케치·리서치 메모를 빠르게 덤프하는 공간. "
-            "형식에 얽매이지 말고 던져두면 나중에 RAG가 모아서 인사이트를 뽑아냅니다."
+            "형식에 얽매이지 말고 던져두면 나중에 AI 검색으로 모아서 인사이트를 뽑아냅니다."
         ),
         tags=["idea"],
         sort_order=1,

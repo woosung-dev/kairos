@@ -3,7 +3,7 @@ import Link from "next/link";
 
 const FEATURES_INCLUDED = [
   "무제한 회의 녹음 & AI 요약",
-  "RAG 기반 지식 검색",
+  "AI 기반 지식 검색",
   "프로젝트 & 노트 관리",
   "팀 워크스페이스",
 ];

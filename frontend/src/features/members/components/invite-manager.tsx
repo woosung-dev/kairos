@@ -164,13 +164,13 @@ export function InviteManager({
                     className="cursor-pointer"
                     onClick={() => setNewInviteRole("member")}
                   >
-                    Member — 콘텐츠 생성/편집, RAG 질문
+                    Member — 콘텐츠 생성/편집, AI 검색
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className="cursor-pointer"
                     onClick={() => setNewInviteRole("viewer")}
                   >
-                    Viewer — 읽기 전용, RAG 질문만
+                    Viewer — 읽기 전용, AI 검색만
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

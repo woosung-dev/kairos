@@ -22,7 +22,7 @@ export async function askRag(
   });
 
   if (!res.ok) {
-    throw new Error(`RAG 요청 실패: ${res.status}`);
+    throw new Error(`AI 검색 요청 실패: ${res.status}`);
   }
 
   return res;
