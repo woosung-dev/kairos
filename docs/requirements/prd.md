@@ -1,11 +1,12 @@
 # Kairos — Product Requirements Document
 
 > *그리스어 καιρός — 흘러가는 시간(Chronos) 속 결정적 순간.*
-> *모든 업무 속에는 포착해야 할 카이로스가 있고, 이 플랫폼은 그것을 조직의 자산으로 만든다.*
+> *흘러가는 모든 정보 흐름에서 결정적 순간만 골라 영구 자산화하는 AI memory layer.*
 
-> **버전:** 2.0
-> **최종 수정:** 2026-04-02
-> **방향 전환:** ADR-004 PARA → 팀 세컨드 브레인 (`docs/dev-log/004-second-brain-pivot.md`)
+> **버전:** 3.0
+> **최종 수정:** 2026-05-14
+> **주요 갱신 (v3.0):** AI memory layer 비전 통합 + Input 축(v1~v5) × Visibility 축(v1.5~v2.0) 2축 로드맵 + Personal↔Team promotion IA + Qdrant 마이그레이션 트리거 lock-in.
+> **방향 전환 이력:** ADR-004 PARA → 팀 세컨드 브레인 (v2.0) → AI memory layer (v3.0, 본 갱신)
 
 ---
 
@@ -14,51 +15,63 @@
 **Kairos(καιρός)**는 그리스어로 단순히 흘러가는 시간(Chronos)과 달리,
 **결정적인 순간, 포착해야 할 기회의 시간**을 뜻한다.
 
-업무 속 회의, 아이디어, 자료 조사 — 모든 곳에 놓치면 사라지는 카이로스가 있고,
-이 플랫폼은 **팀의 세컨드 브레인**으로서 그것을 포착해 조직의 자산으로 만든다.
+회의·메신저 스레드·운전 중 떠올린 음성 메모·이메일·웹 클리핑 — 정보가 만들어지는 모든 표면에는 놓치면 사라지는 카이로스가 있다. Kairos는 **AI memory layer**로서 입력 형태에 구애받지 않고 그 결정적 순간을 골라 **개인 → 팀으로 점진 승격**시키며 영구 자산화한다.
 
-### 핵심 프레임워크: CODE (팀 세컨드 브레인)
+### 핵심 프레임워크: CODE (Personal & Team Second Brain)
 
-Tiago Forte의 세컨드 브레인을 **팀 단위로, AI가 자동화**하여 적용한다.
+Tiago Forte의 세컨드 브레인을 **AI가 자동화**하여, **개인 입력 → 팀 자산 승격(promote)** 모델로 확장한다.
 
 ```
-Capture  → 회의 녹음, 노트, 자료 업로드 (마찰 최소화)
-Organize → 프로젝트에 자동 연결 + AI 태그 (사용자는 선택적 조정)
-Distill  → AI가 핵심 추출 (Kairos의 차별점)
+Capture  → 회의·음성 메모·메신저·이메일·웹 — input 가리지 않음 (v1~v5)
+Organize → 프로젝트 자동 연결 + AI 태그 (사용자 선택적 조정)
+Distill  → AI 핵심 추출 (Kairos 차별점)
   ├── L1: 개별 콘텐츠 요약
   ├── L2: 결정사항 + 액션 아이템
   ├── L3: 프로젝트 인사이트 (주간/월간 자동 종합)
   └── L4: 조직 인사이트 (크로스 프로젝트 패턴)
 Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
+Promote  → 개인 영역에서 검증된 결정만 팀 자산으로 승격 (v1.5~v2.0)
 ```
 
-**"팀의 지식이 시간이 지날수록 복리로 쌓인다"** — 이것이 Kairos의 핵심 가치.
+**"개인의 두 번째 뇌가 팀의 첫 번째 기억이 된다"** — Kairos의 핵심 가치.
+
+> **마케팅 핵심 메시지** (자세히 §7-Marketing):
+> _"흘러간 시간을 다시 검색할 수 있다면."_
+> _"Notion은 정리해야 합니다. Kairos는 정리됩니다."_
+> _"당신의 두 번째 뇌, 그리고 팀의 첫 번째 기억."_
 
 ---
 
 ## 1. 문제 정의
 
-### 현재 상황
-- 회의록, 노트, 자료가 Notion/Drive 등에 **파편화**되어 쌓이지만, 이후 활용되지 않음
-- 프로젝트를 하면서 쌓이는 지식이 **개인의 머릿속에만** 존재 (암묵지)
-- 쌓인 데이터는 "검색하면 나오는 파일" 수준이고, **인사이트로 활용되지 않음**
-- 프로젝트가 끝나면 그 안의 맥락(결정사항, 교훈)이 **사장**됨
-- 새 팀원이 합류하면 기존 맥락 파악에 **몇 주가 소요**됨
+### 현재 상황 — 3가지 통증
+
+| 통증 | 사용자 행동 | 비용 |
+|------|------------|------|
+| **P1 — 입력이 4곳에 흩어짐** | 회의(Zoom 녹화) + 노트(Notion) + 메신저(Slack/카톡) + 음성 메모(iOS) | 검색·통합 불가, 같은 정보 4번 복붙 |
+| **P2 — 사후 정리 노력** | 회의 끝나고 노트 도구로 옮겨 적기 / 카톡 결정 메시지 복사 / 음성 메모 받아쓰기 | 1인당 일평균 1시간 [가설] — Casual 페르소나 직간접 보고 |
+| **P3 — 개인 메모 → 팀 공유 흐름 부재** | "내 머릿속에만 있는데 팀에도 알릴 가치 있어. 어디에 정리해서 공유하지?" 마찰 | 결정·아이디어가 조직 자산화되지 않음 |
+
+→ Notion·Otter·Granola·Mem 등 기존 도구는 1-2가지만 부분 해결. **4 통증을 동시에 다루는 통합 도구 부재**.
 
 ### 해결하고자 하는 것
-> **"회의든 노트든 자료든, 넣기만 하면 AI가 정리하고, 지식이 쌓이고, 나중에 질문하면 인사이트가 나온다."**
+> **"입력 형태는 자유, 구조화는 자동, 공유는 점진."**
+>
+> 회의·메신저·음성 메모·이메일을 그냥 던져두면 AI가 정리하고, 개인 영역에서 충분히 익은 결정만 팀 자산으로 승격된다.
 
-단순한 회의록 저장 도구가 아니라, **팀의 세컨드 브레인 — 데이터가 쌓일수록 조직이 똑똑해지는 복리 지식 플랫폼.**
+단순한 회의록 도구가 아니라, **개인↔팀 양방향 AI memory layer — 입력 표면에 구애받지 않고, 시간이 지날수록 조직이 똑똑해지는 복리 지식 플랫폼.**
 
 ---
 
 ## 2. 타겟 유저
 
-- **주요:** 사내 전체 직원 (부서 간 협업 프로젝트 진행자)
-- **카테고리 라벨:**
-  - 매주 3~5회 회의를 주도하는 팀 리더
-  - 여러 프로젝트를 동시에 관리하는 PM
-  - 과거 의사결정 맥락을 자주 다시 찾아야 하는 구성원
+### 진입 전략 — Personal-first (YC "single-player first" 격언)
+
+Kairos는 **개인이 혼자 가치를 얻은 뒤 팀으로 확장**하는 IA를 채택한다. Notion(80% 개인 사용에서 시작 [확인 필요]), Slack(DM이 80% 트래픽), Figma(drafts→published) 등 성공한 팀 도구의 공통 패턴.
+
+- **1차 사용자**: 정보를 음성·메신저·메모로 빠르게 만들고 사후 정리할 시간 없는 **knowledge worker 개인**
+- **2차 확장**: 1차 사용자가 팀 합류하면 검증된 personal 자산을 **promote** 해 팀 지식으로 승격
+- **3차 (Phase 4 L4)**: 팀 단위 시간 누적으로 조직 인사이트 — 복리 효과
 
 ### 페르소나 명세 (1차, Sprint 7+ 인터뷰 후 갱신)
 
@@ -70,6 +83,23 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 | **PERSONA-002** | 김PM | 30대 IT PM, 5-8명 팀 리더 | `[가설]` | W1 (회의 요약·액션 추출) |
 | **PERSONA-003** | 박PM | 40대 컨설팅/에이전시 PM, 3-5개 프로젝트 동시 | `[가설]` | W3 (프로젝트 RAG Q&A) |
 
+### Personal-first 사용 시나리오 (PERSONA-001, v1.5~v2.0 기준)
+
+```
+T+0     가입 → "WS의 개인 Kairos" personal workspace 자동 생성
+T+1일   운전 중 떠올린 제품 아이디어를 iOS 음성 메모 (v2 input)
+        → Kairos가 자동 transcribe + 요약 + 태그 5개
+T+7일   개인 영역에 회의 3건, 음성 메모 5건, 노트 12건 축적
+        AI: "최근 'pricing model' 토픽이 12회 반복됐어요" (프로액티브)
+T+14일  공동창업자 합류 → "Kairos Team" workspace 신설 + 초대
+T+15일  pricing 노트 5건을 선택 → "Promote to Team" 액션 (v1.6)
+        → Team admin (본인) review queue 자동 통과 (1인 → 2인 신뢰)
+T+30일  팀 RAG Q&A에서 신규 합류자 질문 "왜 freemium 채택?"
+        → 12회 누적된 의사결정 흐름이 출처 [n] 인용으로 답변
+```
+
+→ **단일 사용자 가치 → 팀 가치 → 조직 가치** 점진적 확장. YC 관점에서 가장 안전한 PLG 진입.
+
 > **Wedge 분화 점검**: W3 (PERSONA-001/003 1순위) + W1 (PERSONA-002 1순위) — 1순위 2개로 분화. 3명 모두 W3가 1-2순위 우선 → Sprint 7+ 외부 demand 시그널(ADR-009 S5/S6) ≥60% 집중 시 wedge 우선화 ADR(ADR-009 F6) 트리거.
 
 > **갱신 정책**: PERSONA-002~003 `[가설]`은 Sprint 7+ 외부 인터뷰 5-10명 결과 ADR-011 §4-b (≥60% 응답자가 7필드 중 ≥3개 불일치) 트리거 시 `deprecated` + 신규 페르소나 대체, 미만이면 `interview-confirmed` 전환.
@@ -80,20 +110,28 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 
 상세는 `docs/requirements/competitive-analysis.md` 참조. ADR-009 §2 Q2 보강 + ADR-010 thesis moat 검증 입력.
 
-| # | 서비스 `[전부 확인 필요]` | 1줄 요약 | Kairos wedge 매칭 |
-|---|---|---|---|
-| C1 | **Otter** | 실시간 회의 STT + AI 요약 + Slack/Zoom 통합 | W1 직접 경쟁 |
-| C2 | **Granola** | macOS native 회의 요약 (시스템 오디오) | W1 경쟁 (ADR-010 T3 양쪽 등장, AD-17) |
-| C3 | **Reflect** | 노트 + AI 검색 + 백링크 그래프 | W4 경쟁 |
-| C4 | **Mem** | AI 자동 분류 노트 + RAG Q&A | W3 + M2 경쟁 |
-| C5 | **Tana** | 노트 + 데이터베이스 + 슈퍼태그 + AI Q&A | M3 + W3 경쟁 |
+### 5축 비교 — Input 다양성 × Ingestion × Output 신뢰 × Personal↔Team × Promotion
 
-**Kairos 차별점 (ADR-010 thesis moat M1~M4 정렬)**:
+| 도구 | Input 다양성 | AI Ingestion | 출처 인용 | Personal↔Team | Promote 액션 |
+|------|------------|-------------|---------|--------------|------------|
+| **Kairos (v2.0 목표)** | 회의·음성·메신저·이메일·웹 | 자동 (CODE) | ✅ 인라인 [n] 강제 | Personal+Team workspace 분리 | ✅ explicit + AI 추천 |
+| Otter | 회의만 | 부분 | 부분 | 없음 | 없음 |
+| Granola | 회의 (macOS) | 부분 | 부분 | 개인만 | 없음 |
+| Mem | 노트·일부 통합 | 자동 | 부분 | 개인만 | 없음 |
+| Notion AI | 텍스트만 | 수동 | 약함 | Private page + Team | drag-drop 수동 |
+| Reflect | 노트 | 자동 | 부분 | 개인만 | 없음 |
+| Tana | 노트·DB | 부분 | 없음 | 기본 | 수동 |
+| Glean (Enterprise) | 전사 검색 | 검색 only | ✅ | 전사 only (개인 X) | N/A |
+
+→ **5축 모두 우월한 도구는 현재 없음** `[확인 필요 — 2026-05 기준 시장 조사 1회 더 필요]`. Kairos v2.0 목표가 이를 점유.
+
+### Moat 정렬 (ADR-010 thesis M1~M4 + 신규 M5)
 
 - **M1 계층 RAG** (中, 단독 약함) — Tana만 워크스페이스 범위 AI Q&A, 계층 청킹·6-Layer·1536d 임베딩·Semantic Cache 깊이는 Kairos 우위.
 - **M2 자동 Inbox** (中) — Mem과 **직접 경쟁** (Mem도 AI 자동 분류). 차별 anchor = `workspace.inbox_threshold` 0.9 (I-10) + 사용자 행동 시그널 S4 80%.
 - **M3 CODE 통합** (中) — Tana가 가장 근접 위험. Capture+Organize+Distill L2+Express 일관성 우위이나 모방 risk 높음.
 - **M4 L4 조직 인사이트** (강, 잠재 — **미구현 timeline risk**) — 5개 경쟁자 누구도 L4 영역 진입 X (단일 사용자·단일 워크스페이스 단기 범위).
+- **M5 Personal↔Team graph** (강, 잠재 — v1.5~v2.0 신설) — 개인 활동 패턴 + 팀 활동 패턴 동시 학습으로 **promotion 추천 AI** 가능. Notion·Granola·Mem 누구도 양축 동시 보유 X. v2.0 ship 시 4 도구 사용자가 Kairos로 통합 전환 트리거.
 
 ---
 
@@ -114,9 +152,15 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 
 상세는 ADR-010 (`docs/dev-log/010-future-fit-thesis.md`) 참조.
 
-### Thesis (1줄)
+### Thesis (1줄, v3.0 갱신)
 
-> **"Kairos는 팀의 시간 위에 누적된 조직 인사이트(L4, ADR-007)로 일반 AI 도구와 차별화한다. 단일 사용자 컨텍스트가 아닌 워크스페이스 단위 시간 누적이 moat이며, 자동화된 Inbox + 계층 청킹 RAG가 그 누적을 가능하게 한다."**
+> **"Kairos는 입력 표면에 구애받지 않는 AI memory layer다. 회의·음성 메모·메신저·이메일이 자동 구조화되어 개인 영역에 축적되고, 검증된 결정만 팀으로 승격되어 조직 인사이트(L4)로 복리화된다. 단일 사용자 컨텍스트가 아닌 Personal↔Team graph + 워크스페이스 단위 시간 누적이 moat다."**
+
+### Long-game (1-pager 슬로건)
+
+> _"AI memory layer for people who think out loud."_
+>
+> ChatGPT가 '전 인류의 검색'이라면, Kairos는 '내 팀의 검색 + 내 머리의 저장소'.
 
 ### 위협 시나리오 (통합 도구 흡수 risk) `[전부 가설]`
 
@@ -128,7 +172,7 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 
 > 도래 시점 추정 근거는 ADR-010 §"위협 시나리오" 표 아래 단락 — 모두 외부 검증 전 `[가설]`. `competitive-analysis.md` 후속 보강(B2: 공식 문서 WebFetch)으로 출처 라벨 해제 예정.
 
-### Moat 4개 + 강도
+### Moat 5개 + 강도 (v3.0 — M5 신설)
 
 | Moat | 강도 |
 |---|---|
@@ -136,12 +180,69 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 | **M2** 자동화된 Inbox (`workspace.inbox_threshold` 기본 0.9, I-10) | **中** (메커니즘 모방 가능, 차별은 누적 품질) |
 | **M3** CODE 가치 흐름 통합 (Capture→Organize→Distill→Express 일관) | **中** (일관성 자체가 약점 — 모방 시 전환비용 낮음) |
 | **M4** L4 조직 인사이트 (ADR-007 Phase 4, **미구현**) — 워크스페이스 단위 격리(I-9) + 시간 누적 복리 | **강(잠재)** — 가장 강한 후보이나 timeline risk |
+| **M5** Personal↔Team graph (v1.5~v2.0 신설) — 개인 활동 + 팀 활동 동시 학습 → promotion 추천 AI | **강(잠재)** — 양축 동시 보유 도구 없음, ship 시 카테고리 정의 가능 |
 
 ### 약점 인정 + 검증 시그널
 
 - 단기(L4 구현 전, ~Sprint 10 추정)는 M1+M2+M3 中 셋이 차별 anchor. 가치 제안 단기 약함 — ChatGPT memory 누적 격차 risk.
 - Thesis 전제 미충족: L4(ADR-007 Phase 4 예정)만 남음. ~~멤버십·visibility(D-1 미구현)~~ **[해소 Sprint 6, 2026-05-11 PR #12]** — Project.visibility 컬럼 + ProjectMember 엔티티 + visibility 권한 분기 모두 구현. ADR-014 옵션 A로 orchestrator 경계까지 정합.
+- M5 Personal↔Team graph (v1.5~v2.0)는 v3.0 새 thesis 핵심 — **Sprint 15-16 ship 안 되면 thesis 일부 깨짐**. M5 timeline risk가 M4보다 단기.
 - 검증: Sprint 7+ 외부 인터뷰 응답자의 ≥60%가 "통합 도구로 대체 어려움" 답변 시 thesis 1차 검증 (ADR-010 AD-8, ADR-009 S5와 동일 임계값).
+
+---
+
+## 3.6. IA 2축 로드맵 (v3.0 신설)
+
+기존 PRD는 Sprint 단위 1차원 phase 로드맵이었다. v3.0부터는 **2축 매트릭스**로 재구성:
+
+- **X축 = Input source 다양성** (v1~v5)
+- **Y축 = Visibility/IA — Personal↔Team** (v1.5~v2.0)
+
+```
+           [X축 — Input source 다양화]
+           ┌─────────────────────────────────────────────────────┐
+           │ v1      v2          v3         v4         v5        │
+           │ 회의    음성 메모    Slack       카톡 봇   웹/이메일  │
+           │ ✅      ⏳ Sprint    ⏳ Sprint   ⏳ Sprint  ⏳ Sprint │
+           │ 완료    16~17        18~19       20         21~22    │
+           │                                                     │
+           │ [Y축 — Visibility / Personal↔Team]                  │
+           │                                                     │
+[v1.5]  Personal workspace 자동 생성 + workspace switcher       │
+        Sprint 15 (1차 우선순위, IA가 다른 축에 영향)             │
+                                                                 │
+[v1.6]  Promote action — 아이템 → 다른 workspace로 복제           │
+        Sprint 16                                                │
+                                                                 │
+[v1.7]  Promotion review queue (admin auto-accept or review)    │
+        Sprint 17                                                │
+                                                                 │
+[v1.8]  Cross-workspace RAG (Personal + Team 통합 검색)         │
+        Sprint 18 + 헌법 R-13 신설                                │
+                                                                 │
+[v2.0]  Promotion 추천 AI ("이 메모는 {Team}에 올리면 좋겠어요") │
+        Sprint 22+ (M5 moat 핵심)                                │
+           └─────────────────────────────────────────────────────┘
+```
+
+### Ship 우선순위 (Sprint 15부터)
+
+| Sprint | 축 | 작업 | 근거 |
+|--------|----|------|------|
+| 15 | Y (v1.5) | Personal workspace + switcher | IA 결정이 다른 축에 영향, 먼저 lock-in |
+| 16 | Y (v1.6) + X (v2) | Promotion action + 음성 메모 ingest | Y v1.6 + X v2 같은 인프라 재사용 (STT) |
+| 17 | Y (v1.7) | Promotion review queue | v1.6 ship 후 사용자 행동 데이터 확보 |
+| 18-19 | X (v3) + Y (v1.8) | Slack ingest + cross-workspace RAG | 결정·메시지 RAG 풀 — B2B 진입 |
+| 20 | X (v4) | 카톡 봇 | 한국 시장 wedge |
+| 21-22 | X (v5) + Y (v2.0) | 이메일/웹 + Promotion 추천 AI | M5 moat 완성 |
+
+### 핵심 원칙
+
+1. **IA 먼저, Input 다음** — Visibility 모델 결정이 RAG·임베딩·권한 코드 전체에 영향. 잘못 ship 하면 v2 이후 모든 input pipeline retrofit 필요.
+2. **인프라 재사용 우선** — v2 음성 메모는 v1 STT 재사용, v1.8 cross-workspace RAG는 기존 6-Layer 재사용.
+3. **헌법 갱신 명시** — Y 축 ship마다 헌법 신규 불변식 (R-13 cross-workspace RAG opt-in 등) ADR 작성.
+
+상세는 `docs/dev-log/sprint-15-plan.md` 등 sprint plan에 작성.
 
 ---
 
@@ -359,10 +460,56 @@ Express  → RAG 검색 + 프로액티브 인사이트 + Cmd+K
 
 ## 7. 성공 지표 (MVP 기준)
 
-- 회의 업로드 → Inbox 적재까지 **3분 이내**
+- 회의 업로드 → Inbox 적재까지 **3분 이내** (Sprint 10 검증: 7.5초)
 - AI 액션 아이템 추출 정확도 **80% 이상** (사용자 체감)
 - RAG 질문 → 답변 스트리밍 시작까지 **2초 이내**
 - Phase 1~2 완료 후 내부 테스트 사용자 **5명 이상** 온보딩
+
+---
+
+## 7-Marketing. 마케팅 메시지 (v3.0 신설)
+
+### Tagline 후보 (외부 노출 5개)
+
+1. **"흘러간 시간을 다시 검색할 수 있다면."** — 감성, founder 타겟
+2. **"당신의 모든 결정을, 출처 보장 검색으로."** — 신뢰 강조, B2B
+3. **"Notion은 정리해야 합니다. Kairos는 정리됩니다."** — 비교 우위
+4. **"회의·메신저·음성 메모 — 입력 형태는 자유, 구조화는 자동."** — Input 다양성 + AI ingest
+5. **"Personal memory layer for people who think out loud."** — 영문 deck
+
+> 외부 테스트 후 1개 lock-in (Sprint 15 action item, 인디해커즈/X DM 50명 A/B 반응 측정).
+
+### One-line pitch (투자자 / B2B 세일즈)
+
+> _"We're building the **memory layer for the AI era**. Voice notes, meetings, Slack threads, emails — Kairos automatically extracts your team's καιρός (decisive moments) and makes them permanently searchable with cited sources."_
+
+### 메시지 매트릭스 (청자별)
+
+| 청자 | 메시지 |
+|------|--------|
+| **1인 founder** | "노트 도구 0개로 가능. 녹음만 하면 끝." |
+| **스타트업 PM** | "Notion에 사후 정리하지 마세요. AI가 회의 → Notion 수준 구조로 자동." |
+| **컨설턴트** | "인터뷰 50건이 RAG 데이터셋이 됩니다. 보고서 작성 시간 80% 감소." |
+| **CTO / 데이터팀** | "팀 회의 = 검색 가능한 임베딩. SSO + private 격리 + 출처 보장." |
+| **투자자** | "M1+M5 lock-in moat. 1년 사용자 retention >90% [가설]." |
+
+### 차별화 4축 (마케팅 deck용)
+
+1. **Input source 다양성** — 회의·음성·메신저·이메일 모두 (경쟁 도구는 1-2개만)
+2. **AI-first ingestion** — 사용자 수동 정리 0 (Notion은 수동)
+3. **출처 보장 RAG** — 인라인 [n] 인용 강제, 환각 차단
+4. **Personal↔Team graph** — 개인 → 팀 promotion + AI 추천 (Notion/Granola/Mem 없음)
+
+### 가격 포지셔닝 `[가설]`
+
+| Tier | 가격 | 포함 | 타겟 |
+|------|------|------|------|
+| Free | $0 | 회의 5건/월, Personal workspace only | trial / 1인 founder 진입 |
+| Pro | $19/월 | 무제한 input, Personal+1 Team workspace, RAG | 1인 founder · 프리랜서 |
+| Team | $12/사용자/월 | 5+ 사용자, RBAC, Promote review queue, cross-workspace RAG | 5~15인 스타트업 |
+| Enterprise | $80/사용자/월 | SSO, SOC 2, 감사로그, 데이터 격리 | 50+ 조직 |
+
+> 비교: Otter Pro $16.99 / Notion AI $10 add-on / Granola Business $14. Kairos는 **5축 통합 + Personal↔Team** 가치로 $19 책정 가능. Sprint 15 willingness-to-pay 인터뷰로 검증.
 
 ---
 
@@ -435,7 +582,61 @@ ADR-010 AD-8(thesis PASS) / ADR-011 §4-b(페르소나 FAIL) / 본 S5(thesis PAS
 
 - NotebookLM 스타일 인포그래픽/슬라이드 자동 생성
 - 실시간 라이브 트랜스크립션 (회의 중 실시간 STT)
-- 크로스 프로젝트 RAG (조직 전체 검색) — Sprint 3~4에서 검토
-- Jira / Slack / 외부 캘린더 연동
+- ~~크로스 프로젝트 RAG (조직 전체 검색)~~ — **v1.8 Cross-workspace RAG로 재진입** (Sprint 18+)
+- ~~Jira / Slack / 외부 캘린더 연동~~ — **v3 Slack ingest로 재진입** (Sprint 18-19)
 - 주간/월간 보고서 자동 생성 — L3 프로젝트 인사이트로 대체 가능
 - 모바일 네이티브 앱 (PWA로 대체)
+
+---
+
+## 부록 A — Competitor 비교 매트릭스 (Personal↔Team 축, v3.0 신설)
+
+| 도구 | Personal 영역 | Team 영역 | Promotion 메커니즘 | Kairos 학습 포인트 |
+|------|-------------|----------|-----------------|----------------|
+| **Notion** | Personal workspace (Plus) + Team 내 Private page | Team workspace | drag-drop 수동 | "Personal Plus → Team" 패턴 차용 |
+| **Slack** | DM + 본인 채널 + drafts | Public/Private 채널 | "send to channel" 명시적 | drafts → published 명시 액션 |
+| **Figma** | Drafts | Team Files | "Move to project" | drafts UX 단순함 |
+| **GitHub** | Personal repos | Org repos | Transfer ownership | git mental model 비유 (사용자 의견) |
+| **Linear** | Personal inbox / drafts | Team issues | "Convert to issue" | inbox→issue triage |
+| **Confluence** | Personal space | Team spaces | "Move page" | space 메타포 |
+| **Apple Notes** | 개인 노트 | Shared notes | "Share with..." | invite-based promotion |
+| **Mem** | 개인만 | 없음 | N/A | 팀 영역 부재 — Kairos 우위 |
+| **Granola** | 개인 회의만 | 없음 | N/A | 팀 영역 부재 — Kairos 우위 |
+| **Glean** | 없음 | 전사 검색만 | N/A | 개인 영역 부재 — Kairos 우위 |
+
+**Kairos v2.0의 unique position**: 개인↔팀 양축 동시 보유 + **promotion 추천 AI** (M5 moat). 위 9개 도구 누구도 양축에 AI 추천 미보유.
+
+---
+
+## 부록 B — 인프라 마이그레이션 트리거 (Qdrant 등)
+
+현재 RAG 인프라는 **pgvector** (Postgres 내장). 다음 트리거 1개라도 충족 시 **Qdrant 전환** 검토.
+
+| # | 트리거 조건 | 측정 방법 | 현재 |
+|---|-----------|---------|------|
+| 1 | 활성 사용자 1,000+ | DAU 집계 | ❌ 수십 명 [추정] |
+| 2 | 벡터 수 5M+ | `SELECT count(*) FROM embedding_chunks` | ❌ 1M 미만 [추정] |
+| 3 | RAG p95 응답 시간 >500ms | OpenTelemetry / Sentry 메트릭 | ❌ 측정 권장 (Sprint 15 sub-task) |
+| 4 | 동시 payload filter 4+ (ws × proj × visibility × source × time × ...) | RAG query 패턴 audit | ❌ |
+| 5 | 마케팅 GA 트랙 진입 (Sprint 17+) | 마케팅 sprint 진입 시 | ❌ 아직 |
+
+### 전환 결정 근거 lock-in (v3.0)
+
+- **현 시점 미전환** — Repository 추상화 완료 (`EmbeddingRepository` 5 메서드), 전환 비용 1-2주로 유지. 메모리 `project_qdrant_deferred.md` (2026-04~) 그대로 유효.
+- **Sprint 15 sub-task로 모니터링 메트릭 추가** — RAG p50/p95 + 벡터 수 카운터. 트리거 #3 자동 감지.
+- **마케팅 GA 시점 전환 권장** — Qdrant Cloud + HNSW + scalar quantization → "scale-ready" 신호로 enterprise 세일즈에 활용.
+
+---
+
+## 부록 C — 헌법 / ADR 갱신 예정 (v3.0)
+
+본 PRD 갱신에 따라 추가/갱신 예정 ADR:
+
+| # | 제목 | 시점 | 트리거 |
+|---|------|------|------|
+| 신규 | ADR-016 Personal↔Team IA + Promotion flow | Sprint 15 킥오프 시 | v1.5 ship 직전 |
+| 신규 | ADR-017 Cross-workspace RAG 권한 모델 (R-13 헌법 신설) | Sprint 18 킥오프 시 | v1.8 ship 직전 |
+| 신규 | ADR-018 Promotion 추천 AI (M5 moat 핵심) | Sprint 22+ 킥오프 시 | v2.0 ship 직전 |
+| 신규 | ADR-019 Qdrant 마이그레이션 결정 | 트리거 1+ 충족 시 | 부록 B 트리거 |
+| 갱신 | ADR-010 Future-Fit Thesis | v3.0 PRD 갱신 직후 | M5 moat 추가 반영 |
+| 갱신 | ADR-011 Persona 정의 | F4 외부 인터뷰 결과 후 | Sprint 7+ |

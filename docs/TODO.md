@@ -213,6 +213,38 @@
 - 마케팅 트랙 (가격 / 고객 로고 / 비교표 / 보안 페이지) — dev 단독 처리 불가
 - AD-35 multi-user E2E (Clerk testing mode 도입 후)
 
+### Sprint 15 후보 — Personal Workspace + IA 확장 (2026-05-14 PRD v3.0 lock-in)
+
+> 입력: `docs/requirements/prd.md` v3.0 §3.6 IA 2축 로드맵 + 사용자 의견 (개인↔팀 전환 IA, CLAUDE.md/local.md 비유)
+> ADR 신규 예정: ADR-016 Personal↔Team IA + Promotion flow
+
+**v1.5 — Personal workspace 자동 생성 + switcher (Sprint 15 핵심)**
+- [ ] **S15-T1** 신규 가입 시 "{사용자명}의 개인 Kairos" personal workspace 자동 시드 (BE)
+- [ ] **S15-T2** Workspace switcher UI 우상단 (FE — Notion 패턴 차용)
+- [ ] **S15-T3** Personal workspace 권한 모델 lock-in — 항상 1명, 팀 초대 불가 (BE schema 제약)
+- [ ] **S15-T4** ADR-016 작성 — Personal↔Team IA 결정 근거 + visibility=personal 신설 여부 (현 분석: workspace 단위 분리 채택, project visibility 4번째 추가 안 함)
+- [ ] **S15-T5** 온보딩 UX — 초기에는 personal만 노출, "팀 합류" 액션 시 team workspace 안내
+- [ ] **S15-T6** PRD §7-Marketing tagline 외부 테스트 — 인디해커즈/X DM 50명 A/B 반응 → 1개 lock-in
+
+**Sub-task — RAG 인프라 모니터링 (Qdrant 트리거 #3 자동 감지)**
+- [ ] **S15-T7** RAG p50/p95 응답 시간 + 벡터 수 카운터 OpenTelemetry/Sentry 메트릭 추가 (부록 B 트리거 #3)
+
+**검증**: 1인 founder가 신규 가입 → 7일 자기 personal에서만 사용 → 팀 합류 시점 시뮬레이션. 메모리 누락 0건 + workspace 전환 클릭 0 confusion.
+
+### Sprint 16 후보 — Promotion Action + 음성 메모 ingest (2축 동시 진입)
+
+> 입력: PRD v3.0 §3.6 2축 로드맵 (X v2 음성 + Y v1.6 promote)
+
+**v1.6 — Promotion 액션**
+- [ ] **S16-T1** 아이템(노트/회의/액션)에 "Promote to Team..." 액션 + 대상 workspace+project 선택 모달 (FE)
+- [ ] **S16-T2** Promotion BE API — 메타데이터 + 임베딩 복제 (이동 아님, 원본 tombstone 유지)
+- [ ] **S16-T3** Promotion audit log + 헌법 I-17 신설 ("Promotion은 항상 복제 + tombstone, 이동 금지")
+
+**v2 — 음성 메모 ingest (회의 외 단독 녹음)**
+- [ ] **S16-T4** `/new` 페이지에 "음성 메모" 탭 추가 (회의와 분리, transcript 부재 OK)
+- [ ] **S16-T5** Voice note 모델 (Meeting과 별개) + STT + Gemini 요약 + 태그 자동
+- [ ] **S16-T6** Personal workspace에서 음성 메모 첫 진입 시나리오 lock-in
+
 ### 진행 중 (ADR-008 DevEx 후속)
 
 - [ ] **GCP WIF 초기 설정 + Secret Manager 9개 이관** (사용자 작업) — `docs/guides/deployment.md` §2.5.1 참조
