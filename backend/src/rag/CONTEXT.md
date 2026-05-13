@@ -80,6 +80,8 @@
 | R-8 | **SSE 스트리밍**: `EventSourceResponse` (`sse_starlette.sse`) — 내부적으로 `text/event-stream`. `StreamingResponse` 직접 사용 금지 — 헌법 B-14 |
 | R-9 | **융합 알고리즘은 RRF (Reciprocal Rank Fusion), k=60** — Gemini re-rank 아님. `service.py:152 _reciprocal_rank_fusion` |
 | R-10 | **권한 검증은 `RagPipelineService.ask` 진입에서 SSE 시작 *전* 완료** (Sprint 6 ADR-014 옵션 A). visibility=draft → creator + admin/owner / visibility=private → ProjectMember + admin/owner. 검증 실패 시 `error` + `done` SSE 이벤트로 종료 (스트리밍 시작 안 함). 권한 누락이 ADR-010 M1 RAG 품질 시그널을 오염하지 않도록. |
+| R-11 | **Gemini 예외는 graceful** — SafetyFilter / API 오류 / 네트워크 오류 발생 시 5xx 대신 SSE `error` + `done` 이벤트 송출 (Sprint 14 BUG-C01). 캐시 오염 방지를 위해 SemanticCache 저장 skip. 빈 답변(`full_answer.strip() == ""`)도 동일 정책. |
+| R-12 | **질문 입력 검증** — `RagAskRequest.question` 은 strip 후 2자 이상 + 500자 이하 (Sprint 14 BUG-C01). prompt-injection 류 거대 입력 차단 + Pydantic 422로 5xx 회피. |
 
 ---
 
@@ -97,8 +99,10 @@ POST /ask    질문 → 답변 + 출처 (SSE 스트리밍, EventSourceResponse)
 
 - 검색 결과 0건 → "관련 콘텐츠를 찾을 수 없습니다" + 가이드
 - 캐시 hit이지만 출처 콘텐츠 삭제됨 → 즉시 무효화 + 재검색
-- Gemini API 실패 → 검색 결과만 반환 (요약 없이) — SSE error event
-- 너무 짧은 질문 (< 5자) → 질문 재구성 요청
+- Gemini API 실패 (SafetyFilter / 빈 candidate / 네트워크) → SSE `error` 이벤트 (한국어 안내 + retryAfter=3초) + `done` 이벤트 종료 + 캐시 저장 skip (R-11)
+- Gemini 빈 답변 (strip 후 빈 문자열) → 캐시 저장 skip + `done` 이벤트 정상 종료
+- 질문 길이 위반: strip 후 < 2자 또는 > 500자 → Pydantic 422 (R-12)
+- prompt-injection 류 거대 입력 (>500자) → max_length 초과로 SSE 진입 전 422
 
 ---
 

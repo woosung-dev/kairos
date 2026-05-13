@@ -115,15 +115,45 @@ class RagService:
             ),
         }
 
-        # [8] Generation (Gemini SSE)
+        # [8] Generation (Gemini SSE) — SafetyFilter / API 오류 graceful degrade.
+        # 5xx 대신 SSE error event + done event 송출 후 캐시 저장 skip.
         sources_text = self._format_sources_for_prompt(enriched)
         full_answer = ""
-        async for token in self.ai_service.stream_rag_answer(question, sources_text):
-            full_answer += token
+        try:
+            async for token in self.ai_service.stream_rag_answer(question, sources_text):
+                full_answer += token
+                yield {
+                    "event": "answer",
+                    "data": json.dumps({"token": token}, ensure_ascii=False),
+                }
+        except Exception as ai_err:
+            # SafetyFilter / 빈 candidate / google.genai.errors / 네트워크 오류 등 모두 graceful.
+            logger.exception("RAG Gemini 스트리밍 실패 — graceful degrade: %s", ai_err)
             yield {
-                "event": "answer",
-                "data": json.dumps({"token": token}, ensure_ascii=False),
+                "event": "error",
+                "data": json.dumps(
+                    {
+                        "message": "질문을 처리할 수 없습니다. 다시 시도해주세요.",
+                        "retryAfter": 3,
+                    },
+                    ensure_ascii=False,
+                ),
             }
+            yield {
+                "event": "done",
+                "data": json.dumps({"cached": False, "sourceCount": 0}),
+            }
+            return
+
+        # 빈 답변 — 캐시 오염 방지 위해 저장 skip
+        if not full_answer.strip():
+            yield {
+                "event": "done",
+                "data": json.dumps(
+                    {"cached": False, "sourceCount": len(sources_for_client)}
+                ),
+            }
+            return
 
         # [9] Cache Store
         try:

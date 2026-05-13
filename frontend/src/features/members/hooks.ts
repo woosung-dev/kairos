@@ -58,14 +58,17 @@ export function useMembers(wid: string | undefined) {
 
 export function useWorkspaceRole(workspaceId: string | undefined) {
   const { user } = useUser();
-  const { data: members } = useMembers(workspaceId);
+  const { data: members, isLoading } = useMembers(workspaceId);
 
   // clerkId 기반 매칭 (email은 JWT claims에 미포함)
   const role =
     members?.find((m) => m.clerkId === user?.id)?.role ?? null;
 
+  // workspaceId 가 비어있으면 fetch 자체가 enabled=false → isLoading=false 로 간주.
+  // members 미로딩 상태에서는 권한 분기 컴포넌트가 placeholder/spinner 를 띄울 수 있도록 노출.
   return {
     role,
+    isLoading: !!workspaceId && isLoading,
     isOwner: role === "owner",
     isAdmin: role === "admin" || role === "owner",
     canManage: role === "admin" || role === "owner",

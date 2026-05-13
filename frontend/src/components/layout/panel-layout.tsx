@@ -105,7 +105,7 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
                 onClick={toggleRagOverlay}
                 className="p-1 rounded transition-colors hover:opacity-80"
                 style={{ color: "var(--text-muted)" }}
-                aria-label="RAG 오버레이 닫기"
+                aria-label="AI 검색 패널 닫기"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                   <path d="M1 1l12 12M13 1L1 13" />

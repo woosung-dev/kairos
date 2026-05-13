@@ -70,7 +70,9 @@ class InviteResponse(BaseModel):
 
 
 class UpdateWorkspaceSettingsRequest(BaseModel):
-    inbox_threshold: float = Field(ge=0.5, le=1.0)
+    inbox_threshold: float = Field(ge=0.5, le=1.0, alias="inboxThreshold")
+
+    model_config = {"populate_by_name": True}
 
 
 class InviteInfoResponse(BaseModel):

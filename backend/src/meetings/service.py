@@ -7,12 +7,19 @@ from src.actions.repository import ActionItemRepository
 from src.meetings.exceptions import MeetingNotFoundError
 from src.meetings.models import Meeting
 from src.meetings.repository import MeetingRepository
+from src.projects.repository import ProjectRepository
 
 
 class MeetingService:
-    def __init__(self, repo: MeetingRepository, action_repo: ActionItemRepository | None = None) -> None:
+    def __init__(
+        self,
+        repo: MeetingRepository,
+        action_repo: ActionItemRepository | None = None,
+        project_repo: ProjectRepository | None = None,
+    ) -> None:
         self.repo = repo
         self.action_repo = action_repo
+        self.project_repo = project_repo
 
     async def create_meeting(
         self,
@@ -94,8 +101,20 @@ class MeetingService:
             if summary
             else None
         )
-        # Sprint 1: 프로젝트 연결 없음
-        result["projects"] = []
+        # Sprint 14 T-8: 연결된 프로젝트 (MeetingProjectLink) 동기화 (BUG-H04)
+        if self.project_repo is not None:
+            linked = await self.project_repo.find_projects_by_meeting(meeting_id)
+            result["projects"] = [
+                {
+                    "id": str(p.id),
+                    "title": p.title,
+                    "status": p.status,
+                    "visibility": p.visibility,
+                }
+                for p in linked
+            ]
+        else:
+            result["projects"] = []
         return result
 
     async def get_meeting_status(self, meeting_id: uuid.UUID) -> dict:

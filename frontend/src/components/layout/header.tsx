@@ -1,8 +1,10 @@
 "use client";
 
 import { Search, Users, LogOut, Settings } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "@/store/ui";
 import { useMembers } from "@/features/members/hooks";
+import { useWorkspaces } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { useClerk, useUser } from "@clerk/nextjs";
 import { ThemeToggle } from "./theme-toggle";
@@ -17,7 +19,12 @@ import {
 export function Header() {
   const { toggleSidebar, toggleRagOverlay } = useUIStore();
   const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const { data: members } = useMembers(wid ?? undefined);
+  const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId);
+  // localStorage 의 stale wid 로 인한 404 fetch 차단 (BUG-H01)
+  const { data: workspaces } = useWorkspaces();
+  const isValidWid = !!wid && !!workspaces?.some((w) => w.id === wid);
+  const { data: members } = useMembers(isValidWid ? wid! : undefined);
+  const queryClient = useQueryClient();
   const { signOut } = useClerk();
   const { user } = useUser();
 
@@ -35,9 +42,10 @@ export function Header() {
     >
       {/* 좌측: 사이드바 토글 + breadcrumb */}
       <div className="flex items-center gap-3 shrink-0">
+        {/* Sprint 14 T-10: 모바일에서 사이드바 토글 숨김 (BottomNav 1차 내비). md(768)+에서만 노출. */}
         <button
           onClick={toggleSidebar}
-          className="p-1.5 rounded transition-colors hover:opacity-80"
+          className="hidden md:inline-flex p-1.5 rounded transition-colors hover:opacity-80"
           style={{ color: "var(--text-secondary)" }}
           aria-label="사이드바 토글"
         >
@@ -159,11 +167,15 @@ export function Header() {
 
             <DropdownMenuSeparator />
 
-            {/* 로그아웃 */}
+            {/* 로그아웃 — 워크스페이스 캐시/Zustand 정리 후 sign-out (BUG-H01) */}
             <DropdownMenuItem
               variant="destructive"
               className="px-3 py-2 cursor-pointer"
-              onSelect={() => signOut({ redirectUrl: "/" })}
+              onSelect={async () => {
+                queryClient.clear();
+                setActiveWorkspaceId("");
+                await signOut({ redirectUrl: "/" });
+              }}
             >
               <LogOut size={14} />
               <span>로그아웃</span>

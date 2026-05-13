@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-05-12
+> 마지막 업데이트: 2026-05-13
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조
 
@@ -43,6 +43,14 @@
   - [x] Inbox 신뢰도 임계값 설정 UI (프리셋 70/80/90/95%)
   - [x] 내보내기 포맷 MD/JSON (회의/노트)
   - [ ] 내보내기 포맷 PDF (향후 구현)
+
+## Recently Completed — Multi-Agent QA (3 페르소나 통합 검증, 2026-05-13)
+
+- [x] **Sentinel (시니어 QA, 27분)** — 적대적 검증. Critical 1 / High 4 / Medium 6 / Low 2 = 13 결함. Health 6.8/10. Sprint 4-13 핵심 회귀 모두 PASS (CORS / RBAC / 멀티테넌시 / 오디오 / RAG 배치화). 산출: `docs/dev-log/2026-05-13-multi-agent-qa/qa-report.md`.
+- [x] **Curious (32세 PM, 35분)** — 잠재 고객 도입 결정 시뮬레이션. 5/30/1분 룰 PASS, TTFV 측정 불가 (Blocker), **도입 결정 Maybe** (Dev 배지 + 404 + 카운트 불일치 + 가격 부재). 산출: `docs/dev-log/2026-05-13-multi-agent-qa/interested-user-report.md`.
+- [x] **Casual (28세 직장인, 32분)** — 데스크톱 + 모바일 (375x667) UX. 막힘 12건, 용어 해독률 37.5%, 모바일 UX 5/10. Top 1 권고: "RAG" → "AI 검색" 카피 일괄 치환. 산출: `docs/dev-log/2026-05-13-multi-agent-qa/general-user-report.md`.
+- [x] **통합 HTML 보고서** — 3 페르소나 매트릭스 + Critical/High 결함 + 우선순위 매트릭스. `docs/dev-log/2026-05-13-multi-agent-qa/integrated-report.html`.
+- [x] **Sprint 14 계획 작성** — `docs/dev-log/sprint-14-plan.md` (T-1~T-11, ~28시간). AD-36~39 자의 결정 라벨.
 
 ## Recently Completed — E2E password 전환 + 마이크 녹음 TODO 정리 (2026-05-13)
 
@@ -150,6 +158,14 @@
 - AI 모델 참조 통일 완료: Gemini `gemini-2.5-flash` 확정 (비용 사유)
   → `backend.md`, `global.md`에서 Anthropic → Gemini로 수정 완료
 
+## Blocked — 사용자 작업 필요
+
+- [ ] **T-3 Sprint 14 Clerk Production 인스턴스 발급** [확인 필요]
+  - 위치: Clerk Dashboard → New Application → Production
+  - 발급 후: `frontend/.env.local` + Vercel env 의 `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` 를 `pk_live_*` / `sk_live_*` 로 교체
+  - 효과: 사인인 화면 "Development mode" 배지 제거 (Curious 핵심 망설임 #1)
+  - 코드 측 (커밋 완료): `@clerk/localizations` koKR + SignIn/SignUp `forceRedirectUrl="/dashboard"`
+
 ## Next Actions
 
 ### Sprint 12 — Architecture Deepening (BL 등재, 2026-05-12) ✅ 완료
@@ -165,6 +181,37 @@
 - [x] **BL-004 구현** — `MeetingSummaryResult` / `MeetingActionsResult` Pydantic 모델 추가 + `ai_processing.py` 경계 검증. 테스트 4개 추가.
 - [x] **pyrightconfig.json** — backend/ + 루트 추가. IDE Pyright venv 경로 설정.
 - 테스트: 신규 7개 추가 (BL-003: 3, BL-004: 4) / 전체 87 passed
+
+### Sprint 14 — 가입 첫 5분 신뢰 회복 + RAG 안정화 (2026-05-14 완료, PR 대기)
+
+> 입력: Multi-Agent QA 통합 보고서 (`docs/dev-log/2026-05-13-multi-agent-qa/integrated-report.html`)
+> 상세: `docs/dev-log/sprint-14-plan.md` · 검증: `docs/dev-log/2026-05-13-multi-agent-qa/sprint-14-verification.md`
+> 브랜치: `sprint-14/trust-stabilize` (origin/main off)
+
+**P0 (Critical) — 4건 ✅**
+- [x] **T-1 BUG-C01** RAG `/rag/ask` 5xx graceful degrade (`4eb6f3a`) — Gemini try/except + SSE error event + RagAskRequest max_length=500 + strip→≥2자. 신규 테스트 12개.
+- [x] **T-2** "오늘 할 일" 사이드바 메뉴 404 숨김 (`c22684d`).
+- [x] **T-3** Clerk koKR localization + /dashboard force redirect (`9ea1a78`). Production 키 발급은 사용자 Blocked.
+- [x] **T-4** "RAG" → "AI 검색" 사용자 노출 카피 11곳 + 시드 2곳 치환 (`26ab7d5`) + `features/rag/CONTEXT.md` 카피 정책 lock-in.
+
+**P1 (High) — 7건 ✅**
+- [x] **T-5 BUG-H03** UpdateWorkspaceSettingsRequest 헌법 I-16 위반 fix + AST introspection 회귀 차단 (`3699b9d`). 11 Request audit 결과 1건 위반 → 0건.
+- [x] **T-6 BUG-H02** visibility 모달 race condition fix (`0bf01e6`) — useWorkspaceRole isLoading + onClick closure 회피.
+- [x] **T-7 BUG-H01** dashboard stale ws + setState-in-render fix (`1d246eb`) — useEffect 분리 + Header useWorkspaces 가드 + 로그아웃 queryClient.clear.
+- [x] **T-8 BUG-H04** meeting detail projects 동기화 (`8532ab5`) — ProjectRepository.find_projects_by_meeting 호출. 신규 테스트 3개.
+- [x] **T-9** Inbox 카운트 사이드바↔페이지 동기화 (`79872a2`) — 정책 lock-in: 사이드바 = 미처리 항목 수.
+- [x] **T-10** 모바일 햄버거 토글 숨김 (`1a6d3b3` 묶음).
+- [x] **T-11** 모바일 BottomNav "메모" 진입점 (`1a6d3b3` 묶음) — 검색 자리 swap.
+
+**검증 + dogfooding** — `sprint-14-verification.md` 산출. Backend 110 PASS / FE typecheck PASS / 신규 테스트 18개 모두 PASS / 회귀 0건.
+
+**메트릭**: Composite Health 6.8 → ~8.0/10 (추정) · Curious Maybe → Yes (조건부) · Casual 용어 해독률 37.5% → ~50%+ · 자의 결정 AD-36~39.
+
+### Sprint 14 — Out of Scope (Sprint 15+ 보류)
+- 신규 가입자 onboarding tour (빈 워크스페이스 첫 5분 가치 도달 경로 — 별도 디자인 필요)
+- BUG-M01~M06 + L01~L02 (Sentinel polish)
+- 마케팅 트랙 (가격 / 고객 로고 / 비교표 / 보안 페이지) — dev 단독 처리 불가
+- AD-35 multi-user E2E (Clerk testing mode 도입 후)
 
 ### 진행 중 (ADR-008 DevEx 후속)
 

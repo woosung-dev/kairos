@@ -6,7 +6,7 @@ export default function SignUpPage() {
       className="flex items-center justify-center min-h-screen"
       style={{ background: "var(--background)" }}
     >
-      <SignUp />
+      <SignUp forceRedirectUrl="/dashboard" signInForceRedirectUrl="/dashboard" />
     </div>
   );
 }

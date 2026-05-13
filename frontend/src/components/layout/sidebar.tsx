@@ -6,12 +6,12 @@ import { usePathname } from "next/navigation";
 import { useProjects } from "@/features/projects/hooks";
 import { useMeetings } from "@/features/meetings/hooks";
 import { useNotes } from "@/features/notes/hooks";
+import { useInbox } from "@/features/inbox/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import {
   Archive,
   ChevronDown,
   ChevronRight,
-  CheckSquare,
   FileText,
   Home,
   Inbox,
@@ -30,11 +30,10 @@ interface NavItem {
   requiresWrite?: boolean;
 }
 
-/* 네비 순서: 홈 → Inbox(배지) → 오늘 할 일 → 구분선 → 빠른 메모 → + 추가 */
+/* 네비 순서: 홈 → Inbox(배지) → 구분선 → 빠른 메모 → + 추가 */
 const NAV_TOP: NavItem[] = [
   { href: "/", label: "홈", icon: Home },
   { href: "/inbox", label: "Inbox", icon: Inbox, hasBadge: true },
-  { href: "/today", label: "오늘 할 일", icon: CheckSquare },
 ];
 
 const NAV_BOTTOM: NavItem[] = [
@@ -141,6 +140,12 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const hasRole = useWorkspaceStore((s) => s.hasRole);
 
+  // Sprint 14 T-9: Inbox 카운트 정책 = 미처리(!isProcessed) 항목 수.
+  // /inbox 페이지의 "미처리" 필터 결과와 동일 source-of-truth (동일 query key 캐시 공유).
+  const { data: inboxData } = useInbox(activeWorkspaceId ?? undefined);
+  const unprocessedInboxCount =
+    inboxData?.items.filter((it) => !it.isProcessed).length ?? 0;
+
   const toggleProject = (projectId: string) => {
     setExpandedProjects((prev) => {
       const next = new Set(prev);
@@ -186,8 +191,8 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
         {!collapsed && (
           <span className="flex-1">{item.label}</span>
         )}
-        {/* Inbox 배지 (하드코딩 placeholder — 추후 실제 카운트 연동) */}
-        {!collapsed && item.hasBadge && (
+        {/* Inbox 배지 — 미처리 항목 수 (Sprint 14 T-9, 0건이면 숨김) */}
+        {!collapsed && item.hasBadge && unprocessedInboxCount > 0 && (
           <span
             className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
             style={{
@@ -196,7 +201,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
               borderRadius: "var(--radius-full)",
             }}
           >
-            3
+            {unprocessedInboxCount}
           </span>
         )}
       </Link>
@@ -241,7 +246,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
         className="py-3 space-y-1"
         style={{ padding: collapsed ? "12px 4px" : "12px 8px" }}
       >
-        {/* 상단 네비: 홈 / Inbox / 오늘 할 일 */}
+        {/* 상단 네비: 홈 / Inbox */}
         {NAV_TOP.map(renderNavItem)}
 
         {/* 구분선 */}

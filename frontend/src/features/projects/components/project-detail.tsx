@@ -64,7 +64,7 @@ const STAT_ITEMS = [
   { label: "회의", value: 0, icon: "🎙️" },
   { label: "노트", value: 0, icon: "📝" },
   { label: "액션", value: 0, icon: "✅" },
-  { label: "RAG 검색", value: 0, icon: "🔍" },
+  { label: "AI 검색", value: 0, icon: "🔍" },
 ];
 
 export function ProjectDetail({ projectId }: ProjectDetailProps) {
@@ -77,7 +77,9 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [archiveAlertOpen, setArchiveAlertOpen] = useState(false);
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
-  const { canManage } = useWorkspaceRole(activeWorkspaceId ?? undefined);
+  const { canManage, isLoading: isRoleLoading } = useWorkspaceRole(
+    activeWorkspaceId ?? undefined
+  );
   const deleteMutation = useDeleteProject(activeWorkspaceId ?? undefined);
   const archiveMutation = useArchiveProject(activeWorkspaceId ?? undefined);
 
@@ -139,7 +141,12 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
           {project && (
             <VisibilityBadge
               visibility={project.visibility}
-              onClick={canManage ? () => setVisibilityDialogOpen(true) : undefined}
+              isLoading={isRoleLoading}
+              onClick={() => {
+                // closure 캐싱 회피 — 핸들러는 항상 같은 참조,
+                // 호출 시점에 canManage 평가하여 race-condition 차단 (BUG-H02)
+                if (canManage) setVisibilityDialogOpen(true);
+              }}
             />
           )}
           {canManage && (

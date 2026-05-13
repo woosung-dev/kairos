@@ -1,0 +1,351 @@
+<!doctype html>
+<!-- Multi-Agent QA 통합 보고서 — Sentinel/Curious/Casual 3 페르소나 교차 검증 -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kairos Multi-Agent QA 통합 보고서 — 2026-05-13</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Pretendard Variable", "Pretendard", system-ui, sans-serif; }
+  .heatmap td { text-align: center; font-weight: 600; }
+  .severity-c { background: #fee2e2; color: #991b1b; }
+  .severity-h { background: #fed7aa; color: #9a3412; }
+  .severity-m { background: #fef3c7; color: #92400e; }
+  .severity-l { background: #e0e7ff; color: #3730a3; }
+  .pass { background: #d1fae5; color: #065f46; }
+  .fail { background: #fecaca; color: #7f1d1d; }
+  .partial { background: #fef3c7; color: #92400e; }
+  .score-good { color: #059669; }
+  .score-mid { color: #d97706; }
+  .score-bad { color: #dc2626; }
+  @media print {
+    .no-print { display: none; }
+    body { font-size: 11pt; }
+    h1 { page-break-before: auto; }
+    section { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body class="bg-stone-50 text-stone-900">
+
+<div class="max-w-6xl mx-auto px-6 py-10">
+
+<header class="mb-12 border-b border-stone-200 pb-8">
+  <p class="text-sm text-stone-500 tracking-widest uppercase">Multi-Agent QA Report</p>
+  <h1 class="text-4xl font-bold mt-2">Kairos 사전 릴리즈 통합 검증</h1>
+  <p class="text-lg text-stone-600 mt-3">3 페르소나 (QA · 잠재 고객 · 일반 직장인) 교차 검증 결과 — 2026-05-13</p>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 text-sm">
+    <div><div class="text-stone-500">검증 환경</div><div class="font-medium">로컬 (FE :3000 + BE :8000)</div></div>
+    <div><div class="text-stone-500">검증 깊이</div><div class="font-medium">Exhaustive (3 페르소나)</div></div>
+    <div><div class="text-stone-500">총 소요</div><div class="font-medium">94분 (27+35+32)</div></div>
+    <div><div class="text-stone-500">기준 Sprint</div><div class="font-medium">Sprint 13 직후</div></div>
+  </div>
+</header>
+
+<!-- =========================================== -->
+<section class="mb-12">
+  <h2 class="text-2xl font-bold mb-6 border-l-4 border-stone-900 pl-3">1. Executive Summary</h2>
+
+  <div class="grid md:grid-cols-3 gap-6 mb-6">
+    <div class="bg-white p-6 rounded shadow-sm">
+      <div class="text-sm text-stone-500">Composite Health Score</div>
+      <div class="text-5xl font-bold score-mid mt-2">5.9 <span class="text-xl text-stone-400">/ 10</span></div>
+      <div class="text-xs text-stone-500 mt-2">Sentinel 6.8 · Curious 5.5 · Casual 5.0 가중평균 (Sentinel 50% / 페르소나 25%)</div>
+    </div>
+    <div class="bg-white p-6 rounded shadow-sm">
+      <div class="text-sm text-stone-500">발견 결함 (Sentinel)</div>
+      <div class="mt-2 space-y-1">
+        <div><span class="severity-c px-2 py-0.5 rounded text-sm">Critical 1</span></div>
+        <div><span class="severity-h px-2 py-0.5 rounded text-sm">High 4</span></div>
+        <div><span class="severity-m px-2 py-0.5 rounded text-sm">Medium 6</span></div>
+        <div><span class="severity-l px-2 py-0.5 rounded text-sm">Low 2</span></div>
+      </div>
+    </div>
+    <div class="bg-white p-6 rounded shadow-sm">
+      <div class="text-sm text-stone-500">사용자 의사결정</div>
+      <div class="text-3xl font-bold text-amber-600 mt-2">Maybe</div>
+      <div class="text-xs text-stone-500 mt-2">PM 페르소나 도입 결정. RAG citation 차별점 호평, 가입 첫인상 신뢰 신호 부재로 PoC 보류 → 6개월 후 재방문</div>
+    </div>
+  </div>
+
+  <div class="bg-amber-50 border border-amber-200 p-5 rounded">
+    <h3 class="font-bold text-amber-900 mb-3">🎯 Top 5 핵심 발견 (3 페르소나 종합)</h3>
+    <ol class="list-decimal list-inside space-y-2 text-sm text-stone-800">
+      <li><strong>BUG-C01 RAG 5xx graceful degrade 부재</strong> — Gemini SafetyFilter 거부 시 500 + 영문 응답. SSE error event + 입력 검증 (max_length 500, whitespace strip) 필요. <span class="text-stone-500">[Sentinel]</span></li>
+      <li><strong>"오늘 할 일" 사이드바 메뉴 → 404 (3 페르소나 공통 발견)</strong> — Curious T+25초, Casual 막힘 #1. 메뉴 숨기기 또는 "준비 중" 페이지로 즉시 우회. <span class="text-stone-500">[Curious + Casual]</span></li>
+      <li><strong>"RAG" 개발자 약어 노출 (3회 충돌)</strong> — 검색 a11y 라벨 + 프로젝트 온보딩 + 시드 노트 제목. "AI 검색"으로 일괄 치환. 일반 직장인 신뢰 +30%. <span class="text-stone-500">[Casual]</span></li>
+      <li><strong>"Development mode" Clerk 배지 + 영어 위젯</strong> — B2B PM 도입 검토 차단. Production Clerk 키 + koKR localization 즉시 적용. <span class="text-stone-500">[Curious]</span></li>
+      <li><strong>BUG-H03 헌법 I-16 위반 (camelCase alias 누락)</strong> — `UpdateWorkspaceSettingsRequest`만 snake_case 강제. 전 backend schemas.py audit + schemathesis property test 도입. <span class="text-stone-500">[Sentinel]</span></li>
+    </ol>
+  </div>
+
+  <div class="mt-6 bg-emerald-50 border border-emerald-200 p-5 rounded">
+    <h3 class="font-bold text-emerald-900 mb-2">✅ 강점 (인정해야 할 것)</h3>
+    <ul class="list-disc list-inside space-y-1 text-sm text-stone-800">
+      <li>회귀 baseline 견고 — Sprint 4-13 핵심 회귀 모두 PASS (CORS / RBAC / 멀티테넌시 / 오디오 파이프라인 / RAG 배치화)</li>
+      <li>RAG citation 솔직성 — "결정 사항이 명시되어 있지 않습니다" + 소스 10건 노출. Otter 환각형 요약 대비 명확한 차별점</li>
+      <li>인증 baseline + 한국어 일관성 (비즈니스 응답) — 401/403 모두 한국어, CORS 헤더 100% 부착</li>
+      <li>cross-workspace 격리 견고 — fake/stale UUID 모두 403, AD-33 ProjectMember 차단 PASS</li>
+    </ul>
+  </div>
+</section>
+
+<!-- =========================================== -->
+<section class="mb-12">
+  <h2 class="text-2xl font-bold mb-6 border-l-4 border-stone-900 pl-3">2. 페르소나 매트릭스 (heatmap)</h2>
+
+  <div class="overflow-x-auto">
+    <table class="w-full bg-white rounded shadow-sm heatmap text-sm">
+      <thead class="bg-stone-100 text-stone-700">
+        <tr>
+          <th class="text-left p-3">평가 차원</th>
+          <th class="p-3">Sentinel<br><span class="text-xs font-normal text-stone-500">QA 전문가</span></th>
+          <th class="p-3">Curious<br><span class="text-xs font-normal text-stone-500">관심 사용자 (PM)</span></th>
+          <th class="p-3">Casual<br><span class="text-xs font-normal text-stone-500">일반 직장인</span></th>
+          <th class="text-left p-3">교차 결론</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-t">
+          <td class="text-left p-3 font-medium">기술 안정성</td>
+          <td class="p-3 score-good">6.8/10</td><td class="p-3 score-mid">7/10</td><td class="p-3 score-mid">6/10</td>
+          <td class="text-left p-3 text-xs">회귀 PASS, but C01 5xx + UI race로 감점</td>
+        </tr>
+        <tr class="border-t">
+          <td class="text-left p-3 font-medium">UX 직관성</td>
+          <td class="p-3">—</td><td class="p-3 score-mid">7/10</td><td class="p-3 score-bad">5/10</td>
+          <td class="text-left p-3 text-xs">PM은 5/30/1분 룰 PASS, 일반 직장인은 12분 내 이탈 위험</td>
+        </tr>
+        <tr class="border-t">
+          <td class="text-left p-3 font-medium">신뢰 신호</td>
+          <td class="p-3">—</td><td class="p-3 score-bad">3/10</td><td class="p-3 score-bad">4/10</td>
+          <td class="text-left p-3 text-xs">Dev 배지 + 404 + 미래 날짜로 신뢰 침식</td>
+        </tr>
+        <tr class="border-t">
+          <td class="text-left p-3 font-medium">한국어 마감</td>
+          <td class="p-3 score-mid">7/10</td><td class="p-3 score-bad">4/10</td><td class="p-3 score-bad">5/10</td>
+          <td class="text-left p-3 text-xs">비즈니스 응답 한국어 OK, Clerk + 인프라 영문, "RAG/Visibility/Owner" 잔재</td>
+        </tr>
+        <tr class="border-t">
+          <td class="text-left p-3 font-medium">모바일 UX</td>
+          <td class="p-3">—</td><td class="p-3">—</td><td class="p-3 score-bad">5/10</td>
+          <td class="text-left p-3 text-xs">햄버거 무동작 + BottomNav 진입점 부재 + 검색창 20px</td>
+        </tr>
+        <tr class="border-t">
+          <td class="text-left p-3 font-medium">RAG 핵심 가치</td>
+          <td class="p-3 partial">PARTIAL</td><td class="p-3 pass">PASS (제품 hero)</td><td class="p-3 fail">FAIL (용어 장벽)</td>
+          <td class="text-left p-3 text-xs">기술 동작 OK, PM 검증 OK, 일반 사용자 진입 차단</td>
+        </tr>
+        <tr class="border-t">
+          <td class="text-left p-3 font-medium">도입 결정 시그널</td>
+          <td class="p-3">—</td><td class="p-3 partial">Maybe</td><td class="p-3 fail">포기 위험</td>
+          <td class="text-left p-3 text-xs">PM은 6개월 보류, 직장인은 12분 내 이탈 가능</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- =========================================== -->
+<section class="mb-12">
+  <h2 class="text-2xl font-bold mb-6 border-l-4 border-stone-900 pl-3">3. Critical / High 결함 상세</h2>
+
+  <div class="space-y-4">
+    <article class="bg-white rounded shadow-sm border-l-4 border-red-600 p-5">
+      <div class="flex items-baseline justify-between flex-wrap">
+        <h3 class="font-bold text-lg">BUG-C01 — RAG `/rag/ask` 일부 입력에 500 응답 (graceful degrade 부재)</h3>
+        <span class="severity-c px-2 py-0.5 rounded text-xs">Critical</span>
+      </div>
+      <p class="text-sm mt-2"><strong>재현</strong>: prompt-injection 류 영문 + unicode 변형에서 첫 호출 500 → 두 번째 200 (cache hit). 응답 body `{"detail":"Internal Server Error"}` (영문).</p>
+      <p class="text-sm mt-2"><strong>Root Cause 가설</strong>: Gemini SafetyFilter `BlockedPromptError` 또는 빈 candidate 미catch. SemanticCache 오염 의심.</p>
+      <p class="text-sm mt-2"><strong>권고</strong>: ① `rag/service.py` Gemini 예외 catch → SSE error event 또는 200 + 한국어 안내. ② 입력 검증 (`min_length=1, max_length=500`, whitespace strip ≥2). ③ 5xx 발생 시 한국어 안내 메시지.</p>
+      <p class="text-xs text-stone-500 mt-2">발견: Sentinel · 영향: 비용 abuse + 사용자 신뢰 손상 + Sentry 노이즈</p>
+    </article>
+
+    <article class="bg-white rounded shadow-sm border-l-4 border-orange-500 p-5">
+      <div class="flex items-baseline justify-between flex-wrap">
+        <h3 class="font-bold text-lg">BUG-H01 — Dashboard stale workspace_id 403 + setState-in-render</h3>
+        <span class="severity-h px-2 py-0.5 rounded text-xs">High</span>
+      </div>
+      <p class="text-sm mt-2"><strong>재현</strong>: 로그인 → dashboard 진입 시 `7aea8c86-...`(존재하지 않는 ws) 호출 2건 403. React 콘솔: "Cannot update a component (Header) while rendering a different component (DashboardPage)".</p>
+      <p class="text-sm mt-2"><strong>권고</strong>: `dashboard/page.tsx:78-82` setState를 useEffect로 이동. Header `useMembers(wid)`에 `enabled: workspaces.includes(wid)` 가드. 로그아웃 시 React Query 캐시 invalidation.</p>
+      <p class="text-xs text-stone-500 mt-2">발견: Sentinel · 영향: React 19 strict 격상 시 throw 위험 + 무의미한 BE 부하</p>
+    </article>
+
+    <article class="bg-white rounded shadow-sm border-l-4 border-orange-500 p-5">
+      <div class="flex items-baseline justify-between flex-wrap">
+        <h3 class="font-bold text-lg">BUG-H02 — Visibility 모달 race condition (soft navigation 시 안 열림)</h3>
+        <span class="severity-h px-2 py-0.5 rounded text-xs">High</span>
+      </div>
+      <p class="text-sm mt-2"><strong>재현</strong>: 사이드바 "🚀 시작하기" 클릭 → "Visibility: 공개" 배지 클릭 → 모달 안 열림. F5 후 동일 클릭 → 정상 열림.</p>
+      <p class="text-sm mt-2"><strong>Root Cause</strong>: `useWorkspaceRole`이 첫 렌더에서 members 없이 평가 → role=null → canManage=false → onClick=undefined. 이후 onClick prop 갱신돼도 dialog mount 안 됨.</p>
+      <p class="text-sm mt-2"><strong>권고</strong>: `useWorkspaceRole`이 `{role, isLoading, canManage}` 반환. VisibilityBadge 클릭 핸들러는 `() => canManage && setOpen(true)` 패턴. 다른 권한 분기 컴포넌트도 audit.</p>
+      <p class="text-xs text-stone-500 mt-2">발견: Sentinel + Casual (모바일에서 dropdown 안 보임으로 동일 결함 우회 발견)</p>
+    </article>
+
+    <article class="bg-white rounded shadow-sm border-l-4 border-orange-500 p-5">
+      <div class="flex items-baseline justify-between flex-wrap">
+        <h3 class="font-bold text-lg">BUG-H03 — 헌법 I-16 위반: PATCH /workspaces/{wid}/settings만 snake_case 강제</h3>
+        <span class="severity-h px-2 py-0.5 rounded text-xs">High</span>
+      </div>
+      <p class="text-sm mt-2"><strong>재현</strong>: `{"inboxThreshold":0.85}` body → 422. snake_case `inbox_threshold`만 통과.</p>
+      <p class="text-sm mt-2"><strong>Root Cause</strong>: `backend/src/workspaces/schemas.py:72-73` — `UpdateWorkspaceSettingsRequest`에 alias / `populate_by_name=True` 누락.</p>
+      <p class="text-sm mt-2"><strong>권고</strong>: alias 추가 + 전 backend schemas.py grep audit (`@field` / `Field(...)` 모두 점검) + schemathesis property test (V-T4) 도입으로 lock-in.</p>
+      <p class="text-xs text-stone-500 mt-2">발견: Sentinel · 영향: I-16 헌법 위반, 외부 통합 시 혼란, schemathesis 실패</p>
+    </article>
+
+    <article class="bg-white rounded shadow-sm border-l-4 border-orange-500 p-5">
+      <div class="flex items-baseline justify-between flex-wrap">
+        <h3 class="font-bold text-lg">BUG-H04 — Meeting detail 응답의 `projects: []` 동기화 누락</h3>
+        <span class="severity-h px-2 py-0.5 rounded text-xs">High</span>
+      </div>
+      <p class="text-sm mt-2"><strong>재현</strong>: `POST .../meetings/{mid}/projects` 201 → 즉시 `GET .../meetings/{mid}` → `projects:[]`. 반대 방향 `GET .../meetings?projectId=...`는 정상.</p>
+      <p class="text-sm mt-2"><strong>권고</strong>: `MeetingService.get_detail`에 MeetingProjectLink join 추가 + 응답 schema에 채움. 또는 `projects` 필드 제거.</p>
+      <p class="text-xs text-stone-500 mt-2">발견: Sentinel · 영향: meeting 상세에서 연결 프로젝트 노출 불가</p>
+    </article>
+  </div>
+</section>
+
+<!-- =========================================== -->
+<section class="mb-12">
+  <h2 class="text-2xl font-bold mb-6 border-l-4 border-stone-900 pl-3">4. UX 인상 비교 (Curious vs Casual)</h2>
+
+  <div class="grid md:grid-cols-2 gap-6">
+    <div class="bg-white rounded shadow-sm p-6">
+      <h3 class="font-bold mb-3 text-blue-700">Curious (PM, 32세) — 도입 검토 시각</h3>
+      <ul class="space-y-2 text-sm">
+        <li><strong>5초 룰</strong>: PASS — "AI가 정리합니다. 당신은 결정만 하세요." 헤드라인 + CTA 명확</li>
+        <li><strong>30초 룰</strong>: PASS (조건부) — "CODE 파이프라인" 자체 용어 학습 비용</li>
+        <li><strong>1분 룰</strong>: PASS — 통계(95%/12x/24h) + 시간축 narrative</li>
+        <li><strong>TTFV</strong>: <span class="text-red-600 font-medium">측정 불가</span> — 빈 워크스페이스 onboarding 부재, 무한 로딩 6초+, "오늘 할 일" 404</li>
+        <li><strong>도입 결정</strong>: <span class="text-amber-600 font-medium">Maybe</span> — 기술 코어 매력적이나 Dev 배지 + 404 + 카운트 불일치 + 가격 부재로 PoC 6개월 보류</li>
+        <li><strong>최종 한 줄</strong>: "RAG citation은 진짜 작동하고 차별점이지만, 가입~첫 5분 신뢰 신호 정리가 도입 결정 lever"</li>
+      </ul>
+    </div>
+    <div class="bg-white rounded shadow-sm p-6">
+      <h3 class="font-bold mb-3 text-purple-700">Casual (직장인, 28세) — 사용성 시각</h3>
+      <ul class="space-y-2 text-sm">
+        <li><strong>막힘 지점</strong>: <span class="text-red-600 font-medium">8 + 4 = 12건</span></li>
+        <li><strong>용어 해독률</strong>: <span class="text-red-600 font-medium">37.5%</span> (3/8) — RAG/Visibility/Owner/Archive/마크다운/Private/명시적/onboarding 모두 모름·오해</li>
+        <li><strong>모바일 UX</strong>: <span class="text-red-600 font-medium">5/10</span> — 햄버거 무동작 + 빠른 메모 진입점 부재 + 검색창 20px</li>
+        <li><strong>포기 시점</strong>: 첫 12분 (모바일은 5분)</li>
+        <li><strong>UX 라이팅 Top 1</strong>: "RAG"를 "AI 검색"으로 일괄 치환 — 일반 직장인 신뢰 +30% 추정</li>
+        <li><strong>최종 한 줄</strong>: "① 'RAG' 개발자 약어 제거 ② 죽은 버튼 (404 메뉴 + 모바일 햄버거) 즉시 제거 ③ 모바일 BottomNav에 빠른 메모 진입점 추가"</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="mt-6 bg-stone-100 p-4 rounded text-sm">
+    <strong>교차 결론</strong>: PM은 "기술 매력적이나 신뢰 신호 부족"으로 보류, 일반 직장인은 "용어/UX 장벽"으로 12분 내 이탈. <strong>두 페르소나 모두 "오늘 할 일" 404와 "Inbox 카운트 불일치"를 핵심 이탈 요인으로 지목</strong> — Sprint 14 P0 후보.
+  </div>
+</section>
+
+<!-- =========================================== -->
+<section class="mb-12">
+  <h2 class="text-2xl font-bold mb-6 border-l-4 border-stone-900 pl-3">5. 회귀 점검 결과 (Sprint 4-13)</h2>
+
+  <div class="overflow-x-auto">
+    <table class="w-full bg-white rounded shadow-sm text-sm">
+      <thead class="bg-stone-100 text-stone-700">
+        <tr>
+          <th class="text-left p-3">Sprint / 항목</th>
+          <th class="text-left p-3">검증 내용</th>
+          <th class="p-3">결과</th>
+          <th class="text-left p-3">비고</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-t"><td class="p-3 font-medium">7 BE-T11</td><td class="p-3">CORS 4xx/5xx 응답 헤더</td><td class="p-3"><span class="pass px-2 py-1 rounded text-xs">PASS</span></td><td class="p-3 text-xs">401/404/405/422 모두 access-control-allow-origin 부착</td></tr>
+        <tr class="border-t"><td class="p-3 font-medium">7 AD-33</td><td class="p-3">cross-workspace ProjectMember 차단</td><td class="p-3"><span class="pass px-2 py-1 rounded text-xs">PASS</span></td><td class="p-3 text-xs">비-멤버 user_id 추가 → 403</td></tr>
+        <tr class="border-t"><td class="p-3 font-medium">9</td><td class="p-3">BackgroundTask 세션 수명 (session_factory)</td><td class="p-3"><span class="pass px-2 py-1 rounded text-xs">PASS</span></td><td class="p-3 text-xs">capture-text 7.5초 만에 completed</td></tr>
+        <tr class="border-t"><td class="p-3 font-medium">10</td><td class="p-3">R2 프록시 업로드 (CORS 우회)</td><td class="p-3"><span class="pass px-2 py-1 rounded text-xs">PASS</span></td><td class="p-3 text-xs">직접 R2 PUT 코드 0건</td></tr>
+        <tr class="border-t"><td class="p-3 font-medium">13 BL-003</td><td class="p-3">RAG _enrich_context 배치화</td><td class="p-3"><span class="pass px-2 py-1 rounded text-xs">PASS</span></td><td class="p-3 text-xs">find_chunks_by_ids + rag/service.py:182 호출 확인</td></tr>
+        <tr class="border-t"><td class="p-3 font-medium">13 BL-004</td><td class="p-3">AI processing Pydantic 경계</td><td class="p-3"><span class="pass px-2 py-1 rounded text-xs">PASS</span></td><td class="p-3 text-xs">MeetingSummaryResult/ActionsResult model_validate 확인</td></tr>
+        <tr class="border-t"><td class="p-3 font-medium">6 I-9</td><td class="p-3">멀티테넌시 격리</td><td class="p-3"><span class="pass px-2 py-1 rounded text-xs">PASS</span></td><td class="p-3 text-xs">stale/fake UUID 모두 403</td></tr>
+        <tr class="border-t"><td class="p-3 font-medium">6 I-17</td><td class="p-3">Private 프로젝트 RAG 누설</td><td class="p-3"><span class="partial px-2 py-1 rounded text-xs">부분 FAIL [확인 필요]</span></td><td class="p-3 text-xs">owner-비ProjectMember 시점 노출 — 정책 lock-in 후 재검증 권고</td></tr>
+        <tr class="border-t"><td class="p-3 font-medium">7 UI-2</td><td class="p-3">members API email/clerkId</td><td class="p-3"><span class="partial px-2 py-1 rounded text-xs">부분 PASS</span></td><td class="p-3 text-xs">clerkId OK, email은 빈 문자열 (Clerk webhook 미연동)</td></tr>
+        <tr class="border-t"><td class="p-3 font-medium">6 TZ-1</td><td class="p-3">Workspace 생성 timezone (PR #14)</td><td class="p-3"><span class="pass px-2 py-1 rounded text-xs">PASS</span></td><td class="p-3 text-xs">정상 datetime 보유</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-stone-500 mt-3">※ viewer/member role 시점 RBAC 검증 + 비-멤버 시점 RAG 누설은 1 user 환경 한계로 미수행. AD-35 (Clerk testing mode + multi-user E2E) 도입 후 재검증 필요.</p>
+</section>
+
+<!-- =========================================== -->
+<section class="mb-12">
+  <h2 class="text-2xl font-bold mb-6 border-l-4 border-stone-900 pl-3">6. 우선순위 매트릭스 (Impact × Effort)</h2>
+
+  <div class="overflow-x-auto">
+    <table class="w-full bg-white rounded shadow-sm text-sm">
+      <thead class="bg-stone-100 text-stone-700">
+        <tr>
+          <th class="text-left p-3">우선순위</th>
+          <th class="text-left p-3">항목</th>
+          <th class="p-3">Impact</th>
+          <th class="p-3">Effort</th>
+          <th class="text-left p-3">출처</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-t bg-red-50"><td class="p-3 font-bold">P0</td><td class="p-3">BUG-C01 RAG 5xx graceful degrade</td><td class="p-3 text-center">★★★★★</td><td class="p-3 text-center">★★☆</td><td class="p-3 text-xs">Sentinel</td></tr>
+        <tr class="border-t bg-red-50"><td class="p-3 font-bold">P0</td><td class="p-3">"오늘 할 일" 사이드바 메뉴 404 (즉시 숨김)</td><td class="p-3 text-center">★★★★☆</td><td class="p-3 text-center">★☆☆</td><td class="p-3 text-xs">Curious + Casual</td></tr>
+        <tr class="border-t bg-red-50"><td class="p-3 font-bold">P0</td><td class="p-3">Clerk Production 키 + koKR localization</td><td class="p-3 text-center">★★★★★</td><td class="p-3 text-center">★★☆</td><td class="p-3 text-xs">Curious</td></tr>
+        <tr class="border-t bg-red-50"><td class="p-3 font-bold">P0</td><td class="p-3">"RAG" → "AI 검색" 카피 일괄 치환</td><td class="p-3 text-center">★★★★☆</td><td class="p-3 text-center">★☆☆</td><td class="p-3 text-xs">Casual</td></tr>
+        <tr class="border-t bg-orange-50"><td class="p-3 font-bold">P1</td><td class="p-3">BUG-H03 헌법 I-16 위반 일괄 audit + alias</td><td class="p-3 text-center">★★★☆☆</td><td class="p-3 text-center">★★☆</td><td class="p-3 text-xs">Sentinel</td></tr>
+        <tr class="border-t bg-orange-50"><td class="p-3 font-bold">P1</td><td class="p-3">BUG-H02 visibility 모달 race fix (useWorkspaceRole)</td><td class="p-3 text-center">★★★☆☆</td><td class="p-3 text-center">★★☆</td><td class="p-3 text-xs">Sentinel + Casual</td></tr>
+        <tr class="border-t bg-orange-50"><td class="p-3 font-bold">P1</td><td class="p-3">BUG-H01 dashboard stale ws + setState-in-render</td><td class="p-3 text-center">★★★☆☆</td><td class="p-3 text-center">★☆☆</td><td class="p-3 text-xs">Sentinel</td></tr>
+        <tr class="border-t bg-orange-50"><td class="p-3 font-bold">P1</td><td class="p-3">BUG-H04 meeting detail projects 동기화</td><td class="p-3 text-center">★★☆☆☆</td><td class="p-3 text-center">★☆☆</td><td class="p-3 text-xs">Sentinel</td></tr>
+        <tr class="border-t bg-orange-50"><td class="p-3 font-bold">P1</td><td class="p-3">사이드바 vs 페이지 카운트 동기화 (Inbox 3 vs 12)</td><td class="p-3 text-center">★★★☆☆</td><td class="p-3 text-center">★★☆</td><td class="p-3 text-xs">Sentinel + Curious + Casual</td></tr>
+        <tr class="border-t bg-orange-50"><td class="p-3 font-bold">P1</td><td class="p-3">모바일 햄버거 토글 무동작 (모바일에서 숨김)</td><td class="p-3 text-center">★★★☆☆</td><td class="p-3 text-center">★☆☆</td><td class="p-3 text-xs">Casual</td></tr>
+        <tr class="border-t bg-orange-50"><td class="p-3 font-bold">P1</td><td class="p-3">모바일 BottomNav에 "빠른 메모" 진입점 추가</td><td class="p-3 text-center">★★★☆☆</td><td class="p-3 text-center">★★☆</td><td class="p-3 text-xs">Casual</td></tr>
+        <tr class="border-t bg-yellow-50"><td class="p-3 font-bold">P2</td><td class="p-3">신규 가입자 onboarding tour (빈 워크스페이스 첫 5분 가치)</td><td class="p-3 text-center">★★★★☆</td><td class="p-3 text-center">★★★★</td><td class="p-3 text-xs">Curious (Sprint 15+)</td></tr>
+        <tr class="border-t bg-yellow-50"><td class="p-3 font-bold">P2</td><td class="p-3">대시보드 추천 질문 버튼 dead button 수정</td><td class="p-3 text-center">★★☆☆☆</td><td class="p-3 text-center">★★☆</td><td class="p-3 text-xs">Curious</td></tr>
+        <tr class="border-t bg-yellow-50"><td class="p-3 font-bold">P2</td><td class="p-3">검색 답변 인라인 [소스 1, 2, ...] 표기 정리</td><td class="p-3 text-center">★★☆☆☆</td><td class="p-3 text-center">★★☆</td><td class="p-3 text-xs">Casual</td></tr>
+        <tr class="border-t bg-yellow-50"><td class="p-3 font-bold">P2</td><td class="p-3">"2026-09-01 기준" 미래 날짜 시드/로직 [확인 필요]</td><td class="p-3 text-center">★★☆☆☆</td><td class="p-3 text-center">★☆☆</td><td class="p-3 text-xs">Casual</td></tr>
+        <tr class="border-t bg-yellow-50"><td class="p-3 font-bold">P2</td><td class="p-3">"Owner/Archive/Visibility/Private" 영문 라벨 일괄 한글화</td><td class="p-3 text-center">★★★☆☆</td><td class="p-3 text-center">★★★</td><td class="p-3 text-xs">Casual</td></tr>
+        <tr class="border-t bg-yellow-50"><td class="p-3 font-bold">P2</td><td class="p-3">BUG-M01~M06 (E2E 누적/Clerk 영문/RAG validation/Inbox 정책/dead message/badge)</td><td class="p-3 text-center">★★☆☆☆</td><td class="p-3 text-center">★★☆</td><td class="p-3 text-xs">Sentinel</td></tr>
+        <tr class="border-t bg-blue-50"><td class="p-3 font-bold">P3</td><td class="p-3">가격 페이지 / 고객 로고 / 보안 페이지 (B2B 신뢰 신호)</td><td class="p-3 text-center">★★★★☆</td><td class="p-3 text-center">★★★★</td><td class="p-3 text-xs">Curious (Marketing)</td></tr>
+        <tr class="border-t bg-blue-50"><td class="p-3 font-bold">P3</td><td class="p-3">vs Otter / vs Notion AI 비교표 페이지</td><td class="p-3 text-center">★★★☆☆</td><td class="p-3 text-center">★★★</td><td class="p-3 text-xs">Curious</td></tr>
+        <tr class="border-t bg-blue-50"><td class="p-3 font-bold">P3</td><td class="p-3">BUG-L01/L02 인프라 한국어화 + list wrapping 통일</td><td class="p-3 text-center">★☆☆☆☆</td><td class="p-3 text-center">★★☆</td><td class="p-3 text-xs">Sentinel</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- =========================================== -->
+<section class="mb-12">
+  <h2 class="text-2xl font-bold mb-6 border-l-4 border-stone-900 pl-3">7. Sprint 14 진입 결론</h2>
+  <div class="bg-white p-6 rounded shadow-sm">
+    <p class="mb-3"><strong>Sprint 14 목표 (1줄)</strong>: <em>"가입 첫 5분의 신뢰 침식 제거 + RAG 안정화"</em> — 외부 시각 신뢰 회복과 LLM 5xx 차단으로 도입 가능한 베타로 진입.</p>
+    <p class="mb-3"><strong>Sprint 14 In Scope (P0 + 핵심 P1)</strong>:</p>
+    <ul class="list-disc list-inside text-sm space-y-1 mb-3">
+      <li>P0 4건 모두 (BUG-C01 / 404 메뉴 / Clerk Prod / RAG 카피 치환)</li>
+      <li>P1 7건 중 5건 (BUG-H01~H04 + 카운트 동기화) — H02/H04는 코드 작은 변경, H01은 dashboard 라우트 단일 파일</li>
+      <li>모바일 햄버거 / BottomNav 진입점 — Casual 핵심 결함</li>
+    </ul>
+    <p class="mb-3"><strong>Sprint 14 Out of Scope (Sprint 15+)</strong>: onboarding tour, 가격 페이지, 비교표, B2B 신뢰 신호 마케팅 (자체 dev 영역 외 의존), AD-35 multi-user E2E (별도 Sprint 권고)</p>
+    <p class="text-sm text-stone-500"><strong>상세 작업 분해는 <code class="bg-stone-100 px-2 py-0.5 rounded">docs/dev-log/sprint-14-plan.md</code> 참조.</strong></p>
+  </div>
+</section>
+
+<!-- =========================================== -->
+<section class="mb-8">
+  <h2 class="text-2xl font-bold mb-6 border-l-4 border-stone-900 pl-3">8. Appendix — 원본 보고서</h2>
+  <ul class="list-disc list-inside text-sm space-y-2">
+    <li><a class="text-blue-700 hover:underline" href="qa-report.md">qa-report.md</a> — Sentinel (시니어 QA, 27분, 13 결함, Health 6.8/10)</li>
+    <li><a class="text-blue-700 hover:underline" href="interested-user-report.md">interested-user-report.md</a> — Curious (32세 PM, 35분, 도입 결정 Maybe)</li>
+    <li><a class="text-blue-700 hover:underline" href="general-user-report.md">general-user-report.md</a> — Casual (28세 직장인, 32분, 모바일 UX 5/10)</li>
+    <li><code class="bg-stone-100 px-2 py-0.5 rounded">screenshots/</code> — 49장 스크린샷 (Sentinel 10 + Curious 15 + Casual 24)</li>
+    <li><a class="text-blue-700 hover:underline" href="../sprint-14-plan.md">sprint-14-plan.md</a> — Sprint 14 작업 분해 + 검증 기준</li>
+  </ul>
+  <div class="mt-6 text-xs text-stone-500 border-t border-stone-200 pt-4">
+    <p>생성: 2026-05-13 / 메인 에이전트 통합 / 3 페르소나 sub-agent (Sentinel/Curious/Casual)</p>
+    <p>방법론: Multi-agent QA — 페르소나별 격리된 일관 시각 + 메인 에이전트 교차 검증.</p>
+    <p>한계: viewer/member role 검증, 비-멤버 RAG 누설, 실 오디오 STT는 1 user 환경 + 시간 제약으로 미수행. AD-35 도입 후 재검증.</p>
+  </div>
+</section>
+
+</div>
+</body>
+</html>

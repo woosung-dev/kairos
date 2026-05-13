@@ -10,7 +10,7 @@ const CMD_GROUPS = [
     label: "검색",
     items: [
       { icon: "🔍", label: "지식 검색", shortcut: "⌘K", action: "focus" },
-      { icon: "💬", label: "RAG 질문", shortcut: "?", action: "rag-mode" },
+      { icon: "💬", label: "AI 검색", shortcut: "?", action: "rag-mode" },
     ],
   },
   {
@@ -121,7 +121,7 @@ export function CmdK() {
                 borderRadius: "var(--radius-sm)",
               }}
             >
-              RAG
+              AI
             </span>
           )}
           <input
@@ -134,7 +134,7 @@ export function CmdK() {
                 handleSubmit();
               }
             }}
-            placeholder={isRagMode ? "질문을 입력하세요..." : "검색하거나 명령 입력... (? 로 RAG 질문)"}
+            placeholder={isRagMode ? "질문을 입력하세요..." : "검색하거나 명령 입력... (? 로 AI 검색)"}
             className="w-full bg-transparent text-sm outline-none"
             style={{ color: "var(--text-primary)" }}
             autoFocus
@@ -188,7 +188,7 @@ export function CmdK() {
 
         {isRagMode && (
           <div className="px-4 py-3 text-xs" style={{ color: "var(--text-muted)" }}>
-            Enter로 질문 전송. RAG 패널에서 답변을 확인합니다.
+            Enter로 질문 전송. AI 검색 패널에서 답변을 확인합니다.
           </div>
         )}
       </div>

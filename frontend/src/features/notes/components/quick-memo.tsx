@@ -25,7 +25,7 @@ interface SavedMemo {
 const INITIAL_MEMOS: SavedMemo[] = [
   {
     id: "memo-001",
-    title: "RAG 성능 개선 아이디어",
+    title: "AI 검색 성능 개선 아이디어",
     content: "Semantic cache를 도입하면 반복 쿼리 응답 시간을 80% 줄일 수 있을 것 같다.",
     projectTitle: "Q2 제품 로드맵",
     createdAt: "2026-03-30",
