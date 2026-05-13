@@ -103,7 +103,7 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [archiveAlertOpen, setArchiveAlertOpen] = useState(false);
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
-  const { canManage } = useWorkspaceRole(wid);
+  const { canManage, isLoading: isRoleLoading } = useWorkspaceRole(wid);
   const updateProject = useUpdateProject(wid);
   const deleteMutation = useDeleteProject(wid);
   const archiveMutation = useArchiveProject(wid);
@@ -183,6 +183,7 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
         <DashboardHeader
           project={project}
           canManage={canManage}
+          isRoleLoading={isRoleLoading}
           onVisibilityClick={() => setVisibilityDialogOpen(true)}
           onEditClick={() => setEditDialogOpen(true)}
           onArchiveClick={() => setArchiveAlertOpen(true)}
@@ -198,6 +199,7 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
       <DashboardHeader
         project={project}
         canManage={canManage}
+        isRoleLoading={isRoleLoading}
         onVisibilityClick={() => setVisibilityDialogOpen(true)}
         onEditClick={() => setEditDialogOpen(true)}
         onArchiveClick={() => setArchiveAlertOpen(true)}
@@ -368,6 +370,7 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
 function DashboardHeader({
   project,
   canManage,
+  isRoleLoading,
   onVisibilityClick,
   onEditClick,
   onArchiveClick,
@@ -375,6 +378,7 @@ function DashboardHeader({
 }: {
   project: Project;
   canManage: boolean;
+  isRoleLoading: boolean;
   onVisibilityClick: () => void;
   onEditClick: () => void;
   onArchiveClick: () => void;
@@ -400,7 +404,11 @@ function DashboardHeader({
         </span>
         <VisibilityBadge
           visibility={project.visibility}
-          onClick={canManage ? onVisibilityClick : undefined}
+          isLoading={isRoleLoading}
+          onClick={() => {
+            // closure 캐싱 회피 (BUG-H02) — 호출 시점 canManage 평가
+            if (canManage) onVisibilityClick();
+          }}
         />
         {canManage && (
           <DropdownMenu>
