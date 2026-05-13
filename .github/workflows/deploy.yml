@@ -15,38 +15,33 @@ concurrency:
 env:
   GCP_PROJECT: woosung-dev
   GCP_REGION: asia-northeast3
-  AR_REPO: kairos
-  IMAGE_NAME: api
   SERVICE_NAME: kairos-api
+  IMAGE_NAME: ghcr.io/${{ github.repository }}/api
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # Workload Identity Federation용
+      packages: write  # GHCR push 권한 (GITHUB_TOKEN 자동 사용)
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud (WIF)
-        uses: google-github-actions/auth@v2
+      # ── 이미지 빌드 + GHCR push ──────────────────────────────────────────
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
-          service_account: ${{ secrets.GCP_DEPLOYER_SA }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup gcloud
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
-
-      - name: Build and push image
+      - name: Build and push image to GHCR
         working-directory: backend
         run: |
           set -euo pipefail
-          IMAGE_URI="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.AR_REPO }}/${{ env.IMAGE_NAME }}"
-          SHA_TAG="${IMAGE_URI}:${{ github.sha }}"
-          LATEST_TAG="${IMAGE_URI}:latest"
+          SHA_TAG="${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          LATEST_TAG="${{ env.IMAGE_NAME }}:latest"
 
           docker buildx build \
             --platform linux/amd64 \
@@ -56,6 +51,15 @@ jobs:
             .
 
           echo "IMAGE_URI=$SHA_TAG" >> "$GITHUB_ENV"
+
+      # ── Cloud Run 배포 (GCP SA Key 인증) ─────────────────────────────────
+      - name: Authenticate to Google Cloud (SA Key)
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
 
       - name: Deploy to Cloud Run
         run: |
@@ -76,7 +80,9 @@ jobs:
       - name: Smoke test
         run: |
           set -euo pipefail
-          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.GCP_REGION }} --format="value(status.url)")
+          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.GCP_REGION }} \
+            --format="value(status.url)")
           for i in 1 2 3 4 5; do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${URL}/api/v1/docs")
             if [ "$STATUS" = "200" ]; then
