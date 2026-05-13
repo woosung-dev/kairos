@@ -1,11 +1,12 @@
-# backend/src/core/config.py
-"""앱 설정. 모든 환경변수를 여기서 관리."""
+# 앱 환경변수를 pydantic-settings로 관리하는 설정 모듈
+from functools import lru_cache
+
 from pydantic import SecretStr
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Kairos 백엔드 설정. .env 파일 또는 환경변수에서 로드."""
+    """Kairos 백엔드 설정. .env 파일 또는 OS 환경변수에서 로드."""
 
     # 앱
     app_env: str = "development"
@@ -34,12 +35,15 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr
     openai_api_key: SecretStr
 
-    model_config = {
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
-    }
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,  # 빈 문자열 환경변수 무시
+        extra="ignore",         # 선언되지 않은 변수 무시
+    )
 
 
+@lru_cache
 def get_settings() -> Settings:
-    """Settings 인스턴스를 반환한다. 모듈 레벨 싱글톤 대신 사용."""
+    """Settings 싱글톤 반환. 앱 전체에서 동일 인스턴스 재사용."""
     return Settings()
