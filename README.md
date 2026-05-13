@@ -26,8 +26,8 @@
 ### 1. 환경변수 설정
 
 ```bash
-cp backend/.env.example backend/.env.local
-cp frontend/.env.example frontend/.env.local
+cp backend/.env.example backend/.env        # FastAPI: .env 표준
+cp frontend/.env.example frontend/.env.local  # Next.js: .env.local 표준
 ```
 
 각 파일을 열어 실제 값을 입력합니다.

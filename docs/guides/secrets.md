@@ -1,7 +1,7 @@
 # 환경변수 & 시크릿 관리 가이드
 
-> **한 줄 원칙:** 로컬은 `.env.local`, CI는 GitHub Secrets/Variables, 프로덕션은 GCP Secret Manager.
-> 코드에 값을 하드코딩하거나 `.env.local`을 커밋하는 것은 절대 금지.
+> **한 줄 원칙:** 로컬은 파일로 관리(BE: `.env` / FE: `.env.local`), CI는 GitHub Secrets/Variables, 프로덕션은 GCP Secret Manager.
+> 코드에 값을 하드코딩하거나 env 파일을 커밋하는 것은 절대 금지.
 
 ---
 
@@ -9,8 +9,8 @@
 
 ```bash
 # 1. 템플릿 복사
-cp backend/.env.example backend/.env.local
-cp frontend/.env.example frontend/.env.local
+cp backend/.env.example backend/.env        # FastAPI: .env 표준
+cp frontend/.env.example frontend/.env.local  # Next.js: .env.local 표준
 
 # 2. 각 파일을 열어 실제 값 입력 (아래 발급처 참고)
 ```
@@ -29,7 +29,7 @@ cp frontend/.env.example frontend/.env.local
 
 ---
 
-### 백엔드 (`backend/.env.local`)
+### 백엔드 (`backend/.env`)
 
 | 변수명 | 로컬 | CI (test) | 프로덕션 | 발급처 |
 |---|:---:|:---:|:---:|---|
