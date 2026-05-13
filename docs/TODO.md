@@ -158,6 +158,14 @@
 - AI 모델 참조 통일 완료: Gemini `gemini-2.5-flash` 확정 (비용 사유)
   → `backend.md`, `global.md`에서 Anthropic → Gemini로 수정 완료
 
+## Blocked — 사용자 작업 필요
+
+- [ ] **T-3 Sprint 14 Clerk Production 인스턴스 발급** [확인 필요]
+  - 위치: Clerk Dashboard → New Application → Production
+  - 발급 후: `frontend/.env.local` + Vercel env 의 `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` 를 `pk_live_*` / `sk_live_*` 로 교체
+  - 효과: 사인인 화면 "Development mode" 배지 제거 (Curious 핵심 망설임 #1)
+  - 코드 측 (커밋 완료): `@clerk/localizations` koKR + SignIn/SignUp `forceRedirectUrl="/dashboard"`
+
 ## Next Actions
 
 ### Sprint 12 — Architecture Deepening (BL 등재, 2026-05-12) ✅ 완료
