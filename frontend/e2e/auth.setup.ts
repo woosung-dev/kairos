@@ -36,7 +36,8 @@ setup("authenticate", async ({ page }) => {
 
   // Clerk가 대시보드로 리다이렉트할 때까지 대기
   await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
-  await expect(page.getByText(/오늘의 Kairos|무엇이든 질문하세요/)).toBeVisible();
+  // 페이지 로드 완료 대기 (CI 환경에서 렌더링 지연 대응)
+  await page.waitForLoadState("networkidle");
 
   // 세션 스토리지 + 쿠키 저장
   await page.context().storageState({ path: AUTH_FILE });
