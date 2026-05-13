@@ -44,6 +44,11 @@
   - [x] 내보내기 포맷 MD/JSON (회의/노트)
   - [ ] 내보내기 포맷 PDF (향후 구현)
 
+## Recently Completed — E2E password 전환 + 마이크 녹음 TODO 정리 (2026-05-13)
+
+- [x] **E2E 로그인 OTP → password 방식 전환** — `e2e/auth.setup.ts` Clerk testing mode OTP 흐름 제거. email+password 계정으로 로그인하도록 변경. `test.yml` `E2E_USER_OTP` → `E2E_USER_PASSWORD` 교체.
+- [x] **브라우저 마이크 직접 녹음** — Sprint 11 기구현 확인 (`/new` 페이지 "직접 녹음" 탭 + `useRecording.ts` + `RecordingView`). stale TODO 정리.
+
 ## Recently Completed — Sprint 10 E2E 검증 + R2 CORS 수정 (2026-05-12)
 
 - [x] **E2E 검증 완료 (2026-05-12)**: 실제 오디오 파일 업로드 → status=completed → 트랜스크립트 세그먼트 + InboxItem 생성 확인. **검증 범위: 오디오 업로드 → STT → 요약 → Inbox 적재까지. RAG/Source Viewer E2E는 ADR-008 후속.**
@@ -138,7 +143,7 @@
 
 ## 미구현 (요청됨)
 
-- [ ] **브라우저 마이크 직접 녹음** — `/new` 페이지에 파일 업로드 외에 실시간 녹음 탭 추가 필요. 인터뷰이-01 피드백 2026-05-12.
+(없음)
 
 ## Questions
 
