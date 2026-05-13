@@ -1,8 +1,10 @@
 "use client";
 
 import { Search, Users, LogOut, Settings } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "@/store/ui";
 import { useMembers } from "@/features/members/hooks";
+import { useWorkspaces } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { useClerk, useUser } from "@clerk/nextjs";
 import { ThemeToggle } from "./theme-toggle";
@@ -17,7 +19,12 @@ import {
 export function Header() {
   const { toggleSidebar, toggleRagOverlay } = useUIStore();
   const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const { data: members } = useMembers(wid ?? undefined);
+  const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId);
+  // localStorage 의 stale wid 로 인한 404 fetch 차단 (BUG-H01)
+  const { data: workspaces } = useWorkspaces();
+  const isValidWid = !!wid && !!workspaces?.some((w) => w.id === wid);
+  const { data: members } = useMembers(isValidWid ? wid! : undefined);
+  const queryClient = useQueryClient();
   const { signOut } = useClerk();
   const { user } = useUser();
 
@@ -159,11 +166,15 @@ export function Header() {
 
             <DropdownMenuSeparator />
 
-            {/* 로그아웃 */}
+            {/* 로그아웃 — 워크스페이스 캐시/Zustand 정리 후 sign-out (BUG-H01) */}
             <DropdownMenuItem
               variant="destructive"
               className="px-3 py-2 cursor-pointer"
-              onSelect={() => signOut({ redirectUrl: "/" })}
+              onSelect={async () => {
+                queryClient.clear();
+                setActiveWorkspaceId("");
+                await signOut({ redirectUrl: "/" });
+              }}
             >
               <LogOut size={14} />
               <span>로그아웃</span>

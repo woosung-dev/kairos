@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useWorkspaces, useCreateWorkspace } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
@@ -75,11 +75,15 @@ export default function DashboardPage() {
   const { activeWorkspaceId, setActiveWorkspaceId } = useWorkspaceStore();
 
   const hasWorkspaces = workspaces && workspaces.length > 0;
+  // localStorage에 남은 stale wid 가 현재 워크스페이스 목록에 없으면 첫 워크스페이스로 fallback
   const currentWid = activeWorkspaceId && workspaces?.find((w) => w.id === activeWorkspaceId) ? activeWorkspaceId : workspaces?.[0]?.id;
 
-  if (currentWid && currentWid !== activeWorkspaceId) {
-    setActiveWorkspaceId(currentWid);
-  }
+  // render 중 setState 금지 — useEffect로 분리 (BUG-H01)
+  useEffect(() => {
+    if (currentWid && currentWid !== activeWorkspaceId) {
+      setActiveWorkspaceId(currentWid);
+    }
+  }, [currentWid, activeWorkspaceId, setActiveWorkspaceId]);
 
   if (isLoadingWs) {
     return <div className="flex items-center justify-center h-64"><p className="text-sm" style={{ color: "var(--text-muted)" }}>로딩 중...</p></div>;
