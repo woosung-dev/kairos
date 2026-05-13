@@ -182,29 +182,30 @@
 - [x] **pyrightconfig.json** — backend/ + 루트 추가. IDE Pyright venv 경로 설정.
 - 테스트: 신규 7개 추가 (BL-003: 3, BL-004: 4) / 전체 87 passed
 
-### Sprint 14 — 가입 첫 5분 신뢰 회복 + RAG 안정화 (2026-05-13 계획, 미착수)
+### Sprint 14 — 가입 첫 5분 신뢰 회복 + RAG 안정화 (2026-05-14 완료, PR 대기)
 
 > 입력: Multi-Agent QA 통합 보고서 (`docs/dev-log/2026-05-13-multi-agent-qa/integrated-report.html`)
-> 상세: `docs/dev-log/sprint-14-plan.md`
+> 상세: `docs/dev-log/sprint-14-plan.md` · 검증: `docs/dev-log/2026-05-13-multi-agent-qa/sprint-14-verification.md`
+> 브랜치: `sprint-14/trust-stabilize` (origin/main off)
 
-**P0 (Critical) — 4건**
-- [ ] **T-1 BUG-C01** RAG `/rag/ask` 5xx graceful degrade (BE) — Gemini SafetyFilter catch + SSE error event + 입력 검증 (max_length 500, whitespace strip). 3h
-- [ ] **T-2** "오늘 할 일" 사이드바 메뉴 404 즉시 숨김 (FE). 0.5h
-- [ ] **T-3** Clerk Production 키 + koKR localization (FE + 사용자). 2h
-- [ ] **T-4** "RAG" → "AI 검색" 카피 일괄 치환 (FE + 시드). 2h
+**P0 (Critical) — 4건 ✅**
+- [x] **T-1 BUG-C01** RAG `/rag/ask` 5xx graceful degrade (`4eb6f3a`) — Gemini try/except + SSE error event + RagAskRequest max_length=500 + strip→≥2자. 신규 테스트 12개.
+- [x] **T-2** "오늘 할 일" 사이드바 메뉴 404 숨김 (`c22684d`).
+- [x] **T-3** Clerk koKR localization + /dashboard force redirect (`9ea1a78`). Production 키 발급은 사용자 Blocked.
+- [x] **T-4** "RAG" → "AI 검색" 사용자 노출 카피 11곳 + 시드 2곳 치환 (`26ab7d5`) + `features/rag/CONTEXT.md` 카피 정책 lock-in.
 
-**P1 (High) — 7건**
-- [ ] **T-5 BUG-H03** 헌법 I-16 위반 일괄 audit + alias + populate_by_name (BE 전 schemas.py). 4h
-- [ ] **T-6 BUG-H02** visibility 모달 race condition fix — useWorkspaceRole isLoading (FE). 3h
-- [ ] **T-7 BUG-H01** dashboard stale workspace + setState-in-render (FE). 2h
-- [ ] **T-8 BUG-H04** meeting detail `projects: []` 동기화 (BE). 2h
-- [ ] **T-9** 사이드바 vs 페이지 카운트 동기화 (FE — Inbox 3 vs 12 모순). 2h
-- [ ] **T-10** 모바일 햄버거 토글 무동작 → 모바일에서 숨김 (FE). 1h
-- [ ] **T-11** 모바일 BottomNav "빠른 메모" 진입점 추가 (FE). 3h
+**P1 (High) — 7건 ✅**
+- [x] **T-5 BUG-H03** UpdateWorkspaceSettingsRequest 헌법 I-16 위반 fix + AST introspection 회귀 차단 (`3699b9d`). 11 Request audit 결과 1건 위반 → 0건.
+- [x] **T-6 BUG-H02** visibility 모달 race condition fix (`0bf01e6`) — useWorkspaceRole isLoading + onClick closure 회피.
+- [x] **T-7 BUG-H01** dashboard stale ws + setState-in-render fix (`1d246eb`) — useEffect 분리 + Header useWorkspaces 가드 + 로그아웃 queryClient.clear.
+- [x] **T-8 BUG-H04** meeting detail projects 동기화 (`8532ab5`) — ProjectRepository.find_projects_by_meeting 호출. 신규 테스트 3개.
+- [x] **T-9** Inbox 카운트 사이드바↔페이지 동기화 (`79872a2`) — 정책 lock-in: 사이드바 = 미처리 항목 수.
+- [x] **T-10** 모바일 햄버거 토글 숨김 (`1a6d3b3` 묶음).
+- [x] **T-11** 모바일 BottomNav "메모" 진입점 (`1a6d3b3` 묶음) — 검색 자리 swap.
 
-**검증 + dogfooding** — 3 페르소나 산출물의 P0/P1 결함 재검증 Playwright. 3h
+**검증 + dogfooding** — `sprint-14-verification.md` 산출. Backend 110 PASS / FE typecheck PASS / 신규 테스트 18개 모두 PASS / 회귀 0건.
 
-**총 ~28시간 (3-4일 집중) | AD-36~39 자의 결정**
+**메트릭**: Composite Health 6.8 → ~8.0/10 (추정) · Curious Maybe → Yes (조건부) · Casual 용어 해독률 37.5% → ~50%+ · 자의 결정 AD-36~39.
 
 ### Sprint 14 — Out of Scope (Sprint 15+ 보류)
 - 신규 가입자 onboarding tour (빈 워크스페이스 첫 5분 가치 도달 경로 — 별도 디자인 필요)
