@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-05-12
+> 마지막 업데이트: 2026-05-13
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조
 
@@ -43,6 +43,14 @@
   - [x] Inbox 신뢰도 임계값 설정 UI (프리셋 70/80/90/95%)
   - [x] 내보내기 포맷 MD/JSON (회의/노트)
   - [ ] 내보내기 포맷 PDF (향후 구현)
+
+## Recently Completed — Multi-Agent QA (3 페르소나 통합 검증, 2026-05-13)
+
+- [x] **Sentinel (시니어 QA, 27분)** — 적대적 검증. Critical 1 / High 4 / Medium 6 / Low 2 = 13 결함. Health 6.8/10. Sprint 4-13 핵심 회귀 모두 PASS (CORS / RBAC / 멀티테넌시 / 오디오 / RAG 배치화). 산출: `docs/dev-log/2026-05-13-multi-agent-qa/qa-report.md`.
+- [x] **Curious (32세 PM, 35분)** — 잠재 고객 도입 결정 시뮬레이션. 5/30/1분 룰 PASS, TTFV 측정 불가 (Blocker), **도입 결정 Maybe** (Dev 배지 + 404 + 카운트 불일치 + 가격 부재). 산출: `docs/dev-log/2026-05-13-multi-agent-qa/interested-user-report.md`.
+- [x] **Casual (28세 직장인, 32분)** — 데스크톱 + 모바일 (375x667) UX. 막힘 12건, 용어 해독률 37.5%, 모바일 UX 5/10. Top 1 권고: "RAG" → "AI 검색" 카피 일괄 치환. 산출: `docs/dev-log/2026-05-13-multi-agent-qa/general-user-report.md`.
+- [x] **통합 HTML 보고서** — 3 페르소나 매트릭스 + Critical/High 결함 + 우선순위 매트릭스. `docs/dev-log/2026-05-13-multi-agent-qa/integrated-report.html`.
+- [x] **Sprint 14 계획 작성** — `docs/dev-log/sprint-14-plan.md` (T-1~T-11, ~28시간). AD-36~39 자의 결정 라벨.
 
 ## Recently Completed — E2E password 전환 + 마이크 녹음 TODO 정리 (2026-05-13)
 
@@ -165,6 +173,36 @@
 - [x] **BL-004 구현** — `MeetingSummaryResult` / `MeetingActionsResult` Pydantic 모델 추가 + `ai_processing.py` 경계 검증. 테스트 4개 추가.
 - [x] **pyrightconfig.json** — backend/ + 루트 추가. IDE Pyright venv 경로 설정.
 - 테스트: 신규 7개 추가 (BL-003: 3, BL-004: 4) / 전체 87 passed
+
+### Sprint 14 — 가입 첫 5분 신뢰 회복 + RAG 안정화 (2026-05-13 계획, 미착수)
+
+> 입력: Multi-Agent QA 통합 보고서 (`docs/dev-log/2026-05-13-multi-agent-qa/integrated-report.html`)
+> 상세: `docs/dev-log/sprint-14-plan.md`
+
+**P0 (Critical) — 4건**
+- [ ] **T-1 BUG-C01** RAG `/rag/ask` 5xx graceful degrade (BE) — Gemini SafetyFilter catch + SSE error event + 입력 검증 (max_length 500, whitespace strip). 3h
+- [ ] **T-2** "오늘 할 일" 사이드바 메뉴 404 즉시 숨김 (FE). 0.5h
+- [ ] **T-3** Clerk Production 키 + koKR localization (FE + 사용자). 2h
+- [ ] **T-4** "RAG" → "AI 검색" 카피 일괄 치환 (FE + 시드). 2h
+
+**P1 (High) — 7건**
+- [ ] **T-5 BUG-H03** 헌법 I-16 위반 일괄 audit + alias + populate_by_name (BE 전 schemas.py). 4h
+- [ ] **T-6 BUG-H02** visibility 모달 race condition fix — useWorkspaceRole isLoading (FE). 3h
+- [ ] **T-7 BUG-H01** dashboard stale workspace + setState-in-render (FE). 2h
+- [ ] **T-8 BUG-H04** meeting detail `projects: []` 동기화 (BE). 2h
+- [ ] **T-9** 사이드바 vs 페이지 카운트 동기화 (FE — Inbox 3 vs 12 모순). 2h
+- [ ] **T-10** 모바일 햄버거 토글 무동작 → 모바일에서 숨김 (FE). 1h
+- [ ] **T-11** 모바일 BottomNav "빠른 메모" 진입점 추가 (FE). 3h
+
+**검증 + dogfooding** — 3 페르소나 산출물의 P0/P1 결함 재검증 Playwright. 3h
+
+**총 ~28시간 (3-4일 집중) | AD-36~39 자의 결정**
+
+### Sprint 14 — Out of Scope (Sprint 15+ 보류)
+- 신규 가입자 onboarding tour (빈 워크스페이스 첫 5분 가치 도달 경로 — 별도 디자인 필요)
+- BUG-M01~M06 + L01~L02 (Sentinel polish)
+- 마케팅 트랙 (가격 / 고객 로고 / 비교표 / 보안 페이지) — dev 단독 처리 불가
+- AD-35 multi-user E2E (Clerk testing mode 도입 후)
 
 ### 진행 중 (ADR-008 DevEx 후속)
 
