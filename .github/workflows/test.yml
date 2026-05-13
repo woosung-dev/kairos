@@ -121,6 +121,7 @@ jobs:
           E2E_PORT: "3003"
           E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
           E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+          E2E_API_URL: ${{ secrets.E2E_API_URL }}
 
       - name: Upload traces on failure
         if: failure()
