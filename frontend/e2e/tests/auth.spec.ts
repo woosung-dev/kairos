@@ -22,11 +22,9 @@ test.describe("인증 플로우", () => {
 
   test("로그인 페이지에 이메일 입력 필드가 렌더링된다", async ({ page }) => {
     await page.goto("/sign-in");
-    // Clerk 컴포넌트 hydration 대기 (CI 환경에서 30s까지 소요될 수 있음)
-    await expect(
-      page
-        .locator('input[type="email"], input[name*="email"], input[id*="email"]')
-        .first()
-    ).toBeVisible({ timeout: 30_000 });
+    // getByLabel은 Clerk 입력 필드의 type/name/id 변경에 영향받지 않아 안정적.
+    await expect(page.getByLabel(/email/i).first()).toBeVisible({
+      timeout: 30_000,
+    });
   });
 });

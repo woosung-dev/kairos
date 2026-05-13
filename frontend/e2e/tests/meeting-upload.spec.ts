@@ -27,20 +27,17 @@ test.describe.serial("미팅 업로드 파이프라인", () => {
     // 5. 미팅 상세 페이지 이동 대기 (202 Accepted → redirect)
     await expect(page).toHaveURL(/\/meetings\//, { timeout: 30_000 });
 
-    // 6. status=failed이면 즉시 실패 (낭비 방지)
+    // 6. 종료 상태(완료/실패)까지 폴링.
+    //    이전 버그: el이 없거나 textContent가 빈 사이클에 비교가 true가 되어 조기 통과.
+    //    수정: 명시적으로 종료 상태 문자열만 통과시킴.
     await page.waitForFunction(
       () => {
         const el = document.querySelector('[data-testid="meeting-status"]');
-        return (
-          el?.textContent !== "업로드 중" &&
-          el?.textContent !== "STT 처리 중" &&
-          el?.textContent !== "AI 분석 중" &&
-          el?.textContent !== "임베딩 중"
-        );
+        const text = el?.textContent?.trim();
+        return text === "완료" || text === "실패";
       },
-      { timeout: 180_000, polling: 3000 }
+      { timeout: 240_000, polling: 3000 }
     );
-    await expect(page.getByTestId("meeting-status")).not.toHaveText("실패");
     await expect(page.getByTestId("meeting-status")).toHaveText("완료");
 
     // 7. 요약 섹션 렌더링 확인

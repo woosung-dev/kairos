@@ -42,6 +42,11 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         storageState: "e2e/.auth/user.json",
+        // E2E는 localhost FE → 프로덕션 BE 호출로 CORS preflight가 차단됨.
+        // 프로덕션 backend의 CORS 정책을 건드리지 않기 위해 테스트 환경에서만 web security 비활성화.
+        launchOptions: {
+          args: ["--disable-web-security"],
+        },
       },
       dependencies: ["setup"],
     },
