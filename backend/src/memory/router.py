@@ -20,8 +20,7 @@ from fastapi import (
     UploadFile,
 )
 
-from src.auth.dependencies import get_current_user
-from src.auth.models import User
+from src.auth.rbac import require_member, require_viewer
 from src.memory.dependencies import get_memory_service
 from src.memory.exceptions import EmptyMemoryError
 from src.memory.schemas import (
@@ -33,6 +32,7 @@ from src.memory.schemas import (
     MemoryRecallOut,
 )
 from src.memory.service import MemoryService
+from src.workspaces.models import WorkspaceMember
 
 router = APIRouter(
     prefix="/api/v1/workspaces/{workspace_id}/memory",
@@ -46,13 +46,13 @@ async def capture_memory(
     background_tasks: BackgroundTasks,
     text: str | None = Form(default=None),
     audio: UploadFile | None = File(default=None),
-    user: User = Depends(get_current_user),
+    member: WorkspaceMember = Depends(require_member),
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryCreateOut:
     """메모 capture — text 또는 audio multipart, 즉시 202 + processing."""
     if text and text.strip():
         return await service.capture_text(
-            user_id=user.id,
+            user_id=member.user_id,
             workspace_id=workspace_id,
             text=text.strip(),
             background_tasks=background_tasks,
@@ -60,7 +60,7 @@ async def capture_memory(
     if audio is not None:
         content = await audio.read()
         return await service.capture_voice(
-            user_id=user.id,
+            user_id=member.user_id,
             workspace_id=workspace_id,
             audio_bytes=content,
             filename=audio.filename or "voice.audio",
@@ -74,12 +74,12 @@ async def capture_memory(
 async def recall_memory(
     workspace_id: uuid.UUID,
     q: str = Query(..., min_length=2, max_length=200),
-    user: User = Depends(get_current_user),
+    member: WorkspaceMember = Depends(require_viewer),
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryRecallOut:
     """Recall — vector search + keyword fallback (Top 3, O-A lock-in)."""
     return await service.recall(
-        workspace_id=workspace_id, user_id=user.id, query=q, top_k=3
+        workspace_id=workspace_id, user_id=member.user_id, query=q, top_k=3
     )
 
 
@@ -87,7 +87,7 @@ async def recall_memory(
 @router.get("/metrics", response_model=MemoryMetricsOut)
 async def get_memory_metrics(
     workspace_id: uuid.UUID,
-    user: User = Depends(get_current_user),
+    member: WorkspaceMember = Depends(require_viewer),
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryMetricsOut:
     """R7 metrics — memory_events 기반 capture/recall/promote count + recall p50/p95."""
@@ -98,7 +98,7 @@ async def get_memory_metrics(
 async def get_memory(
     workspace_id: uuid.UUID,
     memory_id: uuid.UUID,
-    user: User = Depends(get_current_user),
+    member: WorkspaceMember = Depends(require_viewer),
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryDetailOut:
     """단일 메모 조회 — distilled_json / embedding_chunk_id / status 확인."""
@@ -113,7 +113,7 @@ async def promote_memory(
     memory_id: uuid.UUID,
     body: MemoryPromoteIn,
     background_tasks: BackgroundTasks,
-    user: User = Depends(get_current_user),
+    member: WorkspaceMember = Depends(require_member),
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryPromoteOut:
     """R6: memory → team workspace 복제 + audit row + 백그라운드 embedding."""
@@ -121,6 +121,6 @@ async def promote_memory(
         memory_id=memory_id,
         source_workspace_id=workspace_id,
         target_workspace_id=body.target_workspace_id,
-        promoted_by_user_id=user.id,
+        promoted_by_user_id=member.user_id,
         background_tasks=background_tasks,
     )
