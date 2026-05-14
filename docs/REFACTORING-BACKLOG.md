@@ -388,3 +388,101 @@ ADR 신설 (ADR-020 후보) — Sprint 18+ wedge 검증 후 결정.
 **Sprint 묶음 권고:** Sprint 18+ (Recall demand 검증 N 충분 후)
 
 **근거:** Sprint 15 Stage 5-1 audit (2026-05-14)
+
+---
+
+## BL-011 — memory 모듈 test coverage 일괄 보강 (Stage 5-5 Testing specialist 9 critical)
+
+**현 상태:**
+Sprint 15 stage 5-5 testing specialist 9 CRITICAL + 4 INFORMATIONAL 미커버 경로 식별. 기존 6 test file (test_api/service/recall/promote/metrics/admin_cleanup)는 happy path 위주 — BG task 실행 / cross-ws isolation / status transition / RBAC 회귀 / lazy seed 회귀 미보호.
+
+**목표 인터페이스:**
+신규 또는 확장 test file 9개:
+1. `test_promote.py` — target=personal/존재X/non-member 3 negative path
+2. `test_api.py` — voice capture + oversized (413) + empty bytes (422)
+3. `test_service.py` — _bg_distill_and_embed / _bg_transcribe_distill_embed / _bg_promote_embed 직접 await + status transition 검증 (성공+실패 분기)
+4. `test_recall.py` — vector hit path (_call_embedding monkeypatch return fake 1536d) + cache hit + concurrent insert (ON CONFLICT 검증)
+5. `test_promote.py` — cross-workspace memory_id isolation (404 보장)
+6. `tests/auth/test_personal_workspace_seed.py` 신설 — lazy seed idempotent + 동시 호출
+7. `test_memory_router_rbac.py` 신설 — viewer/member 차이 + 비-멤버 403
+8. `test_admin_cleanup.py` — R2 delete monkeypatch + expired item 실제 row 갱신
+9. `test_service.py` — PromotionAudit.embedding_status='failed' 분기 + Memory.status='embedding_failed'
+
+추가 informational (P1):
+- `test_dogfood_smoke_import.py` — scripts/dogfood_smoke.py import smoke
+- `test_metrics.py` — percentile edge (NULL latency / 1건 / 다수)
+- `test_api.py` — status state machine (5 status seed + GET)
+- `test_service.py` — _normalize_audio ffmpeg 부재 fallback
+
+**예상 LOC delta:** +700 (테스트 전체)
+
+**Risk:** 🟢 낮음 — 테스트 추가만, 코드 변경 X
+
+**Test harness:** 기존 conftest fixtures 재사용 (memory_client, seed_memory). RBAC fixture는 신규 (viewer / member / non-member user).
+
+**우선순위:** ★★★★☆ (회귀 방지)
+
+**Sprint 묶음 권고:** Sprint 16 첫 주 (Phase B Gemini swap과 묶음, BG task 변경 시 회귀 안전망 필수)
+
+**근거:** Stage 5-5 testing specialist 2026-05-14
+
+---
+
+## BL-012 — memory 모듈 hygiene cleanup (Stage 5-5 Maintainability 18건)
+
+**현 상태:**
+Stage 5-5 maintainability specialist 18 INFORMATIONAL. dead code / magic constants / long methods / function-scope imports / DI bypass / silent failure. 각각 단독으로는 minor지만 누적 시 service.py 844 lines가 더 두꺼워짐.
+
+**목표 인터페이스:**
+1. Dead code: `WorkspaceMembershipError` 제거 (memory/exceptions.py:27 — 사용 X)
+2. Dead field: `PromotionAudit.promoted_note_id` 제거 또는 사용 lock-in
+3. Duplicate imports 정리 (service.py:202 timedelta, R2Service)
+4. DI bypass: cleanup_expired_r2_audio가 `R2Service()` 재생성 -> `self.r2_service` 사용
+5. Silent failure: R2 delete except에 `logger.warning` 추가
+6. Magic constants: GEMINI_MODEL/WHISPER_MODEL/EMBEDDING_MODEL을 core/config.py로 이관 (ADR-019 Phase B와 묶기 적절)
+7. ttl_days=7 / 30 / 365 named constants
+8. Long methods: recall (90 lines) + promote (99 lines) helper 분리
+9. Function-scope imports (service.py:406 select/Workspace/WorkspaceMember) module-level 이관
+10. stale comment 정리 (service.py:598)
+
+**예상 LOC delta:** -150 (cleanup) / +50 (helpers)
+
+**Risk:** 🟢 낮음 — interface 변경 없음
+
+**Test harness:** 기존 테스트 그대로 통과 + BL-011 보강된 회귀 안전망 활용
+
+**우선순위:** ★★★☆☆ (P2 hygiene)
+
+**Sprint 묶음 권고:** Sprint 17 (BL-005~010 본 묶음과 함께 — service.py 전체 리팩토링 1 PR)
+
+**근거:** Stage 5-5 maintainability specialist 2026-05-14
+
+---
+
+## BL-013 — alembic migration FK ondelete + 2-phase deploy + downgrade safety
+
+**현 상태:**
+Stage 5-5 data-migration specialist 6 CRITICAL. Sprint 15 migration `a1b2c3d4e5f6_sprint15_memory_workspace_type.py`가:
+1. 모든 FK에 `ondelete` 명시 X (default RESTRICT) — workspace 삭제 시 memory_items가 차단
+2. Schema + backfill 단일 migration — 2단계 배포 위반 (.ai/stacks/fastapi/backend.md §9)
+3. CREATE INDEX without CONCURRENTLY — prod scale에서 workspaces 테이블 ACCESS EXCLUSIVE lock
+4. Downgrade가 데이터 손실 (DROP TABLE) — 사용자 확인 가드 부재
+5. `workspaces.type` server_default='team'이 기존 solo workspace를 잘못 misclassify (founder 시나리오에서는 무영향이나 multi-tenant 시 surprise)
+
+**목표 인터페이스:**
+신규 migration 2~3개로 분리:
+- `aXXX_alter_memory_fk_ondelete.py` — memory_items/ai_calls/events workspace FK -> CASCADE / promotion_audit -> RESTRICT
+- `aYYY_split_workspace_type_backfill.py` — DDL과 DML 분리 (이미 적용된 상태이므로 2단계 deploy는 사후 documentation)
+- downgrade에 `ALLOW_DESTRUCTIVE_DOWNGRADE` env 가드
+
+**예상 LOC delta:** +120 (신규 migration 2~3개)
+
+**Risk:** 🟡 중간 — prod DB 마이그레이션 추가 실행 필요
+
+**Test harness:** test_alembic_memory.py 확장 — FK behavior 시뮬레이션 (workspace 삭제 -> memory_items CASCADE 검증)
+
+**우선순위:** ★★★☆☆ (prod 배포 안정성)
+
+**Sprint 묶음 권고:** Sprint 17 (multi-tenant 시점 이전 필수, 또는 첫 외부 user team 시점)
+
+**근거:** Stage 5-5 data-migration specialist 2026-05-14
