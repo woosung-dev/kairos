@@ -25,6 +25,7 @@ import src.actions.models  # noqa: F401 — action_items
 import src.notes.models  # noqa: F401 — notes
 import src.inbox.models  # noqa: F401 — inbox_items
 import src.embeddings.models  # noqa: F401 — embedding_chunks, semantic_caches
+import src.memory.models  # noqa: F401 — memory_items, memory_ai_calls, memory_events, promotion_audit, memory_query_embedding_cache
 
 
 @pytest.fixture(scope="module")
@@ -85,3 +86,90 @@ async def memory_client(integration_session, auth_user):
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def personal_ws(integration_session, auth_user):
+    """Personal workspace fixture — type='personal' + WorkspaceMember(owner)."""
+    from src.workspaces.models import Workspace, WorkspaceMember
+
+    ws = Workspace(
+        name=f"{auth_user.display_name}의 개인 Kairos",
+        owner_id=auth_user.id,
+        type="personal",
+    )
+    integration_session.add(ws)
+    await integration_session.flush()
+    member = WorkspaceMember(
+        workspace_id=ws.id, user_id=auth_user.id, role="owner"
+    )
+    integration_session.add(member)
+    await integration_session.flush()
+    return ws
+
+
+@pytest_asyncio.fixture
+async def team_ws(integration_session, auth_user):
+    """Team workspace fixture — type='team' + WorkspaceMember(owner)."""
+    from src.workspaces.models import Workspace, WorkspaceMember
+
+    ws = Workspace(
+        name="테스트 팀",
+        owner_id=auth_user.id,
+        type="team",
+    )
+    integration_session.add(ws)
+    await integration_session.flush()
+    member = WorkspaceMember(
+        workspace_id=ws.id, user_id=auth_user.id, role="owner"
+    )
+    integration_session.add(member)
+    await integration_session.flush()
+    return ws
+
+
+@pytest_asyncio.fixture
+async def seed_memory(integration_session, auth_user, personal_ws):
+    """Recall 테스트용 단일 MemoryItem seed."""
+    from src.memory.models import MemoryItem
+
+    item = MemoryItem(
+        user_id=auth_user.id,
+        workspace_id=personal_ws.id,
+        type="text",
+        raw_content="Sprint 15 wedge 결정 Recall-first",
+        distilled_json={
+            "title": "Sprint 15 wedge",
+            "atomic_notes": ["Recall-first wedge 채택"],
+            "suggested_visibility": "personal",
+        },
+        status="active",
+    )
+    integration_session.add(item)
+    await integration_session.flush()
+    return item
+
+
+@pytest_asyncio.fixture
+async def seed_memories(integration_session, auth_user, personal_ws):
+    """Recall ranking 테스트용 5개 MemoryItem seed."""
+    from src.memory.models import MemoryItem
+
+    items = []
+    for i in range(5):
+        m = MemoryItem(
+            user_id=auth_user.id,
+            workspace_id=personal_ws.id,
+            type="text",
+            raw_content=f"테스트 메모 {i}",
+            distilled_json={
+                "title": f"테스트 메모 {i}",
+                "atomic_notes": [f"atomic notes content {i}"],
+                "suggested_visibility": "personal",
+            },
+            status="active",
+        )
+        integration_session.add(m)
+        items.append(m)
+    await integration_session.flush()
+    return items
