@@ -35,8 +35,11 @@ setup("authenticate", async ({ page }) => {
   }
 
   // ── Clerk 로그인 ──
+  // BL-021 fix: Clerk koKR localization (Sprint 14 9ea1a78) 후 label "이메일 주소"로 변경.
+  // 영문 정규식 `/email/i` 매치 실패 → 60s timeout regression.
+  // Clerk SDK standard input `name="identifier"` 사용 — locale 변화 무관.
   await page.goto("/sign-in");
-  await page.getByLabel(/email/i).fill(email);
+  await page.locator('input[name="identifier"]').fill(email);
   await page.getByRole("button", { name: /continue|계속/i }).click();
   await page.locator('input[type="password"]').fill(password);
   await page.getByRole("button", { name: /continue|sign in|로그인|계속/i }).click();
