@@ -111,6 +111,10 @@ class WorkspaceService:
         workspace = await self.repo.find_by_id(workspace_id)
         if workspace is None:
             raise WorkspaceNotFoundError()
+        # I-19: personal workspace는 1인 격리
+        if getattr(workspace, "type", "team") == "personal":
+            from src.workspaces.exceptions import PersonalWorkspaceProtected
+            raise PersonalWorkspaceProtected("멤버 추가")
 
         # 이메일로 사용자 조회
         user = await self.user_repo.find_by_email(email)
