@@ -90,6 +90,23 @@ class MemoryRepository:
             .values(raw_content=raw_content)
         )
 
+    async def list_expired_audio(self, cutoff: datetime) -> list[MemoryItem]:
+        """Sprint 15 R-CRON — 생성 후 cutoff 이전 + r2_audio_key 보유한 MemoryItem 목록."""
+        stmt = select(MemoryItem).where(
+            MemoryItem.r2_audio_key.is_not(None),
+            MemoryItem.created_at < cutoff,
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def clear_r2_audio_key(self, memory_id: uuid.UUID) -> None:
+        """r2_audio_key NULL 처리 — R2 객체 삭제 후 호출."""
+        await self.session.execute(
+            update(MemoryItem)
+            .where(MemoryItem.id == memory_id)
+            .values(r2_audio_key=None)
+        )
+
     async def save_ai_call(self, call: MemoryAICall) -> None:
         self.session.add(call)
 

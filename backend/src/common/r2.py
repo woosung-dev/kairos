@@ -67,6 +67,20 @@ class R2Service:
             )
         return file_key
 
+    async def delete_object(self, file_key: str) -> None:
+        """R2 객체 삭제 — Sprint 15 R-CRON 30일 TTL cleanup용."""
+        settings = get_settings()
+        async with self._session.client(
+            "s3",
+            endpoint_url=self._get_endpoint_url(),
+            aws_access_key_id=settings.r2_access_key_id.get_secret_value(),
+            aws_secret_access_key=settings.r2_secret_access_key.get_secret_value(),
+            region_name="auto",
+        ) as client:
+            await client.delete_object(
+                Bucket=settings.r2_bucket_name, Key=file_key,
+            )
+
     async def get_download_url(self, file_key: str) -> str:
         """다운로드용 presigned URL 발급 (파이프라인 내부용)."""
         settings = get_settings()

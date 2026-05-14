@@ -20,6 +20,7 @@ import subprocess
 import tempfile
 import time
 import uuid
+from datetime import datetime
 
 from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -175,6 +176,31 @@ class MemoryService:
             distilled_json=None,
             created_at=item.created_at,
         )
+
+    async def cleanup_expired_r2_audio(self, days: int = 30) -> int:
+        """Sprint 15 R-CRON — 30일 TTL R2 audio cleanup. O-E lock-in.
+
+        매일 GCP Cloud Scheduler에서 호출. 삭제 카운트 반환.
+        """
+        from datetime import timedelta
+        from src.common.r2 import R2Service
+
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        expired = await self.repo.list_expired_audio(cutoff)
+        r2 = R2Service()
+        deleted = 0
+        for item in expired:
+            if not item.r2_audio_key:
+                continue
+            try:
+                await r2.delete_object(item.r2_audio_key)
+            except Exception:
+                continue
+            await self.repo.clear_r2_audio_key(item.id)
+            deleted += 1
+        if deleted:
+            await self.repo.commit()
+        return deleted
 
     async def get_memory(
         self, memory_id: uuid.UUID, workspace_id: uuid.UUID
