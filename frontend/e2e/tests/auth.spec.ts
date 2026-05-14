@@ -22,8 +22,9 @@ test.describe("인증 플로우", () => {
 
   test("로그인 페이지에 이메일 입력 필드가 렌더링된다", async ({ page }) => {
     await page.goto("/sign-in");
-    // getByLabel은 Clerk 입력 필드의 type/name/id 변경에 영향받지 않아 안정적.
-    await expect(page.getByLabel(/email/i).first()).toBeVisible({
+    // BL-021: Clerk koKR localization 후 label "이메일 주소"로 변경됨.
+    // Clerk SDK standard input `name="identifier"` 사용 — locale 변화 무관.
+    await expect(page.locator('input[name="identifier"]')).toBeVisible({
       timeout: 30_000,
     });
   });
