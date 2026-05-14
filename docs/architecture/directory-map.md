@@ -49,6 +49,11 @@ frontend/
     │   │   └── types.ts
     │   ├── editor/
     │   │   └── components/            # TiptapEditor
+    │   ├── memory/                    # Sprint 15 Recall-first wedge
+    │   │   ├── components/            # CaptureSheet, PromoteModal, RecallResultCard
+    │   │   ├── api.ts                 # capture/recall/promote/metrics/detail
+    │   │   ├── hooks.ts               # useCapture, useRecall, usePromote, usePollMemory
+    │   │   └── types.ts
     │   └── rag/
     │       ├── components/
     │       ├── api.ts
@@ -76,8 +81,9 @@ backend/
     ├── actions/                       # 액션 아이템
     ├── notes/                         # Tiptap 노트 + pipeline_service (Sprint 6 ADR-014)
     ├── rag/                           # RAG 검색 + Gemini 답변 + pipeline_service (Sprint 6 ADR-014)
-    ├── workspaces/                    # Workspace + Member + Invite (default_project_visibility, Sprint 6)
-    ├── embeddings/                    # EmbeddingChunk + SemanticCache (cross-domain shared service)
+    ├── workspaces/                    # Workspace (type=personal/team, Sprint 15) + Member + Invite (default_project_visibility, Sprint 6)
+    ├── memory/                        # Sprint 15 Recall-first wedge — MemoryItem capture/distill/recall/promote + admin_router (Cron R2 cleanup)
+    ├── embeddings/                    # EmbeddingChunk + SemanticCache (cross-domain shared service) — source_type 'memory' 추가 (Sprint 15)
     ├── upload/                        # R2 presigned URL
     ├── services/                      # 외부 wrapper (transcription, ai_processing) — cross-domain shared service
     ├── common/
@@ -94,3 +100,5 @@ backend/
 `router.py` / `service.py` / `repository.py` / `schemas.py` / `models.py` / `dependencies.py` / `exceptions.py`
 
 **오케스트레이터 (Sprint 6 ADR-014 옵션 A 적용)**: cross-domain 호출 또는 권한 검증 일원화가 필요한 도메인은 추가로 `pipeline_service.py`를 가짐 — 현재 `meetings`, `notes`, `rag` 3 도메인. 진입은 router → pipeline_service → service 위임.
+
+**memory 도메인 (Sprint 15 신설)**: service.py 자체가 orchestrator 역할 (embeddings.create_chunk + services/transcription + services/ai_processing 직접 호출). 헌법 §4.2 위반 인지 → BL-005/BL-006 등재 (Sprint 17 refactor: `memory/pipeline_service.py` 분리 예정). 추가 backlog BL-007~010 (`docs/REFACTORING-BACKLOG.md` 참조).
