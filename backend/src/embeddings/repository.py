@@ -8,6 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.embeddings.models import EmbeddingChunk, SemanticCache
 
 
+async def _apply_hnsw_session_params(session: AsyncSession) -> None:
+    # Sprint 16 ADR-020 / CONTEXT-MAP I-21: 벡터 검색 트랜잭션 진입 시 SET LOCAL.
+    # pgvector >=0.8 의존. RBAC/visibility 포스트필터 결과 부족 자동 해소.
+    await session.execute(text("SET LOCAL hnsw.ef_search = 40"))
+    await session.execute(text("SET LOCAL hnsw.iterative_scan = 'relaxed_order'"))
+    await session.execute(text("SET LOCAL hnsw.max_scan_tuples = 20000"))
+
+
 class EmbeddingRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -64,7 +72,10 @@ class EmbeddingRepository:
         source_type: str | None = None,
         limit: int = 50,
     ) -> list[dict]:
-        """pgvector 코사인 유사도 검색."""
+        """pgvector 코사인 유사도 검색 (HNSW halfvec, Sprint 16 ADR-020)."""
+        # I-21: 트랜잭션 진입 시 SET LOCAL ef_search/iterative_scan/max_scan_tuples
+        await _apply_hnsw_session_params(self.session)
+
         filters = "workspace_id = :wid AND chunk_level = 2"
         params: dict = {"wid": str(workspace_id), "limit": limit}
 
@@ -78,10 +89,10 @@ class EmbeddingRepository:
         query = text(f"""
             SELECT id, chunk_text, source_id, source_type, metadata_json,
                    parent_chunk_id, created_at,
-                   1 - (embedding <=> CAST(:qvec AS vector)) AS score
+                   1 - (embedding <=> CAST(:qvec AS halfvec)) AS score
             FROM embedding_chunks
             WHERE {filters}
-            ORDER BY embedding <=> CAST(:qvec AS vector)
+            ORDER BY embedding <=> CAST(:qvec AS halfvec)
             LIMIT :limit
         """)
         params["qvec"] = str(query_embedding)
@@ -149,7 +160,10 @@ class EmbeddingRepository:
         project_id: uuid.UUID | None = None,
         threshold: float = 0.93,
     ) -> dict | None:
-        """시맨틱 캐시 검색. similarity >= threshold → HIT."""
+        """시맨틱 캐시 검색. similarity >= threshold → HIT (HNSW halfvec, Sprint 16 ADR-020)."""
+        # I-21: 트랜잭션 진입 시 SET LOCAL ef_search/iterative_scan/max_scan_tuples
+        await _apply_hnsw_session_params(self.session)
+
         filters = "workspace_id = :wid AND expires_at > now()"
         params: dict = {"wid": str(workspace_id), "threshold": threshold}
 
@@ -159,11 +173,11 @@ class EmbeddingRepository:
 
         query = text(f"""
             SELECT id, answer, sources, hit_count,
-                   1 - (question_embedding <=> CAST(:qvec AS vector)) AS similarity
+                   1 - (question_embedding <=> CAST(:qvec AS halfvec)) AS similarity
             FROM semantic_caches
             WHERE {filters}
-              AND 1 - (question_embedding <=> CAST(:qvec AS vector)) >= :threshold
-            ORDER BY question_embedding <=> CAST(:qvec AS vector)
+              AND 1 - (question_embedding <=> CAST(:qvec AS halfvec)) >= :threshold
+            ORDER BY question_embedding <=> CAST(:qvec AS halfvec)
             LIMIT 1
         """)
         params["qvec"] = str(question_embedding)
