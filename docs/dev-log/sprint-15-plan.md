@@ -6,6 +6,8 @@
 
 **Goal:** Sprint 15 Recall-first wedge prototype 구현. `/memory` route + voice/text capture + Gemini distill + vector + keyword-fallback recall + 1-button promote + R7 metrics + R8 PERSONA outreach.
 
+> **FIX iter 1 patch applied (2026-05-14)**: `/docs/dev-log/2026-05-14-sprint15-plan-patch.md` 참조 — codex 적대적 검토 (Q4) 20 finding 중 15 must-fix를 patch doc에 inline. Stage 4 진입 시 본 plan + patch doc 함께 참조. **R1 진입 전 first task = T-1 fixtures + ffmpeg Dockerfile** (patch §2).
+
 **Architecture:** 신규 `backend/src/memory/` 도메인 모듈 (Router/Service/Repository/Schemas/Models). 신규 alembic migration (memory_items + workspaces.type). 신규 `frontend/src/features/memory/` (FSD). 헌법 I-9 patch + I-19 코드 R3/R5 commit과 atomic.
 
 **Tech Stack:** FastAPI + SQLModel + asyncpg + pgvector + Gemini gemini-2.5-flash + OpenAI text-embedding-3-small + Whisper API + aioboto3 R2 + Next.js 16 + React Query + shadcn/ui v4 + Tailwind v4.
