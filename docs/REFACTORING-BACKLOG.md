@@ -486,3 +486,199 @@ Stage 5-5 data-migration specialist 6 CRITICAL. Sprint 15 migration `a1b2c3d4e5f
 **Sprint 묶음 권고:** Sprint 17 (multi-tenant 시점 이전 필수, 또는 첫 외부 user team 시점)
 
 **근거:** Stage 5-5 data-migration specialist 2026-05-14
+
+---
+
+## BL-014 — Workspace switcher UI 누락 (Sprint 15 R5 spec gap)
+
+**현 상태:**
+Stage 5-4 design-review (Playwright MCP) 2026-05-14. Sprint 15 R5에서 Personal workspace lazy seed 구현됨 (Lock vs Users 타입). BUT FE에 사용자가 Personal ↔ Team 사이 전환할 수 있는 switcher UI 부재.
+
+- Topbar: 현재 워크스페이스명 "Kairos" + Users icon + member count "1" — 클릭 불가능한 plain text + badge
+- Avatar dropdown: 유저 메뉴만 (다크 모드 / 설정 / 로그아웃) — workspace 전환 옵션 없음
+- 사이드바: 프로젝트 트리만 — 워크스페이스 선택 없음
+
+영향: Personal workspace seed가 되어도 사용자가 진입 불가. Sprint 15 R5 의도 부분 좌절.
+
+**목표 인터페이스:**
+- 옵션 A: Topbar workspace badge → dropdown switcher (DESIGN.md §Workspace Types "Workspace switcher dropdown options에 type badge inline")
+- 옵션 B: Sidebar 상단 workspace selector 추가
+- 옵션 C: `/workspace/[id]/...` route param 명시 (current = active workspace store만 기반)
+
+**예상 LOC delta:** +80~120 (신규 컴포넌트 + store wiring)
+
+**Risk:** 🟡 중간 — workspace store + RBAC 분기 영향
+
+**Test harness:** E2E (Playwright) — Personal ws 진입 + 전환 + memory isolation 검증
+
+**우선순위:** ★★★★☆ (P1 — Sprint 15 R5 spec 완결)
+
+**Sprint 묶음 권고:** Sprint 16 (Best/Medium 분기 시 Promotion build와 묶기, Min 분기 시 별도 우선순위 평가)
+
+**근거:** Stage 5-4 design-review specialist 2026-05-14 F-41
+
+---
+
+## BL-015 — Workspace type badge (Lock/Users) 일관성 적용
+
+**현 상태:**
+Stage 5-4 design-review. DESIGN.md §Workspace Types lock-in (Sprint 15 patch):
+- Personal: `Lock` icon + text-muted
+- Team: `Users` icon + text-accent + bg-accent-subtle
+
+BUT 실제 렌더 상태:
+1. Topbar: Team workspace 진입 시 `Users` icon ✅ (단일 워크스페이스 case 정상)
+2. Recall result card: type badge 누락 — 대신 "🔍 의미 매칭" semantic label
+3. Memory item card 좌상단 corner: type badge 누락
+4. PromoteModal dropdown option: Users icon ✅ (Team만 후보로 노출, 정상)
+
+원인: BL-014 (switcher 없음) + Personal workspace에 가 본 적이 없어 Lock 분기 미검증.
+
+**목표 인터페이스:**
+- `<WorkspaceTypeBadge type="personal" | "team" />` shared component (`frontend/src/features/workspaces/components/`)
+- 사용 위치: switcher dropdown / topbar / recall card top-right / promote modal option
+
+**예상 LOC delta:** +60 (신규 컴포넌트 + 4 호출처)
+
+**Risk:** 🟢 낮음 — visual only
+
+**Test harness:** Storybook or visual regression (없으면 design-review 재실행으로 검증)
+
+**우선순위:** ★★★☆☆ (P2 polish — BL-014에 종속)
+
+**Sprint 묶음 권고:** BL-014 후속 Sprint 16~17
+
+**근거:** Stage 5-4 design-review specialist 2026-05-14 F-1/F-17/F-40
+
+---
+
+## BL-016 — PromoteModal 동명 workspace 구분 (UX 모호성)
+
+**현 상태:**
+Stage 5-4 design-review. PromoteModal combobox에 동일한 name "E2E 테스트 워크스페이스" 4개 표시 (founder test data 결과). 코드는 `workspace.name` 그대로 렌더 → workspace.id로 distinct 하나 사용자는 4개 동일 옵션 사이 구분 불가.
+
+**목표 인터페이스:**
+- Option label에 secondary info 추가: `{name} · {membersCount}명` 또는 `{name} · {idSuffix-4}` 또는 `{name} · {createdAtRelative}`
+- 또는 동명 그룹화 (헤더 + indent)
+
+**예상 LOC delta:** +20 (PromoteModal option label)
+
+**Risk:** 🟢 낮음
+
+**Test harness:** Storybook fixture 또는 design-review 재실행
+
+**우선순위:** ★★☆☆☆ (P2 — multi-tenant 시점 이전 필수, founder 1인 시점 무영향)
+
+**Sprint 묶음 권고:** Sprint 17 (multi-tenant 진입 시)
+
+**근거:** Stage 5-4 design-review specialist 2026-05-14 F-23
+
+---
+
+## BL-017 — Mobile FAB collision with bottom nav
+
+**현 상태:**
+Stage 5-4 design-review mobile viewport (375x667). /memory FAB (bottom-8 right-8 h-14 w-14)와 mobile bottom navigation bar 충돌. FAB가 nav 위에 떠있어 시각적으로 부딪힘, 또는 nav가 FAB 일부를 가림.
+
+**목표 인터페이스:**
+- Mobile `md:hidden` 분기에서 FAB `bottom-{nav-height + 16px}` 적용
+- 또는 FAB → bottom nav "+ 추가" 통합 (이미 nav에 "+ 추가" 있음)
+- 또는 FAB mobile에서 숨김, bottom nav "+ 추가"가 /new 대신 CaptureSheet 트리거
+
+**예상 LOC delta:** +30 (FAB margin 조건부 또는 nav rewire)
+
+**Risk:** 🟢 낮음
+
+**Test harness:** design-review mobile viewport 재실행
+
+**우선순위:** ★★★☆☆ (P2 — mobile 사용성)
+
+**Sprint 묶음 권고:** Sprint 16/17 mobile polish
+
+**근거:** Stage 5-4 design-review specialist 2026-05-14 F-33
+
+---
+
+## BL-018 — DESIGN.md Sprint 15 patch drift (capture row + tabs + bottom nav 5th)
+
+**현 상태:**
+Stage 5-4 design-review. DESIGN.md §Recall UI Layout이 Sprint 15 plan §3.4 Q1 A3 "B3 search-first FAB" 결정 이전 spec 그대로 유지:
+
+```
+[capture row: Mic button (lg) + Textarea (autosize, multi-line)]
+[search bar: input + Cmd+K hint]
+[tabs: Personal | Team]
+```
+
+실제 = search-first FAB layout (Mic row, search bar, tabs 미존재). Atomic Update §2 매트릭스 누락 retrofit 필요. Bottom nav 5th item DESIGN.md = "[검색]" but 실제 = "메모".
+
+**목표 인터페이스:**
+- DESIGN.md §Recall UI 갱신:
+  - capture row 제거 (FAB로 통합)
+  - tabs 제거 (single feed)
+  - 또는 옵션 = Sprint 16 Best 분기 시 tabs 재도입 명시
+- DESIGN.md Bottom Nav: "[검색]" → "[메모]" + 하단에 "Sprint 15 patch 2026-05-14" 기록
+
+**예상 LOC delta:** +40 (DESIGN.md doc)
+
+**Risk:** 🟢 낮음 (doc only)
+
+**Test harness:** N/A (design-review에서 DESIGN.md 기준점이므로 fix 후 재실행 시 0 finding)
+
+**우선순위:** ★★★☆☆ (P2 — atomic update 회수)
+
+**Sprint 묶음 권고:** Sprint 16 첫 doc commit (Phase B와 묶음)
+
+**근거:** Stage 5-4 design-review specialist 2026-05-14 F-2/F-5/F-34
+
+---
+
+## BL-019 — Recall metrics 신선도 + sparkline
+
+**현 상태:**
+Stage 5-4 design-review /admin/recall-metrics. `30초마다 자동 갱신` description 있으나 last-updated timestamp 미노출. 4 metric tile만, trend (7일) sparkline 없음. p95 4934ms = p50 4934ms (단일 데이터 포인트) — sparse data 표시 없음.
+
+**목표 인터페이스:**
+- header에 last-updated `{relative time}` 표시
+- 각 metric tile에 7일 sparkline (memory_events 테이블에서 일별 aggregation)
+- p95=p50 일치 시 "데이터 부족" badge
+- BE: GET /workspaces/{ws}/memory/metrics?range=7d 옵션
+
+**예상 LOC delta:** +200 (BE aggregation + FE sparkline)
+
+**Risk:** 🟡 중간 (BE 신규 endpoint)
+
+**Test harness:** test_memory_metrics_aggregation.py
+
+**우선순위:** ★★☆☆☆ (P2 polish — founder admin)
+
+**Sprint 묶음 권고:** Sprint 17+ (R7 metrics 정식 build)
+
+**근거:** Stage 5-4 design-review specialist 2026-05-14 F-30/F-31
+
+---
+
+## BL-020 — Recall result card / mobile placeholder polish (3건 묶음)
+
+**현 상태:**
+Stage 5-4 design-review 잡다한 polish 3건:
+1. Mobile (375px) search placeholder "무엇을 다시 찾고 싶으세요? (예: Sprint 15 wedge)" 트런케이션 — viewport edge 잘림
+2. Recall result card 날짜 format "2026. 5. 14." trailing period (Korean convention but uncommon for app UI)
+3. Recall result card 우상단 "🔍 의미 매칭" label 위치 — title과 경쟁
+
+**목표 인터페이스:**
+1. Placeholder 단축: "무엇을 다시 찾고 싶으세요?" (예시 제거 또는 별도 hint)
+2. Date format: relative ("오늘" / "어제" / "3일 전") 또는 ISO ("2026-05-14")
+3. 의미 매칭 label: 우하단 corner로 이동 또는 icon-only tooltip
+
+**예상 LOC delta:** +30
+
+**Risk:** 🟢 낮음
+
+**Test harness:** design-review 재실행
+
+**우선순위:** ★☆☆☆☆ (P3 polish)
+
+**Sprint 묶음 권고:** Sprint 17+ (polish bundle)
+
+**근거:** Stage 5-4 design-review specialist 2026-05-14 F-18/F-21/F-37
