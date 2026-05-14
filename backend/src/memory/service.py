@@ -597,8 +597,13 @@ class MemoryService:
     ) -> str:
         """memory 전용 R2 키로 업로드. R2Service.upload_file_bytes는 uploads/{uuid}/ prefix이므로
         memory/{workspace_id}/ prefix 패턴은 직접 boto3 호출로 처리."""
+        # 보안: filename에 path traversal / control char 차단 + 길이 제한 (R2 key 폭주 방지)
+        import re
+        # 확장자 제거 (서버는 정규화 후 .wav로 저장)
+        base = filename.rsplit(".", 1)[0]
+        safe_base = re.sub(r"[^A-Za-z0-9._-]", "_", base)[:64]
         settings = get_settings()
-        key = f"memory/{workspace_id}/{uuid.uuid4()}-{filename}.wav"
+        key = f"memory/{workspace_id}/{uuid.uuid4()}-{safe_base}.wav"
         async with self.r2_service._session.client(
             "s3",
             endpoint_url=self.r2_service._get_endpoint_url(),
@@ -658,11 +663,26 @@ async def _call_distill(
     except Exception as exc:
         elapsed = int((time.time() - start) * 1000)
         # fallback — 사용자가 검색 가능하도록 최소 정보 유지
-        fallback = {
-            "title": (text[:20] if text else "메모") or "메모",
-            "atomic_notes": [text[:200]] if text else [],
-            "suggested_visibility": "personal",
-        }
+        # 보안: LLM 우회 시 raw user input이 distilled_json에 그대로 들어가지 않도록
+        # Pydantic re-validation 강제 (atomic_notes 길이 / visibility enum 검증).
+        title = (text[:20] if text else "메모") or "메모"
+        atomic_notes = [text[:200]] if text else []
+        try:
+            validated_fallback = MemoryDistilledResult.model_validate(
+                {
+                    "title": title,
+                    "atomic_notes": atomic_notes,
+                    "suggested_visibility": "personal",
+                }
+            )
+            fallback = validated_fallback.model_dump()
+        except Exception:
+            # validation도 실패하면 가장 안전한 minimal shape (XSS/injection 차단)
+            fallback = {
+                "title": "메모",
+                "atomic_notes": [],
+                "suggested_visibility": "personal",
+            }
         return fallback, 0, 0, elapsed, str(exc)
 
 
