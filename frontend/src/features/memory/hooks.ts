@@ -50,6 +50,8 @@ export function useCaptureText(workspaceId: string | undefined) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: memoryKeys.all });
+      // 저장 후 사용자 피드백 — sheet 즉시 닫혀서 confirm 없으면 dead UX.
+      toast.success("메모를 저장했어요. AI 정리 중…");
     },
     onError: (err: Error) => {
       toast.error(err.message || "메모 저장에 실패했습니다");
@@ -72,6 +74,7 @@ export function useCaptureVoice(workspaceId: string | undefined) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: memoryKeys.all });
+      toast.success("음성을 업로드했어요. STT + AI 정리 중…");
     },
     onError: (err: Error) => {
       toast.error(err.message || "음성 메모 저장에 실패했습니다");
