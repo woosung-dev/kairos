@@ -270,6 +270,24 @@ T+30일  팀 RAG Q&A에서 신규 합류자 질문 "왜 freemium 채택?"
 
 **Tech Stack:** Next.js 16 + FastAPI + PostgreSQL + Cloudflare R2 + Gemini API + Whisper
 
+### 4.1 RAG 성능 KPI (Sprint 16 ADR-020 신설)
+
+> 당근(Karrot) DB 밋업 pgvector 최적화 노하우 적용 — `docs/dev-log/020-pgvector-hnsw-halfvec.md`. Layer 3 (Hybrid Search) 기준 측정.
+
+| KPI | Baseline (ivfflat) | 목표 (HNSW + halfvec) | 합격선 |
+|---|---|---|---|
+| recall@10 | 측정 기준값 (Stage 5 fixture) | ≥ baseline × 0.95 | < 0.95 시 ADR-020 rollback |
+| p50 latency | Stage 5 측정 | ≤ baseline × 1.0 | regression 금지 |
+| p95 latency | Stage 5 측정 | ≤ baseline × 1.2 | 20% 이상 회귀 금지 |
+| 벡터 저장공간 | 6KB/row (fp32 × 1536d) | 3KB/row (fp16 × 1536d) | 50% 절감 |
+| 인덱스 빌드 시간 | ivfflat baseline | 측정 후 ADR-020 §"비용/리스크" 갱신 | 운영 한계 사전 인지 |
+| RBAC/visibility 포스트필터 결과 부족 빈도 | iterative_scan 미지원 → 발생 가능 | iterative_scan(relaxed_order) → 자동 해소 | "결과 0건" 시그널 감소 |
+
+**측정 fixture**: `backend/tests/embeddings/fixtures/recall_corpus.json` (1000 chunk + 50 query, Sprint 16 Stage 3 신설).
+**측정 도구**: `backend/scripts/bench_vector_search.py` (Sprint 16 Stage 4 신설).
+**검증 시점**: Sprint 16 Stage 5 (alembic upgrade 후 baseline vs after 비교).
+**모니터링 후속**: Sprint 15 R7 metrics infra(`MemoryEvent.recall_latency_ms`)와 통합 검토.
+
 ---
 
 ## 5. Phase 로드맵

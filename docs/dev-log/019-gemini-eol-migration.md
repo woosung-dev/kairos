@@ -3,7 +3,7 @@
 > **날짜:** 2026-05-14 (draft) → Sprint 16 진입 시 lock-in 예정 (2026-05-28)
 > **상태:** Phase A validated (2026-05-14 spike 통과) → Phase B 코드 swap pending (Sprint 16 첫 commit, 2026-05-28)
 > **작성자:** Claude Opus 4.7 (1M context) + 사용자
-> **관련:** PRD v3.0 §AI Pipeline · ADR-014 Service Boundary · `docs/architecture/ai-pipeline.md` · `docs/dev-log/sprint-15-cost-spike.md` · TODO P0 `S17-T-GEMINI-EOL`
+> **관련:** PRD v3.0 §AI Pipeline · ADR-014 Service Boundary · ADR-020 pgvector HNSW/halfvec (Sprint 16 별도 commit — 코드 swap 충돌 회피) · `docs/architecture/ai-pipeline.md` · `docs/dev-log/sprint-15-cost-spike.md` · TODO P0 `S17-T-GEMINI-EOL`
 > **워크플로우:** Sprint 15 R8 14일 stagger 진행 중 AI 단독 prep 작업 — Sprint 16 첫 commit으로 코드 swap 예정
 
 ---
