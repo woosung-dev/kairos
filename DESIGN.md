@@ -125,3 +125,95 @@
 | 2026-04-04 | Project Category → Status Colors 전환 | PARA 제거(ADR-004). Area/Resource 색상 → Active/Completed/Archived. |
 | 2026-04-01 | 청록 액센트 #3ECFB4 채택 | "결정적 순간의 포착" 컨셉. 다크 배경 대비 우수. |
 | 2026-04-01 | Pretendard 한국어 본문 | Apple SD Gothic Neo 대비 가독성, 자간, 웨이트 다양성 우위. |
+| 2026-05-14 | Sprint 15 Recall-first patch (§Workspace Types + §Recall UI) | Stage 2 mini design-consultation. Restrained philosophy 유지 — 색상 신규 0, icon + typography로 Personal/Team 구분. Promote = ghost variant (retention feature 위상). |
+
+---
+
+## Workspace Types (Sprint 15+, Personal vs Team)
+
+> **Decision**: 색상 신규 추가 0. icon + typography + neutral 톤으로 구분. Restrained philosophy (1 accent + neutrals) 보존.
+
+### Visual Distinction
+
+| Type | Icon (lucide-react) | Color | Background | Border | Meaning |
+|------|---------------------|-------|------------|--------|---------|
+| **Personal** | `Lock` | `text-muted` (#5C5C63 dark / #9E9EA6 light) | `bg-surface` | `border-subtle` | 잠금 / 외부 공유 안 됨 |
+| **Team** | `Users` | `text-accent` (#3ECFB4) | `bg-accent-subtle` (rgba(62,207,180,0.1)) | `border-accent/30` | 공유 활성 |
+
+### Badge Spec
+
+- **Font**: caption 11px Geist Mono
+- **Padding**: 2px 6px (2xs / xs)
+- **Radius**: full (9999px, pill)
+- **Gap (icon-label)**: 4px (xs)
+- **Position**: workspace switcher dropdown 옵션 옆 + memory item 카드 좌상단 (selective)
+
+### 사용 위치
+
+- **Workspace switcher** (S15-R4 안에 minimal version): dropdown options에 type badge inline
+- **Memory item 카드** (S15-R4): 카드 좌상단 코너에 type badge (optional, density 높을 시 생략)
+- **Promote modal** (S15-R6): target team workspace 선택 시 badge로 시각 구분
+
+---
+
+## Recall UI (Sprint 15 S15-R4)
+
+### `/memory` Page Layout
+
+```
+[header: page title + workspace switcher]
+[capture row: Mic button (lg) + Textarea (autosize, multi-line)]
+[search bar: input + Cmd+K hint]
+[tabs: Personal | Team (client-side filter, type badge로 시각 구분)]
+[result list: vertical, gap-md]
+```
+
+- **Page padding**: `xl` (32px) on `md+`, `md` (16px) on mobile
+- **Capture row gap**: `md` (16px)
+- **Result list gap**: `md` (16px)
+- **Empty state**: "아직 메모 없음. 위에서 녹음 또는 텍스트 입력으로 시작." centered, `text-muted`
+
+### Recall Result Card
+
+- **Container**:
+  - `bg-surface` (#141416 dark)
+  - `border-subtle` (#1E1E22 dark)
+  - `radius-md` (6px)
+  - `padding-md` (16px)
+  - Hover: `bg-surface-hover` (#1A1A1E), transition 150ms ease-out
+- **Layout**: vertical, `gap-sm` (8px) between rows
+- **Row 1**: Title (h3 18px Satoshi 600) + Type badge (right-aligned, optional)
+- **Row 2**: Atomic notes excerpt (body 15px Pretendard 400, `line-clamp-2`, `text-secondary`)
+- **Row 3**: Source link + timestamp (caption 11px Geist Mono, `text-muted`, hover → `text-accent`)
+- **Promote button**: 카드 우상단 corner (S15-R6 spec)
+
+### Promote 1-Button (S15-R6)
+
+> **Position philosophy**: Retention/expansion feature (post-Recall-validation). Primary CTA 아님 — subtle.
+
+- **Variant**: `ghost` (background 없음, border 없음)
+- **Icon**: `ArrowUpRight` (lucide-react), 14px
+- **Label**: "팀으로 올리기" (small text, 13px Pretendard 500)
+- **Color**: `text-secondary` (#8E8E93 dark / #6B6B73 light)
+- **Hover**: `text-accent` (#3ECFB4) + underline
+- **Size**: small (h: 28px, px-2)
+- **Position**: 카드 우상단 corner
+
+### Promote Modal (click 후)
+
+- **Trigger**: Promote button 클릭
+- **Content**:
+  - Title: "팀으로 올리기" (h2 24px Satoshi 600)
+  - Description: "어느 팀 워크스페이스로 보낼까요?" (body 15px)
+  - Target workspace select: dropdown with Team badges (Users icon + accent)
+  - 확인 button: `primary` variant (#3ECFB4 background, accent CTA) — 실제 promote 시점은 prominent OK
+  - 취소 button: `ghost`
+- **Behavior**: 확인 시 → 202 Accepted + toast "팀에 복사 중...", 백그라운드 promotion + 임베딩 재생성
+
+---
+
+## Feature Flag UX (`NEXT_PUBLIC_RECALL_ENABLED`)
+
+- **false (default)**: 사이드바에 `/memory` 메뉴 항목 미노출. 기존 사용자 영향 0.
+- **true (Sprint 15 dogfooding + PERSONA testing)**: 사이드바에 `/memory` 메뉴 추가 (Mic icon + "Memory" 라벨). Personal workspace seed 자동 시드 (S15-R5).
+- **Sprint 17+ full implementation 시**: flag 제거 + 기본 활성.
