@@ -238,9 +238,32 @@
 
 **검증**: 1인 founder가 신규 가입 → 7일 자기 personal에서만 사용 → 팀 합류 시점 시뮬레이션. 메모리 누락 0건 + workspace 전환 클릭 0 confusion.
 
-### Sprint 16 후보 — Promotion Action + 음성 메모 ingest (2축 동시 진입)
+### Sprint 16 — pgvector 최적화 ✅ 완료 (PR pending, 2026-05-15)
 
-> 입력: PRD v3.0 §3.6 2축 로드맵 (X v2 음성 + Y v1.6 promote)
+> 코드네임: `karrot-eager-marshmallow` (Stage 0~4) + `pure-clover` (Stage 5/6)
+> 워크트리: `~/project/agy-project/kairos-pgvector-opt` (`sprint-16/pgvector-optimization` 브랜치)
+> ADR-020 Accepted — `docs/dev-log/020-pgvector-hnsw-halfvec.md`
+> Verification — `docs/dev-log/sprint-16-pgvector-verification.md`
+
+- [x] Stage 0~6 풀워크플로우 + Atomic Update 매트릭스 강제
+- [x] HNSW + halfvec + iterative_scan 전환 (alembic b2c3d4e5f6a7)
+- [x] **AD-56 정정** (Stage 5 측정 발견) — 컬럼 타입 변경 마이그레이션은 ivfflat drop 동일 revision 강제 (operator class 호환성). expression index 패턴 전용 별도 PR drop 원칙과 분리
+- [x] memory 도메인 `HalfVector` 직렬화 회귀 fix (`src/memory/repository.py:275` — `to_list()` 폴백)
+- [x] bench_vector_search.py 런타임 init 누락 fix (init_engine + get_session_factory 명시)
+- [x] test_halfvec_migration.py `:uid::uuid` asyncpg cast syntax fix (`CAST(:uid AS uuid)`)
+- [x] BL-022(파티셔닝) / BL-023(컬럼분리) / BL-024(pg_prewarm) / BL-025(read replica) / BL-026(측정강화) 등재
+- [x] 통합 테스트 10/10 PASS + Sprint 16 격리 BE 155/155 PASS
+
+**후속 (별도 PR / Sprint)**:
+- ADR-019 Phase B (Gemini 2.5-flash → 3.1-flash-lite swap, 6 spots) — Day 14 (2026-05-28) 후
+- BL-024 pg_prewarm Cloud Run cold start
+- BL-026 옵션 A — dev DB export + ground truth 절차 (production scale recall 측정)
+
+---
+
+### Sprint 17 후보 (전 Sprint 16 후보) — Promotion Action + 음성 메모 ingest (2축 동시 진입)
+
+> 입력: PRD v3.0 §3.6 2축 로드맵 (X v2 음성 + Y v1.6 promote). pgvector 최적화가 Sprint 16 점유 → 본 후보 Sprint 17로 이동.
 
 **v1.6 — Promotion 액션**
 - [ ] **S16-T1** 아이템(노트/회의/액션)에 "Promote to Team..." 액션 + 대상 workspace+project 선택 모달 (FE)
