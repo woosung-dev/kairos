@@ -47,8 +47,8 @@
 | **MemoryAiCall** | memory | distill / embedding / transcribe 호출 cost+latency 로그. `model_id` + `tokens_in/out` + `cost_usd` + `elapsed_ms` | memory_id 범위. Sprint 15 신설 |
 | **MemoryQueryEmbeddingCache** | memory | Recall query 임베딩 캐시 (C3 fix). normalized_query + workspace_id 복합 키 | (workspace_id, normalized_query). Sprint 15 신설 |
 | **MemoryEvent** | memory | R7 metrics 원천 (capture / recall / promote count + recall latency). Cloud Run stateless 정합. memory_id 가 nullable (recall 이벤트는 memory FK 없음) | (workspace_id, event_type, created_at). Sprint 15 신설 |
-| **EmbeddingChunk** | embeddings | 1536d 벡터 + 계층 (L1/L2 사용, L0 미사용). MemoryItem도 source_type=`memory`로 적재 | source_type + source_id + chunk_index |
-| **SemanticCache** | embeddings | TTL 7일, 유사도 ≥0.93 히트. RAG는 호출자(read/write) | PK `id`. 의미적 식별 (workspace_id, project_id, question_embedding) — DB unique constraint 없음 |
+| **EmbeddingChunk** | embeddings | 1536d **halfvec** 벡터 (Sprint 16 ADR-020 — fp16, 4B→2B) + 계층 (L1/L2 사용, L0 미사용). MemoryItem도 source_type=`memory`로 적재 | source_type + source_id + chunk_index |
+| **SemanticCache** | embeddings | TTL 7일, 유사도 ≥0.93 히트. 1536d **halfvec** 벡터 (Sprint 16 ADR-020). RAG는 호출자(read/write) | PK `id`. 의미적 식별 (workspace_id, project_id, question_embedding) — DB unique constraint 없음 |
 | **User** | auth | Clerk 인증 외부 ID 매핑 | clerk_id 유일 |
 
 ### 별칭 금지 (도메인 용어 위반 감지 대상)
@@ -216,6 +216,8 @@ shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
 | I-17 | **cross-workspace ProjectMember 추가 차단 = ProjectService 책임**: `ProjectService.add_member`는 반드시 `WorkspaceRepository.find_member(workspace_id, user_id)`를 호출하여 대상 user가 동일 워크스페이스 멤버임을 검증한다. None이면 `CrossWorkspaceMemberError(403)`. I-9(Repository read 필터)와 레이어 분리: I-9는 read 필터, I-17은 write 검증. | `backend/src/projects/service.py:add_member` |
 | I-18 | **Promotion은 항상 복제 + tombstone, 이동 금지** (Sprint 15 ADR-016 AD-41 + ADR-016 reframe note). `MemoryService.promote`는 source MemoryItem을 보존하고 target workspace에 새 MemoryItem 행을 생성한다. `PromoteAudit`는 `memory_id`(source) + `new_memory_id`(target) + `target_workspace_id` + `promoted_by_user_id` 4-key 강제. 원본 MemoryItem은 archived status 또는 보존 (구현 결정). | `backend/src/memory/service.py:promote` |
 | I-19 | **Personal workspace는 1인 격리**: `Workspace.type=='personal'`인 워크스페이스는 항상 1명 owner. 팀 초대 불가 (`WorkspaceInvite` 발급 금지). BE schema 제약 + service 검증 양쪽 강제. ProjectMember도 1명 (R5 invariant). | `backend/src/workspaces/service.py` + `backend/src/projects/service.py` (personal_project_invariants) |
+| I-20 | **벡터 컬럼 타입 `halfvec(1536)` 고정** (Sprint 16 ADR-020). `EmbeddingChunk.embedding` + `SemanticCache.question_embedding` 양쪽. `Vector(1536)` 직접 사용 금지. 인덱스는 **HNSW**(`m=16, ef_construction=64`)만, ivfflat 신규 사용 금지. cosine 거리 연산자 `<=>` 유지 (`halfvec_cosine_ops`). 당근 DB 밋업 1회 운영 기본값 채택. | `backend/src/embeddings/models.py`, `backend/alembic/versions/<pgvector_hnsw_halfvec>.py` |
+| I-21 | **벡터 검색 쿼리 세션 변수 강제** (Sprint 16 ADR-020). 벡터 검색(`vector_search` / `find_similar_cache`) 트랜잭션 진입 시 `SET LOCAL hnsw.ef_search = 40` + `SET LOCAL hnsw.iterative_scan = 'relaxed_order'` + `SET LOCAL hnsw.max_scan_tuples = 20000` 강제. `_apply_hnsw_session_params(session)` 헬퍼 위임. pgvector ≥0.8 의존. RBAC/visibility 포스트필터 결과 부족 해소. | `backend/src/embeddings/repository.py:_apply_hnsw_session_params` |
 
 ---
 

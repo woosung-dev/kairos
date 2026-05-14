@@ -34,8 +34,11 @@
 **개념적 6-Layer** (PRD / AGENTS.md / docs/architecture/rag-pipeline.md 명명):
 ```
 [1] Cache Lookup           SemanticCache (≥0.93 유사도) → hit 시 즉시 스트리밍 반환
+                           인덱스: pgvector HNSW(halfvec, m=16, ef_construction=64, ef_search=40,
+                                                iterative_scan=relaxed_order) — Sprint 16 ADR-020
 [2] Query Processing       질문 정제 + 임베딩 생성 + 키워드 추출
 [3] Hybrid Search          pgvector (chunk_level=2) + pg_trgm 키워드 검색 (`embedding_repo.text_search()`)
+                           벡터 인덱스: 동일 HNSW(halfvec, ef_search=40, iterative_scan=relaxed_order)
 [4] Rank Fusion (RRF, k=60) Reciprocal Rank Fusion으로 벡터/키워드 결과 융합 (Gemini re-rank 아님)
 [5] Generation             Gemini 답변 + 인용 (sources) — SSE chunk stream
 [6] Cache Store            결과 SemanticCache에 저장 (TTL 7일)
@@ -82,6 +85,7 @@
 | R-10 | **권한 검증은 `RagPipelineService.ask` 진입에서 SSE 시작 *전* 완료** (Sprint 6 ADR-014 옵션 A). visibility=draft → creator + admin/owner / visibility=private → ProjectMember + admin/owner. 검증 실패 시 `error` + `done` SSE 이벤트로 종료 (스트리밍 시작 안 함). 권한 누락이 ADR-010 M1 RAG 품질 시그널을 오염하지 않도록. |
 | R-11 | **Gemini 예외는 graceful** — SafetyFilter / API 오류 / 네트워크 오류 발생 시 5xx 대신 SSE `error` + `done` 이벤트 송출 (Sprint 14 BUG-C01). 캐시 오염 방지를 위해 SemanticCache 저장 skip. 빈 답변(`full_answer.strip() == ""`)도 동일 정책. |
 | R-12 | **질문 입력 검증** — `RagAskRequest.question` 은 strip 후 2자 이상 + 500자 이하 (Sprint 14 BUG-C01). prompt-injection 류 거대 입력 차단 + Pydantic 422로 5xx 회피. |
+| R-13 | **Layer 1/3 진입 시 HNSW 세션 변수 강제** (Sprint 16 ADR-020 + CONTEXT-MAP I-21). `embeddings/repository.py`의 `_apply_hnsw_session_params(session)` 헬퍼가 `vector_search` / `find_similar_cache` 진입 직전 `SET LOCAL hnsw.ef_search=40` + `iterative_scan=relaxed_order` + `max_scan_tuples=20000` 적용. RAG 서비스가 별도 호출하지 않음 (embeddings 도메인 캡슐화). 결과: RBAC/visibility 포스트필터 적용 시 결과 부족 자동 해소. |
 
 ---
 
