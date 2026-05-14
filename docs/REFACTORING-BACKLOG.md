@@ -728,3 +728,42 @@ await page.getByLabel(/email|이메일/i).fill(email);
 **Sprint 묶음 권고:** 별도 hotfix PR 또는 Sprint 16 첫 commit. Sprint 15 PR #29 직전 분리 권고 (PR #29 머지 무관, e2e fail은 동일 상태 유지).
 
 **근거:** Sprint 15 Stage 5-6 qa Exhaustive 후속 진단 2026-05-14 — 사용자 화면 증거로 root cause 정정 (Clerk Account Portal redirect 아님, koKR label mismatch 확정).
+
+---
+
+## BL-022 — embedding_chunks / semantic_caches 파티셔닝 (대규모 도달 시)
+
+**도메인:** embeddings (pgvector HNSW 인덱스 운영)
+**근거:** Sprint 16 ADR-020 §"Alternatives Considered" 2 — 파티셔닝 deferred 결정 (AD-54). 당근(Karrot) DB 밋업 1회 §4 노하우 — 1000만+ row 통테이블에서 HNSW 랜덤 I/O + Vacuum 시간 폭증 시 필요.
+
+**문제 (지연):**
+현재 kairos 데이터 규모는 작음 (chunk 수만 단위). HNSW + halfvec + iterative_scan 으로 충분. 하지만 다음 조건 도달 시 파티셔닝 필요:
+- workspace 100+ (테넌트 격리 단위 증가)
+- embedding_chunks 100만+ row (HNSW 단일 인덱스 메모리 압박)
+- VACUUM ANALYZE 시간 분 단위 (운영 부담)
+- 특정 workspace_id 쿼리 시 partition pruning 효과 ≫ HNSW 그래프 전체 탐색
+
+**옵션:**
+
+1. **workspace_id 기반 LIST 파티셔닝** — 워크스페이스당 인덱스 분리. RBAC 자연스러움. workspace 수가 적을 때 유효 (수십~수백).
+2. **project_id 기반 HASH 파티셔닝** — 프로젝트 수 많을 때. 다만 RAG 쿼리는 project_id 필터 빈도 낮음 (workspace_id 위주).
+3. **created_at 기반 RANGE 파티셔닝** — 시계열 데이터에 유리. 오래된 청크는 cold storage로 분리 가능.
+
+**Trigger 조건 (재진입):**
+- `SELECT count(*) FROM embedding_chunks` ≥ 1,000,000
+- `SELECT count(*) FROM workspaces` ≥ 100
+- `pg_stat_user_tables.n_live_tup` 기반 VACUUM 시간 5분 이상
+- RAG p95 latency baseline × 1.5 이상 (`bench_vector_search.py --mode latency`)
+
+**의존:**
+- ADR-020 Stage 5 측정 통과 후 Accepted 상태 전제
+- alembic 추가 마이그레이션 + 기존 데이터 재배치 (대용량 시 다운타임 가능 — backend.md §9 2단계 배포)
+- 신규 ADR 작성 필요 (파티셔닝 키 + 인덱스 전략)
+
+**예상 LOC delta:** +200~500 (alembic + repository.py 파티션 인지 쿼리 + 운영 스크립트)
+
+**Risk:** 🟡 중간 (데이터 재배치 + planner 동작 변경)
+
+**우선순위:** ★★☆☆☆ (조건부 미래 — Trigger 도달 전 보류)
+
+**Sprint 묶음 권고:** 별도 sprint. ADR-020 후속.

@@ -90,7 +90,7 @@
 |---|---|
 | `CONTEXT-MAP.md` §2 | `EmbeddingChunk` 행: `1536d 벡터` → `1536d **halfvec** 벡터`. `SemanticCache` 행: 동일 표기. `embedding` 별칭 금지 표 유지 |
 | `CONTEXT-MAP.md` §6 | **I-20** 신설 — 벡터 컬럼 타입은 `halfvec(1536)`, ivfflat 금지 HNSW(m=16, ef_construction=64)만. **I-21** 신설 — 벡터 검색 쿼리는 트랜잭션 진입 시 SET LOCAL ef_search/iterative_scan/max_scan_tuples 강제 |
-| `backend/src/embeddings/CONTEXT.md` | **신설** — §1 책임 §2 비책임 §3 엔티티(Halfvec 명시) §4 의존 §5 불변식 E-1~E-8 (I-6/I-7/I-8/I-9/I-20/I-21 mirror + cosine `<=>` + REINDEX 정책) §6 엔드포인트 없음 §7 부채 |
+| `backend/src/embeddings/CONTEXT.md` | **신설** — §1 책임 §2 비책임 §3 엔티티(HALFVEC 명시) §4 의존 §5 불변식 E-1~E-8 (I-6/I-7/I-8/I-9/I-20/I-21 mirror + cosine `<=>` + REINDEX 정책) §6 엔드포인트 없음 §7 부채 |
 | `backend/src/rag/CONTEXT.md` | §4 Layer 1/3 표기 변경: `pgvector` → `pgvector HNSW(halfvec, ef_search=40, iterative_scan=relaxed_order)`. **R-13** 신설 — Layer 1/3 진입 시 ef_search/iterative_scan SET LOCAL 강제 (embeddings/repository 위임) |
 
 ---
@@ -108,7 +108,7 @@
 ## 7. Open Questions (Stage 3 진입 전 차단 조건)
 
 1. **Neon pgvector 버전**: production Neon DB에서 `SELECT default_version FROM pg_available_extensions WHERE name='vector'` 결과 ≥0.8 확인 필요. 미지원 시 Neon plan/region 변경 또는 본 sprint 보류.
-2. **pgvector Python 클래스명**: `pgvector.sqlalchemy` 0.3+ 에서 `Halfvec` vs `HALFVEC` import 명 확인 필요 (소스 확인).
+2. ~~**pgvector Python 클래스명**: `pgvector.sqlalchemy` 0.3+ 에서 `Halfvec` vs `HALFVEC` import 명 확인 필요.~~ **[해소 2026-05-15]** pgvector 0.4.2 sqlalchemy/__init__.py 확인 — `HALFVEC` (대문자) export. 본 sprint는 `from pgvector.sqlalchemy import HALFVEC` 사용.
 3. **데이터 캐스팅 NULL safety**: `embedding IS NULL` row 존재 여부 — `SELECT COUNT(*) FROM embedding_chunks WHERE embedding IS NULL` 사전 측정. 존재 시 `CASE WHEN NULL` 캐스팅 형식 채택.
 4. **production chunk 분포**: recall@10 측정용 fixture 합성 vs 실제 데이터 export 결정 — dev/staging DB chunk 수 확인 후 결정.
 

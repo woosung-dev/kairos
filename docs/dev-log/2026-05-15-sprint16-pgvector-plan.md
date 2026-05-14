@@ -23,15 +23,16 @@ WHERE name = 'vector';
 
 **미달 시**: 본 sprint 보류. Neon plan upgrade 또는 region 변경 검토. ADR-020 Status 미변경 (Proposed 유지).
 
-### 1-B. pgvector Python 패키지 클래스명 확인
+### 1-B. pgvector Python 패키지 클래스명 확인 — **해소 2026-05-15**
 
 ```bash
-# dev 환경에서
-uv pip show pgvector  # >= 0.3 필요
-uv run python -c "from pgvector.sqlalchemy import Halfvec; print(Halfvec.__module__)"
+# dev 환경에서 (검증 완료)
+uv pip show pgvector  # >= 0.4.2 필요
+uv run python -c "from pgvector.sqlalchemy import HALFVEC; print(HALFVEC.__module__)"
+# 출력: pgvector.sqlalchemy.halfvec
 ```
 
-**합격선**: `Halfvec` 클래스 import 성공. `HALFVEC` 별칭은 미사용 (소문자 표기 권장).
+**확정**: pgvector 0.4.2 `sqlalchemy/__init__.py`에서 `HALFVEC` (대문자) export. 본 sprint 코드는 `from pgvector.sqlalchemy import HALFVEC` 사용. 별칭 없음.
 
 ### 1-C. NULL embedding row 존재 여부
 
@@ -242,10 +243,10 @@ embedding: list[float] | None = Field(
 )
 
 # after
-from pgvector.sqlalchemy import Halfvec
+from pgvector.sqlalchemy import HALFVEC
 embedding: list[float] | None = Field(
     default=None,
-    sa_column=Column(Halfvec(1536)) if Halfvec else Column(Text),
+    sa_column=Column(HALFVEC(1536)) if HALFVEC else Column(Text),
 )
 ```
 
@@ -259,8 +260,12 @@ embedding: list[float] | None = Field(
 # before
 "pgvector>=0.4.0",
 # after
-"pgvector>=0.8.0,<1.0.0",
+"pgvector>=0.4.2,<1.0.0",  # sqlalchemy.HALFVEC 지원 (0.4.2+). 서버 확장은 별도 0.8+ 요구.
 ```
+
+> **중요 — Python 패키지 vs 서버 확장 구분**:
+> - **Python 패키지** `pgvector` (PyPI) — `pgvector.sqlalchemy.HALFVEC` 는 **0.4.2+에서 export** (확인됨: `pgvector/sqlalchemy/__init__.py` `from .halfvec import HALFVEC`)
+> - **서버 확장** `vector` (PostgreSQL) — `iterative_scan` / `relaxed_order` 는 **0.8.0+에서 지원**. Neon에서 `SELECT default_version FROM pg_available_extensions WHERE name='vector'` 결과 ≥0.8 필수 (§1-A 사전 차단)
 
 `uv lock` 후 재설치. CI/CD Dockerfile 빌드 캐시 무효화 자동.
 
@@ -400,7 +405,7 @@ if __name__ == "__main__":
 | Cloud Run Dockerfile pgvector 빌드 | 서버 미설치 (서버측 확장) | 무관 |
 | `psycopg` / `asyncpg` halfvec 직렬화 | pgvector-python 0.3+에서 처리 | §1-B 확인 |
 | pgvector-python의 `array.array("e", ...)` (fp16) | Python ≥3.6 native | OK |
-| sqlmodel `Column(Halfvec(1536))` autogenerate | `models.py` 변경 시 alembic autogenerate가 type 차이 감지 | 마이그레이션 수동 작성 (autogenerate에 의존하지 않음) |
+| sqlmodel `Column(HALFVEC(1536))` autogenerate | `models.py` 변경 시 alembic autogenerate가 type 차이 감지 | 마이그레이션 수동 작성 (autogenerate에 의존하지 않음) |
 | 다른 도메인의 vector 컬럼 사용 | embeddings 단독. 다른 도메인 없음 | grep 확인 |
 
 ---
@@ -422,7 +427,7 @@ if __name__ == "__main__":
 
 | 영역 | Sprint 15 / ADR-019 영향 | 본 sprint 영향 | 충돌 가능성 |
 |---|---|---|---|
-| `embeddings/models.py` | 미변경 (sprint-15) | Vector → Halfvec | ✅ 없음 |
+| `embeddings/models.py` | 미변경 (sprint-15) | Vector → HALFVEC | ✅ 없음 |
 | `embeddings/service.py` | I-9 4-C 진입 assertion 강화 (sprint-15) | 미수정 | ✅ 없음 |
 | `embeddings/repository.py` | 미변경 | SET LOCAL 헬퍼 + CAST halfvec | ✅ 없음 |
 | `alembic/env.py` | sprint-15 모델 import 추가 | 본 sprint 추가 없음 | ✅ 없음 |
@@ -442,7 +447,7 @@ if __name__ == "__main__":
 ## 12. Stage 4 진입 체크리스트
 
 - [ ] §1-A Neon pgvector ≥0.8 확인 — 사용자 직접 실행 후 결과 본 plan §1-A에 추가
-- [ ] §1-B `pgvector.sqlalchemy.Halfvec` import 검증 — dev 환경
+- [ ] §1-B `pgvector.sqlalchemy.HALFVEC` import 검증 — dev 환경
 - [ ] §1-C NULL embedding 카운트 측정 — production / staging / dev
 - [ ] §1-D 기존 ivfflat 인덱스 크기 baseline 기록 → ADR-020 §"Consequences"
 - [ ] §2 Neon branch backup 생성
@@ -457,7 +462,7 @@ if __name__ == "__main__":
 ## 13. Open Questions (Stage 4 진입 차단 또는 비차단)
 
 1. **Neon production pgvector 버전 확인** (차단) — 사용자 직접 실행
-2. **`Halfvec` vs `HALFVEC` 클래스명** (차단) — dev 환경 import 검증
+2. ~~**`Halfvec` vs `HALFVEC` 클래스명** (차단) — dev 환경 import 검증~~ **[해소 2026-05-15]** pgvector 0.4.2 `sqlalchemy.HALFVEC` (대문자) 확정. models.py + bench_vector_search.py 본 sprint 코드 반영 완료.
 3. **recall@10 corpus 선택** (비차단, 옵션 A 우선) — Stage 4에서 데이터 export 시도
 4. **bench latency 1000회 vs 더 큰 N** (비차단) — 기본 1000회로 진행, 분산 큰 경우 N 증가
 5. **REINDEX 빈도 (월 1회 vs 주 1회)** (비차단) — 운영 가이드에 "월 1회 기본 + bloat ≥30% 트리거"로 명시

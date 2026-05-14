@@ -43,7 +43,7 @@
 | in | `meetings/pipeline_service` (process_meeting, capture_text) | service | 회의 transcript / capture 청크 적재 |
 | in | `memory/service` (orchestrator) | service | Sprint 15 Recall — capture/recall 시 청크 read/write. BL-006 등재 (pipeline_service.py 분리 예정) |
 | in | `rag/service` | service | RAG 6-Layer Layer 1/3 호출. ADR-014 옵션 A로 진입은 RagPipelineService |
-| out | DB (pgvector ≥0.8 + HNSW + halfvec) | infra | `_apply_hnsw_session_params` 트랜잭션 변수 + `<=>` cosine + pg_trgm `%` |
+| out | DB (pgvector **서버 확장** ≥0.8 + HNSW + halfvec) | infra | `_apply_hnsw_session_params` 트랜잭션 변수 + `<=>` cosine + pg_trgm `%`. Python 패키지(`pgvector`)는 ≥0.4.2 (HALFVEC export 보장) |
 | out | `services/` (OpenAI text-embedding-3-small) | external wrapper | 임베딩 생성은 호출자 책임. embeddings 도메인은 vector 인자 받아 저장만 |
 
 ---
@@ -60,7 +60,7 @@
 | E-4 (= I-9) | 모든 read 쿼리 `workspace_id` 필터. `create_chunk` 진입 시 owner workspace 일치 assertion (Sprint 15 I-9 4-C 강화) | `repository.py` `.where(... workspace_id ...)`, `service.py:create_chunk` |
 | E-5 | cosine 거리 연산자 `<=>` 사용. inner_product `<#>` / L2 `<->` 금지 (텍스트 의미 유사도) | `repository.py:81/84/162/165` |
 | E-6 | `EmbeddingChunk.embedding` 별칭 금지 — `Vector` / `Embedding` 단수형 사용 금지 (CONTEXT-MAP §2-별칭) | code review |
-| E-7 (= I-20) | 벡터 컬럼 타입 `halfvec(1536)` 고정. ivfflat 신규 인덱스 금지. HNSW `m=16, ef_construction=64` 만 | `models.py` (Halfvec import), `alembic/versions/<pgvector_hnsw_halfvec>.py` |
+| E-7 (= I-20) | 벡터 컬럼 타입 `halfvec(1536)` 고정. ivfflat 신규 인덱스 금지. HNSW `m=16, ef_construction=64` 만 | `models.py` (HALFVEC import), `alembic/versions/<pgvector_hnsw_halfvec>.py` |
 | E-8 (= I-21) | 벡터 검색 트랜잭션 진입 시 `_apply_hnsw_session_params(session)` 호출 강제 — `ef_search=40` + `iterative_scan=relaxed_order` + `max_scan_tuples=20000` SET LOCAL. RBAC 포스트필터 결과 부족 해소 | `repository.py:vector_search` / `find_similar_cache` 진입 헬퍼 |
 
 > REINDEX CONCURRENTLY 운영 정책은 헌법 불변식이 아니라 운영 가이드 — `docs/guides/pgvector-reindex.md` + `backend/scripts/reindex_vectors.py` (Sprint 16 신설).
@@ -92,7 +92,7 @@
 ## 9. 진입점 (새 세션)
 
 1. 본 CONTEXT
-2. `models.py` (Halfvec 정의 + chunk_level 계층)
+2. `models.py` (HALFVEC 정의 + chunk_level 계층)
 3. `repository.py` (`_apply_hnsw_session_params` + vector_search + find_similar_cache)
 4. `service.py` (create_chunk 진입 + I-9 4-C assertion)
 5. `docs/architecture/rag-pipeline.md` Layer 1/3 (호출자 관점)

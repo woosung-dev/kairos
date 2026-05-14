@@ -46,20 +46,20 @@
 
 ```python
 # backend/src/embeddings/models.py
-from pgvector.sqlalchemy import Halfvec  # 0.3+
+from pgvector.sqlalchemy import HALFVEC  # 0.3+
 
 class EmbeddingChunk(SQLModel, table=True):
     ...
     embedding: list[float] | None = Field(
         default=None,
-        sa_column=Column(Halfvec(1536)),
+        sa_column=Column(HALFVEC(1536)),
     )
 
 class SemanticCache(SQLModel, table=True):
     ...
     question_embedding: list[float] | None = Field(
         default=None,
-        sa_column=Column(Halfvec(1536)),
+        sa_column=Column(HALFVEC(1536)),
     )
 ```
 
@@ -79,7 +79,11 @@ CREATE INDEX CONCURRENTLY idx_cache_hnsw
 
 ivfflat 인덱스 (`idx_chunks_vector`, `idx_cache_vector`)는 Stage 5 측정 통과 후 **별도 PR**로 drop (AD-56).
 
-### 3. pgvector ≥0.8 + 세션 변수 강제 (I-21)
+### 3. pgvector 서버 확장 ≥0.8 + Python 패키지 ≥0.4.2 + 세션 변수 강제 (I-21)
+
+> **버전 매트릭스**:
+> - **Python 패키지** `pgvector` (PyPI) — ≥**0.4.2** (`sqlalchemy.HALFVEC` export 보장. 0.4.2 sqlalchemy/__init__.py 확인)
+> - **서버 확장** `vector` (PostgreSQL) — ≥**0.8** (`iterative_scan` / `relaxed_order` / `max_scan_tuples` 지원). Neon에서 `SELECT default_version FROM pg_available_extensions WHERE name='vector'` 결과로 검증
 
 ```python
 # backend/src/embeddings/repository.py
@@ -158,10 +162,10 @@ SELECT default_version FROM pg_available_extensions WHERE name='vector';
 - Stage 3 진입 직전: `SELECT default_version FROM pg_available_extensions WHERE name='vector'` ≥0.8 검증
 
 ### Stage 4 (코드)
-- `backend/src/embeddings/models.py` — `from pgvector.sqlalchemy import Halfvec`
+- `backend/src/embeddings/models.py` — `from pgvector.sqlalchemy import HALFVEC`
 - `backend/alembic/versions/NEW_pgvector_hnsw_halfvec.py` 신설
 - `backend/src/embeddings/repository.py` — `_apply_hnsw_session_params` + CAST halfvec
-- `backend/pyproject.toml` — `pgvector>=0.8.0,<1.0.0`
+- `backend/pyproject.toml` — `pgvector>=0.4.2,<1.0.0` (Python 패키지는 0.4.2부터 `sqlalchemy.HALFVEC` 지원. **서버 확장**은 별도로 `>=0.8` 요구 — Stage 3 §1-A 사전 SQL로 검증)
 - `backend/scripts/reindex_vectors.py` + `bench_vector_search.py` 신설
 - `docs/guides/pgvector-reindex.md` 신설
 - (별도 PR) ivfflat drop
@@ -218,7 +222,7 @@ SELECT default_version FROM pg_available_extensions WHERE name='vector';
 | Neon pgvector 0.8 미지원 | Stage 차단 | 사전 차단 SQL (위 Verification) |
 | halfvec 정밀도 손실 | recall 회귀 | Stage 5 recall@10 ≥0.95 필수 합격 기준 |
 | HNSW 그래프 메모리 압력 | shared_buffers 압박 | Neon scale 사양 확인 + p95 측정 |
-| pgvector 0.8 SQLModel/asyncpg 호환 | import 실패 | dev 환경 사전 검증 + `Halfvec` vs `HALFVEC` 클래스명 확인 |
+| pgvector 0.8 SQLModel/asyncpg 호환 | import 실패 | **해소** — pgvector 0.4.2 sqlalchemy 모듈에서 `HALFVEC` export 확인 (2026-05-15 본 sprint 검증). 서버 확장 0.8+는 Stage 3 §1-A 사전 SQL로 검증 |
 | 다른 도메인(쿼리)이 SET LOCAL 미적용 | 일부 쿼리 ef_search 기본값 사용 | embeddings/repository 캡슐화 (AD-55) + I-21 헌법 강제 + code review |
 
 ---
