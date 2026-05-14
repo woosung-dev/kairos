@@ -22,7 +22,20 @@
 
 ## 녹음 방법
 
-### 옵션 A: 브라우저 MediaRecorder (권장 — 실제 FE 흐름)
+### 옵션 0: 자동화 cli (가장 빠름, macOS only)
+
+`backend/scripts/record_samples.sh` — ffmpeg + avfoundation 인터랙티브 녹음. 7 sample 일괄 ~15분.
+
+```bash
+chmod +x backend/scripts/record_samples.sh
+bash backend/scripts/record_samples.sh           # 일반 (5min 포함)
+bash backend/scripts/record_samples.sh --skip-long  # 5min skip (~10분)
+bash backend/scripts/record_samples.sh --silent-only  # 무음 1개만 (smoke)
+```
+
+장점: 카운트다운 + 파일명 자동 + 코덱 자동 (webm libopus / mp4 aac). 단점: iOS sample도 macOS mic로 녹음됨 → 진짜 iOS MIME 검증 필요 시 옵션 A 병행.
+
+### 옵션 A: 브라우저 MediaRecorder (FE 실제 흐름)
 
 ```html
 <!-- record.html, 로컬에서 file:// 또는 http 서빙 -->
