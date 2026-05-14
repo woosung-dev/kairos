@@ -43,9 +43,11 @@ async def integration_session(postgres_container):
     )
     engine = create_async_engine(url, echo=False)
 
-    # 스키마 초기화 (첫 실행 시) + pgvector 확장 활성화
+    # 스키마 초기화 + pgvector 확장 활성화.
+    # drop_all → create_all로 매 테스트 격리 (이전 테스트 commit 잔여 제거).
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        await conn.run_sync(SQLModel.metadata.drop_all)
         await conn.run_sync(SQLModel.metadata.create_all)
 
     async with AsyncSession(engine, expire_on_commit=False) as session:
@@ -71,17 +73,38 @@ async def auth_user(integration_session):
 
 
 @pytest_asyncio.fixture
-async def memory_client(integration_session, auth_user):
+async def memory_client(integration_session, auth_user, monkeypatch):
     """Memory API 테스트용 AsyncClient — get_current_user + get_async_session override.
 
-    R2 이후 personal_ws fixture를 함께 의존성 주입 예정.
+    R1 patch §4 — BackgroundTask 헬퍼(_bg_distill_and_embed, _bg_transcribe_distill_embed)는
+    외부 Gemini/OpenAI 호출이 발생하므로 테스트에서 no-op으로 monkeypatch.
+    enqueue 동작(202 즉시)만 검증하고, distill/embed 실제 호출은 별도 unit test에서 mock으로.
     """
     from src.auth.dependencies import get_current_user
-    from src.common.database import get_async_session
+    from src.common.database import get_async_session, get_session_factory
     from src.main import app
+    from src.memory.service import MemoryService
+
+    async def _noop_distill(self, *args, **kwargs):
+        return None
+
+    async def _noop_transcribe(self, *args, **kwargs):
+        return None
+
+    monkeypatch.setattr(
+        MemoryService, "_bg_distill_and_embed", _noop_distill
+    )
+    monkeypatch.setattr(
+        MemoryService, "_bg_transcribe_distill_embed", _noop_transcribe
+    )
+
+    # session_factory는 lifespan 미실행이라 None — dummy 주입 (background no-op이므로 실제 미사용)
+    def _dummy_factory():
+        return None
 
     app.dependency_overrides[get_current_user] = lambda: auth_user
     app.dependency_overrides[get_async_session] = lambda: integration_session
+    app.dependency_overrides[get_session_factory] = _dummy_factory
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c

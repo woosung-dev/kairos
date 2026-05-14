@@ -11,6 +11,7 @@ from src.core.config import get_settings
 from src.core.lifespan import lifespan
 from src.inbox.router import router as inbox_router
 from src.meetings.router import router as meetings_router
+from src.memory.router import router as memory_router
 from src.notes.router import router as notes_router
 from src.projects.router import meeting_project_router, router as projects_router
 from src.rag.router import router as rag_router
@@ -102,6 +103,7 @@ app.include_router(projects_router)
 app.include_router(meeting_project_router)
 app.include_router(actions_router)
 app.include_router(inbox_router)
+app.include_router(memory_router)
 app.include_router(notes_router)
 app.include_router(rag_router)
 app.include_router(upload_router)
