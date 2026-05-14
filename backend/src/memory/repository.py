@@ -269,10 +269,17 @@ class MemoryRepository:
         cached = result.scalar_one_or_none()
         if cached is None or cached.embedding is None:
             return None
-        # pgvector는 read 시 numpy.ndarray로 디스크라이즈. asyncpg가 pgvector text 형식으로
-        # bind할 때 numpy float를 직렬화 못해서 SerializationError → vector_search 500.
-        # native Python float list로 명시 캐스팅하여 driver 호환 보장.
-        return [float(x) for x in cached.embedding]
+        # pgvector read 시 컬럼 타입별 결과 객체:
+        #   Vector  → numpy.ndarray (iterable)
+        #   HALFVEC → pgvector.halfvec.HalfVector (not iterable, to_list() 제공)
+        # Sprint 16 ADR-020 halfvec 전환 후 iter()가 TypeError 발생 → to_list()/numpy() 폴백.
+        # asyncpg bind 시 numpy float 직렬화 실패 방지 위해 native Python float 명시 캐스팅.
+        raw = cached.embedding
+        if hasattr(raw, "to_list"):
+            values = raw.to_list()
+        else:
+            values = list(raw)
+        return [float(x) for x in values]
 
     async def save_query_embedding_cache(
         self,

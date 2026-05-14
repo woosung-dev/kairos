@@ -53,7 +53,7 @@
 - **파라미터**: `m=16, ef_construction=64, ef_search=40` (당근 운영 기본값 그대로 채택)
 - **이유**: 동적 데이터 (memory capture / meeting transcript 지속 삽입) 친화. ivfflat은 lists 정적이라 재구성 부담.
 - **트레이드오프**: 인덱스 빌드 시간 ↑, 인덱스 크기 ↑ (당근도 동일 인정)
-- **롤백**: 신규 HNSW와 기존 ivfflat 병행 유지. Stage 5 측정 통과 후 별도 PR로 ivfflat drop (backend.md §9 2단계 배포).
+- **롤백** (AD-56 정정 2026-05-15 Stage 5): 단일 마이그레이션에서 ivfflat drop + 컬럼 타입 halfvec + HNSW 재정의 동시 진행. `vector_cosine_ops`가 halfvec 컬럼과 호환 불가 → ivfflat 운영 유지 불가. 안전망 = alembic downgrade에서 vector 컬럼 + ivfflat 재생성.
 
 ### 3-3. pgvector 0.4 → 0.8+ + iterative_scan
 - **세션 변수** (`SET LOCAL`, 트랜잭션 범위):

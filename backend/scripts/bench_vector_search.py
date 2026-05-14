@@ -30,15 +30,50 @@ import argparse
 import asyncio
 import json
 import math
+import sys
 import time
 import uuid
 from pathlib import Path
 from statistics import median
 
+# 스크립트 실행 시 backend/src 모듈 import 가능하도록 sys.path 보정
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(_BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_DIR))
+
 from sqlalchemy import text
 
-from src.common.database import async_session_factory
-from src.embeddings.repository import EmbeddingRepository
+from src.common.database import (  # noqa: E402
+    dispose_engine,
+    get_session_factory,
+    init_engine,
+)
+from src.core.config import get_settings  # noqa: E402
+from src.embeddings.repository import EmbeddingRepository  # noqa: E402
+
+# 런타임에 init_engine 호출 후 get_session_factory()로 채워짐
+_session_factory = None
+
+
+def async_session_factory():
+    """런타임 초기화된 session factory 호출 wrapper.
+
+    bench script는 lifespan 외부에서 실행되므로 init_engine + get_session_factory를
+    명시 호출해야 한다 (Sprint 16 Stage 5 — async_session_factory 직접 import 불가).
+    """
+    if _session_factory is None:
+        raise RuntimeError(
+            "init_engine 미호출 — bench script 진입 시점에 _ensure_engine 호출 필요"
+        )
+    return _session_factory()
+
+
+def _ensure_engine() -> None:
+    global _session_factory
+    if _session_factory is not None:
+        return
+    init_engine(get_settings().database_url)
+    _session_factory = get_session_factory()
 
 FIXTURE_PATH = (
     Path(__file__).parent.parent
@@ -320,6 +355,14 @@ async def show_state() -> None:
 
 
 async def run(*, mode: str, iters: int) -> int:
+    _ensure_engine()
+    try:
+        return await _run_inner(mode=mode, iters=iters)
+    finally:
+        await dispose_engine()
+
+
+async def _run_inner(*, mode: str, iters: int) -> int:
     await show_state()
 
     if mode in ("latency", "all"):

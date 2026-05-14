@@ -83,16 +83,18 @@ uv run python backend/scripts/reindex_vectors.py --force
 | REINDEX 후에도 bloat 그대로 | pgstattuple 캐싱 | `VACUUM ANALYZE embedding_chunks` 후 재측정 |
 | 빌드 시간 너무 길음 (분 이상) | 대용량 + HNSW 그래프 |	`ef_construction` 일시 감소 (ADR-020 재튜닝 검토). 또는 분할 빌드 |
 
-## 7. ivfflat 인덱스 (구) drop 절차
+## 7. ivfflat 인덱스 (구) drop — **동일 마이그레이션 처리 (AD-56 정정 2026-05-15)**
 
-본 sprint에서는 HNSW 신규 인덱스만 추가. 기존 ivfflat 인덱스 (`idx_chunks_vector`, `idx_cache_vector`)는 **별도 PR**로 drop (AD-56, backend.md §9 2단계 배포).
+본 sprint는 컬럼 타입을 `vector(1536)` → `halfvec(1536)`로 변경하므로 ivfflat 인덱스(`vector_cosine_ops`)를 동일 마이그레이션 b2c3d4e5f6a7 내에서 drop 강제. `vector_cosine_ops`가 halfvec 컬럼과 호환 불가 → ALTER COLUMN TYPE 시 `DatatypeMismatchError`. backend.md §9 2단계 배포는 **컬럼 타입 유지 expression index 패턴** 전용.
 
 ```sql
--- (별도 PR alembic 마이그레이션)
--- Stage 5 측정 통과 (recall@10 ≥0.95×baseline + p50/p95 합격) 후에만 실행
+-- backend/alembic/versions/b2c3d4e5f6a7_pgvector_hnsw_halfvec.py upgrade() step 2.5
+-- (CONCURRENTLY는 autocommit_block 내부 실행)
 DROP INDEX CONCURRENTLY IF EXISTS idx_chunks_vector;
 DROP INDEX CONCURRENTLY IF EXISTS idx_cache_vector;
 ```
+
+안전망 = alembic downgrade가 vector 컬럼 + ivfflat 인덱스 양방향 복구 (`CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_chunks_vector USING ivfflat (embedding vector_cosine_ops) WITH (lists=100)` 등).
 
 ## 8. 모니터링 지표 (Sprint 16+ 후속)
 

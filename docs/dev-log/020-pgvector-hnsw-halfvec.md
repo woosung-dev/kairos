@@ -1,9 +1,9 @@
 # ADR-020: pgvector 인덱스 전략 — ivfflat → HNSW + halfvec + iterative_scan
 
-> **날짜:** 2026-05-15 (draft) → Sprint 16 Stage 5 측정 통과 후 Accepted
-> **상태:** Proposed
+> **날짜:** 2026-05-15
+> **상태:** Accepted (2026-05-15 Stage 5 측정 통과 — `docs/dev-log/sprint-16-pgvector-verification.md`)
 > **작성자:** Claude Opus 4.7 (1M context) + 사용자
-> **관련:** CONTEXT-MAP §6 I-20/I-21 (Sprint 16 Stage 0 lock-in) · ADR-014 Service Boundary · ADR-019 Gemini EOL · `docs/architecture/rag-pipeline.md` §3/§4/§7 · `backend/src/embeddings/CONTEXT.md` E-7/E-8 · `docs/dev-log/2026-05-15-sprint16-pgvector-grill.md` · BL-003 (RAG N+1 해소, Sprint 13 PR #21)
+> **관련:** CONTEXT-MAP §6 I-20/I-21 (Sprint 16 Stage 0 lock-in) · ADR-014 Service Boundary · ADR-019 Gemini EOL · `docs/architecture/rag-pipeline.md` §3/§4/§7 · `backend/src/embeddings/CONTEXT.md` E-7/E-8 · `docs/dev-log/2026-05-15-sprint16-pgvector-grill.md` · `docs/dev-log/sprint-16-pgvector-verification.md` (Stage 5) · BL-003 (RAG N+1 해소, Sprint 13 PR #21)
 > **출처:** 당근(Karrot) DB 밋업 1회 (백은빈, 2025-XX) `pgvector 검색 최적화` — youtube `n3_LY7YFCwE`
 > **워크플로우:** `.ai/templates/workflow.md` Stage 1 (ADR + PRD) · plan `~/.claude/plans/karrot-eager-marshmallow.md`
 
@@ -36,7 +36,7 @@
 - **AD-53**: pgvector 0.8+ 업그레이드 + `iterative_scan = 'relaxed_order'` + `max_scan_tuples = 20000`. 자의 = RBAC 포스트필터 한계 해소 + RAG 사용자 체감 결함 차단. relaxed_order는 당근 운영 채택, RRF 융합 후 순위 재계산이라 strict 불요.
 - **AD-54**: 파티셔닝 **제외**. 자의 = kairos 현 데이터 규모 작음(chunk 만 단위) → 조기 최적화 회피. BL-022 등재 (workspace 100+ 또는 chunk 100만+ 트리거).
 - **AD-55**: SET LOCAL 호출 위치는 **embeddings/repository.py 내부** (`_apply_hnsw_session_params(session)` 헬퍼). 자의 = embeddings 도메인 캡슐화. RAG service가 별도 호출 안 함 → ADR-014 옵션 A 책임 분리 유지.
-- **AD-56**: ivfflat 인덱스 drop은 **별도 PR**. 자의 = backend.md §9 2단계 배포 원칙. HNSW 신규 생성 → Stage 5 측정 통과 → ivfflat drop 별도 commit. 롤백 안전망.
+- **AD-56 (정정 2026-05-15 Stage 5 측정)**: ivfflat 인덱스 drop은 **동일 마이그레이션** 내 강제. 정정 사유 = `vector_cosine_ops` operator class가 halfvec 컬럼과 호환 불가 → ALTER COLUMN TYPE 시 `DatatypeMismatchError`. backend.md §9 2단계 배포 원칙은 **컬럼 타입을 유지하는 expression index 패턴** 전용. 본 sprint는 vector→halfvec 컬럼 타입 변경이므로 ivfflat 운영 유지 불가. 안전망 = alembic downgrade가 vector 컬럼 + ivfflat 양방향 복구 보장 (b2c3d4e5f6a7 downgrade 검증).
 - **AD-57**: Python 패키지(`pgvector` PyPI) vs 서버 확장(`vector` PostgreSQL) 의존 분리 명시. 자의 = 0.4.2 sqlalchemy/__init__.py에서 HALFVEC export 확인 → Python 패키지 ≥0.4.2 충분. 서버 확장 ≥0.8 (iterative_scan)은 별도 검증 (Stage 3 §1-A).
 - **AD-58**: `memory_query_embedding_cache.embedding` (Sprint 15 신설) 도 본 sprint에서 halfvec 전환. 자의 = `memory/repository.py:vector_search`가 `embedding_chunks` halfvec와 JOIN하므로 query 임베딩 캐시 타입도 동일해야 cosine `<=>` 정합 + bindparam type 정합. plan §11 누락 retrofit.
 - **AD-59**: `semantic_caches` fillfactor 80 + autovacuum_analyze_scale_factor 0.02 본 sprint 적용. 자의 = `hit_count` 매 hit마다 UPDATE → 당근 §4-B "갱신 잦은 컬럼" 권고 단기 대응 (HOT update). 컬럼 분리는 BL-023 등재 (장기). `embedding_chunks` + `memory_query_embedding_cache` 도 analyze scale_factor 0.05로 통계 갱신 빈도 상향 (HNSW 그래프 통계 최신화).
@@ -85,7 +85,7 @@ CREATE INDEX CONCURRENTLY idx_cache_hnsw
   WITH (m = 16, ef_construction = 64);
 ```
 
-ivfflat 인덱스 (`idx_chunks_vector`, `idx_cache_vector`)는 Stage 5 측정 통과 후 **별도 PR**로 drop (AD-56).
+ivfflat 인덱스 (`idx_chunks_vector`, `idx_cache_vector`)는 **동일 마이그레이션**에서 drop (AD-56 정정 2026-05-15). 컬럼 타입 변경 시 PG가 operator class 호환성을 검증하므로 ivfflat 운영 유지 불가.
 
 ### 3. pgvector 서버 확장 ≥0.8 + Python 패키지 ≥0.4.2 + 세션 변수 강제 (I-21)
 
@@ -176,7 +176,7 @@ SELECT default_version FROM pg_available_extensions WHERE name='vector';
 - `backend/pyproject.toml` — `pgvector>=0.4.2,<1.0.0` (Python 패키지는 0.4.2부터 `sqlalchemy.HALFVEC` 지원. **서버 확장**은 별도로 `>=0.8` 요구 — Stage 3 §1-A 사전 SQL로 검증)
 - `backend/scripts/reindex_vectors.py` + `bench_vector_search.py` 신설
 - `docs/guides/pgvector-reindex.md` 신설
-- (별도 PR) ivfflat drop
+- ~~(별도 PR) ivfflat drop~~ → **동일 마이그레이션** drop (AD-56 정정 2026-05-15)
 
 ### Stage 5 (검증)
 - `backend/tests/embeddings/test_halfvec_migration.py` — alembic up/down + EXPLAIN `Index Scan using idx_chunks_hnsw` 검증
@@ -217,7 +217,7 @@ SELECT default_version FROM pg_available_extensions WHERE name='vector';
 - 검증 실패 시 `alembic downgrade -1` + branch swap
 
 ### Stage 5 측정 실패 시 (recall@10 < 0.95×baseline)
-- 본 ADR rollback. ivfflat은 별도 PR drop 전이므로 그대로 사용 가능
+- 본 ADR rollback. `alembic downgrade -1`이 vector 컬럼 + ivfflat 인덱스 (`idx_chunks_vector` / `idx_cache_vector`) 동시 복구 (AD-56 정정 2026-05-15에서 downgrade 보강).
 - `_apply_hnsw_session_params` 호출 제거 + CAST halfvec→vector 복귀 + 컬럼 타입 ALTER 역마이그레이션
 
 ---

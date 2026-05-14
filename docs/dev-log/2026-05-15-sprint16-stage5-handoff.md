@@ -245,17 +245,9 @@ uv run pytest tests/embeddings/test_halfvec_migration.py -v
 
 측정 모두 합격 시 `docs/dev-log/020-pgvector-hnsw-halfvec.md` 헤더 `> **상태:** Proposed` → `Accepted` patch.
 
-### 4-E. (별도 PR) ivfflat drop
+### 4-E. ivfflat drop — **본 마이그레이션 동일 revision (AD-56 정정 2026-05-15 Stage 5)**
 
-본 PR 머지 후 별도 PR로:
-```python
-# backend/alembic/versions/<new>_drop_ivfflat_indexes.py
-with op.get_context().autocommit_block():
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS idx_chunks_vector")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS idx_cache_vector")
-```
-
-AD-56 — 2단계 배포 원칙 (backend.md §9).
+별도 PR 불가 — `vector_cosine_ops` operator class가 halfvec 컬럼과 호환 불가 → ALTER COLUMN TYPE 시 `DatatypeMismatchError`. ivfflat drop은 b2c3d4e5f6a7 upgrade() step 2.5에서 강제. backend.md §9 2단계 배포 원칙은 컬럼 타입 유지 expression index 패턴 전용. 안전망 = downgrade에서 ivfflat 재생성.
 
 ---
 
@@ -268,7 +260,7 @@ AD-56 — 2단계 배포 원칙 (backend.md §9).
   - pgvector 캐스팅 = NULL safe (CASE WHEN)
   - SET LOCAL은 트랜잭션 범위 — repository 진입에서 매번 호출
   - Neon branch backup = pgvector 메이저 마이그레이션 안전망
-  - 2단계 배포: 신규 인덱스 → 측정 → 별도 PR로 구 인덱스 drop
+  - 2단계 배포 (AD-56 정정 2026-05-15): expression index 패턴 = 별도 PR drop 가능. **컬럼 타입 변경 패턴 = 동일 revision drop 강제** (operator class 호환성)
   - **pgvector Python 패키지(`HALFVEC`) vs 서버 확장(`iterative_scan`) 의존 분리**
   - **pgvector-python 0.4.2 sqlalchemy 모듈 export 이름은 `HALFVEC` (대문자) — 0.3+ 명세 다를 수 있어 직접 소스 확인 필수**
 
@@ -298,7 +290,7 @@ ADR-019 (Gemini 2.5 → 3.1-flash-lite) Phase B 코드 swap은 본 sprint와 직
 4. ⬜ Stage 6 회고 + PR 푸시
 5. ⬜ PR 머지
 6. ⬜ ADR-019 Phase B 별도 PR (model_id swap, 6 spots) — 데모 종료 (Day 14 = 2026-05-28) 후
-7. ⬜ ivfflat drop 별도 PR (Stage 5 측정 통과 + 본 sprint PR 머지 후)
+7. ~~ivfflat drop 별도 PR~~ → 본 sprint 마이그레이션 b2c3d4e5f6a7에서 동일 revision drop (AD-56 정정 2026-05-15)
 
 ---
 

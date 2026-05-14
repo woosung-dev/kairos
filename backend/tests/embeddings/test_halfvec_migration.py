@@ -339,15 +339,19 @@ _TEST_WS_ID = "00000000-0000-0000-0000-0000000000aa"
 
 
 async def _seed_workspace(session):
-    """FK 위반 회피용 user + workspace seed (멱등)."""
+    """FK 위반 회피용 user + workspace seed (멱등).
+
+    asyncpg는 `:name::type` 형식의 PG cast를 `:name` + `:type` 두 파라미터로 오인 →
+    `CAST(:name AS type)` 표준 SQL 사용.
+    """
     # 1. user
     await session.execute(
         text(
             """
             INSERT INTO users (id, clerk_id, email, display_name, created_at, updated_at)
-            SELECT :uid::uuid, 'clerk_test_halfvec', 'halfvec@test.kairos',
+            SELECT CAST(:uid AS uuid), 'clerk_test_halfvec', 'halfvec@test.kairos',
                    'halfvec tester', now(), now()
-            WHERE NOT EXISTS (SELECT 1 FROM users WHERE id = :uid::uuid)
+            WHERE NOT EXISTS (SELECT 1 FROM users WHERE id = CAST(:uid AS uuid))
             """
         ),
         {"uid": _TEST_USER_ID},
@@ -358,8 +362,9 @@ async def _seed_workspace(session):
             """
             INSERT INTO workspaces (id, name, type, owner_id, inbox_threshold,
                                     created_at, updated_at)
-            SELECT :wid::uuid, 'test-ws', 'personal', :uid::uuid, 0.9, now(), now()
-            WHERE NOT EXISTS (SELECT 1 FROM workspaces WHERE id = :wid::uuid)
+            SELECT CAST(:wid AS uuid), 'test-ws', 'personal',
+                   CAST(:uid AS uuid), 0.9, now(), now()
+            WHERE NOT EXISTS (SELECT 1 FROM workspaces WHERE id = CAST(:wid AS uuid))
             """
         ),
         {"wid": _TEST_WS_ID, "uid": _TEST_USER_ID},

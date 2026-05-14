@@ -139,14 +139,15 @@ def upgrade() -> None:
             WITH (m = 16, ef_construction = 64)
         """)
 
-    # 5. 기존 ivfflat 인덱스는 본 revision에서 drop 하지 않음 (AD-56 — 별도 PR)
-    # Stage 5 측정 통과 후 별도 commit에서:
-    # op.execute("DROP INDEX CONCURRENTLY IF EXISTS idx_chunks_vector")
-    # op.execute("DROP INDEX CONCURRENTLY IF EXISTS idx_cache_vector")
+    # 5. (AD-56 정정 2026-05-15 Stage 5) 기존 ivfflat 인덱스는 step 2.5 (컬럼 타입 변경 직전)에서
+    #    동일 revision drop 강제. 이유 = `vector_cosine_ops` operator class는 halfvec 컬럼과 호환
+    #    불가 → ALTER COLUMN TYPE 시 `DatatypeMismatchError`. backend.md §9 2단계 배포 원칙은
+    #    컬럼 타입을 유지하는 expression index 패턴 전용.
+    # 안전망 = downgrade에서 ivfflat 재생성 (CONCURRENTLY).
 
 
 def downgrade() -> None:
-    # 역순: halfvec → vector 컬럼 + HNSW drop + ivfflat은 유지된 상태 가정
+    # 역순: HNSW drop → halfvec → vector 컬럼 복귀 → ivfflat 재생성 (AD-56 정정).
     with op.get_context().autocommit_block():
         op.execute("DROP INDEX CONCURRENTLY IF EXISTS idx_chunks_hnsw")
         op.execute("DROP INDEX CONCURRENTLY IF EXISTS idx_cache_hnsw")
@@ -417,9 +418,8 @@ if __name__ == "__main__":
 | Stage 3 진입 직전 | Neon 0.8 미지원 | 본 sprint 보류, ADR-020 Status Proposed 유지 |
 | Stage 4 alembic upgrade | CONCURRENTLY 락 충돌 / 캐스팅 실패 | downgrade -1 + 원인 분석 + 수정 후 재시도 |
 | Stage 4 backend 기존 test 회귀 | repository CAST halfvec 오류 | repository.py revert + 모델 revert + downgrade |
-| Stage 5 recall@10 < 0.95×baseline | halfvec 정밀도 부족 | ADR-020 rollback + Neon branch swap. ivfflat 인덱스 유지 상태라 즉시 복구 가능 |
+| Stage 5 recall@10 < 0.95×baseline | halfvec 정밀도 부족 | ADR-020 rollback + Neon branch swap. **ivfflat 인덱스는 alembic downgrade에서 재생성됨** (AD-56 정정 2026-05-15) |
 | Stage 5 p95 > baseline × 1.2 | HNSW 그래프 메모리 압박 | ef_search 재튜닝 → 재측정. 또는 m 조정. 그래도 미달 시 rollback |
-| (별도 PR) ivfflat drop 후 회귀 | HNSW 인덱스 손상 | `CREATE INDEX CONCURRENTLY idx_chunks_vector USING ivfflat ...` 즉시 복구 + HNSW 재빌드 |
 
 ---
 
@@ -438,10 +438,9 @@ if __name__ == "__main__":
 | `rag/service.py` / `rag/pipeline_service.py` | sprint-15 미변경 | 호출자 변경 없음 (R-13 강제만) | ✅ 없음 |
 
 **결론**: 본 sprint와 ADR-019 Phase B는 완전 직교. 둘 다 Sprint 16에 들어가도 별도 commit이면 충돌 없음. 권장 commit 순서:
-1. 본 ADR-020 Stage 4 코드 swap
+1. 본 ADR-020 Stage 4 코드 swap (단일 alembic revision — ivfflat drop + halfvec ALTER + HNSW 재정의 동시 진행, AD-56 정정 2026-05-15)
 2. 본 ADR-020 Stage 5 검증 통과
-3. ADR-019 Phase B Gemini model_id swap
-4. 본 ADR-020 별도 PR로 ivfflat drop
+3. ADR-019 Phase B Gemini model_id swap (별도 PR, Day 14 후)
 
 ---
 
