@@ -55,9 +55,9 @@ export default function RecallMetricsPage() {
   return (
     <main className="p-8 max-w-3xl">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold">Recall Metrics</h1>
+        <h1 className="text-2xl font-semibold">메모리 메트릭</h1>
         <p className="text-sm text-muted-foreground">
-          현재 워크스페이스의 capture / recall / promote 누적 + recall latency p50/p95.
+          현재 워크스페이스의 캡쳐 / 회상 / 프로모트 누적 + 회상 latency p50/p95.
           30초마다 자동 갱신.
         </p>
       </header>
@@ -70,19 +70,19 @@ export default function RecallMetricsPage() {
       {data && (
         <dl className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="rounded-lg border border-border p-4">
-            <dt className="text-xs uppercase text-muted-foreground mb-1">Capture</dt>
+            <dt className="text-xs uppercase text-muted-foreground mb-1">캡쳐</dt>
             <dd className="text-3xl font-mono">{data.capture_count}</dd>
           </div>
           <div className="rounded-lg border border-border p-4">
-            <dt className="text-xs uppercase text-muted-foreground mb-1">Recall</dt>
+            <dt className="text-xs uppercase text-muted-foreground mb-1">회상</dt>
             <dd className="text-3xl font-mono">{data.recall_count}</dd>
           </div>
           <div className="rounded-lg border border-border p-4">
-            <dt className="text-xs uppercase text-muted-foreground mb-1">Promote</dt>
+            <dt className="text-xs uppercase text-muted-foreground mb-1">프로모트</dt>
             <dd className="text-3xl font-mono">{data.promote_count}</dd>
           </div>
           <div className="rounded-lg border border-border p-4">
-            <dt className="text-xs uppercase text-muted-foreground mb-1">Recall p50 / p95</dt>
+            <dt className="text-xs uppercase text-muted-foreground mb-1">회상 p50 / p95</dt>
             <dd className="text-xl font-mono">
               {data.recall_p50_ms ?? "—"} / {data.recall_p95_ms ?? "—"}
               <span className="text-xs text-muted-foreground ml-1">ms</span>
