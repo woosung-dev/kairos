@@ -266,11 +266,20 @@ class MemoryRepository:
         normalized_query: str,
         embedding: list[float],
     ) -> None:
-        """C3: cache 저장. composite PK 중복 시 race condition은 무시 (다음 lookup이 어차피 hit)."""
-        cache = MemoryQueryEmbeddingCache(
-            workspace_id=workspace_id,
-            normalized_query=normalized_query,
-            embedding=embedding,
+        """C3: cache 저장. composite PK 중복 시 INSERT skip (race condition safe)."""
+        # PostgreSQL ON CONFLICT DO NOTHING — 동시 recall 두 건이 동일 query 미스 시 두 번째 INSERT가 IntegrityError 일으키지 않음
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        stmt = (
+            pg_insert(MemoryQueryEmbeddingCache.__table__)
+            .values(
+                workspace_id=workspace_id,
+                normalized_query=normalized_query,
+                embedding=embedding,
+            )
+            .on_conflict_do_nothing(
+                index_elements=["workspace_id", "normalized_query"]
+            )
         )
-        self.session.add(cache)
+        await self.session.execute(stmt)
         await self.session.flush()
