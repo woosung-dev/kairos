@@ -245,6 +245,10 @@
 - [ ] **S16-T5** Voice note 모델 (Meeting과 별개) + STT + Gemini 요약 + 태그 자동
 - [ ] **S16-T6** Personal workspace에서 음성 메모 첫 진입 시나리오 lock-in
 
+### Sprint 17+ candidates (Sprint 15 lock-in)
+
+- [ ] **P0 S17-T-GEMINI-EOL** — Gemini 2.5 Flash EOL 2026-06-17 대응 ADR + Gemini 2.5 Pro / Flash 2.0 마이그레이션 plan. Day 0 spike (`backend/scripts/sprint15_day0_spike.py`)에 response header deprecation probe 1줄 inline. 결과 spike doc 별도 섹션. Sprint 16 진입 시 ADR-019 신설.
+
 ### 진행 중 (ADR-008 DevEx 후속)
 
 - [ ] **GCP WIF 초기 설정 + Secret Manager 9개 이관** (사용자 작업) — `docs/guides/deployment.md` §2.5.1 참조

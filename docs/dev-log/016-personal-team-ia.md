@@ -30,6 +30,8 @@ Sprint 14 AD-39 소진 후 AD-40부터 시작.
 
 - **AD-40**: Option D (Personal workspace + Promotion flow, Notion 패턴) 채택 — A/B/C 대비. 자의 = "workspace 단위 격리(헌법 I-9)와 일관성 + 사용자 mental model 명확성" 트레이드오프에서 단순함 + 보안 선택.
 - **AD-41**: Promotion = **복제 + tombstone** (이동 아님). 자의 = 감사 추적 + 원본 변경 시 팀 자산 영향 차단 + 롤백 가능성. 복제 비용(스토리지 2x)은 텍스트 + 1536d 임베딩 기준 무시 가능.
+
+> **[2026-05-14 reframe note]** Promotion = post-Recall-validation feature. v1 wedge 아니며 Sprint 17+ 정식 implementation. Recall demand 검증 (Sprint 15 R8 success criteria 충족) 통과 시 진입. Sprint 15에서는 S15-R6 1-button promote prototype만 (audit row 1개, multi-team/chain/review queue 모두 후순위). 근거: Stage 1 design doc `~/.gstack/projects/woosung-dev-kairos/woosung-sprint-15-personal-workspace-design-20260514-090026.md` §Premise 5 revision.
 - **AD-42**: visibility enum 4번째(`personal`) 추가하지 **않음** — workspace 단위 분리로 충분. 자의 = enum 폭증 회피 + 권한 코드 분기 단순화. Project.visibility는 그대로 public/draft/private 3개.
 - **AD-43**: Personal workspace는 항상 **1명, 팀 초대 불가** (BE schema 제약으로 강제). 자의 = 사용자 실수로 팀 노출 방지 + privacy 보장 단순화.
 - **AD-44**: Promotion review queue (v1.7)는 Sprint 17에서 결정 — 1차는 admin auto-accept 가능 (특히 1인 founder가 본인 personal → 본인이 admin인 team으로 promote 시 마찰 없음).
