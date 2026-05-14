@@ -247,7 +247,7 @@ class MemoryRepository:
         normalized_query: str,
         ttl_days: int = 7,
     ) -> list[float] | None:
-        """C3: 7일 TTL cache lookup."""
+        """C3: 7일 TTL cache lookup. pgvector ndarray → Python float list 명시 변환."""
         cutoff = datetime.utcnow() - timedelta(days=ttl_days)
         stmt = select(MemoryQueryEmbeddingCache).where(
             MemoryQueryEmbeddingCache.workspace_id == workspace_id,
@@ -256,9 +256,12 @@ class MemoryRepository:
         )
         result = await self.session.execute(stmt)
         cached = result.scalar_one_or_none()
-        if cached is None:
+        if cached is None or cached.embedding is None:
             return None
-        return list(cached.embedding) if cached.embedding else None
+        # pgvector는 read 시 numpy.ndarray로 디스크라이즈. asyncpg가 pgvector text 형식으로
+        # bind할 때 numpy float를 직렬화 못해서 SerializationError → vector_search 500.
+        # native Python float list로 명시 캐스팅하여 driver 호환 보장.
+        return [float(x) for x in cached.embedding]
 
     async def save_query_embedding_cache(
         self,
