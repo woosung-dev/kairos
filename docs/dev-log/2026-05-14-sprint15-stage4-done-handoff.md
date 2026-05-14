@@ -101,6 +101,20 @@ http://localhost:3000
 6. /admin/recall-metrics → 5 metric 노출 (founder Clerk ID gate)
 ```
 
+### 3.1.a BE-only 자동화 smoke (시간 절감)
+
+`backend/scripts/dogfood_smoke.py` — 5+1 시나리오 BE 직접 호출. ~10분 → ~30초.
+
+```bash
+# Clerk JWT 추출 (브라우저 devtools → Application → Cookies → __session 또는 Clerk dashboard)
+export CLERK_JWT=eyJ...
+
+cd backend && uv run uvicorn src.main:app --reload &
+cd backend && uv run python scripts/dogfood_smoke.py
+```
+
+step 1~6 pass/fail + 누적 elapsed 출력. FE 시각 검증 (사이드바 NEW pill / FAB / Modal)은 별도 브라우저 확인. 본 smoke = BE coverage only.
+
 ### 3.2 Audio sample 녹음 가이드
 
 `backend/scripts/samples/README.md` 참조. 7개 audio (chrome 10s/60s/5min, ios 10s/60s, ko_filler 60s, silent 10s). 녹음 후:
