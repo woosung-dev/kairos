@@ -37,12 +37,20 @@
 - **AD-54**: 파티셔닝 **제외**. 자의 = kairos 현 데이터 규모 작음(chunk 만 단위) → 조기 최적화 회피. BL-022 등재 (workspace 100+ 또는 chunk 100만+ 트리거).
 - **AD-55**: SET LOCAL 호출 위치는 **embeddings/repository.py 내부** (`_apply_hnsw_session_params(session)` 헬퍼). 자의 = embeddings 도메인 캡슐화. RAG service가 별도 호출 안 함 → ADR-014 옵션 A 책임 분리 유지.
 - **AD-56**: ivfflat 인덱스 drop은 **별도 PR**. 자의 = backend.md §9 2단계 배포 원칙. HNSW 신규 생성 → Stage 5 측정 통과 → ivfflat drop 별도 commit. 롤백 안전망.
+- **AD-57**: Python 패키지(`pgvector` PyPI) vs 서버 확장(`vector` PostgreSQL) 의존 분리 명시. 자의 = 0.4.2 sqlalchemy/__init__.py에서 HALFVEC export 확인 → Python 패키지 ≥0.4.2 충분. 서버 확장 ≥0.8 (iterative_scan)은 별도 검증 (Stage 3 §1-A).
+- **AD-58**: `memory_query_embedding_cache.embedding` (Sprint 15 신설) 도 본 sprint에서 halfvec 전환. 자의 = `memory/repository.py:vector_search`가 `embedding_chunks` halfvec와 JOIN하므로 query 임베딩 캐시 타입도 동일해야 cosine `<=>` 정합 + bindparam type 정합. plan §11 누락 retrofit.
+- **AD-59**: `semantic_caches` fillfactor 80 + autovacuum_analyze_scale_factor 0.02 본 sprint 적용. 자의 = `hit_count` 매 hit마다 UPDATE → 당근 §4-B "갱신 잦은 컬럼" 권고 단기 대응 (HOT update). 컬럼 분리는 BL-023 등재 (장기). `embedding_chunks` + `memory_query_embedding_cache` 도 analyze scale_factor 0.05로 통계 갱신 빈도 상향 (HNSW 그래프 통계 최신화).
 
 ---
 
 ## 결정
 
 ### 1. 벡터 컬럼 타입 — halfvec(1536) 고정 (I-20)
+
+**적용 범위 (3개 컬럼)**:
+- `embedding_chunks.embedding` (embeddings 도메인)
+- `semantic_caches.question_embedding` (embeddings 도메인)
+- `memory_query_embedding_cache.embedding` (memory 도메인, Sprint 15 신설 — embedding_chunks JOIN 타입 정합 위해 동일 sprint 일관 전환. AD-58)
 
 ```python
 # backend/src/embeddings/models.py

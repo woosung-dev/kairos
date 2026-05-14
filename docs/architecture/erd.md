@@ -217,7 +217,7 @@ erDiagram
     MemoryQueryEmbeddingCache {
         uuid workspace_id PK "FK + composite PK"
         string normalized_query PK "lowercased + trimmed"
-        vector embedding "1536차원"
+        halfvec embedding "1536차원 fp16 (Sprint 16 ADR-020)"
         timestamp created_at
     }
 

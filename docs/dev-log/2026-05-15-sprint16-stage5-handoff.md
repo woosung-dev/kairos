@@ -10,13 +10,42 @@
 ## 1. 완료 상태 (commit history)
 
 ```
+(예정) Stage 4 보강 — memory 도메인 patch + 운영 정책 + BL-023~026 등재 (P0/P1 누락 retrofit)
+c5e3861 Stage 5 진입 — HALFVEC 정정 + Python/서버 분리 + BL-022 + handoff
 51acf11 feat(embeddings): Stage 4 — pgvector HNSW + halfvec 전환 + iterative_scan + REINDEX 운영
 2017d86 docs(sprint-16): Stage 3 — pgvector 마이그레이션 plan + 사전 차단 체크리스트
 55f8008 docs(sprint-16): Stage 1 — ADR-020 신설 + PRD RAG KPI + rag-pipeline HNSW 표기
 ed062c3 docs(sprint-16): Stage 0 — pgvector 도메인 용어 lock-in + I-20/I-21 신설
 ```
 
-origin/main 대비 **4 commits ahead, 미푸시**.
+origin/main 대비 **6 commits ahead, 미푸시**.
+
+### 보강 commit 내용 (Stage 4 P0/P1 누락 retrofit)
+
+**P0 누락 적발 (사용자 지적 2026-05-15 — 본 sprint 깊이 부족 진단)**:
+- `memory/repository.py:vector_search` — `embedding_chunks` 직접 SQL JOIN. `_VECTOR_TYPE = Vector(1536)` bind. SET LOCAL 미호출 → I-21 위반
+- `memory/models.py:MemoryQueryEmbeddingCache.embedding` — `Vector(1536)` (Sprint 15 신설)
+- alembic 마이그레이션에 `memory_query_embedding_cache` 컬럼 변경 미포함
+
+**P1 누락 적발 (영상 §4-B 갱신 잦은 컬럼 분리 권고)**:
+- `semantic_caches.hit_count` 매 hit UPDATE → dead tuple 양산. fillfactor + autovacuum 정책 0회 적용
+- HNSW 그래프 통계 갱신을 위한 ANALYZE 빈도 조정 누락
+
+**P0/P1 해소 (본 보강 commit)**:
+- `memory/repository.py` — `_VECTOR_TYPE` → `_HALFVEC_TYPE` + `_apply_hnsw_session_params` import + 호출
+- `memory/models.py` — `Vector` → `HALFVEC` (MemoryQueryEmbeddingCache)
+- alembic — step 3-b (`memory_query_embedding_cache` halfvec ALTER) + step 6 (fillfactor 80 + autovacuum_analyze_scale_factor 0.02/0.05)
+- `embeddings/CONTEXT.md` — E-9 (외부 도메인 헬퍼 호출 강제) + E-10 (운영 정책) 신설
+- ADR-020 §"Decision" 1 — 적용 범위 3개 컬럼 명시 + AD-57~59 추가
+- plan §11 — memory 영향 LOW → HIGH 정정
+- CONTEXT-MAP §2 — MemoryQueryEmbeddingCache halfvec 표기
+- erd.md 220줄 — halfvec 표기
+
+**BL 등재 (P2/P3)**:
+- BL-023 — `semantic_caches.hit_count` 별도 테이블 분리 (장기, 컬럼 분리)
+- BL-024 — pg_prewarm 정책 (Cloud Run cold start 시 인덱스 워밍업)
+- BL-025 — 읽기 분산 (Neon read replica + 라우팅)
+- BL-026 — 측정 강화 (nDCG / precision / 인덱스 빌드 시간 / EXPLAIN ANALYZE 헬퍼)
 
 | Stage | 산출물 | 상태 |
 |---|---|---|
@@ -163,7 +192,10 @@ TestContainers `pgvector/pgvector:pg16` 이미 0.8+ 지원이라 통합 테스�
 | p50 (ms) | 측정값 | 측정값 | 비율 | ≤1.0× |
 | p95 (ms) | 측정값 | 측정값 | 비율 | ≤1.2× |
 | 인덱스 크기 (idx_chunks_*) | 측정값 | 측정값 | 비율 | (참고) |
-| 인덱스 빌드 시간 | 측정값 | 측정값 | 비율 | (참고) |
+| 인덱스 빌드 시간 | 측정값 | 측정값 | 비율 | (참고) — BL-026 |
+| nDCG@10 | 측정값 | 측정값 | 비율 | ≥0.95 (BL-026) |
+| precision@10 | 측정값 | 측정값 | 비율 | ≥0.90 (BL-026) |
+| memory recall (`memory/repository.py:vector_search`) | 측정값 | 측정값 | 비율 | ef_search 적용 EXPLAIN 검증 |
 
 ### 4-D. ADR-020 Status → Accepted
 

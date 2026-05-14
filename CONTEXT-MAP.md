@@ -45,7 +45,7 @@
 | **MemoryItem** | memory | Recall-first wedge. `type`: `text` / `voice`. status: `processing` / `transcription_pending` / `embedding_pending` / `embedding_failed` / `active` / `archived`. `r2_audio_key` (voice, 30일 TTL) + `distilled_json` (Gemini 출력) | (workspace_id, id). Sprint 15 신설 |
 | **PromoteAudit** | memory | Promote (복제 + tombstone) 감사 row. `memory_id` (source) + `target_workspace_id` + `new_memory_id` + `promoted_by_user_id`. **I-18 강제** | (memory_id, new_memory_id). Sprint 15 신설 |
 | **MemoryAiCall** | memory | distill / embedding / transcribe 호출 cost+latency 로그. `model_id` + `tokens_in/out` + `cost_usd` + `elapsed_ms` | memory_id 범위. Sprint 15 신설 |
-| **MemoryQueryEmbeddingCache** | memory | Recall query 임베딩 캐시 (C3 fix). normalized_query + workspace_id 복합 키 | (workspace_id, normalized_query). Sprint 15 신설 |
+| **MemoryQueryEmbeddingCache** | memory | Recall query 임베딩 캐시 (C3 fix). 1536d **halfvec** (Sprint 16 ADR-020 — embedding_chunks JOIN 타입 정합). normalized_query + workspace_id 복합 키 | (workspace_id, normalized_query). Sprint 15 신설 |
 | **MemoryEvent** | memory | R7 metrics 원천 (capture / recall / promote count + recall latency). Cloud Run stateless 정합. memory_id 가 nullable (recall 이벤트는 memory FK 없음) | (workspace_id, event_type, created_at). Sprint 15 신설 |
 | **EmbeddingChunk** | embeddings | 1536d **halfvec** 벡터 (Sprint 16 ADR-020 — fp16, 4B→2B) + 계층 (L1/L2 사용, L0 미사용). MemoryItem도 source_type=`memory`로 적재 | source_type + source_id + chunk_index |
 | **SemanticCache** | embeddings | TTL 7일, 유사도 ≥0.93 히트. 1536d **halfvec** 벡터 (Sprint 16 ADR-020). RAG는 호출자(read/write) | PK `id`. 의미적 식별 (workspace_id, project_id, question_embedding) — DB unique constraint 없음 |

@@ -67,6 +67,16 @@ def upgrade() -> None:
                     ELSE question_embedding::halfvec(1536) END)
         """
     )
+    # 3-b. memory_query_embedding_cache (Sprint 15 신설) — 동일 sprint 일관 halfvec 전환.
+    #      memory/repository.py:vector_search가 embedding_chunks (halfvec) JOIN하므로
+    #      query 임베딩 캐시도 동일 타입이 정합. 인덱스 없음 (PK lookup).
+    op.execute(
+        """
+        ALTER TABLE memory_query_embedding_cache
+        ALTER COLUMN embedding TYPE halfvec(1536)
+        USING embedding::halfvec(1536)
+        """
+    )
 
     # 4. 컬럼 타입 변경 후 인덱스 재정의 (캐스팅 표현 → 직접 컬럼 참조).
     #    planner 최적화 + 인덱스 정의 단순화.
@@ -95,9 +105,31 @@ def upgrade() -> None:
     #       DROP INDEX CONCURRENTLY IF EXISTS idx_chunks_vector;
     #       DROP INDEX CONCURRENTLY IF EXISTS idx_cache_vector;
 
+    # 6. 운영 정책 — fillfactor (HOT update) + autovacuum_analyze_scale_factor.
+    #    당근 DB 밋업 §4-B "갱신 잦은 컬럼 분리" 권고를 단기 적용 (컬럼 분리는 BL-023 등재).
+    #    semantic_caches.hit_count는 매 hit마다 UPDATE → HOT update 활성화 + 통계 자주 갱신.
+    op.execute(
+        "ALTER TABLE semantic_caches "
+        "SET (fillfactor = 80, autovacuum_analyze_scale_factor = 0.02)"
+    )
+    # embedding_chunks는 INSERT 위주이나 HNSW 그래프 통계 갱신을 위해 analyze 빈도 상향.
+    op.execute(
+        "ALTER TABLE embedding_chunks "
+        "SET (autovacuum_analyze_scale_factor = 0.05)"
+    )
+    # memory_query_embedding_cache는 INSERT/DELETE 위주 (TTL 7일 만료). 동일 정책.
+    op.execute(
+        "ALTER TABLE memory_query_embedding_cache "
+        "SET (autovacuum_analyze_scale_factor = 0.05)"
+    )
+
 
 def downgrade() -> None:
-    # 역순: HNSW drop + halfvec → vector 컬럼 복귀 (ivfflat은 유지된 상태 가정).
+    # 역순: 운영 정책 RESET → HNSW drop → halfvec → vector 컬럼 복귀 (ivfflat은 유지된 상태 가정).
+    op.execute("ALTER TABLE semantic_caches RESET (fillfactor, autovacuum_analyze_scale_factor)")
+    op.execute("ALTER TABLE embedding_chunks RESET (autovacuum_analyze_scale_factor)")
+    op.execute("ALTER TABLE memory_query_embedding_cache RESET (autovacuum_analyze_scale_factor)")
+
     with op.get_context().autocommit_block():
         op.execute("DROP INDEX CONCURRENTLY IF EXISTS idx_chunks_hnsw")
         op.execute("DROP INDEX CONCURRENTLY IF EXISTS idx_cache_hnsw")
@@ -115,5 +147,12 @@ def downgrade() -> None:
         ALTER COLUMN question_embedding TYPE vector(1536)
         USING (CASE WHEN question_embedding IS NULL THEN NULL
                     ELSE question_embedding::vector(1536) END)
+        """
+    )
+    op.execute(
+        """
+        ALTER TABLE memory_query_embedding_cache
+        ALTER COLUMN embedding TYPE vector(1536)
+        USING embedding::vector(1536)
         """
     )

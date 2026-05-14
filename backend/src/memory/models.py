@@ -17,9 +17,10 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
 try:
-    from pgvector.sqlalchemy import Vector
+    # Sprint 16 ADR-020: Vector → HALFVEC (fp16, 4B→2B). MemoryQueryEmbeddingCache 정합.
+    from pgvector.sqlalchemy import HALFVEC
 except ImportError:
-    Vector = None  # 패키지 미설치 시 fallback
+    HALFVEC = None  # 패키지 미설치 시 fallback
 
 
 class MemoryItem(SQLModel, table=True):
@@ -137,6 +138,6 @@ class MemoryQueryEmbeddingCache(SQLModel, table=True):
         sa_column=Column(Text, nullable=False, primary_key=True)
     )
     embedding: list[float] = Field(
-        sa_column=Column(Vector(1536) if Vector else Text, nullable=False)
+        sa_column=Column(HALFVEC(1536) if HALFVEC else Text, nullable=False)
     )
     created_at: datetime = Field(default_factory=datetime.utcnow)

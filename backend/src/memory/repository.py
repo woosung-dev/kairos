@@ -21,11 +21,16 @@ from src.memory.models import (
 )
 
 try:
-    from pgvector.sqlalchemy import Vector
+    # Sprint 16 ADR-020: Vector → HALFVEC (fp16). embedding_chunks 컬럼이 halfvec(1536)이라
+    # bindparam 타입도 동일하게 맞춰서 `<=>` 연산자가 halfvec_cosine_ops 인덱스를 타게 함.
+    from pgvector.sqlalchemy import HALFVEC
 
-    _VECTOR_TYPE: Any = Vector(1536)
+    _HALFVEC_TYPE: Any = HALFVEC(1536)
 except ImportError:
-    _VECTOR_TYPE = None
+    _HALFVEC_TYPE = None
+
+# 본 sprint 이후 EmbeddingChunk + MemoryQueryEmbeddingCache 양쪽 모두 halfvec 컬럼.
+from src.embeddings.repository import _apply_hnsw_session_params  # I-21 HNSW 세션 변수
 
 
 class MemoryRepository:
@@ -166,7 +171,13 @@ class MemoryRepository:
         query_embedding: list[float],
         top_k: int,
     ) -> list[tuple]:
-        """pgvector cosine similarity (A7 typed bind). I-9 workspace_id 강제."""
+        """pgvector cosine similarity (A7 typed bind). I-9 workspace_id 강제.
+
+        Sprint 16 ADR-020 — halfvec 컬럼 + HNSW 인덱스 사용.
+        I-21: 트랜잭션 진입 시 SET LOCAL ef_search/iterative_scan/max_scan_tuples.
+        """
+        await _apply_hnsw_session_params(self.session)
+
         sql = text(
             """
             SELECT mi.id, mi.distilled_json, mi.raw_content, mi.created_at,
@@ -180,8 +191,8 @@ class MemoryRepository:
             LIMIT :limit
             """
         )
-        if _VECTOR_TYPE is not None:
-            sql = sql.bindparams(bindparam("qvec", type_=_VECTOR_TYPE))
+        if _HALFVEC_TYPE is not None:
+            sql = sql.bindparams(bindparam("qvec", type_=_HALFVEC_TYPE))
         result = await self.session.execute(
             sql,
             {

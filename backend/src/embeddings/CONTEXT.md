@@ -42,6 +42,7 @@
 | in | `notes/pipeline_service` (NotePipelineService) | service | ADR-014 옵션 A — notes 작성 시 청크 적재 |
 | in | `meetings/pipeline_service` (process_meeting, capture_text) | service | 회의 transcript / capture 청크 적재 |
 | in | `memory/service` (orchestrator) | service | Sprint 15 Recall — capture/recall 시 청크 read/write. BL-006 등재 (pipeline_service.py 분리 예정) |
+| in | `memory/repository.py:vector_search` | repository (직접 SQL) | ⚠️ 본 도메인 우회 — `embedding_chunks` JOIN `memory_items` 직접 query. Sprint 16부터 `_apply_hnsw_session_params` 호출 강제 (E-9 / I-21). 본 도메인 캡슐화 약속 위반 후보 — BL-006 pipeline_service 분리 시 본 도메인 메서드로 흡수 검토 |
 | in | `rag/service` | service | RAG 6-Layer Layer 1/3 호출. ADR-014 옵션 A로 진입은 RagPipelineService |
 | out | DB (pgvector **서버 확장** ≥0.8 + HNSW + halfvec) | infra | `_apply_hnsw_session_params` 트랜잭션 변수 + `<=>` cosine + pg_trgm `%`. Python 패키지(`pgvector`)는 ≥0.4.2 (HALFVEC export 보장) |
 | out | `services/` (OpenAI text-embedding-3-small) | external wrapper | 임베딩 생성은 호출자 책임. embeddings 도메인은 vector 인자 받아 저장만 |
@@ -62,6 +63,8 @@
 | E-6 | `EmbeddingChunk.embedding` 별칭 금지 — `Vector` / `Embedding` 단수형 사용 금지 (CONTEXT-MAP §2-별칭) | code review |
 | E-7 (= I-20) | 벡터 컬럼 타입 `halfvec(1536)` 고정. ivfflat 신규 인덱스 금지. HNSW `m=16, ef_construction=64` 만 | `models.py` (HALFVEC import), `alembic/versions/<pgvector_hnsw_halfvec>.py` |
 | E-8 (= I-21) | 벡터 검색 트랜잭션 진입 시 `_apply_hnsw_session_params(session)` 호출 강제 — `ef_search=40` + `iterative_scan=relaxed_order` + `max_scan_tuples=20000` SET LOCAL. RBAC 포스트필터 결과 부족 해소 | `repository.py:vector_search` / `find_similar_cache` 진입 헬퍼 |
+| E-9 | **embedding_chunks 직접 SQL 사용 외부 도메인**도 `_apply_hnsw_session_params` 호출 강제 (Sprint 16). 본 도메인이 export하는 module-level 헬퍼를 import 후 진입 시 호출 — 캡슐화 우회의 최소 비용 약속. 현 외부 사용처: `memory/repository.py:vector_search`. BL-006 pipeline_service 분리 시 흡수 검토. | `memory/repository.py:163` |
+| E-10 | **운영 정책** (Sprint 16 ADR-020 §AD-59) — `semantic_caches` fillfactor 80 + autovacuum_analyze_scale_factor 0.02 (hit_count 빈번 UPDATE 대응). `embedding_chunks` + `memory_query_embedding_cache` autovacuum_analyze_scale_factor 0.05 (HNSW 통계 빈번 갱신). alembic `ALTER TABLE ... SET (...)` 명시. | `backend/alembic/versions/b2c3d4e5f6a7_pgvector_hnsw_halfvec.py` step 6 |
 
 > REINDEX CONCURRENTLY 운영 정책은 헌법 불변식이 아니라 운영 가이드 — `docs/guides/pgvector-reindex.md` + `backend/scripts/reindex_vectors.py` (Sprint 16 신설).
 

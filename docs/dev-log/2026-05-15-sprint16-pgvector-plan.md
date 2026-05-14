@@ -433,6 +433,7 @@ if __name__ == "__main__":
 | `alembic/env.py` | sprint-15 모델 import 추가 | 본 sprint 추가 없음 | ✅ 없음 |
 | `alembic/versions/` | a1b2c3d4e5f6 (sprint-15 memory) | NEW revision (`down_revision=a1b...`) | ✅ 없음, 선형 체인 |
 | `services/ai_processing.py` | ADR-019 Phase B에서 model_id swap 예정 (Sprint 16 별도 commit) | 본 sprint 영향 없음 | ✅ 없음 (별도 commit) |
+| `memory/repository.py` ⚠️ **본 sprint patch 필수** | sprint-15 `vector_search` 자체 구현 (`embedding_chunks` 직접 JOIN SQL) + `_VECTOR_TYPE = Vector(1536)` bind + `MemoryQueryEmbeddingCache.embedding Vector(1536)` 컬럼 | `_VECTOR_TYPE` → `_HALFVEC_TYPE` + `_apply_hnsw_session_params(session)` 호출 추가 + MemoryQueryEmbeddingCache halfvec 전환 | 🔴 **HIGH — Stage 4 보강 commit으로 처리** |
 | `memory/service.py` | recall path embedding 호출 | _apply_hnsw_session_params는 repository 내부 캡슐화로 호출자 변경 없음 | ✅ 없음 |
 | `rag/service.py` / `rag/pipeline_service.py` | sprint-15 미변경 | 호출자 변경 없음 (R-13 강제만) | ✅ 없음 |
 
