@@ -99,6 +99,10 @@ async def memory_client(integration_session, auth_user, monkeypatch):
         # (embedding, total_tokens, elapsed_ms, error) — error 반환으로 vector 경로 우회
         return [], 0, 0, "test-disabled"
 
+    async def _noop_promote_embed(**_kwargs):
+        # R6 promote bgtask — 외부 OpenAI 호출 차단 (audit row 검증은 동기 경로에서)
+        return None
+
     monkeypatch.setattr(
         MemoryService, "_bg_distill_and_embed", _noop_distill
     )
@@ -106,6 +110,9 @@ async def memory_client(integration_session, auth_user, monkeypatch):
         MemoryService, "_bg_transcribe_distill_embed", _noop_transcribe
     )
     monkeypatch.setattr(memory_service_module, "_call_embedding", _noop_embed)
+    monkeypatch.setattr(
+        memory_service_module, "_bg_promote_embed", _noop_promote_embed
+    )
 
     # session_factory는 lifespan 미실행이라 None — dummy 주입 (background no-op이므로 실제 미사용)
     def _dummy_factory():

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { useRecall } from "@/features/memory/hooks";
 import { CaptureSheet } from "@/features/memory/components/CaptureSheet";
+import { PromoteModal } from "@/features/memory/components/PromoteModal";
 import { RecallResultCard } from "@/features/memory/components/RecallResultCard";
 
 const DEBOUNCE_MS = 300;
@@ -31,6 +32,7 @@ export default function MemoryPage() {
 
   const [query, setQuery] = useState("");
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
+  const [promoteMemoryId, setPromoteMemoryId] = useState<string | null>(null);
   const debouncedQuery = useDebouncedValue(query, DEBOUNCE_MS);
 
   const isEmpty = !query.trim();
@@ -100,7 +102,11 @@ export default function MemoryPage() {
           )}
           <div className="flex flex-col gap-3">
             {data.sources.map((source) => (
-              <RecallResultCard key={source.memory_id} source={source} />
+              <RecallResultCard
+                key={source.memory_id}
+                source={source}
+                onPromote={(id) => setPromoteMemoryId(id)}
+              />
             ))}
           </div>
         </>
@@ -121,6 +127,17 @@ export default function MemoryPage() {
         open={isCaptureOpen}
         onOpenChange={setIsCaptureOpen}
       />
+
+      {promoteMemoryId && workspaceId && (
+        <PromoteModal
+          memoryId={promoteMemoryId}
+          sourceWorkspaceId={workspaceId}
+          open={promoteMemoryId !== null}
+          onOpenChange={(open) => {
+            if (!open) setPromoteMemoryId(null);
+          }}
+        />
+      )}
     </div>
   );
 }

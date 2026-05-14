@@ -48,3 +48,17 @@ class MemoryRecallOut(BaseModel):
     query: str
     sources: list[MemoryRecallSource]
     fallback_used: bool
+
+
+class MemoryPromoteIn(BaseModel):
+    """POST /memory/{id}/promote 요청 — 대상 팀 workspace."""
+
+    target_workspace_id: uuid.UUID
+
+
+class MemoryPromoteOut(BaseModel):
+    """POST /memory/{id}/promote 응답 — 복제본 + audit 식별자."""
+
+    new_memory_id: uuid.UUID
+    audit_id: uuid.UUID
+    status: str

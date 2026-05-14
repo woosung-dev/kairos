@@ -30,3 +30,27 @@ class WorkspaceMembershipError(HTTPException):
             status_code=403,
             detail="해당 워크스페이스 멤버가 아닙니다",
         )
+
+
+class TargetWorkspaceInvalidError(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=422,
+            detail="대상 워크스페이스가 유효하지 않습니다",
+        )
+
+
+class CannotPromoteToPersonalError(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=422,
+            detail="개인 워크스페이스로는 promote 할 수 없습니다",
+        )
+
+
+class CannotPromoteToSameWorkspaceError(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=422,
+            detail="같은 워크스페이스로는 promote 할 수 없습니다",
+        )

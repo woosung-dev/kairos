@@ -24,7 +24,13 @@ from src.auth.dependencies import get_current_user
 from src.auth.models import User
 from src.memory.dependencies import get_memory_service
 from src.memory.exceptions import EmptyMemoryError
-from src.memory.schemas import MemoryCreateOut, MemoryDetailOut, MemoryRecallOut
+from src.memory.schemas import (
+    MemoryCreateOut,
+    MemoryDetailOut,
+    MemoryPromoteIn,
+    MemoryPromoteOut,
+    MemoryRecallOut,
+)
 from src.memory.service import MemoryService
 
 router = APIRouter(
@@ -85,3 +91,24 @@ async def get_memory(
 ) -> MemoryDetailOut:
     """단일 메모 조회 — distilled_json / embedding_chunk_id / status 확인."""
     return await service.get_memory(memory_id, workspace_id)
+
+
+@router.post(
+    "/{memory_id}/promote", response_model=MemoryPromoteOut, status_code=202
+)
+async def promote_memory(
+    workspace_id: uuid.UUID,
+    memory_id: uuid.UUID,
+    body: MemoryPromoteIn,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    service: MemoryService = Depends(get_memory_service),
+) -> MemoryPromoteOut:
+    """R6: memory → team workspace 복제 + audit row + 백그라운드 embedding."""
+    return await service.promote(
+        memory_id=memory_id,
+        source_workspace_id=workspace_id,
+        target_workspace_id=body.target_workspace_id,
+        promoted_by_user_id=user.id,
+        background_tasks=background_tasks,
+    )

@@ -33,14 +33,23 @@ from src.common.r2 import R2Service
 from src.core.config import get_settings
 from src.memory.exceptions import (
     AudioTooLargeError,
+    CannotPromoteToPersonalError,
+    CannotPromoteToSameWorkspaceError,
     EmptyMemoryError,
     MemoryNotFoundError,
+    TargetWorkspaceInvalidError,
 )
-from src.memory.models import MemoryAICall, MemoryEvent, MemoryItem
+from src.memory.models import (
+    MemoryAICall,
+    MemoryEvent,
+    MemoryItem,
+    PromotionAudit,
+)
 from src.memory.repository import MemoryRepository
 from src.memory.schemas import (
     MemoryCreateOut,
     MemoryDetailOut,
+    MemoryPromoteOut,
     MemoryRecallOut,
     MemoryRecallSource,
 )
@@ -335,6 +344,109 @@ class MemoryService:
         )
         await self.repo.commit()
 
+    # ── R6 promote 1-button ──
+
+    async def promote(
+        self,
+        *,
+        memory_id: uuid.UUID,
+        source_workspace_id: uuid.UUID,
+        target_workspace_id: uuid.UUID,
+        promoted_by_user_id: uuid.UUID,
+        background_tasks: BackgroundTasks,
+    ) -> MemoryPromoteOut:
+        """1-button promote: 원본 보존 + target ws 복제 + audit row + bg embedding 재생성.
+
+        ADR-016 AD-41 (복제 + tombstone) — source MemoryItem.status 변경 없음.
+        검증: source != target / target type='team' / user가 target ws 멤버.
+        """
+        from sqlalchemy import select
+        from src.workspaces.models import Workspace, WorkspaceMember
+
+        if source_workspace_id == target_workspace_id:
+            raise CannotPromoteToSameWorkspaceError()
+
+        # 1. 원본 fetch (workspace_id 강제 필터로 I-9 격리)
+        source = await self.repo.get_by_id(memory_id, source_workspace_id)
+        if source is None:
+            raise MemoryNotFoundError()
+
+        # 2. target workspace 검증 — type='team' + user가 멤버
+        target_q = select(Workspace).where(Workspace.id == target_workspace_id)
+        target = (
+            await self.repo.session.execute(target_q)
+        ).scalar_one_or_none()
+        if target is None:
+            raise TargetWorkspaceInvalidError()
+        if getattr(target, "type", "team") == "personal":
+            raise CannotPromoteToPersonalError()
+        member_q = select(WorkspaceMember).where(
+            WorkspaceMember.workspace_id == target_workspace_id,
+            WorkspaceMember.user_id == promoted_by_user_id,
+        )
+        member = (
+            await self.repo.session.execute(member_q)
+        ).scalar_one_or_none()
+        if member is None:
+            raise TargetWorkspaceInvalidError()
+
+        # 3. 복제본 MemoryItem 신규 (원본은 그대로 보존)
+        duplicate = MemoryItem(
+            user_id=promoted_by_user_id,
+            workspace_id=target_workspace_id,
+            type=source.type,
+            raw_content=source.raw_content,
+            distilled_json=source.distilled_json,
+            r2_audio_key=source.r2_audio_key,
+            status="embedding_pending",
+        )
+        await self.repo.save_item(duplicate)
+
+        # 4. promotion_audit row
+        audit = PromotionAudit(
+            memory_id=source.id,
+            source_workspace_id=source_workspace_id,
+            target_workspace_id=target_workspace_id,
+            target_project_id=None,
+            promoted_by_user_id=promoted_by_user_id,
+            embedding_status="pending",
+        )
+        await self.repo.save_promotion_audit(audit)
+
+        # 5. promote 이벤트 (C7 DB-backed metrics)
+        await self.repo.save_event(
+            MemoryEvent(
+                workspace_id=source_workspace_id,
+                user_id=promoted_by_user_id,
+                event_type="promote",
+                event_metadata={
+                    "source_memory_id": str(source.id),
+                    "target_workspace_id": str(target_workspace_id),
+                    "new_memory_id": str(duplicate.id),
+                },
+            )
+        )
+        await self.repo.commit()
+
+        # 6. background: target ws에 embedding 재생성 + audit status 갱신
+        embed_text = _build_embed_text(
+            source.distilled_json or {}, source.raw_content
+        )
+        background_tasks.add_task(
+            _bg_promote_embed,
+            new_memory_id=duplicate.id,
+            target_workspace_id=target_workspace_id,
+            audit_id=audit.id,
+            embed_text=embed_text,
+            session_factory=self._session_factory,
+        )
+
+        return MemoryPromoteOut(
+            new_memory_id=duplicate.id,
+            audit_id=audit.id,
+            status="embedding_pending",
+        )
+
     # ── BackgroundTask 헬퍼 (별도 session) ──
 
     async def _bg_distill_and_embed(
@@ -580,6 +692,56 @@ async def _create_memory_embedding_chunk(
         chunk_level=2,
     )
     return chunk.id
+
+
+async def _bg_promote_embed(
+    new_memory_id: uuid.UUID,
+    target_workspace_id: uuid.UUID,
+    audit_id: uuid.UUID,
+    embed_text: str,
+    session_factory: "async_sessionmaker[AsyncSession]",
+) -> None:
+    """R6 promote 백그라운드: 복제 MemoryItem에 embedding 생성 + audit status 갱신.
+
+    pending → processing → completed/failed 흐름. session_factory로 별도 session.
+    """
+    from sqlalchemy import update as _update
+
+    async with session_factory() as session:
+        repo = MemoryRepository(session)
+        # processing 마크
+        await session.execute(
+            _update(PromotionAudit)
+            .where(PromotionAudit.id == audit_id)
+            .values(embedding_status="processing")
+        )
+        await session.commit()
+
+        embedding, _tokens, _elapsed, error = await _call_embedding(embed_text)
+        if error or not embedding:
+            await session.execute(
+                _update(PromotionAudit)
+                .where(PromotionAudit.id == audit_id)
+                .values(embedding_status="failed")
+            )
+            await repo.update_status(new_memory_id, "embedding_failed")
+            await session.commit()
+            return
+
+        chunk_id = await _create_memory_embedding_chunk(
+            session,
+            new_memory_id,
+            target_workspace_id,
+            embed_text,
+            embedding,
+        )
+        await repo.update_embedding(new_memory_id, chunk_id, "active")
+        await session.execute(
+            _update(PromotionAudit)
+            .where(PromotionAudit.id == audit_id)
+            .values(embedding_status="completed")
+        )
+        await session.commit()
 
 
 def _build_embed_text(distilled: dict, fallback_text: str) -> str:

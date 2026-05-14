@@ -210,6 +210,13 @@
   - 취소 button: `ghost`
 - **Behavior**: 확인 시 → 202 Accepted + toast "팀에 복사 중...", 백그라운드 promotion + 임베딩 재생성
 
+#### 검증 (Sprint 15 R6)
+
+- ✅ C1 dropdown variant 채택 — Target workspace 단일 select + 즉시 promote CTA.
+- ✅ 원본 보존 + 복제 + tombstone (ADR-016 AD-41) — `embedding_status: pending → processing → completed/failed` 비동기 흐름.
+- ✅ 취소 button은 `ghost` — destructive feedback 없음 (복사는 reversible).
+- ✅ Target workspace 후보가 비어있을 때 select disabled + 안내 문구 노출.
+
 ---
 
 ## Feature Flag UX (`NEXT_PUBLIC_RECALL_ENABLED`)

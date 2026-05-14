@@ -107,3 +107,31 @@ export async function recallMemory(
     { token }
   );
 }
+
+// --- R6 Promote 1-button ---
+
+export interface PromoteMemoryResponse {
+  new_memory_id: string;
+  audit_id: string;
+  status: string;
+}
+
+/**
+ * Memory promote — 원본 보존 + target team workspace 복제 (ADR-016 AD-41).
+ * 202 Accepted + audit_id. embedding 재생성은 백그라운드.
+ */
+export async function promoteMemory(
+  token: string,
+  sourceWorkspaceId: string,
+  memoryId: string,
+  targetWorkspaceId: string
+): Promise<PromoteMemoryResponse> {
+  return apiClient<PromoteMemoryResponse>(
+    `/workspaces/${sourceWorkspaceId}/memory/${memoryId}/promote`,
+    {
+      token,
+      method: "POST",
+      body: JSON.stringify({ target_workspace_id: targetWorkspaceId }),
+    }
+  );
+}

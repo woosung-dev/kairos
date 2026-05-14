@@ -17,6 +17,7 @@ from src.memory.models import (
     MemoryEvent,
     MemoryItem,
     MemoryQueryEmbeddingCache,
+    PromotionAudit,
 )
 
 try:
@@ -94,6 +95,14 @@ class MemoryRepository:
 
     async def save_event(self, event: MemoryEvent) -> None:
         self.session.add(event)
+
+    async def save_promotion_audit(
+        self, audit: PromotionAudit
+    ) -> PromotionAudit:
+        """R6: promotion_audit row 저장 — id flush 후 반환."""
+        self.session.add(audit)
+        await self.session.flush()
+        return audit
 
     async def commit(self) -> None:
         await self.session.commit()

@@ -14,6 +14,7 @@ import {
   captureVoice,
   getMemory,
   memoryKeys,
+  promoteMemory,
   recallMemory,
 } from "./api";
 
@@ -97,6 +98,38 @@ export function useRecall(
     },
     enabled: enabled && !!workspaceId && q.trim().length >= 2,
     staleTime: 30_000,
+  });
+}
+
+/**
+ * R6: Memory promote mutation — 원본 보존 + target team ws 복제 (1-button).
+ * 성공 시 invalidate + toast. 실패 시 toast로 사용자 피드백.
+ */
+export function usePromote(workspaceId: string | undefined) {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      memoryId: string;
+      targetWorkspaceId: string;
+    }) => {
+      const token = await getToken();
+      if (!token) throw new Error("인증이 필요합니다");
+      if (!workspaceId) throw new Error("워크스페이스가 선택되지 않았습니다");
+      return promoteMemory(
+        token,
+        workspaceId,
+        input.memoryId,
+        input.targetWorkspaceId
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: memoryKeys.all });
+      toast.success("팀에 복사 중…");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "팀으로 올리는 데 실패했어요");
+    },
   });
 }
 
