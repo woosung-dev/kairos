@@ -64,7 +64,7 @@ export function PromoteModal({
             htmlFor="promote-target"
             className="mb-2 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
           >
-            Target workspace
+            대상 워크스페이스
           </label>
           <div className="relative">
             <Users className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
