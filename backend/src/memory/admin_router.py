@@ -4,6 +4,8 @@
 본 라우터는 Clerk JWT 인증 대신 cron secret token 헤더로 보호.
 GCP Cloud Scheduler에서 매일 호출. 30일 이상 경과한 voice 메모의 R2 객체 삭제.
 """
+import hmac
+
 from fastapi import APIRouter, Depends, Header, HTTPException
 
 from src.core.config import get_settings
@@ -14,10 +16,11 @@ admin_router = APIRouter(prefix="/api/v1/admin/memory", tags=["memory-admin"])
 
 
 async def verify_cron_token(x_cron_token: str = Header(default="")) -> None:
-    """Cron secret token 검증 — Clerk JWT 우회 경로."""
+    """Cron secret token 검증 — Clerk JWT 우회 경로. timing-safe compare."""
     settings = get_settings()
     expected = settings.cron_secret_token.get_secret_value()
-    if not x_cron_token or x_cron_token != expected:
+    # hmac.compare_digest로 constant-time 비교 (timing-attack 방지)
+    if not x_cron_token or not hmac.compare_digest(x_cron_token, expected):
         raise HTTPException(status_code=403, detail="invalid cron token")
 
 
