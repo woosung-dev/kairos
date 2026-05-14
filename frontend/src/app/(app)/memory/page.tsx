@@ -71,7 +71,7 @@ export default function MemoryPage() {
             아직 검색어를 입력하지 않았어요. 오른쪽 아래 + 버튼으로 메모를
             먼저 추가해 보세요.
           </p>
-          <p className="text-xs text-muted-foreground">↘ 우측 하단 FAB 클릭</p>
+          <p className="text-xs text-muted-foreground">↘ 우측 하단 + 버튼</p>
         </div>
       )}
 
