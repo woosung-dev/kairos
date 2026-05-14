@@ -27,6 +27,7 @@ from src.memory.exceptions import EmptyMemoryError
 from src.memory.schemas import (
     MemoryCreateOut,
     MemoryDetailOut,
+    MemoryMetricsOut,
     MemoryPromoteIn,
     MemoryPromoteOut,
     MemoryRecallOut,
@@ -80,6 +81,17 @@ async def recall_memory(
     return await service.recall(
         workspace_id=workspace_id, user_id=user.id, query=q, top_k=3
     )
+
+
+# /metrics도 /{memory_id} 보다 먼저 선언 — UUID 패턴 충돌 회피.
+@router.get("/metrics", response_model=MemoryMetricsOut)
+async def get_memory_metrics(
+    workspace_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    service: MemoryService = Depends(get_memory_service),
+) -> MemoryMetricsOut:
+    """R7 metrics — memory_events 기반 capture/recall/promote count + recall p50/p95."""
+    return await service.get_metrics(workspace_id)
 
 
 @router.get("/{memory_id}", response_model=MemoryDetailOut)

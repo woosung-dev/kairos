@@ -90,6 +90,40 @@ class MemoryRepository:
             .values(raw_content=raw_content)
         )
 
+    async def get_metrics_counts(self, workspace_id: uuid.UUID) -> dict[str, int]:
+        """C7 — memory_events 기반 capture/recall/promote count."""
+        from sqlalchemy import func
+        stmt = (
+            select(MemoryEvent.event_type, func.count(MemoryEvent.id))
+            .where(MemoryEvent.workspace_id == workspace_id)
+            .group_by(MemoryEvent.event_type)
+        )
+        result = await self.session.execute(stmt)
+        return {row[0]: int(row[1]) for row in result.all()}
+
+    async def get_recall_latency_percentiles(
+        self, workspace_id: uuid.UUID
+    ) -> tuple[int | None, int | None]:
+        """C7 — recall latency p50/p95 (PostgreSQL percentile_cont)."""
+        stmt = text(
+            """
+            SELECT
+                percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms) AS p50,
+                percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95
+            FROM memory_events
+            WHERE workspace_id = :wid
+              AND event_type = 'recall'
+              AND latency_ms IS NOT NULL
+            """
+        )
+        result = await self.session.execute(stmt, {"wid": workspace_id})
+        row = result.one_or_none()
+        if row is None:
+            return None, None
+        p50 = int(row[0]) if row[0] is not None else None
+        p95 = int(row[1]) if row[1] is not None else None
+        return p50, p95
+
     async def list_expired_audio(self, cutoff: datetime) -> list[MemoryItem]:
         """Sprint 15 R-CRON — 생성 후 cutoff 이전 + r2_audio_key 보유한 MemoryItem 목록."""
         stmt = select(MemoryItem).where(

@@ -50,6 +50,7 @@ from src.memory.repository import MemoryRepository
 from src.memory.schemas import (
     MemoryCreateOut,
     MemoryDetailOut,
+    MemoryMetricsOut,
     MemoryPromoteOut,
     MemoryRecallOut,
     MemoryRecallSource,
@@ -175,6 +176,22 @@ class MemoryService:
             status="transcription_pending",
             distilled_json=None,
             created_at=item.created_at,
+        )
+
+    async def get_metrics(self, workspace_id: uuid.UUID) -> MemoryMetricsOut:
+        """Sprint 15 R7 — DB-backed metrics (patch §10 P-R7).
+
+        memory_events 테이블 직접 집계 (Cloud Run stateless 정합).
+        모듈-level deque/counter 사용 X.
+        """
+        counts = await self.repo.get_metrics_counts(workspace_id)
+        p50, p95 = await self.repo.get_recall_latency_percentiles(workspace_id)
+        return MemoryMetricsOut(
+            capture_count=counts.get("capture", 0),
+            recall_count=counts.get("recall", 0),
+            promote_count=counts.get("promote", 0),
+            recall_p50_ms=p50,
+            recall_p95_ms=p95,
         )
 
     async def cleanup_expired_r2_audio(self, days: int = 30) -> int:

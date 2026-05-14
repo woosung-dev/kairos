@@ -62,3 +62,13 @@ class MemoryPromoteOut(BaseModel):
     new_memory_id: uuid.UUID
     audit_id: uuid.UUID
     status: str
+
+
+class MemoryMetricsOut(BaseModel):
+    """Sprint 15 R7 — DB-backed metrics (memory_events 기반, patch §10 P-R7)."""
+
+    capture_count: int
+    recall_count: int
+    promote_count: int
+    recall_p50_ms: int | None
+    recall_p95_ms: int | None
