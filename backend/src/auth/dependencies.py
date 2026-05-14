@@ -98,12 +98,14 @@ async def get_current_user(
 
     # Personal workspace lazy seed — 신규 user / 기존 user backfill 안전망
     # ON CONFLICT는 partial unique index `uq_workspaces_owner_personal` 사용
+    # PostgreSQL 제약: partial unique index는 named constraint로 ON CONFLICT 참조 불가
+    # -> index_predicate 형식 (column + WHERE) 으로 명시
     await session.execute(
         _text(
             """
             INSERT INTO workspaces (id, owner_id, name, type, inbox_threshold, created_at, updated_at)
             VALUES (gen_random_uuid(), :owner_id, :name, 'personal', 0.9, now(), now())
-            ON CONFLICT ON CONSTRAINT uq_workspaces_owner_personal DO NOTHING
+            ON CONFLICT (owner_id) WHERE type = 'personal' DO NOTHING
             """
         ),
         {"owner_id": str(user.id), "name": f"{user.display_name}의 개인 Kairos"},
