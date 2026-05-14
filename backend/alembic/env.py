@@ -11,13 +11,28 @@ from src.core.config import get_settings
 
 # 모든 모델을 import하여 metadata에 등록
 from src.auth.models import User  # noqa: F401
-from src.workspaces.models import Workspace, WorkspaceMember  # noqa: F401
+from src.workspaces.models import (  # noqa: F401
+    Workspace,
+    WorkspaceMember,
+    WorkspaceInvite,
+)
 from src.meetings.models import Meeting, MeetingSummary, TranscriptSegment  # noqa: F401
-from src.projects.models import Project, MeetingProjectLink  # noqa: F401
+from src.projects.models import (  # noqa: F401
+    Project,
+    MeetingProjectLink,
+    ProjectMember,
+)
 from src.actions.models import ActionItem  # noqa: F401
 from src.inbox.models import InboxItem  # noqa: F401
 from src.embeddings.models import EmbeddingChunk, SemanticCache  # noqa: F401
 from src.notes.models import Note  # noqa: F401
+from src.memory.models import (  # noqa: F401
+    MemoryItem,
+    MemoryAICall,
+    MemoryEvent,
+    PromotionAudit,
+    MemoryQueryEmbeddingCache,
+)
 
 from sqlmodel import SQLModel
 
