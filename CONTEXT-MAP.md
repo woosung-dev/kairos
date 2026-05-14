@@ -190,7 +190,7 @@ shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
 | I-6 | **임베딩 모델 고정**: OpenAI `text-embedding-3-small`, 1536d | `embeddings/service.py` |
 | I-7 | **임베딩 검색 대상은 chunk_level = 2 만**. L0(document)은 코드 미사용, L1은 부모 참조용 | `embeddings/repository.py` |
 | I-8 | **SemanticCache TTL 7일, threshold 0.93** | `embeddings/` (rag는 호출자) |
-| I-9 | **멀티테넌시 격리**: 모든 Repository는 `workspace_id` 필터 강제 | `<domain>/repository.py` `.where(... .workspace_id == workspace_id)` |
+| I-9 | **멀티테넌시 격리**: 모든 Repository는 `workspace_id` 필터 강제. 신규 EmbeddingChunk insert 시 `workspace_id`는 신규 entity owner workspace와 매칭 (service layer 검증 + `embeddings/service.py:create_chunk` 진입 assertion). | `<domain>/repository.py` `.where(... .workspace_id == workspace_id)`, `backend/src/embeddings/service.py:create_chunk` |
 | I-10 | **Inbox confidence 임계값**: 워크스페이스별 `workspaces.inbox_threshold` (기본 0.9). PATCH 가능 | `workspaces/models.py:15`, `meetings/pipeline_service.py:67` |
 | I-11 | **shadcn `components/ui/` 수정 금지** | `frontend/src/components/ui/` |
 | I-12 | **언어 정책**: 사고/문서/주석 한국어, 코드/네이밍 영어 | AGENTS.md §1 |

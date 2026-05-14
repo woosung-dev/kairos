@@ -79,10 +79,14 @@ async def memory_client(integration_session, auth_user, monkeypatch):
     R1 patch §4 — BackgroundTask 헬퍼(_bg_distill_and_embed, _bg_transcribe_distill_embed)는
     외부 Gemini/OpenAI 호출이 발생하므로 테스트에서 no-op으로 monkeypatch.
     enqueue 동작(202 즉시)만 검증하고, distill/embed 실제 호출은 별도 unit test에서 mock으로.
+
+    R3 patch §6 — recall endpoint의 _call_embedding(OpenAI)도 monkeypatch로 차단.
+    vector_search는 항상 None 반환 → keyword fallback 경로 강제 검증.
     """
     from src.auth.dependencies import get_current_user
     from src.common.database import get_async_session, get_session_factory
     from src.main import app
+    from src.memory import service as memory_service_module
     from src.memory.service import MemoryService
 
     async def _noop_distill(self, *args, **kwargs):
@@ -91,12 +95,17 @@ async def memory_client(integration_session, auth_user, monkeypatch):
     async def _noop_transcribe(self, *args, **kwargs):
         return None
 
+    async def _noop_embed(_text: str):
+        # (embedding, total_tokens, elapsed_ms, error) — error 반환으로 vector 경로 우회
+        return [], 0, 0, "test-disabled"
+
     monkeypatch.setattr(
         MemoryService, "_bg_distill_and_embed", _noop_distill
     )
     monkeypatch.setattr(
         MemoryService, "_bg_transcribe_distill_embed", _noop_transcribe
     )
+    monkeypatch.setattr(memory_service_module, "_call_embedding", _noop_embed)
 
     # session_factory는 lifespan 미실행이라 None — dummy 주입 (background no-op이므로 실제 미사용)
     def _dummy_factory():

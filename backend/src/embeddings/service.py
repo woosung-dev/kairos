@@ -1,15 +1,77 @@
 # backend/src/embeddings/service.py
-"""임베딩 서비스 — 청킹 + OpenAI 임베딩 생성 + 저장."""
+"""임베딩 서비스 — 청킹 + OpenAI 임베딩 생성 + 저장.
+
+I-9 4-C: 신규 EmbeddingChunk insert 시 workspace_id는 신규 entity owner workspace와
+매칭되어야 한다. 본 모듈의 create_chunk 헬퍼가 진입 assertion으로 강제한다.
+caller는 source entity의 workspace_id를 명시 제공한다.
+"""
 import logging
 import uuid
 
 from openai import AsyncOpenAI
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import get_settings
 from src.embeddings.models import EmbeddingChunk
 from src.embeddings.repository import EmbeddingRepository
 
 logger = logging.getLogger(__name__)
+
+# I-9 4-C — 허용된 source_type 화이트리스트. 신규 도메인 추가 시 본 set + ADR 갱신 필수.
+_ALLOWED_SOURCE_TYPES: frozenset[str] = frozenset(
+    {"meeting", "note", "action", "inbox", "memory"}
+)
+
+
+async def create_chunk(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    source_workspace_id: uuid.UUID,
+    source_type: str,
+    source_id: uuid.UUID,
+    chunk_text: str,
+    embedding: list[float],
+    chunk_index: int = 0,
+    chunk_level: int = 2,
+    parent_chunk_id: uuid.UUID | None = None,
+    project_id: uuid.UUID | None = None,
+    metadata_json: dict | None = None,
+) -> EmbeddingChunk:
+    """단건 EmbeddingChunk insert + I-9 4-C assertion.
+
+    - workspace_id == source_workspace_id: tenant 격리 위반 방지.
+    - source_type ∈ _ALLOWED_SOURCE_TYPES: 의도치 않은 타입 인서트 차단.
+    - workspace_id, source_id 필수.
+    """
+    assert workspace_id is not None, "I-9: workspace_id required for EmbeddingChunk"
+    assert source_id is not None, "I-9: source_id required for EmbeddingChunk"
+    assert source_workspace_id is not None, (
+        "I-9 4-C: source_workspace_id required — caller must verify source entity workspace"
+    )
+    assert workspace_id == source_workspace_id, (
+        f"I-9 4-C violation: chunk workspace_id ({workspace_id}) "
+        f"!= source workspace_id ({source_workspace_id})"
+    )
+    assert source_type in _ALLOWED_SOURCE_TYPES, (
+        f"I-9: invalid source_type {source_type!r}, allowed={sorted(_ALLOWED_SOURCE_TYPES)}"
+    )
+
+    chunk = EmbeddingChunk(
+        workspace_id=workspace_id,
+        project_id=project_id,
+        source_id=source_id,
+        source_type=source_type,
+        chunk_text=chunk_text,
+        chunk_index=chunk_index,
+        chunk_level=chunk_level,
+        parent_chunk_id=parent_chunk_id,
+        embedding=embedding,
+        metadata_json=metadata_json or {},
+    )
+    session.add(chunk)
+    await session.flush()
+    return chunk
 
 
 class EmbeddingService:

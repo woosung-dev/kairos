@@ -15,6 +15,7 @@ import asyncio
 import io
 import logging
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -37,7 +38,12 @@ from src.memory.exceptions import (
 )
 from src.memory.models import MemoryAICall, MemoryEvent, MemoryItem
 from src.memory.repository import MemoryRepository
-from src.memory.schemas import MemoryCreateOut, MemoryDetailOut
+from src.memory.schemas import (
+    MemoryCreateOut,
+    MemoryDetailOut,
+    MemoryRecallOut,
+    MemoryRecallSource,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -180,6 +186,154 @@ class MemoryService:
             created_at=item.created_at,
             updated_at=item.updated_at,
         )
+
+    # ── R3 recall ──
+
+    async def recall(
+        self,
+        workspace_id: uuid.UUID,
+        user_id: uuid.UUID,
+        query: str,
+        top_k: int = 3,
+    ) -> MemoryRecallOut:
+        """Vector search + keyword fallback. I-9 workspace_id 강제 + C7 event log.
+
+        O-A: top_k=3 lock-in.
+        O-B: keyword fallback은 token overlap count (BM25는 Sprint 17+ defer).
+        """
+        start = time.time()
+
+        # 1. Vector search — query embedding (C3 cache) + pgvector cosine
+        query_embedding = await self._get_query_embedding(workspace_id, query)
+        vector_rows: list[tuple] = []
+        if query_embedding:
+            vector_rows = await self.repo.vector_search(
+                workspace_id, query_embedding, top_k
+            )
+
+        vector_sources: list[MemoryRecallSource] = []
+        for row in vector_rows:
+            distilled = row[1] if isinstance(row[1], dict) else {}
+            title = distilled.get("title") if distilled else None
+            if not title:
+                raw = row[2] or ""
+                title = raw[:60] if raw else "(제목 없음)"
+            atomic_notes = (
+                distilled.get("atomic_notes", []) if distilled else []
+            )
+            vector_sources.append(
+                MemoryRecallSource(
+                    memory_id=uuid.UUID(str(row[0])),
+                    title=title,
+                    atomic_notes_excerpt=" / ".join(atomic_notes[:2]),
+                    score=float(row[4]),
+                    match_type="vector",
+                    created_at=row[3],
+                )
+            )
+
+        if vector_sources:
+            elapsed_ms = int((time.time() - start) * 1000)
+            await self._log_recall_event(
+                workspace_id=workspace_id,
+                user_id=user_id,
+                latency_ms=elapsed_ms,
+                match_type="vector",
+                query_len=len(query),
+                source_count=len(vector_sources),
+            )
+            return MemoryRecallOut(
+                query=query, sources=vector_sources, fallback_used=False
+            )
+
+        # 2. Keyword fallback (O-B)
+        tokens = self._tokenize_query(query)
+        rows = await self.repo.search_keyword(workspace_id, tokens, limit=top_k)
+        keyword_sources: list[MemoryRecallSource] = []
+        for item, cnt in rows:
+            distilled = item.distilled_json or {}
+            title = distilled.get("title") or (
+                item.raw_content[:60] if item.raw_content else "(제목 없음)"
+            )
+            atomic_notes = distilled.get("atomic_notes", []) or []
+            keyword_sources.append(
+                MemoryRecallSource(
+                    memory_id=item.id,
+                    title=title,
+                    atomic_notes_excerpt=" / ".join(atomic_notes[:2]),
+                    score=min(1.0, cnt / max(len(tokens), 1)),
+                    match_type="keyword",
+                    created_at=item.created_at,
+                )
+            )
+
+        elapsed_ms = int((time.time() - start) * 1000)
+        await self._log_recall_event(
+            workspace_id=workspace_id,
+            user_id=user_id,
+            latency_ms=elapsed_ms,
+            match_type="keyword",
+            query_len=len(query),
+            source_count=len(keyword_sources),
+        )
+        return MemoryRecallOut(
+            query=query, sources=keyword_sources, fallback_used=True
+        )
+
+    async def _get_query_embedding(
+        self, workspace_id: uuid.UUID, query: str
+    ) -> list[float] | None:
+        """C3 cache lookup → 미스 시 OpenAI 호출 + cache 저장.
+
+        OpenAI 호출 실패 시 None 반환 (recall은 keyword fallback로 진행).
+        """
+        normalized = " ".join(query.lower().split())
+        cached = await self.repo.get_query_embedding_cache(
+            workspace_id, normalized
+        )
+        if cached is not None:
+            return cached
+        embedding, _tokens, _elapsed, error = await _call_embedding(query)
+        if error or not embedding:
+            return None
+        await self.repo.save_query_embedding_cache(
+            workspace_id, normalized, embedding
+        )
+        await self.repo.commit()
+        return embedding
+
+    @staticmethod
+    def _tokenize_query(query: str) -> list[str]:
+        """한국어 어절 + 영문 단어 단위 split (2자 이상). 대소문자 normalize."""
+        tokens = re.findall(
+            r"[가-힣]+|[A-Za-z][A-Za-z0-9_]*", query.lower()
+        )
+        return [t for t in tokens if len(t) >= 2]
+
+    async def _log_recall_event(
+        self,
+        workspace_id: uuid.UUID,
+        user_id: uuid.UUID,
+        latency_ms: int,
+        match_type: str,
+        query_len: int,
+        source_count: int,
+    ) -> None:
+        """C7: memory_events 'recall' row 기록."""
+        await self.repo.save_event(
+            MemoryEvent(
+                workspace_id=workspace_id,
+                user_id=user_id,
+                event_type="recall",
+                latency_ms=latency_ms,
+                event_metadata={
+                    "match_type": match_type,
+                    "query_len": query_len,
+                    "source_count": source_count,
+                },
+            )
+        )
+        await self.repo.commit()
 
     # ── BackgroundTask 헬퍼 (별도 session) ──
 
@@ -409,21 +563,22 @@ async def _create_memory_embedding_chunk(
     """memory_id를 source_id로 EmbeddingChunk(level=2) insert.
 
     source_type='memory' — recall(R3)에서 source_type 필터로 사용.
+    I-9 4-C: embeddings.service.create_chunk 헬퍼를 경유하여 workspace_id 매칭을 강제한다.
+    memory_item 자체가 동일 workspace_id로 생성되므로 source_workspace_id = workspace_id.
     """
-    from src.embeddings.models import EmbeddingChunk
+    from src.embeddings.service import create_chunk
 
-    chunk = EmbeddingChunk(
+    chunk = await create_chunk(
+        session,
         workspace_id=workspace_id,
-        source_id=memory_id,
+        source_workspace_id=workspace_id,
         source_type="memory",
+        source_id=memory_id,
         chunk_text=content,
+        embedding=embedding,
         chunk_index=0,
         chunk_level=2,
-        embedding=embedding,
-        metadata_json={},
     )
-    session.add(chunk)
-    await session.flush()
     return chunk.id
 
 

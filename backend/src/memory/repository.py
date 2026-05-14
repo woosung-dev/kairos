@@ -2,13 +2,29 @@
 """Memory Repository — DB access only.
 
 backend rules §3 — AsyncSession은 Repository만 보유. service는 import 금지.
+R3 추가: vector_search (pgvector typed bind A7) + search_keyword (O-B token overlap)
+       + query embedding cache (C3 7일 TTL).
 """
 import uuid
+from datetime import datetime, timedelta
+from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import bindparam, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.memory.models import MemoryAICall, MemoryEvent, MemoryItem
+from src.memory.models import (
+    MemoryAICall,
+    MemoryEvent,
+    MemoryItem,
+    MemoryQueryEmbeddingCache,
+)
+
+try:
+    from pgvector.sqlalchemy import Vector
+
+    _VECTOR_TYPE: Any = Vector(1536)
+except ImportError:
+    _VECTOR_TYPE = None
 
 
 class MemoryRepository:
@@ -81,3 +97,120 @@ class MemoryRepository:
 
     async def commit(self) -> None:
         await self.session.commit()
+
+    # ── R3 recall ──
+
+    async def vector_search(
+        self,
+        workspace_id: uuid.UUID,
+        query_embedding: list[float],
+        top_k: int,
+    ) -> list[tuple]:
+        """pgvector cosine similarity (A7 typed bind). I-9 workspace_id 강제."""
+        sql = text(
+            """
+            SELECT mi.id, mi.distilled_json, mi.raw_content, mi.created_at,
+                   1 - (ec.embedding <=> :qvec) AS score
+            FROM embedding_chunks ec
+            JOIN memory_items mi ON ec.source_id = mi.id
+            WHERE ec.workspace_id = :wid
+              AND ec.source_type = 'memory'
+              AND mi.deleted_at IS NULL
+            ORDER BY ec.embedding <=> :qvec
+            LIMIT :limit
+            """
+        )
+        if _VECTOR_TYPE is not None:
+            sql = sql.bindparams(bindparam("qvec", type_=_VECTOR_TYPE))
+        result = await self.session.execute(
+            sql,
+            {
+                "qvec": query_embedding,
+                "wid": workspace_id,
+                "limit": top_k,
+            },
+        )
+        return list(result.all())
+
+    async def search_keyword(
+        self,
+        workspace_id: uuid.UUID,
+        tokens: list[str],
+        limit: int,
+    ) -> list[tuple[MemoryItem, int]]:
+        """O-B: token overlap count fallback. raw_content + distilled_json 텍스트 ILIKE 합산.
+
+        BM25는 Sprint 17+ defer. workspace_id 필터 강제 (I-9).
+        """
+        if not tokens:
+            return []
+        params: dict[str, Any] = {"wid": workspace_id, "limit": limit}
+        cases: list[str] = []
+        for i, t in enumerate(tokens):
+            tok_key = f"tok{i}"
+            params[tok_key] = f"%{t}%"
+            cases.append(
+                f"(CASE WHEN mi.raw_content ILIKE :{tok_key} THEN 1 ELSE 0 END) + "
+                f"(CASE WHEN COALESCE(mi.distilled_json::text, '') ILIKE :{tok_key} "
+                f"THEN 1 ELSE 0 END)"
+            )
+        sum_expr = " + ".join(cases)
+        sql = text(
+            f"""
+            SELECT mi.id, ({sum_expr}) AS overlap
+            FROM memory_items mi
+            WHERE mi.workspace_id = :wid
+              AND mi.deleted_at IS NULL
+              AND mi.status = 'active'
+              AND ({sum_expr}) > 0
+            ORDER BY overlap DESC, mi.created_at DESC
+            LIMIT :limit
+            """
+        )
+        result = await self.session.execute(sql, params)
+        rows = list(result.all())
+        if not rows:
+            return []
+        ids = [row[0] for row in rows]
+        items_q = select(MemoryItem).where(MemoryItem.id.in_(ids))
+        items_result = await self.session.execute(items_q)
+        items_map = {item.id: item for item in items_result.scalars().all()}
+        return [
+            (items_map[row[0]], int(row[1]))
+            for row in rows
+            if row[0] in items_map
+        ]
+
+    async def get_query_embedding_cache(
+        self,
+        workspace_id: uuid.UUID,
+        normalized_query: str,
+        ttl_days: int = 7,
+    ) -> list[float] | None:
+        """C3: 7일 TTL cache lookup."""
+        cutoff = datetime.utcnow() - timedelta(days=ttl_days)
+        stmt = select(MemoryQueryEmbeddingCache).where(
+            MemoryQueryEmbeddingCache.workspace_id == workspace_id,
+            MemoryQueryEmbeddingCache.normalized_query == normalized_query,
+            MemoryQueryEmbeddingCache.created_at >= cutoff,
+        )
+        result = await self.session.execute(stmt)
+        cached = result.scalar_one_or_none()
+        if cached is None:
+            return None
+        return list(cached.embedding) if cached.embedding else None
+
+    async def save_query_embedding_cache(
+        self,
+        workspace_id: uuid.UUID,
+        normalized_query: str,
+        embedding: list[float],
+    ) -> None:
+        """C3: cache 저장. composite PK 중복 시 race condition은 무시 (다음 lookup이 어차피 hit)."""
+        cache = MemoryQueryEmbeddingCache(
+            workspace_id=workspace_id,
+            normalized_query=normalized_query,
+            embedding=embedding,
+        )
+        self.session.add(cache)
+        await self.session.flush()
