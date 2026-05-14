@@ -115,6 +115,20 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 | 35 | 6 | `GET` | `/api/v1/workspaces/{wid}/projects/{pid}/members` | 프로젝트 멤버 목록 (viewer+) |
 | 36 | 6 | `POST` | `/api/v1/workspaces/{wid}/projects/{pid}/members` | 프로젝트 멤버 추가 (admin+). 403 — cross-workspace 차단 (추가 대상 user가 해당 워크스페이스 멤버가 아님, Sprint 7 AD-33) |
 | 37 | 6 | `DELETE` | `/api/v1/workspaces/{wid}/projects/{pid}/members/{uid}` | 프로젝트 멤버 제거 (admin+) |
+| 38 | 15 | `POST` | `/api/v1/workspaces/{wid}/memory` | 메모 capture (text Form 또는 audio multipart, 202 + BG task) — require_member |
+| 39 | 15 | `GET` | `/api/v1/workspaces/{wid}/memory/recall?q=...` | Recall (vector + keyword fallback Top 3) — require_viewer |
+| 40 | 15 | `GET` | `/api/v1/workspaces/{wid}/memory/metrics` | R7 metrics (capture/recall/promote count + recall p50/p95) — require_viewer |
+| 41 | 15 | `GET` | `/api/v1/workspaces/{wid}/memory/{memory_id}` | 단일 메모 polling (status + distilled_json) — require_viewer |
+| 42 | 15 | `POST` | `/api/v1/workspaces/{wid}/memory/{memory_id}/promote` | 메모 → team workspace 복제 (I-18 복제+tombstone, 202 + BG) — require_member |
+| 43 | 15 | `POST` | `/api/v1/admin/memory/r2-cleanup` | 30일 경과 voice R2 객체 cleanup (X-Cron-Token header, GCP Cloud Scheduler 호출) |
+
+> **Sprint 15 변경 (Memory 모듈 신설)** — ADR-016 Personal↔Team IA + Recall-first wedge:
+> - 38~43: 신규 6 endpoint (memory 도메인). 38/39/40/41/42는 `/api/v1/workspaces/{ws_id}/memory*` 패턴 (I-13 정합). 43은 admin 예외.
+> - workspace.type 신설: `personal` (1인 격리, I-19) / `team`. 38/42 RBAC = require_member (write), 39/40/41 = require_viewer (read).
+> - 42 promote: I-18 강제 (복제 + tombstone). target=personal/존재X/non-member 시 422 / 404. PromotionAudit row 생성.
+> - 43 admin: `X-Cron-Token` header gate (hmac.compare_digest, Codex P1 fix #2 + Review C3 timing-safe).
+> - capture 입력 제약: `text` max_length=10000 (TextTooLongError) + text/audio 둘 다 보내면 422 (BothInputsProvidedError, Review C2/C3).
+> - Personal workspace는 초대/멤버 추가 차단 (PersonalWorkspaceProtected 403, Review C1 I-19 가드).
 
 > **Sprint 6 변경 (visibility + ProjectMember)**:
 > - 16/17/18/19: Project 응답에 `visibility` 필드 추가 (`public` | `draft` | `private`).

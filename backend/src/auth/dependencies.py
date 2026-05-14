@@ -74,9 +74,18 @@ async def get_current_user(
     claims: dict = Depends(verify_clerk_token),
     session: AsyncSession = Depends(get_async_session),
 ) -> User:
-    """현재 인증된 사용자를 반환. 없으면 자동 생성 (첫 로그인)."""
+    """현재 인증된 사용자를 반환. 없으면 자동 생성 (첫 로그인).
+
+    Sprint 15 — 첫 로그인 시 personal workspace + WorkspaceMember(owner) lazy seed.
+    동시 요청 race 대응: ON CONFLICT DO NOTHING (A9 fix, patch §8 P-R5).
+    UNIQUE partial index `uq_workspaces_owner_personal` (postgresql_where=`type='personal'`)는
+    R2 migration에서 사전 생성됨.
+    """
+    from sqlalchemy import text as _text
+
     repo = UserRepository(session)
     user = await repo.find_by_clerk_id(claims["sub"])
+    is_new_user = user is None
     if user is None:
         # 첫 로그인: 자동 생성
         user = User(
@@ -86,6 +95,42 @@ async def get_current_user(
         )
         user = await repo.save(user)
         await repo.commit()
+
+    # Personal workspace lazy seed — 신규 user / 기존 user backfill 안전망
+    # ON CONFLICT는 partial unique index `uq_workspaces_owner_personal` 사용
+    # PostgreSQL 제약: partial unique index는 named constraint로 ON CONFLICT 참조 불가
+    # -> index_predicate 형식 (column + WHERE) 으로 명시
+    await session.execute(
+        _text(
+            """
+            INSERT INTO workspaces (id, owner_id, name, type, inbox_threshold, created_at, updated_at)
+            VALUES (gen_random_uuid(), :owner_id, :name, 'personal', 0.9, now(), now())
+            ON CONFLICT (owner_id) WHERE type = 'personal' DO NOTHING
+            """
+        ),
+        {"owner_id": str(user.id), "name": f"{user.display_name}의 개인 Kairos"},
+    )
+    # WorkspaceMember(owner) seed — 동일 user 다중 personal-ws 방지된 상태에서 멤버십만 보장
+    await session.execute(
+        _text(
+            """
+            INSERT INTO workspace_members (id, workspace_id, user_id, role)
+            SELECT gen_random_uuid(), w.id, w.owner_id, 'owner'
+            FROM workspaces w
+            WHERE w.owner_id = :owner_id AND w.type = 'personal'
+              AND NOT EXISTS (
+                SELECT 1 FROM workspace_members m
+                WHERE m.workspace_id = w.id AND m.user_id = w.owner_id
+              )
+            """
+        ),
+        {"owner_id": str(user.id)},
+    )
+    if is_new_user:
+        await session.commit()
+    else:
+        # 기존 user request 흐름에서는 commit을 짧게 — race 영향 최소화
+        await session.commit()
     return user
 
 

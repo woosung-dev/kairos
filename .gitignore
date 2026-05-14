@@ -18,6 +18,13 @@ frontend/out/
 *.swo
 .DS_Store
 
+# Sprint 15 Day 0 audio samples (개인 음성 데이터 — README만 commit)
+backend/scripts/samples/*.webm
+backend/scripts/samples/*.mp4
+backend/scripts/samples/*.wav
+backend/scripts/samples/*.aac
+backend/scripts/samples/*.m4a
+
 # Build
 dist/
 build/

@@ -62,13 +62,14 @@ class WorkspaceService:
         }
 
     async def list_workspaces(self, user_id: uuid.UUID) -> list[dict]:
-        """사용자가 속한 워크스페이스 목록."""
+        """사용자가 속한 워크스페이스 목록 (Sprint 15: type 필드 포함 — Promote modal에서 team 필터)."""
         workspaces = await self.repo.find_by_user(user_id)
         return [
             {
                 "id": str(ws.id),
                 "name": ws.name,
                 "ownerId": str(ws.owner_id),
+                "type": getattr(ws, "type", "team"),
                 "createdAt": ws.created_at.isoformat(),
                 "updatedAt": ws.updated_at.isoformat(),
             }
@@ -110,6 +111,10 @@ class WorkspaceService:
         workspace = await self.repo.find_by_id(workspace_id)
         if workspace is None:
             raise WorkspaceNotFoundError()
+        # I-19: personal workspace는 1인 격리
+        if getattr(workspace, "type", "team") == "personal":
+            from src.workspaces.exceptions import PersonalWorkspaceProtected
+            raise PersonalWorkspaceProtected("멤버 추가")
 
         # 이메일로 사용자 조회
         user = await self.user_repo.find_by_email(email)

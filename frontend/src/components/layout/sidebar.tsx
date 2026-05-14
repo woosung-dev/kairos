@@ -10,6 +10,7 @@ import { useInbox } from "@/features/inbox/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import {
   Archive,
+  Brain,
   ChevronDown,
   ChevronRight,
   FileText,
@@ -28,12 +29,19 @@ interface NavItem {
   icon: LucideIcon;
   hasBadge?: boolean;
   requiresWrite?: boolean;
+  hasNewPill?: boolean;
 }
 
-/* 네비 순서: 홈 → Inbox(배지) → 구분선 → 빠른 메모 → + 추가 */
+// Sprint 15 Recall-first wedge — true일 때만 Memory 네비 노출
+const IS_RECALL_ENABLED = process.env.NEXT_PUBLIC_RECALL_ENABLED === "true";
+
+/* 네비 순서: 홈 → Inbox(배지) → [Memory(NEW, flag)] → 구분선 → 빠른 메모 → + 추가 */
 const NAV_TOP: NavItem[] = [
   { href: "/", label: "홈", icon: Home },
   { href: "/inbox", label: "Inbox", icon: Inbox, hasBadge: true },
+  ...(IS_RECALL_ENABLED
+    ? [{ href: "/memory", label: "Memory", icon: Brain, hasNewPill: true }]
+    : []),
 ];
 
 const NAV_BOTTOM: NavItem[] = [
@@ -202,6 +210,19 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
             }}
           >
             {unprocessedInboxCount}
+          </span>
+        )}
+        {/* NEW 핀 — Sprint 15 Memory 진입점 강조 */}
+        {!collapsed && item.hasNewPill && (
+          <span
+            className="text-[10px] font-medium px-1.5 py-0.5 rounded-full uppercase tracking-wider"
+            style={{
+              background: "var(--accent)",
+              color: "var(--background)",
+              borderRadius: "var(--radius-full)",
+            }}
+          >
+            NEW
           </span>
         )}
       </Link>

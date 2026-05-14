@@ -16,6 +16,8 @@ erDiagram
         uuid id PK
         string name
         uuid owner_id FK
+        enum type "personal | team (Sprint 15, default team)"
+        float inbox_threshold
         timestamp created_at
         timestamp updated_at
     }
@@ -170,6 +172,65 @@ erDiagram
         timestamp expires_at "TTL 7일"
     }
 
+    %% Sprint 15 memory 모듈 — Recall-first wedge (ADR-016)
+    MemoryItem {
+        uuid id PK
+        uuid user_id FK
+        uuid workspace_id FK "I-9 격리"
+        enum type "text | voice"
+        string raw_content "원본 텍스트 또는 transcript"
+        jsonb distilled_json "Gemini distill 결과 {title, atomic_notes, suggested_visibility}"
+        string r2_audio_key "voice 메모 R2 객체 키, 30일 TTL"
+        uuid embedding_chunk_id FK "source_type=memory chunk"
+        enum status "processing | transcription_pending | embedding_pending | embedding_failed | active | archived"
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at
+    }
+
+    PromotionAudit {
+        uuid id PK
+        uuid memory_id FK "source MemoryItem (I-18 복제+tombstone)"
+        uuid source_workspace_id FK
+        uuid target_workspace_id FK
+        uuid target_project_id FK
+        uuid promoted_by_user_id FK
+        uuid promoted_note_id FK "Sprint 16+ note 변환 시"
+        enum embedding_status "pending | processing | completed | failed"
+        timestamp created_at
+    }
+
+    MemoryAICall {
+        uuid id PK
+        uuid memory_id FK
+        uuid workspace_id FK
+        enum call_type "distill | embedding | transcribe"
+        string model_name
+        int elapsed_ms
+        int input_tokens
+        int output_tokens
+        enum status "pending | success | failed"
+        string error_message
+        timestamp created_at
+    }
+
+    MemoryQueryEmbeddingCache {
+        uuid workspace_id PK "FK + composite PK"
+        string normalized_query PK "lowercased + trimmed"
+        vector embedding "1536차원"
+        timestamp created_at
+    }
+
+    MemoryEvent {
+        uuid id PK
+        uuid workspace_id FK
+        uuid user_id FK
+        enum event_type "capture | recall | promote"
+        int latency_ms "recall만"
+        jsonb event_metadata
+        timestamp created_at
+    }
+
     User ||--o{ Workspace : "소유"
     Workspace ||--o{ WorkspaceMember : "멤버"
     User ||--o{ WorkspaceMember : "소속"
@@ -195,7 +256,54 @@ erDiagram
     Project ||--o{ EmbeddingChunk : "범위 검색"
     Project ||--o{ SemanticCache : "범위별 캐시"
     EmbeddingChunk ||--o{ EmbeddingChunk : "부모-자식 계층"
+
+    %% Sprint 15 memory relations
+    Workspace ||--o{ MemoryItem : "포함 (I-9 격리)"
+    User ||--o{ MemoryItem : "생성"
+    MemoryItem ||--o| EmbeddingChunk : "1:1 source_type=memory"
+    MemoryItem ||--o{ PromotionAudit : "복제 audit (I-18 tombstone)"
+    Workspace ||--o{ PromotionAudit : "source + target"
+    User ||--o{ PromotionAudit : "promoter"
+    MemoryItem ||--o{ MemoryAICall : "AI 호출 로그"
+    Workspace ||--o{ MemoryAICall : "tenant 격리"
+    Workspace ||--o{ MemoryQueryEmbeddingCache : "C3 cache (workspace 격리)"
+    Workspace ||--o{ MemoryEvent : "R7 metrics 원천"
+    User ||--o{ MemoryEvent : "actor"
 ```
+
+---
+
+## Sprint 15 신설 엔티티 (memory 도메인)
+
+> CONTEXT-MAP §2 entity 14 → 18로 확장. memory 모듈 5 entity 신설 + Workspace.type 컬럼.
+> 관련 ADR: ADR-016 Personal↔Team IA + ADR-019 Gemini EOL migration.
+
+### MemoryItem (root)
+- Recall-first wedge의 1차 진입점. text 또는 voice capture.
+- `distilled_json`: Gemini 산출 (title 10자 / atomic_notes / suggested_visibility=personal|team)
+- `r2_audio_key`: voice 메모 R2 객체 (30일 TTL, R-CRON cleanup endpoint로 일괄 삭제)
+- `embedding_chunk_id`: EmbeddingChunk와 1:1 (source_type='memory'). embedding 실패 시 NULL.
+- status state machine: `processing → transcription_pending (voice만) → embedding_pending → active` / `embedding_failed`. archived = soft delete.
+- 불변식: I-9 workspace 격리 + I-18 promote 복제 + I-19 personal 1인 격리.
+
+### PromotionAudit (I-18 강제)
+- Promote 1-button (Sprint 15 R6 1차) + Sprint 16+ 정식 build의 감사 row.
+- `memory_id` = source MemoryItem (보존, archived 또는 active 유지) + 복제본은 별도 신규 MemoryItem.
+- `target_workspace_id` 검증 (personal 차단, member 검증) — Codex P1 fix #1 RBAC.
+- `embedding_status`: BG task `_bg_promote_embed`로 별도 임베딩 생성 후 갱신.
+
+### MemoryAICall
+- distill / embedding / transcribe 호출 cost+latency 로그 (C2 lock-in).
+- 비용 모니터링 + ADR-019 Phase B swap 검증 데이터 제공.
+
+### MemoryQueryEmbeddingCache (C3)
+- recall query 임베딩 캐시. composite PK (workspace_id, normalized_query).
+- ON CONFLICT DO NOTHING (Codex P2 fix #3 race-safe).
+- pgvector index 없음 — exact-match lookup 전용 (vector similarity X).
+
+### MemoryEvent (R7)
+- DB-backed metrics. capture/recall/promote count + recall latency_ms.
+- Cloud Run stateless 정합 (모듈-level deque 폐기).
 
 ## 관계 설명
 

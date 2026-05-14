@@ -30,6 +30,8 @@ Sprint 14 AD-39 소진 후 AD-40부터 시작.
 
 - **AD-40**: Option D (Personal workspace + Promotion flow, Notion 패턴) 채택 — A/B/C 대비. 자의 = "workspace 단위 격리(헌법 I-9)와 일관성 + 사용자 mental model 명확성" 트레이드오프에서 단순함 + 보안 선택.
 - **AD-41**: Promotion = **복제 + tombstone** (이동 아님). 자의 = 감사 추적 + 원본 변경 시 팀 자산 영향 차단 + 롤백 가능성. 복제 비용(스토리지 2x)은 텍스트 + 1536d 임베딩 기준 무시 가능.
+
+> **[2026-05-14 reframe note]** Promotion = post-Recall-validation feature. v1 wedge 아니며 Sprint 17+ 정식 implementation. Recall demand 검증 (Sprint 15 R8 success criteria 충족) 통과 시 진입. Sprint 15에서는 S15-R6 1-button promote prototype만 (audit row 1개, multi-team/chain/review queue 모두 후순위). 근거: Stage 1 design doc `~/.gstack/projects/woosung-dev-kairos/woosung-sprint-15-personal-workspace-design-20260514-090026.md` §Premise 5 revision.
 - **AD-42**: visibility enum 4번째(`personal`) 추가하지 **않음** — workspace 단위 분리로 충분. 자의 = enum 폭증 회피 + 권한 코드 분기 단순화. Project.visibility는 그대로 public/draft/private 3개.
 - **AD-43**: Personal workspace는 항상 **1명, 팀 초대 불가** (BE schema 제약으로 강제). 자의 = 사용자 실수로 팀 노출 방지 + privacy 보장 단순화.
 - **AD-44**: Promotion review queue (v1.7)는 Sprint 17에서 결정 — 1차는 admin auto-accept 가능 (특히 1인 founder가 본인 personal → 본인이 admin인 team으로 promote 시 마찰 없음).
@@ -88,7 +90,7 @@ Sprint 14 AD-39 소진 후 AD-40부터 시작.
 ### 4. 헌법 갱신 (CONTEXT-MAP)
 
 - **I-9 (workspace 격리) 유지 + 강화**: Personal workspace도 workspace_id로 격리. RAG 검색은 항상 단일 workspace_id 필터.
-- **I-17 신설**: "Promotion은 항상 복제 + tombstone, 이동 금지." Promotion으로 인한 cross-workspace 데이터 이전은 audit log 강제.
+- **I-18 신설** (I-17 slot은 Sprint 7 BE-T13 cross-workspace ProjectMember 추가 차단으로 이미 점유): "Promotion은 항상 복제 + tombstone, 이동 금지." Promotion으로 인한 cross-workspace 데이터 이전은 audit log 강제.
 - **R-13 신설 (Sprint 18+ ADR-017)**: Cross-workspace RAG은 명시적 opt-in + 권한 재검증. 본 ADR scope 외 — Sprint 18 ADR-017에서 결정.
 
 ### 5. 마케팅 메시지 lock-in (PRD §7-Marketing 정합)
@@ -198,7 +200,7 @@ Option A에 promotion 액션 + tombstone + review queue 추가. 본 ADR이 채�
 |------|------|------|
 | S16-T1 | FE: "Promote to Team..." 액션 모달 (target ws + project 선택) | Sprint 15 완료 |
 | S16-T2 | BE: Promotion API — 복제 + 임베딩 신규 생성 + tombstone (AD-41) | S16-T1 |
-| S16-T3 | DOC: 헌법 I-17 신설 + ADR-016 referenced | S16-T2 |
+| S16-T3 | DOC: 헌법 I-18 신설 + ADR-016 referenced | S16-T2 |
 | S16-T4 | FE: `/new`에 "음성 메모" 탭 (회의와 분리) | — |
 | S16-T5 | BE: Voice note 모델 + STT + Gemini 요약 + 태그 | S16-T4 |
 | S16-T6 | UX: Personal에서 음성 메모 첫 진입 시나리오 lock-in | S16-T4, T5 |
@@ -234,7 +236,7 @@ Option A에 promotion 액션 + tombstone + review queue 추가. 본 ADR이 채�
 ## 후속 (Follow-ups)
 
 - **F1 (Sprint 15 킥오프 시)**: 본 ADR + Sprint 15 plan 정합 점검. S15-T1~T7 task 분해.
-- **F2 (Sprint 16 킥오프 시)**: 헌법 I-17 신설 PR + Promotion 시퀀스 detail 결정.
+- **F2 (Sprint 16 킥오프 시)**: 헌법 I-18 신설 PR + Promotion 시퀀스 detail 결정.
 - **F3 (Sprint 17 킥오프 시)**: v1.7 review queue — admin auto-accept vs manual review 정책. AD-44 재검토.
 - **F4 (Sprint 18 킥오프 시)**: **ADR-017 Cross-workspace RAG** 신설 — 헌법 R-13 명시 + Personal↔Team 검색 권한 분기.
 - **F5 (Sprint 22+ 킥오프 시)**: **ADR-018 Promotion 추천 AI** 신설 — M5 moat 핵심 + confidence threshold + 사용자 검토 게이트.

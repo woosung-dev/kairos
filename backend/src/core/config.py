@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr
     openai_api_key: SecretStr
 
+    # Cron (Sprint 15 R-CRON — R2 30일 cleanup endpoint 인증)
+    cron_secret_token: SecretStr = SecretStr("dev-cron-secret-CHANGE-ME-IN-PROD")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

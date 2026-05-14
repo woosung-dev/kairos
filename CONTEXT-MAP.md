@@ -25,13 +25,13 @@
 
 ---
 
-## 2. 핵심 엔티티 (14개)
+## 2. 핵심 엔티티 (18개)
 
 > ERD 원본: `docs/architecture/erd.md`. 본 문서가 코드 사실 기준 — ERD와 충돌 시 본 문서 우선.
 
 | 엔티티 | 소유 도메인 | 정의 | 식별 |
 |---|---|---|---|
-| **Workspace** | workspaces | 멀티테넌시 격리 단위. 모든 콘텐츠의 루트 | UUID, `inbox_threshold: float = 0.9` 보유 |
+| **Workspace** | workspaces | 멀티테넌시 격리 단위. 모든 콘텐츠의 루트. `type`: `personal` / `team` (Sprint 15 신설) | UUID, `inbox_threshold: float = 0.9` 보유 |
 | **WorkspaceMember** | workspaces | role: `owner` / `admin` / `member` / `viewer` | (workspace_id, user_id) 유일 |
 | **WorkspaceInvite** | workspaces | 초대 링크 (nanoid 12자리 code + role + max_uses + expires_at) | code 유일 |
 | **Project** | projects | 작업 단위 (PARA Replace). status: `active` / `completed` / `archived` | workspace 내 |
@@ -42,7 +42,12 @@
 | **MeetingProjectLink** | projects | Meeting↔Project N:M | (meeting_id, project_id) 유일 |
 | **ActionItem** | actions | status: `todo` / `in_progress` / `done` / `cancelled`. `project_id` / `meeting_id` / `assignee_id` / `due_date` 모두 **nullable** | workspace 범위 |
 | **Note** | notes | Tiptap JSON 콘텐츠 (Project 종속) | project 내 |
-| **EmbeddingChunk** | embeddings | 1536d 벡터 + 계층 (L1/L2 사용, L0 미사용) | source_type + source_id + chunk_index |
+| **MemoryItem** | memory | Recall-first wedge. `type`: `text` / `voice`. status: `processing` / `transcription_pending` / `embedding_pending` / `embedding_failed` / `active` / `archived`. `r2_audio_key` (voice, 30일 TTL) + `distilled_json` (Gemini 출력) | (workspace_id, id). Sprint 15 신설 |
+| **PromoteAudit** | memory | Promote (복제 + tombstone) 감사 row. `memory_id` (source) + `target_workspace_id` + `new_memory_id` + `promoted_by_user_id`. **I-18 강제** | (memory_id, new_memory_id). Sprint 15 신설 |
+| **MemoryAiCall** | memory | distill / embedding / transcribe 호출 cost+latency 로그. `model_id` + `tokens_in/out` + `cost_usd` + `elapsed_ms` | memory_id 범위. Sprint 15 신설 |
+| **MemoryQueryEmbeddingCache** | memory | Recall query 임베딩 캐시 (C3 fix). normalized_query + workspace_id 복합 키 | (workspace_id, normalized_query). Sprint 15 신설 |
+| **MemoryEvent** | memory | R7 metrics 원천 (capture / recall / promote count + recall latency). Cloud Run stateless 정합. memory_id 가 nullable (recall 이벤트는 memory FK 없음) | (workspace_id, event_type, created_at). Sprint 15 신설 |
+| **EmbeddingChunk** | embeddings | 1536d 벡터 + 계층 (L1/L2 사용, L0 미사용). MemoryItem도 source_type=`memory`로 적재 | source_type + source_id + chunk_index |
 | **SemanticCache** | embeddings | TTL 7일, 유사도 ≥0.93 히트. RAG는 호출자(read/write) | PK `id`. 의미적 식별 (workspace_id, project_id, question_embedding) — DB unique constraint 없음 |
 | **User** | auth | Clerk 인증 외부 ID 매핑 | clerk_id 유일 |
 
@@ -59,6 +64,11 @@
 | MeetingSummary | Summary (단독 — 항상 Meeting 접두) |
 | ActionItem | Task, Todo, Issue |
 | Note | Memo, Doc, Document |
+| MemoryItem | Memory (단수 단독 금지), Capture (Capture는 동사), QuickNote, Snippet |
+| PromoteAudit | Promotion Log, AuditLog (단독 금지) |
+| MemoryAiCall | AI Log, Distill Log |
+| MemoryQueryEmbeddingCache | Query Cache (SemanticCache와 충돌), Recall Cache |
+| MemoryEvent | Memory Log, Activity Log |
 | EmbeddingChunk | Vector, Embedding (단수형 금지 — 계층 강조) |
 | SemanticCache | Query Cache, RAG Cache, Answer Cache |
 | User | Account, Member (Member는 WorkspaceMember 전용) |
@@ -85,19 +95,20 @@
 
 ## 4. 도메인 경계
 
-### 4.1 백엔드 도메인 모듈 (12개)
+### 4.1 백엔드 도메인 모듈 (13개)
 
 ```
 backend/src/
 ├── auth/          Clerk JWT 검증 (User 매핑)
-├── workspaces/    Workspace + WorkspaceMember + WorkspaceInvite + inbox_threshold
+├── workspaces/    Workspace (type=personal/team) + WorkspaceMember + WorkspaceInvite + inbox_threshold
 ├── projects/      Project CRUD + MeetingProjectLink + 태그
 ├── inbox/         Inbox 적재 + AI 분류 추천
 ├── meetings/      Meeting 인제스트, STT, 파이프라인
 ├── notes/         Tiptap Note
 ├── actions/       ActionItem (nullable project/meeting/assignee)
+├── memory/        Sprint 15 Recall-first wedge — MemoryItem capture (text+voice) / Distill / Recall (vector+keyword fallback) / Promote (복제+tombstone, I-18). service.py가 orchestrator 역할 (BL-005/BL-006로 pipeline_service.py 분리 등재됨)
 ├── upload/        Cloudflare R2 업로드 (presigned URL)
-├── embeddings/    EmbeddingChunk + SemanticCache 저장/검색 (pgvector)
+├── embeddings/    EmbeddingChunk + SemanticCache 저장/검색 (pgvector). source_type 추가: `memory`
 ├── rag/           RAG 6-Layer + Gemini 답변 (SSE 스트리밍)
 ├── common/        database / r2 / pagination / exceptions / prompts
 ├── core/          config (pydantic-settings)
@@ -125,6 +136,9 @@ graph TD
   rag -. orchestrator only .-> embeddings
   meetings -. orchestrator only .-> inbox
   meetings -. orchestrator only .-> embeddings
+  memory -. orchestrator only .-> embeddings
+  memory -. orchestrator only .-> services_ai
+  memory -. orchestrator only .-> services_stt
 ```
 
 | 케이스 | 허용 | 강제 위치 |
@@ -172,6 +186,7 @@ shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
 | `backend/src/rag/CONTEXT.md` | RAG 6-Layer + SSE 스트리밍 |
 | `backend/src/projects/CONTEXT.md` | 인사이트 L1~L4 + 멤버십 (Sprint 6 예정) |
 | `backend/src/actions/CONTEXT.md` | 액션 추출/추적 (nullable 부모) |
+| `backend/src/memory/CONTEXT.md` | Recall-first wedge — Capture(text+voice)/Distill/Recall/Promote. service.py가 orchestrator 역할 (BL-005/BL-006 refactor 대기) |
 | 그 외 (auth, embeddings, notes, upload, workspaces) | `backend/CONTEXT.md` 안 짧은 섹션 |
 
 ---
@@ -190,7 +205,7 @@ shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
 | I-6 | **임베딩 모델 고정**: OpenAI `text-embedding-3-small`, 1536d | `embeddings/service.py` |
 | I-7 | **임베딩 검색 대상은 chunk_level = 2 만**. L0(document)은 코드 미사용, L1은 부모 참조용 | `embeddings/repository.py` |
 | I-8 | **SemanticCache TTL 7일, threshold 0.93** | `embeddings/` (rag는 호출자) |
-| I-9 | **멀티테넌시 격리**: 모든 Repository는 `workspace_id` 필터 강제 | `<domain>/repository.py` `.where(... .workspace_id == workspace_id)` |
+| I-9 | **멀티테넌시 격리**: 모든 Repository는 `workspace_id` 필터 강제. 신규 EmbeddingChunk insert 시 `workspace_id`는 신규 entity owner workspace와 매칭 (service layer 검증 + `embeddings/service.py:create_chunk` 진입 assertion). | `<domain>/repository.py` `.where(... .workspace_id == workspace_id)`, `backend/src/embeddings/service.py:create_chunk` |
 | I-10 | **Inbox confidence 임계값**: 워크스페이스별 `workspaces.inbox_threshold` (기본 0.9). PATCH 가능 | `workspaces/models.py:15`, `meetings/pipeline_service.py:67` |
 | I-11 | **shadcn `components/ui/` 수정 금지** | `frontend/src/components/ui/` |
 | I-12 | **언어 정책**: 사고/문서/주석 한국어, 코드/네이밍 영어 | AGENTS.md §1 |
@@ -199,6 +214,8 @@ shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
 | I-15 | **Secret은 `SecretStr`**: 사용 시 `.get_secret_value()` | `core/config.py` |
 | I-16 | **DB snake_case ↔ API camelCase**: Pydantic alias로 변환 | `<domain>/schemas.py` |
 | I-17 | **cross-workspace ProjectMember 추가 차단 = ProjectService 책임**: `ProjectService.add_member`는 반드시 `WorkspaceRepository.find_member(workspace_id, user_id)`를 호출하여 대상 user가 동일 워크스페이스 멤버임을 검증한다. None이면 `CrossWorkspaceMemberError(403)`. I-9(Repository read 필터)와 레이어 분리: I-9는 read 필터, I-17은 write 검증. | `backend/src/projects/service.py:add_member` |
+| I-18 | **Promotion은 항상 복제 + tombstone, 이동 금지** (Sprint 15 ADR-016 AD-41 + ADR-016 reframe note). `MemoryService.promote`는 source MemoryItem을 보존하고 target workspace에 새 MemoryItem 행을 생성한다. `PromoteAudit`는 `memory_id`(source) + `new_memory_id`(target) + `target_workspace_id` + `promoted_by_user_id` 4-key 강제. 원본 MemoryItem은 archived status 또는 보존 (구현 결정). | `backend/src/memory/service.py:promote` |
+| I-19 | **Personal workspace는 1인 격리**: `Workspace.type=='personal'`인 워크스페이스는 항상 1명 owner. 팀 초대 불가 (`WorkspaceInvite` 발급 금지). BE schema 제약 + service 검증 양쪽 강제. ProjectMember도 1명 (R5 invariant). | `backend/src/workspaces/service.py` + `backend/src/projects/service.py` (personal_project_invariants) |
 
 ---
 

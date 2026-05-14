@@ -1,5 +1,7 @@
 # backend/src/workspaces/exceptions.py
 """Workspace 도메인 예외."""
+from fastapi import HTTPException
+
 from src.common.exceptions import AlreadyExistsError, NotFoundError
 
 
@@ -34,3 +36,13 @@ class CannotModifyOwnerError(Exception):
 class MemberNotFoundError(NotFoundError):
     def __init__(self) -> None:
         super().__init__("멤버")
+
+
+class PersonalWorkspaceProtected(HTTPException):
+    """Sprint 15 ADR-016 AD-43: Personal workspace는 항상 1명, 팀 초대 / ProjectMember 추가 불가."""
+
+    def __init__(self, action: str = "operation") -> None:
+        super().__init__(
+            status_code=403,
+            detail=f"개인 워크스페이스에는 {action}을(를) 수행할 수 없습니다",
+        )

@@ -105,3 +105,33 @@ class MeetingActionsResult(BaseModel):
     actionItems: list[dict] = []
     suggestedProject: dict = {}
     suggestedTags: list[str] = []
+
+
+# ── Sprint 15 Recall-first wedge — Memory distill 프롬프트 ──
+MEMORY_DISTILL_PROMPT = """당신은 사용자의 메모 (음성 transcript 또는 텍스트)를 짧은 구조화된 요약으로 변환하는 AI입니다.
+
+반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요.
+
+출력 JSON 스키마:
+{{
+  "title": "10~20자 이내 짧은 제목 (한국어)",
+  "atomic_notes": ["핵심 1", "핵심 2", "핵심 3"],
+  "suggested_visibility": "personal | team"
+}}
+
+규칙:
+- title은 사용자가 나중에 다시 찾기 쉽게 검색 가능한 단어를 포함
+- atomic_notes는 1~5개, 각 항목은 짧고 자족적 (단독으로 의미 통함)
+- suggested_visibility는 "팀에 공유할 가치 있는 결정/팩트"면 'team', 단순 개인 메모면 'personal'
+
+## 입력
+{content}
+"""
+
+
+class MemoryDistilledResult(BaseModel):
+    """Memory distill 응답 계약 — MEMORY_DISTILL_PROMPT 출력 스키마와 동기화 유지."""
+
+    title: str
+    atomic_notes: list[str] = []
+    suggested_visibility: str = "personal"

@@ -13,6 +13,7 @@ from src.workspaces.exceptions import (
     InviteNotFoundError,
     MemberAlreadyExistsError,
     MemberNotFoundError,
+    PersonalWorkspaceProtected,
     WorkspaceNotFoundError,
 )
 from src.workspaces.models import WorkspaceInvite, WorkspaceMember
@@ -55,6 +56,9 @@ class InviteService:
         workspace = await self.repo.find_by_id(workspace_id)
         if workspace is None:
             raise WorkspaceNotFoundError()
+        # I-19: personal workspace는 1인 격리 — 초대 발급 불가
+        if getattr(workspace, "type", "team") == "personal":
+            raise PersonalWorkspaceProtected("초대")
 
         expires_at = None
         if expires_in_days is not None:
@@ -161,6 +165,13 @@ class InviteService:
         is_valid, reason = self._validate_invite(invite)
         if not is_valid:
             raise InviteExpiredError(reason or "초대 링크를 사용할 수 없습니다")
+
+        # I-19: personal workspace 멤버 추가 금지 (만약 기존 invite가 발급되어 있었다면 차단)
+        workspace = await self.repo.find_by_id(invite.workspace_id)
+        if workspace is None:
+            raise WorkspaceNotFoundError()
+        if getattr(workspace, "type", "team") == "personal":
+            raise PersonalWorkspaceProtected("멤버 추가")
 
         # 이미 멤버인지 확인
         existing = await self.repo.find_member(invite.workspace_id, user_id)

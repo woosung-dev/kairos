@@ -213,6 +213,13 @@
 - 마케팅 트랙 (가격 / 고객 로고 / 비교표 / 보안 페이지) — dev 단독 처리 불가
 - AD-35 multi-user E2E (Clerk testing mode 도입 후)
 
+### Sprint 15 — DRAFT PR #29 pushed (2026-05-14)
+
+> **상태**: 단일 draft PR https://github.com/woosung-dev/kairos/pull/29 (52 commits, 76 files, +12570/-20). R8 14일 stagger 결과 후 main 머지.
+> **Stage 5 진행**: 5-1~5-7 완료. 5-8/5-9 머지 후.
+> **R8 미시작**: PR 본문 §"R8 외부 검증 결과" TBD placeholder. retro fill-in 후 PR 댓글로 결과 추가.
+> **Sprint 16 진입 조건**: R8 결과 → Best/Medium/Min 분기 (`docs/dev-log/2026-05-14-sprint16-plan-draft.md §3`).
+
 ### Sprint 15 후보 — Personal Workspace + IA 확장 (2026-05-14 PRD v3.0 lock-in)
 
 > 입력: `docs/requirements/prd.md` v3.0 §3.6 IA 2축 로드맵 + 사용자 의견 (개인↔팀 전환 IA, CLAUDE.md/local.md 비유)
@@ -238,12 +245,16 @@
 **v1.6 — Promotion 액션**
 - [ ] **S16-T1** 아이템(노트/회의/액션)에 "Promote to Team..." 액션 + 대상 workspace+project 선택 모달 (FE)
 - [ ] **S16-T2** Promotion BE API — 메타데이터 + 임베딩 복제 (이동 아님, 원본 tombstone 유지)
-- [ ] **S16-T3** Promotion audit log + 헌법 I-17 신설 ("Promotion은 항상 복제 + tombstone, 이동 금지")
+- [ ] **S16-T3** Promotion audit log + 헌법 I-18 신설 ("Promotion은 항상 복제 + tombstone, 이동 금지") — I-17 slot은 Sprint 7 BE-T13 cross-ws ProjectMember 차단으로 점유
 
 **v2 — 음성 메모 ingest (회의 외 단독 녹음)**
 - [ ] **S16-T4** `/new` 페이지에 "음성 메모" 탭 추가 (회의와 분리, transcript 부재 OK)
 - [ ] **S16-T5** Voice note 모델 (Meeting과 별개) + STT + Gemini 요약 + 태그 자동
 - [ ] **S16-T6** Personal workspace에서 음성 메모 첫 진입 시나리오 lock-in
+
+### Sprint 17+ candidates (Sprint 15 lock-in)
+
+- [ ] **P0 S17-T-GEMINI-EOL** — Gemini 2.5 Flash EOL 2026-06-17 대응 ADR + Gemini 2.5 Pro / Flash 2.0 마이그레이션 plan. Day 0 spike (`backend/scripts/sprint15_day0_spike.py`)에 response header deprecation probe 1줄 inline. 결과 spike doc 별도 섹션. Sprint 16 진입 시 ADR-019 신설.
 
 ### 진행 중 (ADR-008 DevEx 후속)
 
