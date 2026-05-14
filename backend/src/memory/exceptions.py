@@ -19,6 +19,26 @@ class EmptyMemoryError(HTTPException):
         )
 
 
+class BothInputsProvidedError(HTTPException):
+    """text와 audio 양쪽 동시 입력 — 한 가지만 허용 (silent drop 차단)."""
+
+    def __init__(self):
+        super().__init__(
+            status_code=422,
+            detail="text와 audio 중 하나만 보낼 수 있습니다",
+        )
+
+
+class TextTooLongError(HTTPException):
+    """text 입력이 max_length 초과 — Gemini cost 폭주 차단."""
+
+    def __init__(self, max_length: int):
+        super().__init__(
+            status_code=422,
+            detail=f"text 길이는 {max_length}자 이하여야 합니다",
+        )
+
+
 class MemoryNotFoundError(HTTPException):
     def __init__(self):
         super().__init__(status_code=404, detail="메모를 찾을 수 없습니다")

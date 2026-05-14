@@ -22,7 +22,11 @@ from fastapi import (
 
 from src.auth.rbac import require_member, require_viewer
 from src.memory.dependencies import get_memory_service
-from src.memory.exceptions import EmptyMemoryError
+from src.memory.exceptions import (
+    BothInputsProvidedError,
+    EmptyMemoryError,
+    TextTooLongError,
+)
 from src.memory.schemas import (
     MemoryCreateOut,
     MemoryDetailOut,
@@ -40,6 +44,9 @@ router = APIRouter(
 )
 
 
+MAX_TEXT_LENGTH = 10000
+
+
 @router.post("", response_model=MemoryCreateOut, status_code=202)
 async def capture_memory(
     workspace_id: uuid.UUID,
@@ -49,15 +56,25 @@ async def capture_memory(
     member: WorkspaceMember = Depends(require_member),
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryCreateOut:
-    """메모 capture — text 또는 audio multipart, 즉시 202 + processing."""
-    if text and text.strip():
+    """메모 capture — text 또는 audio multipart 단일 입력. 즉시 202 + processing."""
+    has_text = bool(text and text.strip())
+    has_audio = audio is not None
+    # 둘 다 입력은 silent drop 차단 (Codex Stage 5-5 API C2)
+    if has_text and has_audio:
+        raise BothInputsProvidedError()
+    if has_text:
+        assert text is not None  # 위 has_text 가드로 보장
+        normalized = text.strip()
+        if len(normalized) > MAX_TEXT_LENGTH:
+            raise TextTooLongError(MAX_TEXT_LENGTH)
         return await service.capture_text(
             user_id=member.user_id,
             workspace_id=workspace_id,
-            text=text.strip(),
+            text=normalized,
             background_tasks=background_tasks,
         )
-    if audio is not None:
+    if has_audio:
+        assert audio is not None
         content = await audio.read()
         return await service.capture_voice(
             user_id=member.user_id,
