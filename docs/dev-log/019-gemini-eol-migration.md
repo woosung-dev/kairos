@@ -1,7 +1,7 @@
 # ADR-019: Gemini 2.5 Flash EOL 마이그레이션 → gemini-3.1-flash-lite
 
 > **날짜:** 2026-05-14 (draft) → Sprint 16 진입 시 lock-in 예정 (2026-05-28)
-> **상태:** Draft (Sprint 16 진입 시 → Accepted)
+> **상태:** Phase A validated (2026-05-14 spike 통과) → Phase B 코드 swap pending (Sprint 16 첫 commit, 2026-05-28)
 > **작성자:** Claude Opus 4.7 (1M context) + 사용자
 > **관련:** PRD v3.0 §AI Pipeline · ADR-014 Service Boundary · `docs/architecture/ai-pipeline.md` · `docs/dev-log/sprint-15-cost-spike.md` · TODO P0 `S17-T-GEMINI-EOL`
 > **워크플로우:** Sprint 15 R8 14일 stagger 진행 중 AI 단독 prep 작업 — Sprint 16 첫 commit으로 코드 swap 예정
@@ -79,22 +79,25 @@ verification: pytest 144 pass / R7 metrics latency 측정.
 
 ---
 
-## Consequences (Positive)
+## Consequences (Positive) — 2026-05-14 spike 실측
 
 1. **EOL 회피**: 2026-06-17 이후 서비스 중단 위험 제거
-2. **Latency 개선**: distill 4.8s → ~2.4s (2.5x TTFT + 45% output speed) → user-facing capture polling UX 개선
-3. **Cost 절감**: ~$0.0026/tester/week (Day 0 spike) → ~$0.0015/tester/week 예상 (40% output 절감 dominant)
-4. **SLA**: GA 모델 → 다음 EOL까지 12개월+ 안정성
-5. **단일 모델 정책 유지**: Repository 추상화 / multi-vendor 부담 없음
+2. **Latency 개선 (실측)**: distill p50 **5231ms → 908ms = 5.76x speedup** (예측 2.5x 초과). 이유: 3.1-flash-lite default thinking mode off (thoughts_token_count 294 → null). distill task에 thinking 불필요.
+3. **Cost 절감 (실측)**: $0.0025/tester/week → $0.0020/tester/week = **20% 절감**. 토큰 절약 (thoughts off) + 단가 절감 합산.
+4. **Schema 동등성 (실측)**: 3/3 sample 모두 `{title, atomic_notes, suggested_visibility}` 필드 존재 (schema_match_rate=1.0).
+5. **SLA**: GA 모델 → 다음 EOL까지 12개월+ 안정성
+6. **단일 모델 정책 유지**: Repository 추상화 / multi-vendor 부담 없음
+7. **EOL probe**: 두 모델 응답에 sunset/deprecation 신호 없음 — 공식 공지만 신뢰
 
 ---
 
-## Consequences (Negative / 위험)
+## Consequences (Negative / 위험) — 2026-05-14 spike 후 갱신
 
-1. **Output JSON schema 불일치 위험**: distill prompt 응답 구조가 미묘하게 달라질 수 있음 → §Verification에서 spike로 사전 검증
-2. **Thinking mode 차이**: 3.1-flash-lite는 minimal/low/medium/high thinking levels 선택 가능 (preview tier 기준) — GA에서 이 control이 제한될 수 있음. 현 distill 호출은 thinking mode 미지정 (default) → 영향 없음으로 추정, spike에서 확인
+1. ~~**Output JSON schema 불일치 위험**~~: spike에서 3/3 schema 일치 확인 → **해소됨**
+2. **Thinking mode default off**: 3.1-flash-lite는 default thinking off (spike 측정). distill 같은 단순 요약 task는 영향 없으나, 향후 복잡 reasoning이 필요한 use case (예: RAG re-ranking, 다단계 추론) 추가 시 thinking 명시 활성 필요 가능. 현재 Kairos에는 해당 없음.
 3. **Knowledge cutoff 2025-01**: 2.5-flash와 동일 수준이므로 distill task (입력 데이터 그대로 요약)에는 영향 없음
-4. **Token usage 변화 가능성**: 새 모델은 같은 input에 대해 다른 token count 산출 가능 → cost 계산 spike 결과로 재확인 필요
+4. ~~**Token usage 변화 가능성**~~: spike에서 baseline 717 tokens → candidate 390 tokens = **45% 감소** (thoughts off 효과). cost 우호적 → **위험 아님으로 재분류**.
+5. **GA 모델 자체 EOL**: 12개월 후 또 다른 마이그레이션 필요 가능 — 정상 lifecycle, ADR 패턴 재사용으로 비용 최소화
 
 ---
 
@@ -113,12 +116,12 @@ verification: pytest 144 pass / R7 metrics latency 측정.
 
 ## Implementation
 
-### Phase A — 본 ADR 후속 spike (2026-05-14)
+### Phase A — 본 ADR 후속 spike (2026-05-14, ✅ DONE)
 
-1. Day 0 spike script 확장: `GEMINI_MODELS` 리스트로 2.5-flash + 3.1-flash-lite 두 모델 dual-record
-2. text 3 sample × 2 모델 = 6 result 실측
-3. `model_comparison` 섹션 추가 (latency_delta_ms / cost_delta_usd / output_equivalence)
-4. 결과 paste → `docs/dev-log/sprint-15-cost-spike.md §3.5`
+1. ✅ Day 0 spike script 확장: `GEMINI_MODELS` list (commit 676556f)
+2. ✅ text 3 sample × 2 모델 = 6 distill success, audio 7 sample은 founder 녹음 후 별도 진행
+3. ✅ `model_comparison` 섹션 (latency_delta_ms / cost_delta_usd / output_equivalence) 출력 검증
+4. ✅ 결과 paste 완료: `docs/dev-log/sprint-15-cost-spike.md §3.5` (commit 2cee665)
 
 ### Phase B — Sprint 16 첫 commit (2026-05-28)
 
