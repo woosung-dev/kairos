@@ -682,3 +682,49 @@ Stage 5-4 design-review 잡다한 polish 3건:
 **Sprint 묶음 권고:** Sprint 17+ (polish bundle)
 
 **근거:** Stage 5-4 design-review specialist 2026-05-14 F-18/F-21/F-37
+
+---
+
+## BL-021 — e2e auth.setup Clerk koKR label selector mismatch
+
+**현 상태:**
+PR #29 CI e2e job fail (5m timeout). main에서 이미 같은 fail inherit (run 25825914554, 2026-05-13 push sha 8311620 이후). 본 PR 책임 아님 — auth.setup.ts 본 PR diff 0 (Sprint 14에서 마지막 수정).
+
+직접 원인:
+- Clerk SignIn component label = "이메일 주소" (koKR localization 적용 `9ea1a78 fix(auth): T-3 Clerk koKR localization + /dashboard force redirect`)
+- e2e selector = `getByLabel(/email/i)` 영문 정규식만
+- 한국어 label "이메일 주소" → `/email/i` 매치 0 → 60초 timeout → 3 retry fail → 7 후속 test "did not run"
+
+증거:
+- 사용자 local sign-in 페이지 스크린샷 (2026-05-14) — embedded SignIn form 정상 렌더, label "이메일 주소", continue button "계속"
+- main last fail (25825914554) + PR #29 fail (25850407909) 동일 step / 동일 line / 동일 error message
+- auth.setup.ts:42 `getByRole("button", { name: /continue|계속/i })` 이미 한국어 매치 ✅. line 39만 누락
+
+**목표 인터페이스:**
+
+가장 robust 옵션 (locale-independent):
+```ts
+// before
+await page.getByLabel(/email/i).fill(email);
+// after — Clerk SignIn component standard input name (locale 변화 무관)
+await page.locator('input[name="identifier"]').fill(email);
+```
+
+대안 (regex 확장):
+```ts
+await page.getByLabel(/email|이메일/i).fill(email);
+```
+
+추천: `input[name="identifier"]` (Clerk SDK standard, 향후 locale 추가 시 미영향).
+
+**예상 LOC delta:** +1/-1 (auth.setup.ts:39 1줄 patch)
+
+**Risk:** 🟢 낮음 (test file only)
+
+**Test harness:** PR push 후 GitHub Actions e2e job 재실행 통과 확인
+
+**우선순위:** ★★★★☆ (P1 — CI 통과 정상화. main + 모든 후속 PR에 영향)
+
+**Sprint 묶음 권고:** 별도 hotfix PR 또는 Sprint 16 첫 commit. Sprint 15 PR #29 직전 분리 권고 (PR #29 머지 무관, e2e fail은 동일 상태 유지).
+
+**근거:** Sprint 15 Stage 5-6 qa Exhaustive 후속 진단 2026-05-14 — 사용자 화면 증거로 root cause 정정 (Clerk Account Portal redirect 아님, koKR label mismatch 확정).
