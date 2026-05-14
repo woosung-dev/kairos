@@ -28,8 +28,9 @@ export default function RecallMetricsPage() {
     queryFn: async () => {
       const token = await getToken();
       if (!token || !workspaceId) throw new Error("auth/workspace 미설정");
+      // apiClient는 `${API_BASE_URL}/api/v1` prefix를 자동 부여한다. 중복 prefix 금지.
       return apiClient<MemoryMetrics>(
-        `/api/v1/workspaces/${workspaceId}/memory/metrics`,
+        `/workspaces/${workspaceId}/memory/metrics`,
         { token },
       );
     },
