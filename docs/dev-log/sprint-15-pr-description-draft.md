@@ -70,11 +70,12 @@ Sprint 15는 Kairos를 회의 도구에서 **AI 메모리 레이어 + Personal�
 - **ADR-019 Phase A spike**: 3.1-flash-lite distill p50 908ms (5.76x speedup) / cost 20% 절감 / schema 3/3
 - **R8 14일 stagger**: 별도 retro 결과 paste (`docs/dev-log/sprint-15-r8-outreach.md §6`)
 
-## R8 외부 검증 결과 (Day 14 retro 후 작성 — 1줄 채움)
+## R8 외부 검증 결과 (TBD — R8 14일 stagger 진행 예정)
 
-> Sprint 16 결정: __Best / Medium / Min__
-> 핵심 metric: outreach __건 sent / __ booked / __ completed / __ retained / __ "$10 yes"
-> 결정 근거: __ (Best=Promotion 정식 build / Medium=Phase B + 안정화 / Min=outreach sprint)
+> **현재 상태**: R8 outreach 미시작 (Day 0 이전). 14일 stagger 종료 후 본 PR 댓글로 결과 추가 예정.
+> **Sprint 16 분기 결정**: `docs/dev-log/2026-05-14-sprint16-plan-draft.md §3` Best/Medium/Min 매트릭스 기반.
+> **머지 정책**: 본 PR은 **draft** 상태로 push. R8 결과 확인 후 ready for review → main 머지 결정.
+> **메트릭 추적**: `docs/dev-log/sprint-15-r8-outreach.md §6` Final Result 표 + `docs/dev-log/sprint-15-r8-day14-retro-template.md` §7 fill-in.
 
 ## Files changed (요약)
 
@@ -133,10 +134,20 @@ gh pr create --base main --title "..." --body-file <(awk '/^```markdown$/,/^```$
 
 ## 체크리스트 (push 전)
 
-- [ ] R8 14일 retro 완료 → §"R8 외부 검증 결과" 채움
-- [ ] Day 14 fix iter (있다면) commit
+- [ ] Stage 5-4 design-review 완료 (P0 fix / P1+ BL 등재)
+- [ ] Stage 5-6 qa Exhaustive Health ≥8/10
 - [ ] BE 144 pass 재확인
 - [ ] FE tsc clean 재확인
 - [ ] alembic upgrade head 적용 확인 (prod DB 별도)
-- [ ] PR description의 후속 §Sprint 16 첫 commit 링크 확인
+- [ ] PR description §"R8 외부 검증 결과" TBD placeholder 갱신 (R8 14일 진행 예정 명시)
+- [ ] Docs sync 섹션 첨부 — `git diff --stat docs/ backend/**/CONTEXT.md CONTEXT-MAP.md` 결과
 - [ ] 사용자 push 승인 (`PR push만 사용자 승인` 정책)
+- [ ] `gh pr create --draft` flag 강제 (R8 결과 전까지 머지 X)
+
+## R8 결과 후 (별도 세션)
+
+- [ ] R8 14일 stagger 진행 + retro template fill-in
+- [ ] `docs/dev-log/sprint-15-r8-day14-retro-template.md` §6/§7 작성
+- [ ] PR 댓글로 R8 결과 paste (또는 §"R8 외부 검증 결과" 본문 갱신)
+- [ ] Sprint 16 분기 결정 (Best/Medium/Min) → `2026-05-14-sprint16-plan-draft.md` rename `2026-05-28-sprint16-plan.md`
+- [ ] PR draft → ready for review → main 머지
