@@ -213,6 +213,13 @@
 - 마케팅 트랙 (가격 / 고객 로고 / 비교표 / 보안 페이지) — dev 단독 처리 불가
 - AD-35 multi-user E2E (Clerk testing mode 도입 후)
 
+### Sprint 15 — DRAFT PR #29 pushed (2026-05-14)
+
+> **상태**: 단일 draft PR https://github.com/woosung-dev/kairos/pull/29 (52 commits, 76 files, +12570/-20). R8 14일 stagger 결과 후 main 머지.
+> **Stage 5 진행**: 5-1~5-7 완료. 5-8/5-9 머지 후.
+> **R8 미시작**: PR 본문 §"R8 외부 검증 결과" TBD placeholder. retro fill-in 후 PR 댓글로 결과 추가.
+> **Sprint 16 진입 조건**: R8 결과 → Best/Medium/Min 분기 (`docs/dev-log/2026-05-14-sprint16-plan-draft.md §3`).
+
 ### Sprint 15 후보 — Personal Workspace + IA 확장 (2026-05-14 PRD v3.0 lock-in)
 
 > 입력: `docs/requirements/prd.md` v3.0 §3.6 IA 2축 로드맵 + 사용자 의견 (개인↔팀 전환 IA, CLAUDE.md/local.md 비유)
