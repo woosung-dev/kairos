@@ -10,7 +10,8 @@
 ## 1. 완료 상태 (commit history)
 
 ```
-(예정) Stage 4 보강 — memory 도메인 patch + 운영 정책 + BL-023~026 등재 (P0/P1 누락 retrofit)
+(예정) Stage 5 코드 산출물 — 통합 테스트 + recall corpus 생성기 + bench 보강 (BL-026 일부)
+bf0ea8c Stage 4 보강 — memory 도메인 patch + 운영 정책 + BL-023~026 (P0/P1 retrofit)
 c5e3861 Stage 5 진입 — HALFVEC 정정 + Python/서버 분리 + BL-022 + handoff
 51acf11 feat(embeddings): Stage 4 — pgvector HNSW + halfvec 전환 + iterative_scan + REINDEX 운영
 2017d86 docs(sprint-16): Stage 3 — pgvector 마이그레이션 plan + 사전 차단 체크리스트
@@ -18,7 +19,30 @@ c5e3861 Stage 5 진입 — HALFVEC 정정 + Python/서버 분리 + BL-022 + hand
 ed062c3 docs(sprint-16): Stage 0 — pgvector 도메인 용어 lock-in + I-20/I-21 신설
 ```
 
-origin/main 대비 **6 commits ahead, 미푸시**.
+origin/main 대비 **7 commits ahead, 미푸시**.
+
+### Stage 5 코드 산출물 (사용자 환경 무관 — 본 보강 commit)
+
+**통합 테스트** — `backend/tests/embeddings/test_halfvec_migration.py` (10 케이스):
+- 컬럼 타입 halfvec 검증 (3 테이블)
+- INSERT + cosine `<=>` 정합
+- _apply_hnsw_session_params SET LOCAL 효과 (SHOW)
+- vector_search + find_similar_cache + memory/repository.py:vector_search 진입 시 헬퍼 적용 (I-21 / E-9)
+- NULL embedding 보존
+- semantic_caches hit_count UPDATE
+- EXPLAIN — HNSW 인덱스 사용 (정보성)
+
+**recall corpus 생성기** — `backend/tests/embeddings/fixtures/generate_recall_corpus.py`:
+- 결정론적 (seed 42), L2 정규화 (OpenAI text-embedding-3-small 모사)
+- 3분포: 동일 chunk (recall 1.0) / 노이즈 추가 (0.9+) / 새 random (ranking 검증)
+- 기본 200 chunk × 30 query × 1536d
+
+**bench script 보강** — `backend/scripts/bench_vector_search.py` (BL-026 일부):
+- 신규 mode: `latency` / `recall` / `memory-recall` / `build-time` / `explain` / `all`
+- nDCG@10 + precision@10 측정 (BL-026 합격선: ≥0.95 / ≥0.90)
+- HNSW 인덱스 빌드 시간 측정 (`measure_build_time`)
+- EXPLAIN ANALYZE 헬퍼 — `uses_hnsw_index` 자동 판정
+- p99 추가 + memory recall 별도 측정 (E-9 검증)
 
 ### 보강 commit 내용 (Stage 4 P0/P1 누락 retrofit)
 
@@ -158,29 +182,49 @@ uv run alembic upgrade head
 
 ## 4. Stage 5 산출물 (다음 세션 작업)
 
-### 4-A. recall@10 corpus 결정
+### 4-A. recall@10 corpus 결정 — **옵션 B 스크립트 commit됨**
 
-| 옵션 | 내용 | 우선 |
+| 옵션 | 상태 | 비고 |
 |---|---|---|
-| A. dev DB export | `SELECT id, chunk_text, embedding, workspace_id FROM embedding_chunks LIMIT 1000` + 임의 50 query 추출 | 우선 |
-| B. 합성 corpus | `sklearn.TfidfVectorizer` + numpy 임베딩 + 임계 노이즈 | 폴백 |
+| A. dev DB export | ⏸ BL-026 후속 | production export + cosine ground truth 산출 절차 미구현 |
+| B. 합성 corpus | ✅ **commit됨** | `backend/tests/embeddings/fixtures/generate_recall_corpus.py` |
 
-산출물: `backend/tests/embeddings/fixtures/recall_corpus.json`.
-
-### 4-B. 통합 테스트 신설
-
-`backend/tests/embeddings/test_halfvec_migration.py`:
-
-```python
-# 검증 항목:
-# 1. INSERT halfvec 임베딩 → cosine `<=>` SELECT 정합
-# 2. NULL embedding 보존
-# 3. _apply_hnsw_session_params 호출 후 EXPLAIN에서 Index Scan using idx_chunks_hnsw
-# 4. iterative_scan 적용 시 WHERE 포스트필터 + LIMIT 도달 자동 추가 스캔 동작
-# 5. find_similar_cache threshold 0.93 동작 유지
+실행:
+```bash
+cd backend
+uv run python tests/embeddings/fixtures/generate_recall_corpus.py
+# → recall_corpus.json (gitignore, 결정론적 seed=42)
 ```
 
-TestContainers `pgvector/pgvector:pg16` 이미 0.8+ 지원이라 통합 테스트 즉시 실행.
+기본 200 chunk × 30 query × 1536d. 옵션:
+- 30% — 기존 chunk 그대로 (recall 1.0 예상)
+- 40% — chunk + 노이즈 std=0.05 (recall 0.9+ 예상)
+- 30% — 새 random vector (ranking 검증)
+
+산출물 path: `backend/tests/embeddings/fixtures/recall_corpus.json`
+
+### 4-B. 통합 테스트 — **commit됨**
+
+`backend/tests/embeddings/test_halfvec_migration.py` (7개 테스트 케이스):
+
+1. `test_embedding_chunks_column_is_halfvec` — information_schema 검증
+2. `test_semantic_caches_column_is_halfvec` — 동일
+3. `test_memory_query_embedding_cache_column_is_halfvec` — AD-58 검증 (sprint-15 신설본 halfvec 전환)
+4. `test_insert_halfvec_and_cosine_search` — INSERT + cosine `<=>` 정합
+5. `test_apply_hnsw_session_params_sets_variables` — SHOW로 SET LOCAL 효과 검증
+6. `test_vector_search_invokes_hnsw_params` — EmbeddingRepository.vector_search 진입 시 SET LOCAL
+7. `test_null_embedding_preserved` — NULL 보존
+8. `test_semantic_cache_find_and_hit_count` — find_similar_cache + hit_count UPDATE
+9. `test_memory_repository_vector_search_applies_hnsw_params` — E-9 검증 (외부 도메인 헬퍼 호출)
+10. `test_explain_uses_hnsw_index` — EXPLAIN 정보성
+
+TestContainers `pgvector/pgvector:pg16` 사용 — 사용자 환경 무관 즉시 실행.
+
+실행:
+```bash
+cd backend
+uv run pytest tests/embeddings/test_halfvec_migration.py -v
+```
 
 ### 4-C. verification doc
 
