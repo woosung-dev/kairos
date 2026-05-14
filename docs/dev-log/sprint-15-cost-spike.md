@@ -80,6 +80,86 @@ sync 처리 시 user 5초+ wait → UX 불가. BackgroundTask architecture 유�
 
 ---
 
+### 3.5 ADR-019: 2-Model 비교 (2026-05-14 2차 spike, text-only)
+
+> **목적**: gemini-2.5-flash (baseline, EOL 2026-06-17) vs gemini-3.1-flash-lite (candidate, GA 2026-05-07) 직접 측정. ADR-019 채택 판단 evidence.
+>
+> **방법**: 동일 prompt + 동일 text 3 sample × 2 모델 = 6 distill 호출. transcript / embedding은 baseline 기준 1회 (모델 비교 변수 통제).
+
+#### 3.5.1 Per-Model Aggregate (text 3건 success 기준)
+
+```json
+{
+  "gemini-2.5-flash": {
+    "label": "baseline",
+    "e2e_p50_ms": 6305,
+    "e2e_p95_ms": 6325,
+    "distill_p50_ms": 5231,
+    "distill_p95_ms": 6049,
+    "total_cost_usd": 0.0025,
+    "cost_per_tester_week_estimate_usd": 0.0025
+  },
+  "gemini-3.1-flash-lite": {
+    "label": "candidate",
+    "e2e_p50_ms": 2002,
+    "e2e_p95_ms": 2049,
+    "distill_p50_ms": 908,
+    "distill_p95_ms": 969,
+    "total_cost_usd": 0.0020,
+    "cost_per_tester_week_estimate_usd": 0.0020
+  }
+}
+```
+
+> ⚠️ `failure_rate 70%`는 audio 7 sample missing으로 인한 script noise. 두 모델 모두 text 3/3 distill success.
+
+#### 3.5.2 Model Comparison
+
+```json
+{
+  "baseline": "gemini-2.5-flash",
+  "candidate": "gemini-3.1-flash-lite",
+  "distill_latency_delta_ms_p50": -4323,
+  "distill_latency_delta_ms_p95": -5080,
+  "distill_speedup_ratio_p50": 5.76,
+  "cost_per_tester_week_delta_usd": -0.0005,
+  "cost_reduction_pct": 20.0,
+  "output_equivalence": {
+    "both_distill_success": 3,
+    "both_schema_ok": 3,
+    "schema_match_rate": 1.0
+  }
+}
+```
+
+#### 3.5.3 Findings
+
+1. **Latency**: 3.1-flash-lite distill p50 = **908ms** (baseline 5231ms) → **5.76x speedup**. ADR-019 예측 (2.5x TTFT)을 크게 초과.
+2. **Token usage**:
+   - baseline (2.5-flash): `thoughts_token_count=294`, `candidates_token_count=77`, total=717
+   - candidate (3.1-flash-lite): `thoughts_token_count=null`, `candidates_token_count=44`, total=390
+   - → 3.1-flash-lite는 본 호출에서 thinking mode off (default). distill task는 thinking 불필요 — 적절한 동작. 만약 향후 quality 회귀 발견 시 thinking mode parameter explicit 활성 검토.
+3. **Cost**: 20% 절감 ($0.0025 → $0.0020 per tester / week). ADR-019 예측 (17~40%) 범위 내. 토큰 절약 (less thoughts tokens)이 절감 주 원인.
+4. **Output schema equivalence**: 3/3 모두 `{title, atomic_notes, suggested_visibility}` 3 필드 존재 (schema_match_rate=1.0). distill 호환성 검증 완료.
+5. **EOL probe**:
+   - 두 모델 모두 `usage_metadata` / `response_attrs`에 deprecation/sunset 신호 없음
+   - 표면 신호 부재 ≠ 공식 공지 무효 — 2026-06-17 EOL 그대로 유효
+
+#### 3.5.4 ADR-019 Threshold Evaluation
+
+| Threshold | baseline | candidate | 통과 |
+|-----------|----------|-----------|------|
+| failure_rate ≤ 5% (text-only) | 0% (3/3) | 0% (3/3) | ✅ 두 모델 |
+| e2e p95 ≤ 60s | 6325ms | 2049ms | ✅ 두 모델 |
+| cost / tester / week ≤ $2 | $0.0025 | $0.0020 | ✅ 두 모델 |
+| schema 동등성 ≥ 90% | n/a | 100% (3/3) | ✅ |
+| distill speedup ≥ 1.5x | n/a | 5.76x | ✅ |
+| cost reduction ≥ 0% | n/a | +20% | ✅ |
+
+→ **ADR-019 Phase A (spike) 통과**. Sprint 16 진입 시 코드 swap 진행 (Phase B). Rollback 조건 모두 미저촉.
+
+---
+
 ## §4. Gemini EOL Probe (Q3 inline) — 2026-05-14 결과
 
 > Gemini 2.5 Flash EOL = 2026-06-17 (Sprint 15 시작 +34일). 첫 distill 호출의 response 객체 dump.
@@ -108,7 +188,9 @@ sync 처리 시 user 5초+ wait → UX 불가. BackgroundTask architecture 유�
 - ✅ `sdk_http_response` attribute 존재 — 다음 iter에서 raw HTTP header 정밀 dump 가능 (현재는 미사용)
 - ⚠️ Gemini SDK는 sunset header를 일반적으로 SDK 객체에 노출하지 않음 — Google AI Studio 공식 공지 page를 별도 모니터링 필요
 
-→ **표면 신호 없음**. S17-T-GEMINI-EOL 우선순위 유지 (가속 불필요). Sprint 16 진입 (2026-05-28) 시 ADR-019 작성 후 마이그레이션. EOL 6/17까지 ~20일 여유.
+→ **표면 신호 없음**. S17-T-GEMINI-EOL 우선순위 유지 (가속 불필요). Sprint 16 진입 (2026-05-28) 시 ADR-019 마이그레이션 (draft 작성됨 `docs/dev-log/019-gemini-eol-migration.md`). EOL 6/17까지 ~20일 여유.
+
+**ADR-019 evidence**: §3.5 참조 — 3.1-flash-lite 5.76x 빠름 / 20% cost 절감 / schema 3/3 동등.
 
 ---
 
@@ -131,5 +213,7 @@ sync 처리 시 user 5초+ wait → UX 불가. BackgroundTask architecture 유�
 ## §7. 후속 액션
 
 1. founder audio sample 7개 녹음 (`backend/scripts/samples/` README 가이드)
-2. 2차 spike run → 본 doc §3.1 / §3.3 audio 결과 추가 paste
+2. 2차 spike run (audio 포함) → 본 doc §3.1 / §3.3 audio 결과 추가 paste
+3. ADR-019 Phase B 코드 swap → Sprint 16 첫 commit (2026-05-28)
+4. swap 후 R7 metrics에서 distill latency p50 실측 → 5.76x speedup 확인
 3. Sprint 16 진입 시 (2026-05-28) Gemini EOL ADR-019 신설 — S17-T-GEMINI-EOL 항목
