@@ -28,8 +28,10 @@ export function PromoteModal({
   onOpenChange,
 }: PromoteModalProps) {
   const { data: workspaces } = useWorkspaces();
+  // 신규 생성된 워크스페이스는 응답에 type 필드가 누락될 수 있음 (useCreateWorkspace가
+  // cache에 추가하는 row). type이 명시적으로 'personal'이 아니면 team으로 본다.
   const teamOptions = (workspaces ?? []).filter(
-    (w) => w.type === "team" && w.id !== sourceWorkspaceId
+    (w) => w.type !== "personal" && w.id !== sourceWorkspaceId
   );
   const [targetId, setTargetId] = useState<string>("");
   const promote = usePromote(sourceWorkspaceId);
