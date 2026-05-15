@@ -1,10 +1,10 @@
 # ADR-019: Gemini 2.5 Flash EOL 마이그레이션 → gemini-3.1-flash-lite
 
-> **날짜:** 2026-05-14 (draft) → Sprint 16 진입 시 lock-in 예정 (2026-05-28)
-> **상태:** Phase A validated (2026-05-14 spike 통과) → Phase B 코드 swap pending (Sprint 16 첫 commit, 2026-05-28)
+> **날짜:** 2026-05-14 (draft) → 2026-05-15 Phase B accepted (EOL D-33 압박으로 Sprint 16 일정보다 앞당김)
+> **상태:** **Accepted** (Phase A spike 2026-05-14 validated + Phase B 코드 swap 2026-05-15 적용 완료)
 > **작성자:** Claude Opus 4.7 (1M context) + 사용자
 > **관련:** PRD v3.0 §AI Pipeline · ADR-014 Service Boundary · ADR-020 pgvector HNSW/halfvec (Sprint 16 별도 commit — 코드 swap 충돌 회피) · `docs/architecture/ai-pipeline.md` · `docs/dev-log/sprint-15-cost-spike.md` · TODO P0 `S17-T-GEMINI-EOL`
-> **워크플로우:** Sprint 15 R8 14일 stagger 진행 중 AI 단독 prep 작업 — Sprint 16 첫 commit으로 코드 swap 예정
+> **워크플로우:** Sprint 15 R8 14일 stagger 진행 중. EOL 2026-06-17 D-33 압박으로 R8 demo 완료 (2026-05-28) 전 swap 결정 (AD-49 정정 = AD-57로 별도 라벨).
 
 ---
 
@@ -36,6 +36,7 @@
 - **AD-48**: Multi-vendor abstraction (LiteLLM / OpenRouter) **도입하지 않음**. 자의 = MVP premature abstraction + Repository 추상화 부담 + Kairos 단일 모델 정책 (CLAUDE.md "Gemini 고정") 일관성.
 - **AD-49**: 코드 swap은 **Sprint 16 첫 commit**. 자의 = R8 14일 demo 진행 중 모델 변경 = 외부 demo 결과 오염 위험. demo 종료 (Day 14 = 2026-05-28) 후 즉시 적용.
 - **AD-50**: Embedding 모델 (`text-embedding-3-small`)은 본 ADR scope 외. 자의 = 별도 lifecycle, EOL 신호 없음, 마이그레이션 시 별도 ADR 필요.
+- **AD-57** (2026-05-15 정정): AD-49 정정 — Sprint 16 머지 (2026-05-14 PR #30) 완료 후 main 깨끗 + R8 미시작 (founder outreach 80 미진척) 확인. 외부 demo 오염 가능성 부재 + EOL D-33 압박 → Phase B를 2026-05-28 기다리지 않고 2026-05-15 즉시 진입. 자의 = "외부 demo 결과 오염 위험" 가정이 실제 R8 미시작 상태로 무효화됨.
 
 ---
 
@@ -123,12 +124,13 @@ verification: pytest 144 pass / R7 metrics latency 측정.
 3. ✅ `model_comparison` 섹션 (latency_delta_ms / cost_delta_usd / output_equivalence) 출력 검증
 4. ✅ 결과 paste 완료: `docs/dev-log/sprint-15-cost-spike.md §3.5` (commit 2cee665)
 
-### Phase B — Sprint 16 첫 commit (2026-05-28)
+### Phase B — ✅ DONE (2026-05-15, AD-57 정정으로 앞당김)
 
-1. 위 §3 6 spots 단일 commit
-2. `pytest tests/` → 144 pass 유지 확인
-3. `uvicorn` 띄우고 /memory capture → R7 metrics 또는 서버 로그에서 distill latency 측정
-4. 본 ADR status = Draft → Accepted 갱신
+1. ✅ §3 6 spots 코드 + docs 동일 PR 적용 (브랜치 `sprint-17/adr-019-phase-b-gemini-swap`)
+2. ✅ `cd backend && uv run pytest -q` → **155 pass / 2 pre-existing fail / 1 skipped** (회귀 0건. fail 2건 = `tests/services/test_transcription.py` ffmpeg 8.1.1 mock mp3 fixture 호환 이슈, main 동일)
+3. ⏳ `uvicorn` /memory capture distill latency 측정 = 사용자 dogfooding 단계 (PR 머지 후)
+4. ✅ 본 ADR status = Draft → **Accepted** 갱신 (본 patch)
+5. ✅ Atomic Update 매트릭스: `CONTEXT-MAP.md` I-3 / `backend/CONTEXT.md` B-4 / `backend/src/memory/CONTEXT.md` I-3 / `AGENTS.md` 기술 스택 + AI 제약 / `.ai/stacks/fastapi/backend.md` / `README.md` / `docs/architecture/ai-pipeline.md` rule + code sample / `docs/architecture/rag-pipeline.md` 다이어그램 + 비교 표 동시 patch
 
 ---
 
@@ -141,12 +143,12 @@ verification: pytest 144 pass / R7 metrics latency 측정.
 - cost per call 비교 (3.1-flash-lite < 2.5-flash 확인)
 - failure rate < 5% (두 모델 모두)
 
-### Production swap (Phase B)
+### Production swap (Phase B, 2026-05-15)
 
-- BE 144 pass (test_ai_processing.py assertion 갱신 후)
-- BE startup health 200
-- /memory capture → 202 + processing → polling → status=active + distilled_json schema 동등
-- R7 metrics (admin page) latency 비교 (전후 ratio ≥ 1.5x)
+- ✅ BE pytest 155 pass (회귀 0건). 2 fail = pre-existing ffmpeg mp3 fixture (main 동일 검증).
+- ⏳ BE startup health 200 = 사용자 로컬/배포 검증 단계
+- ⏳ /memory capture → 202 + processing → polling → status=active + distilled_json schema 동등 = 사용자 dogfooding 단계
+- ⏳ R7 metrics (admin page) latency 비교 (전후 ratio ≥ 1.5x) = PR 머지 + 사용자 1-2회 capture 후
 
 ---
 

@@ -255,7 +255,7 @@
 - [x] 통합 테스트 10/10 PASS + Sprint 16 격리 BE 155/155 PASS
 
 **후속 (별도 PR / Sprint)**:
-- ADR-019 Phase B (Gemini 2.5-flash → 3.1-flash-lite swap, 6 spots) — Day 14 (2026-05-28) 후
+- [x] ADR-019 Phase B (Gemini 2.5-flash → 3.1-flash-lite swap, 6 spots) — **2026-05-15 적용 완료** (AD-57 정정으로 R8 demo 종료 전 앞당김. EOL D-33 압박 + R8 미시작 확인). 브랜치 `sprint-17/adr-019-phase-b-gemini-swap`. pytest 155 pass 회귀 0건.
 - BL-024 pg_prewarm Cloud Run cold start
 - BL-026 옵션 A — dev DB export + ground truth 절차 (production scale recall 측정)
 
@@ -277,7 +277,7 @@
 
 ### Sprint 17+ candidates (Sprint 15 lock-in)
 
-- [ ] **P0 S17-T-GEMINI-EOL** — Gemini 2.5 Flash EOL 2026-06-17 대응 ADR + Gemini 2.5 Pro / Flash 2.0 마이그레이션 plan. Day 0 spike (`backend/scripts/sprint15_day0_spike.py`)에 response header deprecation probe 1줄 inline. 결과 spike doc 별도 섹션. Sprint 16 진입 시 ADR-019 신설.
+- [x] **P0 S17-T-GEMINI-EOL** — Gemini 2.5 Flash EOL 2026-06-17 대응. **ADR-019 Accepted** (Phase A spike 2026-05-14 / Phase B swap 2026-05-15). `gemini-3.1-flash-lite` GA 채택. spike 결과: distill 5.76x speedup / 20% cost 절감 / schema 3/3. 별도 Pro/Flash 2.0 마이그레이션 plan 불필요 (단일 단계 swap으로 종료).
 
 ### 진행 중 (ADR-008 DevEx 후속)
 

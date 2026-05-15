@@ -199,7 +199,7 @@ shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
 |---|---|---|
 | I-1 | **AsyncSession은 Repository만 보유** — Service에 `from sqlalchemy.ext.asyncio import AsyncSession` 금지 | `backend/src/<domain>/service.py` |
 | I-2 | **크로스 도메인 트랜잭션은 orchestrator 경유** — 같은 session 공유, 마지막 1회 commit 원칙. **예외: 장기 파이프라인 진행 보고용 status commit 허용** — BackgroundTask에서 클라이언트 polling을 지원하려면 status 전이마다 commit이 필요. 이 경우 부분 커밋 상태 모델이 생성됨: `transcribing`(세그먼트 없음) / `analyzing`(세그먼트 있음) / `completed`(요약+임베딩 있음) / `failed`(error_message 있음). | `<domain>/pipeline_service.py` 또는 `services/` |
-| I-3 | **AI 모델 고정**: Gemini `gemini-2.5-flash` | `core/config.py` |
+| I-3 | **AI 모델 고정**: Gemini `gemini-3.1-flash-lite` (ADR-019 Phase B, 2026-05-15 swap. 이전: `gemini-2.5-flash` EOL 2026-06-17) | `core/config.py` |
 | I-4 | **프롬프트 중앙 관리**: `common/prompts.py` 상수만, 인라인 프롬프트 금지 | code review |
 | I-5 | **장기 작업**: `BackgroundTasks` + `202 Accepted` + `GET .../status` polling | meetings 패턴 |
 | I-6 | **임베딩 모델 고정**: OpenAI `text-embedding-3-small`, 1536d | `embeddings/service.py` |

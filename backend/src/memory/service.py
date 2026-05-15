@@ -61,7 +61,7 @@ logger = logging.getLogger(__name__)
 # 상수
 MAX_AUDIO_BYTES = 25 * 1024 * 1024  # Whisper API 25MB 한도
 WHISPER_MODEL = "gpt-4o-mini-transcribe"  # patch §13 — $0.003/min 기본
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.1-flash-lite"
 EMBEDDING_MODEL = "text-embedding-3-small"
 
 

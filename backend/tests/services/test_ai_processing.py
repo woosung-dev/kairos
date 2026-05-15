@@ -66,7 +66,7 @@ async def test_summarize_with_code_fence():
 
 @pytest.mark.asyncio
 async def test_summarize_uses_correct_model():
-    """gemini-2.5-flash 모델 고정 확인."""
+    """gemini-3.1-flash-lite 모델 고정 확인 (ADR-019 Phase B)."""
     mock_response = MagicMock()
     mock_response.text = MOCK_SUMMARY_RESPONSE
 
@@ -81,7 +81,7 @@ async def test_summarize_uses_correct_model():
             await service.summarize("테스트")
 
             call_kwargs = mock_client.aio.models.generate_content.call_args.kwargs
-            assert call_kwargs["model"] == "gemini-2.5-flash"
+            assert call_kwargs["model"] == "gemini-3.1-flash-lite"
 
 
 # ── BL-004: 스키마 검증 테스트 ──

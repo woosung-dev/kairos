@@ -53,7 +53,7 @@ Memory 도메인은 **개인 메모리 레이어**를 담당. Notion/Apple Notes
 | **I-9 (memory 적용)** | MemoryItem 모든 query는 `workspace_id` 필터 + embeddings.create_chunk 시 `workspace_id`가 source memory의 workspace와 매칭 (4-C atomic patch) | `repository.py` 전역 + `service.py:721` assertion |
 | **I-18** | Promotion = 복제 + tombstone. PromoteAudit 4-key 강제 | `service.py:407~434` (promote) |
 | **I-19** | Personal workspace 1인 격리 — Personal에 capture는 1 user만 가능 (auth/dependencies 시드) | `auth/dependencies.py` lazy seed |
-| I-3 (Gemini 모델) | `gemini-2.5-flash` (ADR-019 Phase B에서 → `gemini-3.1-flash-lite`) | `service.py:64` `GEMINI_MODEL` |
+| I-3 (Gemini 모델) | `gemini-3.1-flash-lite` (ADR-019 Phase B 적용 완료, 2026-05-15. 이전: `gemini-2.5-flash` EOL 2026-06-17) | `service.py:64` `GEMINI_MODEL` |
 | I-4 (프롬프트 중앙 관리) | distill prompt = `common/prompts.py` 상수 (인라인 금지) | Sprint 15 R1 lock-in |
 
 ---

@@ -20,7 +20,7 @@
 
 - 모든 프롬프트는 `backend/src/common/prompts.py`에 **상수**로 정의
 - 인라인 프롬프트 작성 **절대 금지**
-- Gemini 모델 고정: `gemini-2.5-flash` (임의 변경 금지)
+- Gemini 모델 고정: `gemini-3.1-flash-lite` (임의 변경 금지, ADR-019 Phase B 적용 2026-05-15. 이전: `gemini-2.5-flash` EOL 2026-06-17)
 - 모든 Gemini 호출은 `services/ai_processing.py`에 집중 관리
 - LLM 구현체는 `BaseLLMService` 인터페이스로 추상화
 
@@ -148,7 +148,7 @@ client = genai.Client(
 
 # 사용 예시
 response = await client.aio.models.generate_content(
-    model="gemini-2.5-flash",
+    model="gemini-3.1-flash-lite",
     contents=transcript_text,
     config=genai.types.GenerateContentConfig(
         system_instruction=MEETING_SUMMARY_SYSTEM_PROMPT,

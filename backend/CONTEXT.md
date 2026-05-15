@@ -68,7 +68,7 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 | B-1 | **AsyncSession은 Repository만 보유** — Service에 `from sqlalchemy.ext.asyncio import AsyncSession` 금지 | code review |
 | B-2 | **모든 Repository는 `workspace_id` 필터 강제** (멀티테넌시) | `.where(... .workspace_id == workspace_id)` |
 | B-3 | **크로스 도메인 트랜잭션은 `pipeline_service.py` 또는 `services/`** — 같은 session 공유, dependencies.py에서 조립. Repository 직접 read는 허용 (CONTEXT-MAP §4.2 #1). **embeddings·ai_processing·transcription = cross-domain shared service** — 직접 호출은 orchestrator 경계 내부에서만 (Sprint 6 ADR-014, 헌법 결정 #1) | code review |
-| B-4 | **AI 모델 고정**: Gemini `gemini-2.5-flash` | `core/config.py` |
+| B-4 | **AI 모델 고정**: Gemini `gemini-3.1-flash-lite` (ADR-019 Phase B, 2026-05-15 swap. 이전: `gemini-2.5-flash` EOL 2026-06-17) | `core/config.py` |
 | B-5 | **임베딩 모델 고정**: OpenAI `text-embedding-3-small` (1536d), 청킹 512토큰/오버랩 50토큰 | `embeddings/service.py` |
 | B-6 | **프롬프트 중앙 관리**: `common/prompts.py` 상수만, 인라인 프롬프트 금지 | code review |
 | B-7 | **장기 작업**: `BackgroundTasks` + `202 Accepted` + `GET .../status` polling | `meetings/router.py` 패턴 |

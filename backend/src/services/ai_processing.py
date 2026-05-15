@@ -15,7 +15,7 @@ from src.common.prompts import (
 from src.core.config import get_settings
 
 # Gemini 모델 고정
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.1-flash-lite"
 
 
 class AIProcessingService:
