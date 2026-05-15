@@ -255,30 +255,11 @@ function KanbanColumn({ id, label, color, items }: KanbanColumnProps) {
   );
 }
 
-// --- KanbanCard (드래그 가능) ---
+// --- KanbanCardContent (순수 view) — KanbanCard + DragOverlay 양쪽에서 재사용 ---
 
-interface KanbanCardProps {
-  item: ActionItem;
-}
-
-function KanbanCard({ item }: KanbanCardProps) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: item.id,
-  });
-
+function KanbanCardContent({ item }: { item: ActionItem }) {
   return (
-    <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      className="p-3 rounded border cursor-grab active:cursor-grabbing transition-opacity"
-      style={{
-        background: "var(--surface)",
-        borderColor: "var(--border-subtle)",
-        borderRadius: "var(--radius-md)",
-        opacity: isDragging ? 0.4 : 1,
-      }}
-    >
+    <>
       {/* 우선순위 인디케이터 + 제목 */}
       <div className="flex items-start gap-2 mb-2">
         <span
@@ -324,11 +305,36 @@ function KanbanCard({ item }: KanbanCardProps) {
           </span>
         )}
       </div>
+    </>
+  );
+}
+
+// --- KanbanCard (드래그 가능) ---
+
+function KanbanCard({ item }: { item: ActionItem }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: item.id,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className="p-3 rounded border cursor-grab active:cursor-grabbing transition-opacity"
+      style={{
+        background: "var(--surface)",
+        borderColor: "var(--border-subtle)",
+        borderRadius: "var(--radius-md)",
+        opacity: isDragging ? 0.4 : 1,
+      }}
+    >
+      <KanbanCardContent item={item} />
     </div>
   );
 }
 
-// --- DragOverlay용 카드 (드래그 중 미리보기) ---
+// --- DragOverlay용 카드 (드래그 중 미리보기, shadow + 고정 width) ---
 
 function KanbanCardOverlay({ item }: { item: ActionItem }) {
   return (
@@ -341,47 +347,7 @@ function KanbanCardOverlay({ item }: { item: ActionItem }) {
         width: 280,
       }}
     >
-      <div className="flex items-start gap-2 mb-2">
-        <span
-          className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
-          style={{ background: PRIORITY_COLORS[item.priority] }}
-        />
-        <p className="text-sm flex-1" style={{ color: "var(--text-primary)" }}>
-          {item.title}
-        </p>
-      </div>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {item.assignee && (
-            <span
-              className="text-[10px] px-1.5 py-0.5 rounded-full"
-              style={{
-                background: "var(--surface-active)",
-                color: "var(--text-muted)",
-              }}
-            >
-              {item.assignee.displayName}
-            </span>
-          )}
-          <span
-            className="text-[10px] px-1.5 py-0.5 rounded-full"
-            style={{
-              background: `${PRIORITY_COLORS[item.priority]}20`,
-              color: PRIORITY_COLORS[item.priority],
-            }}
-          >
-            {PRIORITY_LABELS[item.priority]}
-          </span>
-        </div>
-        {item.dueDate && (
-          <span
-            className="text-[10px]"
-            style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
-          >
-            {item.dueDate}
-          </span>
-        )}
-      </div>
+      <KanbanCardContent item={item} />
     </div>
   );
 }
