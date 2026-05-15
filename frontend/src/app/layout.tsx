@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { koKR } from "@clerk/localizations";
 import { ThemeProvider } from "@/components/layout/theme-provider";
+import { QueryProvider } from "@/lib/query-client";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -41,8 +43,15 @@ export default function RootLayout({
           {/* ThemeProvider 는 root layout body 최상위에 위치해야 inline FOUC
               방지 script 가 React component tree 깊은 곳에서 렌더되어 발생하는
               "Encountered a script tag while rendering React component" 경고
-              회피 가능 (next-themes 0.4 + Next.js 16 정합). */}
-          <ThemeProvider>{children}</ThemeProvider>
+              회피 가능 (next-themes 0.4 + Next.js 16 정합).
+              QueryProvider 도 root 에 둬서 /invite 등 (app) 외부 라우트도
+              React Query 사용 가능 (ISSUE-008 fix). */}
+          <ThemeProvider>
+            <QueryProvider>
+              {children}
+              <Toaster />
+            </QueryProvider>
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

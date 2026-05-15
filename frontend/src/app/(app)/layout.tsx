@@ -1,14 +1,7 @@
+// (app) 그룹 — QueryProvider + ThemeProvider + Toaster 는 root layout 에 위치.
+// 본 layout 은 PanelLayout 만 wrap (사이드바 + 헤더 + 메인 컨테이너).
 import { PanelLayout } from "@/components/layout/panel-layout";
-import { QueryProvider } from "@/lib/query-client";
-import { Toaster } from "@/components/ui/sonner";
 
-// ThemeProvider 는 app/layout.tsx root 로 이동 (next-themes inline script
-// 경고 회피). 본 (app) 그룹은 QueryProvider + PanelLayout 만 wrap.
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <QueryProvider>
-      <PanelLayout>{children}</PanelLayout>
-      <Toaster />
-    </QueryProvider>
-  );
+  return <PanelLayout>{children}</PanelLayout>;
 }
