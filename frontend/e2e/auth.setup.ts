@@ -55,8 +55,20 @@ setup("authenticate", async ({ page }) => {
   if (!token) throw new Error("Clerk 토큰을 가져올 수 없습니다.");
 
   const headers = { Authorization: `Bearer ${token}` };
+  // BL-027 fix: GET/POST 응답 .ok() 가드 + 명시 throw.
+  // 기존 .json().catch(() => []) silent fallback은 503/HTML 응답을 빈 배열로 위장 →
+  // 후속 POST에서 다시 .json() 호출 시 SyntaxError 도미노 (Unexpected token '<').
+  // E2E_API_URL stale 또는 Cloud Run service down 회귀를 1번의 fail에서 즉시 식별.
   const wsRes = await page.request.get(`${apiUrl}/api/v1/workspaces`, { headers });
-  const wsList = await wsRes.json().catch(() => []);
+  if (!wsRes.ok()) {
+    const body = await wsRes.text();
+    throw new Error(
+      `[e2e auth.setup] GET /api/v1/workspaces 실패 — status=${wsRes.status()} ` +
+        `apiUrl=${apiUrl} body[0..200]=${body.slice(0, 200)}\n` +
+        `→ E2E_API_URL secret 또는 Cloud Run service URL 점검 필요 (BL-027).`,
+    );
+  }
+  const wsList = await wsRes.json();
 
   let wsId: string;
   if (Array.isArray(wsList) && wsList.length > 0) {
@@ -66,7 +78,16 @@ setup("authenticate", async ({ page }) => {
       headers: { ...headers, "Content-Type": "application/json" },
       data: { name: "E2E 테스트 워크스페이스" },
     });
-    wsId = (await createRes.json()).id;
+    if (!createRes.ok()) {
+      const body = await createRes.text();
+      throw new Error(
+        `[e2e auth.setup] POST /api/v1/workspaces 실패 — status=${createRes.status()} ` +
+          `apiUrl=${apiUrl} body[0..200]=${body.slice(0, 200)}\n` +
+          `→ E2E_API_URL secret 또는 Cloud Run service URL 점검 필요 (BL-027).`,
+      );
+    }
+    const created = await createRes.json();
+    wsId = created.id;
   }
 
   // ── localStorage에 activeWorkspaceId 주입 (Zustand persist 형식) ──
