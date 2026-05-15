@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import type {
   CreateInviteRequest,
+  Invite,
   UpdateMemberRoleRequest,
 } from "./types";
 
@@ -151,9 +152,15 @@ export function useCreateInvite(wid: string | undefined) {
       if (!token) throw new Error("인증이 필요합니다");
       return createInvite(token, wid!, data);
     },
-    onSuccess: () => {
+    onSuccess: (newInvite) => {
       toast.success("초대 링크가 생성되었습니다");
       if (wid) {
+        // BL-038: optimistic update — invalidate 만 하면 refetch 완료까지 race
+        // 동안 사용자가 빈 목록 봄. mutation 응답으로 받은 새 invite 를 즉시
+        // 캐시 맨 위에 prepend, 그 후 background refetch 로 정합성 확인.
+        queryClient.setQueryData<Invite[]>(inviteKeys.list(wid), (old) =>
+          old ? [newInvite, ...old] : [newInvite],
+        );
         queryClient.invalidateQueries({ queryKey: inviteKeys.list(wid) });
       }
     },
@@ -171,11 +178,16 @@ export function useDeactivateInvite(wid: string | undefined) {
     mutationFn: async (inviteId: string) => {
       const token = await getToken();
       if (!token) throw new Error("인증이 필요합니다");
-      return deactivateInvite(token, wid!, inviteId);
+      await deactivateInvite(token, wid!, inviteId);
+      return inviteId;
     },
-    onSuccess: () => {
+    onSuccess: (deactivatedId) => {
       toast.success("초대 링크가 비활성화되었습니다");
       if (wid) {
+        // BL-038: optimistic update — 캐시에서 즉시 제거 후 background refetch.
+        queryClient.setQueryData<Invite[]>(inviteKeys.list(wid), (old) =>
+          old ? old.filter((inv) => inv.id !== deactivatedId) : old,
+        );
         queryClient.invalidateQueries({ queryKey: inviteKeys.list(wid) });
       }
     },
