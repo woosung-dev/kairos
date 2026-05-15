@@ -21,7 +21,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useWorkspaceRole } from "@/features/members/hooks";
-import { useProject, useArchiveProject, useDeleteProject, useUpdateProject } from "../hooks";
+import {
+  useProject,
+  useArchiveProject,
+  useDeleteProject,
+  useUpdateProject,
+  useRecentItems,
+} from "../hooks";
 import { useActionItems, useUpdateActionItem } from "@/features/actions/hooks";
 import { useMeetings } from "@/features/meetings/hooks";
 import { useNotes } from "@/features/notes/hooks";
@@ -141,30 +147,11 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
   }
 
   const actions = actionsData?.items ?? [];
-
   const projectMeetings = meetingsData?.items ?? [];
-
   const notes = notesData?.items ?? [];
 
-  /* 최근 아이템: 회의 + 노트 합쳐 날짜순 정렬, 5개 */
-  type RecentItem =
-    | { kind: "meeting"; data: Meeting }
-    | { kind: "note"; data: Note };
-
-  const recentItems: RecentItem[] = [
-    ...projectMeetings.map((m): RecentItem => ({ kind: "meeting", data: m })),
-    ...notes.slice(0, 5).map((n): RecentItem => ({ kind: "note", data: n })),
-  ]
-    .sort((a, b) => {
-      const aDate = a.kind === "meeting"
-        ? (a.data.recordedAt ?? a.data.createdAt)
-        : a.data.createdAt;
-      const bDate = b.kind === "meeting"
-        ? (b.data.recordedAt ?? b.data.createdAt)
-        : b.data.createdAt;
-      return new Date(bDate).getTime() - new Date(aDate).getTime();
-    })
-    .slice(0, 5);
+  /* 최근 아이템: 회의 + 노트 합쳐 날짜순 정렬, 5개 — hooks.ts:useRecentItems */
+  const recentItems = useRecentItems(projectMeetings, notes);
 
   const isContentLoading = actionsLoading || meetingsLoading || notesLoading;
 
