@@ -9,9 +9,11 @@
 | `api/`           | API 명세서, 프론트-백엔드 통신 규약        |
 | `guides/`        | 로컬 셋업, 배포, secrets, prompt, 세션 루틴 |
 | `dev-log/`       | ADR (Architecture Decision Records) + Sprint plan/verification |
-| `superpowers/`   | Sprint 실행 계획(plans/) + 설계(specs/)    |
+| `_archive/`      | superseded/stale 문서 (검색 제외) — `_archive/README.md` 참조 |
 | `TODO.md`        | 작업 현황 (Completed / In Progress / Blocked) |
 | `REFACTORING-BACKLOG.md` | BL-NNN 리팩토링 백로그 (P0~P3 분류) |
+
+> **본 색인이 active doc 의 유일한 entry point.** `_archive/` 는 history 보존용 — 검색 대상 아님.
 
 ## 문서 목록
 
@@ -23,7 +25,6 @@
 - [인터뷰 가이드](requirements/interview-guide.md) + [인터뷰 결과](requirements/interview-results.md)
 - [경쟁사 분석](requirements/competitive-analysis.md)
 - [UI/UX 인터랙션 명세](requirements/ui-ux-spec.md) — ADR-006 기준 C|D 2-Panel, Today 피드, Inbox 2그룹, RAG 오버레이
-- [~~PARA 방법론~~](requirements/para-methodology.md) — *Deprecated: ADR-004에 의해 second-brain.md로 대체*
 
 ### architecture/
 - [디렉토리 구조 맵](architecture/directory-map.md)
@@ -67,7 +68,6 @@
 
 **Sprint plan / verification**
 - [Sprint 6 dogfooding matrix](dev-log/sprint-6-dogfooding-matrix.md)
-- [Sprint 11 session prompt](dev-log/sprint-11-session-prompt.md)
 - [Sprint 14 plan](dev-log/sprint-14-plan.md)
 - [Sprint 15 plan](dev-log/sprint-15-plan.md) — Personal workspace + Memory module + Recall-first wedge
 - [Sprint 15 verification](dev-log/sprint-15-verification.md)
@@ -83,12 +83,10 @@
 **Multi-agent QA (Sprint 13)**
 - [Multi-agent QA reports](dev-log/2026-05-13-multi-agent-qa/) — Sentinel / Curious / Casual 3축 통합 검증
 
-### superpowers/ (Sprint 실행 기록)
+### _archive/ (보관)
 
-> superpowers가 자동 생성한 Sprint 별 설계(specs/)와 실행 계획(plans/) 문서.
-
-**specs/ (설계)** — Phase 0 + Sprint 1~4
-**plans/ (실행)** — Phase 0 + Sprint 1~4
+> 2026-05-15 Sprint 18 PR-B 에서 stale 문서 분리. 진입 색인에서 제외, history 보존.
+> 자세한 이동 이력은 [`_archive/README.md`](_archive/README.md) 참조.
 
 ### Meta docs
 
@@ -98,6 +96,6 @@
 ## 헌법 + 도메인 CONTEXT
 
 본 docs/ 외부에 위치하지만 진입점:
-- [`CONTEXT-MAP.md`](../CONTEXT-MAP.md) — 도메인 경계 + 핵심 불변식 (I-1 ~ I-19)
+- [`CONTEXT-MAP.md`](../CONTEXT-MAP.md) — 도메인 경계 + 핵심 불변식 (I-1 ~ I-21) + §9 Atomic Update 강제
 - [`DESIGN.md`](../DESIGN.md) — 디자인 시스템 (Industrial/Utilitarian)
 - 도메인별 `backend/src/<domain>/CONTEXT.md` (workspaces, projects, meetings, notes, inbox, rag, embeddings, memory)
