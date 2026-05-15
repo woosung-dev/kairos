@@ -26,8 +26,12 @@ export default function RootLayout({
             href="https://fonts.gstatic.com"
             crossOrigin="anonymous"
           />
+          <link rel="preconnect" href="https://api.fontshare.com" />
+          <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="anonymous" />
+          {/* BL-037: Satoshi 는 Google Fonts 미배포 — Indian Type Foundry/Fontshare 가
+              실제 호스팅. 기존 Google Fonts URL 은 영구 pending 으로 FOIT 유발. */}
           <link
-            href="https://fonts.googleapis.com/css2?family=Satoshi:wght@400;500;600;700&display=swap"
+            href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&display=swap"
             rel="stylesheet"
           />
           <link
