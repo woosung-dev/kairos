@@ -83,7 +83,26 @@ export function InviteManager({
     }
   };
 
-  if (!isAdmin) return null;
+  // BL-039: non-admin 진입 시 빈 헤더 대신 명시적 권한 부족 메시지.
+  // BE 가 403 반환하므로 fetch 가 실패하지만 사용자 입장에서 침묵은 혼란.
+  if (!isAdmin) {
+    return (
+      <div
+        className="text-center py-8 rounded-lg"
+        style={{
+          background: "var(--surface)",
+          color: "var(--text-muted)",
+        }}
+      >
+        <Link2
+          className="w-8 h-8 mx-auto mb-2"
+          style={{ color: "var(--text-muted)" }}
+        />
+        <p className="text-sm">초대 링크 관리 권한이 필요합니다</p>
+        <p className="text-xs mt-1">admin 이상 역할의 멤버에게 문의하세요</p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
