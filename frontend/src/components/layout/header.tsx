@@ -142,7 +142,7 @@ export function Header() {
             {/* 설정 */}
             <DropdownMenuItem
               className="px-3 py-2 cursor-pointer"
-              onSelect={() => {
+              onClick={() => {
                 if (wid) {
                   window.location.href = `/workspace/${wid}/settings`;
                 }
@@ -154,11 +154,12 @@ export function Header() {
 
             <DropdownMenuSeparator />
 
-            {/* 로그아웃 — 워크스페이스 캐시/Zustand 정리 후 sign-out (BUG-H01) */}
+            {/* 로그아웃 — 워크스페이스 캐시/Zustand 정리 후 sign-out (BUG-H01).
+                base-ui Menu.Item 은 onClick 사용 — onSelect (Radix API) 는 미동작. */}
             <DropdownMenuItem
               variant="destructive"
               className="px-3 py-2 cursor-pointer"
-              onSelect={async () => {
+              onClick={async () => {
                 queryClient.clear();
                 setActiveWorkspaceId("");
                 await signOut({ redirectUrl: "/" });
