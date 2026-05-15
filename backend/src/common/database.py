@@ -12,11 +12,17 @@ _async_session_factory = None
 def init_engine(database_url: str) -> None:
     """비동기 엔진과 세션 팩토리를 초기화한다. lifespan에서 호출."""
     global _engine, _async_session_factory
+    # BL-034: Neon Postgres 의 idle connection timeout (기본 5분) 이후 pool 에
+    # 남은 connection 을 재사용하면 asyncpg.InterfaceError "connection is closed".
+    # pool_pre_ping=True 는 매 체크아웃마다 가벼운 SELECT 1 으로 health check,
+    # pool_recycle=240 은 4분 (Neon timeout 보다 짧게) 마다 connection 재생성.
     _engine = create_async_engine(
         database_url,
         echo=False,
         pool_size=5,
         max_overflow=10,
+        pool_pre_ping=True,
+        pool_recycle=240,
     )
     _async_session_factory = async_sessionmaker(
         bind=_engine,
