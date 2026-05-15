@@ -18,7 +18,7 @@ class ProjectService:
     def __init__(
         self,
         repo: ProjectRepository,
-        ws_repo: WorkspaceRepository | None = None,
+        ws_repo: WorkspaceRepository,
     ) -> None:
         self.repo = repo
         self.ws_repo = ws_repo
@@ -142,14 +142,13 @@ class ProjectService:
             raise ProjectNotFoundError()
         if project.workspace_id != workspace_id:
             raise WorkspaceMismatchError()
-        if self.ws_repo is not None:
-            # Sprint 15 ADR-016 AD-43: personal workspace는 ProjectMember 추가 불가
-            ws = await self.ws_repo.find_by_id(workspace_id)
-            if ws is not None and getattr(ws, "type", "team") == "personal":
-                raise PersonalWorkspaceProtected("프로젝트 멤버 추가")
-            ws_member = await self.ws_repo.find_member(workspace_id, user_id)
-            if ws_member is None:
-                raise CrossWorkspaceMemberError()
+        # Sprint 15 ADR-016 AD-43: personal workspace는 ProjectMember 추가 불가
+        ws = await self.ws_repo.find_by_id(workspace_id)
+        if ws is not None and getattr(ws, "type", "team") == "personal":
+            raise PersonalWorkspaceProtected("프로젝트 멤버 추가")
+        ws_member = await self.ws_repo.find_member(workspace_id, user_id)
+        if ws_member is None:
+            raise CrossWorkspaceMemberError()
         member = await self.repo.add_member(project_id, project.workspace_id, user_id, role)
         await self.repo.commit()
         return {
