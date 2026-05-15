@@ -57,6 +57,7 @@ class WorkspaceService:
             "id": str(workspace.id),
             "name": workspace.name,
             "ownerId": str(workspace.owner_id),
+            "type": getattr(workspace, "type", "team"),
             "createdAt": workspace.created_at.isoformat(),
             "updatedAt": workspace.updated_at.isoformat(),
         }
@@ -86,6 +87,7 @@ class WorkspaceService:
             "id": str(workspace.id),
             "name": workspace.name,
             "ownerId": str(workspace.owner_id),
+            "type": getattr(workspace, "type", "team"),
             "memberCount": member_count,
             "inboxThreshold": workspace.inbox_threshold,
             "createdAt": workspace.created_at.isoformat(),

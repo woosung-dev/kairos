@@ -14,6 +14,8 @@ class WorkspaceResponse(BaseModel):
     id: uuid.UUID
     name: str
     owner_id: uuid.UUID
+    # Sprint 15 R6: 'personal' | 'team'. legacy row 보호용 default 'team' (DB type 컬럼 NULL 방어).
+    type: str = "team"
     created_at: str
     updated_at: str
 
