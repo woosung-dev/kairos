@@ -55,6 +55,7 @@ class WorkspaceRepository:
     async def find_member(
         self, workspace_id: uuid.UUID, user_id: uuid.UUID
     ) -> WorkspaceMember | None:
+        """워크스페이스-유저 조합으로 멤버 조회. RBAC 검증 + I-17 cross-workspace 차단에서 사용."""
         result = await self.session.execute(
             select(WorkspaceMember).where(
                 WorkspaceMember.workspace_id == workspace_id,
@@ -62,12 +63,6 @@ class WorkspaceRepository:
             )
         )
         return result.scalar_one_or_none()
-
-    async def find_by_workspace_and_user(
-        self, workspace_id: uuid.UUID, user_id: uuid.UUID
-    ) -> WorkspaceMember | None:
-        """워크스페이스-유저 조합으로 멤버 조회. RBAC 검증용."""
-        return await self.find_member(workspace_id, user_id)
 
     async def find_member_by_id(
         self, member_id: uuid.UUID

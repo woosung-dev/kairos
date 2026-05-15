@@ -32,7 +32,7 @@ async def test_role_checker_allows_sufficient_role():
 
     with patch("src.auth.rbac.WorkspaceRepository") as MockRepo:
         instance = MockRepo.return_value
-        instance.find_by_workspace_and_user = AsyncMock(return_value=mock_member)
+        instance.find_member = AsyncMock(return_value=mock_member)
         result = await checker(
             workspace_id=uuid.uuid4(),
             current_user=MagicMock(id=uuid.uuid4()),
@@ -50,7 +50,7 @@ async def test_role_checker_rejects_insufficient_role():
 
     with patch("src.auth.rbac.WorkspaceRepository") as MockRepo:
         instance = MockRepo.return_value
-        instance.find_by_workspace_and_user = AsyncMock(return_value=mock_member)
+        instance.find_member = AsyncMock(return_value=mock_member)
         with pytest.raises(HTTPException) as exc_info:
             await checker(
                 workspace_id=uuid.uuid4(),
@@ -67,7 +67,7 @@ async def test_role_checker_rejects_non_member():
 
     with patch("src.auth.rbac.WorkspaceRepository") as MockRepo:
         instance = MockRepo.return_value
-        instance.find_by_workspace_and_user = AsyncMock(return_value=None)
+        instance.find_member = AsyncMock(return_value=None)
         with pytest.raises(HTTPException) as exc_info:
             await checker(
                 workspace_id=uuid.uuid4(),

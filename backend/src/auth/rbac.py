@@ -44,9 +44,7 @@ class RoleChecker:
         session: AsyncSession = Depends(get_async_session),
     ) -> WorkspaceMember:
         repo = WorkspaceRepository(session)
-        member = await repo.find_by_workspace_and_user(
-            workspace_id, current_user.id
-        )
+        member = await repo.find_member(workspace_id, current_user.id)
         if member is None:
             raise HTTPException(
                 status_code=403, detail="워크스페이스 멤버가 아닙니다"
