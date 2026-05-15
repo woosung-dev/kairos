@@ -877,3 +877,33 @@ Cloud Run + Neon Postgres 환경에서 BE 인스턴스 cold start 시:
 **우선순위:** ★★★☆☆ (Sprint 16 Stage 5 진입 시 통합 권장)
 
 **Sprint 묶음 권고:** **Sprint 16 Stage 5 verification** — 본 sprint 측정 산출물에 포함하거나 직후 sprint.
+
+---
+
+## BL-027 — e2e auth.setup 외부 의존 (BE URL) 503/HTML 보호 ✅ **완료 (2026-05-15 fix PR)**
+
+**도메인:** frontend / e2e / devops
+**근거:** Sprint 16 PR #30 머지 후 main e2e 회귀. E2E_API_URL이 가리키는 Cloud Run service가
+404 HTML 반환 → `auth.setup.ts:69` `(await createRes.json()).id` SyntaxError.
+원인 = Cloud Run service URL stale 또는 redeploy 누락 (PR #30 머지 14h 전 main e2e success
+시점 ~ 본 PR 머지 후 e2e fail 시점 사이 외부 환경 변화).
+
+**증거:**
+- run 25874617335 (PR #30 candidate) + rerun: 2회 fail (`SyntaxError: Unexpected token '<', "<html><hea"... is not valid JSON`)
+- run 25862668773 (main 9cdee27, 코드 변경 0) rerun: 동일 fail
+- 추정 Cloud Run URL curl: `404 Page not found` HTML — e2e 응답과 패턴 매칭
+
+**fix:**
+- `frontend/e2e/auth.setup.ts` GET/POST 응답 `.ok()` 가드 + 명시 error 메시지 (status + apiUrl + body[0..200])
+- 기존 `.json().catch(() => [])` silent fallback 제거 (503 시 wsList=[] 분기로 빠져 POST에서 다시 SyntaxError 발생하는 도미노 차단)
+- 후속 = 사용자 GCP 콘솔에서 E2E_API_URL secret 갱신 (또는 Cloud Run service 재배포)
+
+**예상 효과:**
+- 동일 회귀 재발 시 fail 1번에 원인 출력 (전: SyntaxError stack ×3, 후: `status=404 apiUrl=... body=<html>... → E2E_API_URL ... 점검 필요`)
+- CI 디버깅 1 round trip 단축
+
+**Risk:** 🟢 낮음 (e2e 가드만, 런타임 영향 0)
+
+**우선순위:** ★★★★☆ (회귀 진단 시간 직결)
+
+**Sprint 묶음:** BL-021 (Sprint 15 hotfix-2 Clerk koKR selector mismatch) + 본 BL-027 status code 보호 = auth.setup hardening 2건 누적.
