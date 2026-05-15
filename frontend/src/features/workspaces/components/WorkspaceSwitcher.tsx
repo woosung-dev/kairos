@@ -1,7 +1,7 @@
 // 워크스페이스 전환 dropdown — BL-014 (Sprint 17 workspace-switcher-ui). 좌측 topbar에서 호출.
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown, Plus, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -14,11 +14,37 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useWorkspaces, useCreateWorkspace } from "../hooks";
 import { useWorkspaceStore } from "../store";
+import type { Workspace } from "../types";
 import { WorkspaceTypeBadge } from "./WorkspaceTypeBadge";
 import { inferWorkspaceType } from "../utils";
 
 interface WorkspaceSwitcherProps {
   memberCount?: number;
+}
+
+/**
+ * BL-035: 동일 이름 워크스페이스가 2개 이상이면 created_at 오름차순 기준 #N 접미사 부여.
+ * 단일 이름은 접미사 없음. type 별로 그룹핑 — team / personal 끼리만 비교.
+ */
+function buildDisambiguationMap(
+  workspaces: Workspace[],
+): Map<string, string> {
+  const suffixMap = new Map<string, string>();
+  const groups = new Map<string, Workspace[]>();
+  workspaces.forEach((ws) => {
+    const key = `${inferWorkspaceType(ws)}:${ws.name}`;
+    const arr = groups.get(key);
+    if (arr) arr.push(ws);
+    else groups.set(key, [ws]);
+  });
+  groups.forEach((group) => {
+    if (group.length < 2) return;
+    const sorted = [...group].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    sorted.forEach((ws, idx) => {
+      suffixMap.set(ws.id, `#${idx + 1}`);
+    });
+  });
+  return suffixMap;
 }
 
 export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
@@ -33,6 +59,12 @@ export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
 
   const active = workspaces?.find((w) => w.id === activeWid);
   const activeType = active ? inferWorkspaceType(active) : "team";
+
+  const suffixMap = useMemo(
+    () => buildDisambiguationMap(workspaces ?? []),
+    [workspaces],
+  );
+  const activeSuffix = active ? suffixMap.get(active.id) : undefined;
 
   const handleSwitch = (wid: string) => {
     if (wid === activeWid) return;
@@ -65,7 +97,14 @@ export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
         }}
         aria-label="워크스페이스 전환"
       >
-        <span className="text-sm">{active?.name ?? "Kairos"}</span>
+        <span className="text-sm">
+          {active?.name ?? "Kairos"}
+          {activeSuffix && (
+            <span className="ml-1" style={{ color: "var(--text-muted)" }}>
+              {activeSuffix}
+            </span>
+          )}
+        </span>
         {active && (
           <WorkspaceTypeBadge workspace={active} size="sm" />
         )}
@@ -93,11 +132,13 @@ export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
 
         {(workspaces ?? []).map((ws) => {
           const isActive = ws.id === activeWid;
+          const suffix = suffixMap.get(ws.id);
           return (
             <DropdownMenuItem
               key={ws.id}
               className="px-3 py-2 cursor-pointer flex items-center gap-2"
               onSelect={() => handleSwitch(ws.id)}
+              title={suffix ? `${ws.name} (생성: ${ws.createdAt.slice(0, 10)})` : ws.name}
             >
               <WorkspaceTypeBadge workspace={ws} size="sm" />
               <span
@@ -105,6 +146,11 @@ export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
                 style={{ color: "var(--text-primary)" }}
               >
                 {ws.name}
+                {suffix && (
+                  <span className="ml-1" style={{ color: "var(--text-muted)" }}>
+                    {suffix}
+                  </span>
+                )}
               </span>
               {isActive && (
                 <Check size={14} style={{ color: "var(--accent)" }} />
