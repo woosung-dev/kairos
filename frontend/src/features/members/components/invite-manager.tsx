@@ -24,6 +24,8 @@ import {
 } from "@/features/projects/components/visibility-badge";
 import type { ProjectVisibility } from "@/features/projects/types";
 
+import { formatExpiry } from "@/lib/format-expiry";
+
 import { useInvites, useCreateInvite, useDeactivateInvite } from "../hooks";
 import type { WorkspaceRole } from "../types";
 
@@ -79,18 +81,6 @@ export function InviteManager({
       deactivateInvite.mutate(confirmDeactivateId);
       setConfirmDeactivateId(null);
     }
-  };
-
-  const formatExpiry = (expiresAt: string | null) => {
-    if (!expiresAt) return "만료 없음";
-    const date = new Date(expiresAt);
-    const now = new Date();
-    const diffDays = Math.ceil(
-      (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    if (diffDays <= 0) return "만료됨";
-    if (diffDays === 1) return "1일 남음";
-    return `${diffDays}일 남음`;
   };
 
   if (!isAdmin) return null;
