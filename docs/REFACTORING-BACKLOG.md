@@ -685,7 +685,9 @@ Stage 5-4 design-review 잡다한 polish 3건:
 
 ---
 
-## BL-021 — e2e auth.setup Clerk koKR label selector mismatch
+## BL-021 — e2e auth.setup Clerk koKR label selector mismatch ✅ **완료 (commit 2bf3df8)**
+
+**해결:** `frontend/e2e/auth.setup.ts:42` selector 를 `getByLabel(/email/i)` → `input[name="identifier"]` 로 정정. Clerk SDK standard input name 사용으로 locale-independent.
 
 **현 상태:**
 PR #29 CI e2e job fail (5m timeout). main에서 이미 같은 fail inherit (run 25825914554, 2026-05-13 push sha 8311620 이후). 본 PR 책임 아님 — auth.setup.ts 본 PR diff 0 (Sprint 14에서 마지막 수정).
@@ -964,7 +966,9 @@ def _yield_error(message: str) -> AsyncGenerator[dict, None]:
 
 ---
 
-## BL-030 — tests/services/test_transcription.py ffmpeg fixture 환경 의존
+## BL-030 — tests/services/test_transcription.py ffmpeg fixture 환경 의존 ✅ **완료 (Sprint 19)**
+
+**해결:** test 에서 `src.services.transcription.convert_to_wav` 를 `_fake_convert_to_wav` stub 으로 patch 추가. ffmpeg 실제 호출 회피 — fake bytes (`b"fake_audio_bytes"`) 가 ffprobe 의 mp3 detection score 임계값에 영향받지 않게 차단. 157 pytest pass.
 
 **도메인:** backend / tests
 **근거:** Sprint 18 PR-C 검증 시 1 fail. `test_transcribe_returns_segments` 가 `ffmpeg` mp3 fixture 를 invalid 데이터로 호출 → ffmpeg `Format mp3 detected only with low score of 1. Failed to find two consecutive MPEG audio frames`.
