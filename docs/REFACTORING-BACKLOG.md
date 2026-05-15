@@ -907,3 +907,164 @@ Cloud Run + Neon Postgres 환경에서 BE 인스턴스 cold start 시:
 **우선순위:** ★★★★☆ (회귀 진단 시간 직결)
 
 **Sprint 묶음:** BL-021 (Sprint 15 hotfix-2 Clerk koKR selector mismatch) + 본 BL-027 status code 보호 = auth.setup hardening 2건 누적.
+
+---
+
+## BL-028 — memory/service.py BackgroundMemoryService 분할
+
+**도메인:** backend / memory
+**근거:** Sprint 18 PR-C3 진행 중 발견. memory/service.py 864 LOC monolith. 클래스 메서드 `_bg_distill_and_embed` + `_bg_transcribe_distill_embed` + 모듈 함수 `_bg_promote_embed` 가 백그라운드 task 책임. Sprint 18 에서는 11줄 wrapper `_create_memory_embedding_chunk` 만 inline (circular import 회피).
+
+**문제:**
+- `_call_distill` / `_call_embedding` / `_call_transcribe` 모듈 헬퍼가 service.py 내부에 있어 background 분리 시 circular import.
+- Foreground (capture_text/capture_voice/recall) + background (distill/embed/transcribe) 책임 단일 클래스 누적.
+
+**해결:**
+- `backend/src/memory/_helpers.py` 신설 — `_call_*` 헬퍼 3개 이동.
+- `backend/src/memory/background.py` 신설 — `BackgroundMemoryService` 클래스 (3 백그라운드 task).
+- `MemoryService.__init__` 에 BackgroundMemoryService 주입. router 변경 없음.
+
+**예상 LOC delta:** service.py −300 / background.py +250 / _helpers.py +100. net +50, monolith 해소.
+
+**Risk:** 🟡 중간 — session_factory 패턴 유지 + 22 memory tests 회귀 검증 필요.
+
+**우선순위:** ★★☆☆☆ (구조 개선, 동작 동등)
+
+**Sprint 묶음:** 단독 또는 다른 memory 부채 (BL-005/006) 와 묶음.
+
+**근거:** Sprint 18 PR-C3 retrofit (commit ccfb192).
+
+---
+
+## BL-029 — rag/pipeline_service.py SSE error 공용 helper
+
+**도메인:** backend / rag
+**근거:** Sprint 18 PR-C2 분석. RagPipelineService 87줄 중 33줄이 visibility 검증 + SSE error yield + done yield 반복. ADR-014 옵션 A 로 도입됐으나 yield 패턴이 3회 동일 (project 부재 / draft 작성자 미스 / private 멤버 아님).
+
+**문제:**
+SSE error event yield 보일러플레이트 3중 중복. error 메시지만 다름.
+
+**해결:**
+```python
+def _yield_error(message: str) -> AsyncGenerator[dict, None]:
+    yield {"event": "error", "data": json.dumps({"message": message}, ensure_ascii=False)}
+    yield {"event": "done", "data": json.dumps({"cached": False, "sourceCount": 0})}
+```
+3 yield 블록 → 1 호출.
+
+**예상 LOC delta:** −30 (현 87 → ~55).
+
+**Risk:** 🟢 낮음 — 동작 동등.
+
+**우선순위:** ★★☆☆☆
+
+**Sprint 묶음:** 단독.
+
+**근거:** Sprint 18 PR-C2 skip 시 재평가 (헌법 D-3 부채 매핑).
+
+---
+
+## BL-030 — tests/services/test_transcription.py ffmpeg fixture 환경 의존
+
+**도메인:** backend / tests
+**근거:** Sprint 18 PR-C 검증 시 1 fail. `test_transcribe_returns_segments` 가 `ffmpeg` mp3 fixture 를 invalid 데이터로 호출 → ffmpeg `Format mp3 detected only with low score of 1. Failed to find two consecutive MPEG audio frames`.
+
+**문제:**
+- fixture mp3 가 binary 가 아닌 placeholder/text 가능성.
+- 또는 ffmpeg 8.1.1 의 mp3 detection score 임계값 변경.
+- CI 미정 — local 만 fail 인지, CI 도 fail 인지 미확인.
+
+**해결 후보:**
+- valid mp3 fixture 재생성 (LAME 또는 ffmpeg `-f lavfi -i sine`).
+- 또는 transcription 테스트 mock 화 (실제 ffmpeg 호출 회피).
+
+**예상 LOC delta:** fixture 1개 + 테스트 1~2줄 수정.
+
+**Risk:** 🟢 낮음.
+
+**우선순위:** ★★★☆☆ (회귀 시그널 회복).
+
+**Sprint 묶음:** 단독 또는 BL-030 + transcription 테스트 정비.
+
+**근거:** Sprint 18 검증 산출물.
+
+---
+
+## BL-031 — ErrorBoundary 도메인별 page-level 점진 도입
+
+**도메인:** frontend / reliability
+**근거:** Sprint 18 PR-F2 에서 `app/(app)/error.tsx` + `loading.tsx` group-level 1개만 도입. 도메인별 (`projects/[id]`, `meetings/[id]`, `inbox/`, `memory/`, `search/`) page-level 도입은 후속.
+
+**문제:**
+group-level fallback 만 있으면 한 도메인 에러가 전체 (app) area 리렌더. 도메인별 fallback 으로 격리 가능.
+
+**해결:**
+- `app/(app)/projects/[id]/error.tsx` 신설
+- `app/(app)/meetings/[id]/error.tsx`
+- `app/(app)/inbox/error.tsx`
+- `app/(app)/memory/error.tsx`
+- `app/(app)/search/error.tsx`
+
+각각 도메인 특화 fallback 메시지 + reset 핸들러.
+
+**예상 LOC delta:** +200 (5 파일 × ~40줄).
+
+**Risk:** 🟢 낮음.
+
+**우선순위:** ★★☆☆☆.
+
+**Sprint 묶음:** 단독 또는 frontend QA sprint 묶음.
+
+**근거:** Sprint 18 PR-F2 후속.
+
+---
+
+## BL-032 — superpowers/ stale doc 자동 archive 정책
+
+**도메인:** docs / 운영
+**근거:** Sprint 18 PR-B 에서 superpowers/ 24 파일 archive 시도 후 revert (스킬 자동 산출 위치라 archive 부적합). 향후 신규 plan/spec 도 시간 지나면 stale — 정책 없으면 누적.
+
+**문제:**
+- 스킬이 매 sprint plan/spec 자동 생성. Sprint 종료 후 plan 은 reference 가치 ↓.
+- 영구 누적 시 docs/superpowers/ 비대.
+
+**해결 후보:**
+1. **시간 기준** — N+3 sprint 이상 stale plan 자동 archive (script).
+2. **참조 기준** — 본문 frontmatter 에 `status: archived` 마킹 → 색인 제외.
+3. **외부 저장** — docs/superpowers/ 자체를 git ignore + 별도 백업 storage.
+
+**예상 LOC delta:** 정책 doc 1 + 스크립트 1 (~100 LOC).
+
+**Risk:** 🟢 낮음.
+
+**우선순위:** ★☆☆☆☆ (장기 — 누적 임계 시 진행).
+
+**Sprint 묶음:** 단독, Sprint 25+ 추정.
+
+**근거:** Sprint 18 PR-B revert (commit 51f8210).
+
+---
+
+## BL-033 — pyright + SQLModel false positive 다수 무관 진단
+
+**도메인:** backend / devex
+**근거:** Sprint 18 PR-A 진행 중 다수 pyright 진단 발생 — `Argument of type "bool" cannot be assigned to ... whereclause`. 모두 `.where(Model.col == value)` 패턴에서 SQLModel column comparison 을 bool 로 추론.
+
+**문제:**
+- 변경과 무관한 false positive 다수 → 신규 진단 노이즈 묻힘.
+- IDE 경고 누적 → 개발자 무시 습관화 → 진짜 에러 놓침.
+
+**해결 후보:**
+1. SQLModel 타입 stub 갱신 (`sqlalchemy.orm.Mapped` 호환).
+2. pyright config 에서 해당 룰 무시 또는 strictness 조정.
+3. SQLModel → SQLAlchemy 2.0 native + Pydantic 분리 (장기).
+
+**예상 LOC delta:** config 1줄 ~ 코드 전면 (옵션 별).
+
+**Risk:** 🟡 중간 (옵션 3 시) / 🟢 낮음 (옵션 1/2).
+
+**우선순위:** ★★☆☆☆.
+
+**Sprint 묶음:** 단독.
+
+**근거:** Sprint 18 PR-A diagnostic 누적.
