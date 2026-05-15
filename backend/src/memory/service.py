@@ -738,13 +738,13 @@ async def _create_memory_embedding_chunk(
     """memory_id를 source_id로 EmbeddingChunk(level=2) insert.
 
     source_type='memory' — recall(R3)에서 source_type 필터로 사용.
-    I-9 4-C: embeddings.service.create_chunk 헬퍼를 경유하여 workspace_id 매칭을 강제한다.
+    I-9 4-C: EmbeddingRepository.save_chunk 의 진입 assertion 이 workspace_id 매칭을 강제한다.
     memory_item 자체가 동일 workspace_id로 생성되므로 source_workspace_id = workspace_id.
     """
-    from src.embeddings.service import create_chunk
+    from src.embeddings.repository import EmbeddingRepository
 
-    chunk = await create_chunk(
-        session,
+    repo = EmbeddingRepository(session)
+    chunk = await repo.save_chunk(
         workspace_id=workspace_id,
         source_workspace_id=workspace_id,
         source_type="memory",
