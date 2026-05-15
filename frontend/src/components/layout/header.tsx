@@ -1,11 +1,12 @@
 "use client";
 
-import { Search, Users, LogOut, Settings } from "lucide-react";
+import { Search, LogOut, Settings } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "@/store/ui";
 import { useMembers } from "@/features/members/hooks";
 import { useWorkspaces } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import { WorkspaceSwitcher } from "@/features/workspaces/components/WorkspaceSwitcher";
 import { useClerk, useUser } from "@clerk/nextjs";
 import { ThemeToggle } from "./theme-toggle";
 import {
@@ -55,21 +56,7 @@ export function Header() {
             <rect x="2" y="11.5" width="12" height="1.5" rx="0.5" />
           </svg>
         </button>
-        <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          Kairos
-        </span>
-        {members && members.length > 0 && (
-          <span
-            className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full"
-            style={{
-              background: "var(--surface-active)",
-              color: "var(--text-muted)",
-            }}
-          >
-            <Users size={10} />
-            {members.length}
-          </span>
-        )}
+        <WorkspaceSwitcher memberCount={members?.length} />
       </div>
 
       {/* 중앙: RAG 검색바 스타일 (클릭 시 RAG 오버레이 열기) */}

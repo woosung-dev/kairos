@@ -104,7 +104,7 @@
 
 - **Sidebar:** Desktop=220px 텍스트+아이콘, Compact=48px 아이콘만, Mobile=숨김
 - **RAG:** Desktop/Compact=Cmd+K 슬라이드 오버레이, Mobile=`/search` 라우트
-- **Bottom Nav (Mobile):** [홈] [프로젝트] [+추가] [Inbox] [검색] — `md:hidden`
+- **Bottom Nav (Mobile):** [홈] [프로젝트] [+추가] [Inbox] [메모] — `md:hidden` (Sprint 14 T-11: "[검색]" → "[메모]" 5th slot 변경. RAG 검색은 Mobile에서 `/search` 라우트로 별도 진입)
 
 ## Motion
 - **Approach:** Minimal-functional — 상태 전환과 패널 토글만.
@@ -126,6 +126,7 @@
 | 2026-04-01 | 청록 액센트 #3ECFB4 채택 | "결정적 순간의 포착" 컨셉. 다크 배경 대비 우수. |
 | 2026-04-01 | Pretendard 한국어 본문 | Apple SD Gothic Neo 대비 가독성, 자간, 웨이트 다양성 우위. |
 | 2026-05-14 | Sprint 15 Recall-first patch (§Workspace Types + §Recall UI) | Stage 2 mini design-consultation. Restrained philosophy 유지 — 색상 신규 0, icon + typography로 Personal/Team 구분. Promote = ghost variant (retention feature 위상). |
+| 2026-05-15 | Sprint 17 Workspace Switcher + Recall UI atomic update (BL-014/015/018) | §Recall UI에서 capture row + tabs 제거 (search-first FAB layout 실제 구현 반영). Bottom Nav 5th [검색] → [메모] (Sprint 14 T-11 retrofit). Workspace switcher dropdown spec lock-in (header.tsx topbar). |
 
 ---
 
@@ -150,28 +151,38 @@
 
 ### 사용 위치
 
-- **Workspace switcher** (S15-R4 안에 minimal version): dropdown options에 type badge inline
-- **Memory item 카드** (S15-R4): 카드 좌상단 코너에 type badge (optional, density 높을 시 생략)
-- **Promote modal** (S15-R6): target team workspace 선택 시 badge로 시각 구분
+- **Workspace switcher** (Sprint 17 BL-014, `components/layout/header.tsx` topbar): trigger에 active workspace type badge + dropdown options에 type badge inline. 새 워크스페이스 inline create UI 포함.
+- **Memory item 카드** (S15-R4): topbar switcher에서 active workspace 명시되어 redundancy 회피 — Sprint 17 결정으로 카드 type badge 생략 (BL-015 F-17 wontfix).
+- **Promote modal** (S15-R6): target team workspace 선택 시 Users icon으로 시각 구분 (Team only filter, native `<select>` UI 유지).
+
+### Workspace Switcher Dropdown Spec (Sprint 17 BL-014)
+
+- **Trigger**: topbar 좌측. `{workspace.name} + WorkspaceTypeBadge + (team only) memberCount + ChevronDown`
+- **Dropdown width**: 260px
+- **Header**: "워크스페이스" caption (11px Geist Mono uppercase, `text-muted`)
+- **Option row**: `WorkspaceTypeBadge + workspace.name + (active) Check icon (accent)`
+- **Create entry**: "새 워크스페이스" (`Plus` icon) → inline input + 생성 button (accent) + 취소 ghost
+- **Switch behavior**: `setActiveWorkspaceId(id) + queryClient.clear() + router.refresh()` — query state 격리 강제 (workspace 경계 보호)
 
 ---
 
-## Recall UI (Sprint 15 S15-R4)
+## Recall UI (Sprint 15 S15-R4, Sprint 17 atomic update)
 
 ### `/memory` Page Layout
 
 ```
-[header: page title + workspace switcher]
-[capture row: Mic button (lg) + Textarea (autosize, multi-line)]
+[header: page title (topbar Workspace Switcher 별도, layout/header.tsx)]
 [search bar: input + Cmd+K hint]
-[tabs: Personal | Team (client-side filter, type badge로 시각 구분)]
 [result list: vertical, gap-md]
+[FAB: 우하단 floating "+" — Mic/Text capture entry]
 ```
 
+> **Sprint 15 plan §3.4 Q1 A3 결정 — search-first FAB layout 채택**: capture row + tabs 미렌더. 캡처 진입은 FAB (mobile은 BottomNav "메모" + FAB). Personal/Team tabs 제거 = single feed + active workspace context (topbar switcher에서 시각화). Sprint 16 Best 분기에서 tabs 재도입 가능.
+
 - **Page padding**: `xl` (32px) on `md+`, `md` (16px) on mobile
-- **Capture row gap**: `md` (16px)
 - **Result list gap**: `md` (16px)
-- **Empty state**: "아직 메모 없음. 위에서 녹음 또는 텍스트 입력으로 시작." centered, `text-muted`
+- **Empty state**: "아직 메모 없음. 우하단 + 에서 녹음 또는 텍스트 입력으로 시작." centered, `text-muted`
+- **Active workspace 시각화**: topbar `WorkspaceSwitcher` (Workspace Type badge 자동 노출). Recall card 별도 type badge 생략 — single workspace context redundancy 회피.
 
 ### Recall Result Card
 

@@ -489,7 +489,7 @@ Stage 5-5 data-migration specialist 6 CRITICAL. Sprint 15 migration `a1b2c3d4e5f
 
 ---
 
-## BL-014 — Workspace switcher UI 누락 (Sprint 15 R5 spec gap)
+## BL-014 — Workspace switcher UI 누락 (Sprint 15 R5 spec gap) ✅ **완료 (Sprint 17, 2026-05-15)**
 
 **현 상태:**
 Stage 5-4 design-review (Playwright MCP) 2026-05-14. Sprint 15 R5에서 Personal workspace lazy seed 구현됨 (Lock vs Users 타입). BUT FE에 사용자가 Personal ↔ Team 사이 전환할 수 있는 switcher UI 부재.
@@ -519,7 +519,7 @@ Stage 5-4 design-review (Playwright MCP) 2026-05-14. Sprint 15 R5에서 Personal
 
 ---
 
-## BL-015 — Workspace type badge (Lock/Users) 일관성 적용
+## BL-015 — Workspace type badge (Lock/Users) 일관성 적용 ✅ **부분 완료 (Sprint 17, 2026-05-15)** — F-1 topbar + F-40 PromoteModal 완료. F-17 Recall card는 topbar switcher context redundancy 회피로 wontfix 결정.
 
 **현 상태:**
 Stage 5-4 design-review. DESIGN.md §Workspace Types lock-in (Sprint 15 patch):
@@ -599,7 +599,7 @@ Stage 5-4 design-review mobile viewport (375x667). /memory FAB (bottom-8 right-8
 
 ---
 
-## BL-018 — DESIGN.md Sprint 15 patch drift (capture row + tabs + bottom nav 5th)
+## BL-018 — DESIGN.md Sprint 15 patch drift (capture row + tabs + bottom nav 5th) ✅ **완료 (Sprint 17, 2026-05-15)**
 
 **현 상태:**
 Stage 5-4 design-review. DESIGN.md §Recall UI Layout이 Sprint 15 plan §3.4 Q1 A3 "B3 search-first FAB" 결정 이전 spec 그대로 유지:
