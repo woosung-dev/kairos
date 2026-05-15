@@ -83,6 +83,17 @@
 
 - (없음 — 다음 Next Actions 참조)
 
+## Recently Completed — Sprint 17 Workspace Switcher UI (BL-014/015/018, 2026-05-15)
+
+- [x] **BL-014** Workspace switcher dropdown — `frontend/src/features/workspaces/components/WorkspaceSwitcher.tsx` 신설. header.tsx topbar 좌측에 wire. trigger = `{name} + WorkspaceTypeBadge + (team only) memberCount + ChevronDown`. options에 type badge inline + 활성 워크스페이스 Check 마크 + 새 워크스페이스 inline create.
+- [x] **BL-015 (부분)** `WorkspaceTypeBadge` shared 컴포넌트 — `Lock`(Personal) / `Users`(Team) + 11px Geist Mono. Switcher trigger + options 2곳 적용. F-17 Recall card는 topbar context redundancy 회피로 wontfix. F-40 PromoteModal은 기존 Users icon + Team only filter 유지.
+- [x] **BL-018** DESIGN.md atomic update — §Recall UI `capture row` + `tabs` 제거 (search-first FAB 실제 구현 반영). Bottom Nav 5th [검색] → [메모]. Workspace Switcher Dropdown Spec 인라인 lock-in. Decisions Log 2026-05-15 entry 추가.
+- [x] **BE 수정** `WorkspaceResponse` schema + `create_workspace` / `get_workspace` service dict에 `type` 필드 노출 (legacy row default 'team'). list_workspaces는 기존 노출 유지.
+- [x] **FE util** `inferWorkspaceType()` — BE 응답 누락 시 `"...의 개인 Kairos"` suffix match fallback.
+
+**Atomic Update sync**: DESIGN.md (§Workspace Types + §Recall UI + Decisions Log + Bottom Nav) / REFACTORING-BACKLOG (BL-014/015/018 closeout).
+**검증**: BE pytest 155 pass / FE tsc clean / eslint clean / 회귀 0건.
+
 ## Recently Completed — Sprint 6 Dogfooding + Critical 회귀 fix (2026-05-11, PR #14)
 
 - [x] **Sprint 6 dogfooding 자동 검증** — Playwright MCP + BE API 직접 호출. owner 1 user 세션으로 8 케이스 자동 통과 (1G/1H/2A/3A/3B/3G + SETUP). 결과는 `docs/dev-log/sprint-6-dogfooding-matrix.md`.
