@@ -125,6 +125,12 @@ Query Processing (범위 필터 결정, 질문 정규화)
 └─────────────────────────────────────────────────────────┘
 ```
 
+> **Sprint 16 ADR-020 — 인덱스 / 세션 변수 정책** (`docs/dev-log/020-pgvector-hnsw-halfvec.md`):
+> - **Layer 1 (Semantic Cache)** + **Layer 3 (Vector Search)** 인덱스: pgvector **HNSW** on `halfvec(1536)`, `m=16, ef_construction=64`, `halfvec_cosine_ops`
+> - 트랜잭션 진입 시 `_apply_hnsw_session_params(session)` (`backend/src/embeddings/repository.py`) 자동 호출 — `SET LOCAL hnsw.ef_search=40` + `iterative_scan=relaxed_order` + `max_scan_tuples=20000`
+> - 헌법 강제: CONTEXT-MAP I-20 (타입/인덱스) + I-21 (세션 변수) + `rag/CONTEXT.md` R-13 (Layer 1/3 진입 강제)
+> - RBAC/visibility 포스트필터 결과 부족 → `iterative_scan`이 LIMIT 도달 시까지 자동 추가 스캔으로 해소
+
 ---
 
 ## 4. 하이브리드 검색 전략
@@ -168,17 +174,30 @@ LIMIT 50;
 
 > **`pg_trgm`을 선택한 이유:** 한국어 형태소 분석기(`mecab` 등) 없이도 트라이그램 기반으로 부분 매칭이 가능하다. "당근님" → {"당근", "근님"} 트라이그램으로 분해되어 정확 매칭 + 퍼지 매칭 모두 지원.
 
-#### Vector 검색 (pgvector)
+#### Vector 검색 (pgvector HNSW + halfvec, Sprint 16 ADR-020)
 
 ```sql
--- 벡터 유사도 검색
+-- (트랜잭션 진입 시 자동) SET LOCAL hnsw.ef_search = 40;
+-- (트랜잭션 진입 시 자동) SET LOCAL hnsw.iterative_scan = 'relaxed_order';
+-- (트랜잭션 진입 시 자동) SET LOCAL hnsw.max_scan_tuples = 20000;
+
+-- 벡터 유사도 검색 (cosine, halfvec_cosine_ops 인덱스 사용)
 SELECT id, chunk_text,
-       1 - (embedding <=> $query_vector) AS vector_score
+       1 - (embedding <=> CAST($query_vector AS halfvec)) AS vector_score
 FROM embedding_chunks
 WHERE workspace_id = $1
-ORDER BY embedding <=> $query_vector
+ORDER BY embedding <=> CAST($query_vector AS halfvec)
 LIMIT 50;
 ```
+
+> **인덱스 정의** (`backend/alembic/versions/<pgvector_hnsw_halfvec>.py`, Sprint 16 Stage 4):
+> ```sql
+> CREATE INDEX CONCURRENTLY idx_chunks_hnsw
+>   ON embedding_chunks
+>   USING hnsw (embedding halfvec_cosine_ops)
+>   WITH (m = 16, ef_construction = 64);
+> ```
+> SET LOCAL은 `embeddings/repository.py:_apply_hnsw_session_params` 헬퍼가 트랜잭션 진입 직전 호출 (R-13 / I-21). `iterative_scan`이 워크스페이스/visibility 포스트필터 적용 후 LIMIT 미달 시 자동 추가 스캔을 수행하므로, 후보 부족으로 인한 "검색 결과 0건" 케이스가 자동 해소된다.
 
 #### RRF 결합 (Reciprocal Rank Fusion)
 

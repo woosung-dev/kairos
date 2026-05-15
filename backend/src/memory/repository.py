@@ -21,11 +21,16 @@ from src.memory.models import (
 )
 
 try:
-    from pgvector.sqlalchemy import Vector
+    # Sprint 16 ADR-020: Vector → HALFVEC (fp16). embedding_chunks 컬럼이 halfvec(1536)이라
+    # bindparam 타입도 동일하게 맞춰서 `<=>` 연산자가 halfvec_cosine_ops 인덱스를 타게 함.
+    from pgvector.sqlalchemy import HALFVEC
 
-    _VECTOR_TYPE: Any = Vector(1536)
+    _HALFVEC_TYPE: Any = HALFVEC(1536)
 except ImportError:
-    _VECTOR_TYPE = None
+    _HALFVEC_TYPE = None
+
+# 본 sprint 이후 EmbeddingChunk + MemoryQueryEmbeddingCache 양쪽 모두 halfvec 컬럼.
+from src.embeddings.repository import _apply_hnsw_session_params  # I-21 HNSW 세션 변수
 
 
 class MemoryRepository:
@@ -166,7 +171,13 @@ class MemoryRepository:
         query_embedding: list[float],
         top_k: int,
     ) -> list[tuple]:
-        """pgvector cosine similarity (A7 typed bind). I-9 workspace_id 강제."""
+        """pgvector cosine similarity (A7 typed bind). I-9 workspace_id 강제.
+
+        Sprint 16 ADR-020 — halfvec 컬럼 + HNSW 인덱스 사용.
+        I-21: 트랜잭션 진입 시 SET LOCAL ef_search/iterative_scan/max_scan_tuples.
+        """
+        await _apply_hnsw_session_params(self.session)
+
         sql = text(
             """
             SELECT mi.id, mi.distilled_json, mi.raw_content, mi.created_at,
@@ -180,8 +191,8 @@ class MemoryRepository:
             LIMIT :limit
             """
         )
-        if _VECTOR_TYPE is not None:
-            sql = sql.bindparams(bindparam("qvec", type_=_VECTOR_TYPE))
+        if _HALFVEC_TYPE is not None:
+            sql = sql.bindparams(bindparam("qvec", type_=_HALFVEC_TYPE))
         result = await self.session.execute(
             sql,
             {
@@ -258,10 +269,17 @@ class MemoryRepository:
         cached = result.scalar_one_or_none()
         if cached is None or cached.embedding is None:
             return None
-        # pgvector는 read 시 numpy.ndarray로 디스크라이즈. asyncpg가 pgvector text 형식으로
-        # bind할 때 numpy float를 직렬화 못해서 SerializationError → vector_search 500.
-        # native Python float list로 명시 캐스팅하여 driver 호환 보장.
-        return [float(x) for x in cached.embedding]
+        # pgvector read 시 컬럼 타입별 결과 객체:
+        #   Vector  → numpy.ndarray (iterable)
+        #   HALFVEC → pgvector.halfvec.HalfVector (not iterable, to_list() 제공)
+        # Sprint 16 ADR-020 halfvec 전환 후 iter()가 TypeError 발생 → to_list()/numpy() 폴백.
+        # asyncpg bind 시 numpy float 직렬화 실패 방지 위해 native Python float 명시 캐스팅.
+        raw = cached.embedding
+        if hasattr(raw, "to_list"):
+            values = raw.to_list()
+        else:
+            values = list(raw)
+        return [float(x) for x in values]
 
     async def save_query_embedding_cache(
         self,

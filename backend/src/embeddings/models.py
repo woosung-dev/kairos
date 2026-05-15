@@ -7,9 +7,10 @@ from sqlalchemy import JSON, Column, Text
 from sqlmodel import Field, SQLModel
 
 try:
-    from pgvector.sqlalchemy import Vector
+    # Sprint 16 ADR-020: Vector(fp32, 4B) → Halfvec(fp16, 2B) — 저장 50% 절감 (I-20)
+    from pgvector.sqlalchemy import HALFVEC
 except ImportError:
-    Vector = None  # 패키지 미설치 시 fallback
+    HALFVEC = None  # 패키지 미설치 시 fallback
 
 
 class EmbeddingChunk(SQLModel, table=True):
@@ -23,7 +24,7 @@ class EmbeddingChunk(SQLModel, table=True):
         default=None, foreign_key="projects.id", index=True
     )
     source_id: uuid.UUID = Field(nullable=False)
-    source_type: str = Field(nullable=False)  # 'meeting' | 'note' | 'action'
+    source_type: str = Field(nullable=False)  # 'meeting' | 'note' | 'action' | 'memory'
     chunk_text: str = Field(sa_column=Column(Text, nullable=False))
     chunk_index: int = Field(default=0)
     chunk_level: int = Field(default=2)  # 0=문서, 1=섹션/화자, 2=문단
@@ -32,7 +33,7 @@ class EmbeddingChunk(SQLModel, table=True):
     )
     embedding: list[float] | None = Field(
         default=None,
-        sa_column=Column(Vector(1536)) if Vector else Column(Text),
+        sa_column=Column(HALFVEC(1536)) if HALFVEC else Column(Text),
     )
     metadata_json: dict = Field(default_factory=dict, sa_type=JSON)
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -55,7 +56,7 @@ class SemanticCache(SQLModel, table=True):
     question: str = Field(sa_column=Column(Text, nullable=False))
     question_embedding: list[float] | None = Field(
         default=None,
-        sa_column=Column(Vector(1536)) if Vector else Column(Text),
+        sa_column=Column(HALFVEC(1536)) if HALFVEC else Column(Text),
     )
     answer: str = Field(sa_column=Column(Text, nullable=False))
     sources: list = Field(default_factory=list, sa_type=JSON)

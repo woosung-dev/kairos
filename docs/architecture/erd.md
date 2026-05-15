@@ -149,8 +149,8 @@ erDiagram
         uuid workspace_id FK
         uuid project_id FK "프로젝트 범위 검색용"
         uuid source_id
-        enum source_type "meeting | note | action"
-        vector embedding "1536차원"
+        enum source_type "meeting | note | action | memory"
+        halfvec embedding "1536차원 fp16 (Sprint 16 ADR-020)"
         string chunk_text
         int chunk_index
         int chunk_level "0:document 1:section 2:paragraph"
@@ -164,7 +164,7 @@ erDiagram
         uuid workspace_id FK
         uuid project_id FK "범위별 캐시"
         string question
-        vector question_embedding "1536차원"
+        halfvec question_embedding "1536차원 fp16 (Sprint 16 ADR-020)"
         string answer
         jsonb sources "출처 목록"
         int hit_count
@@ -217,7 +217,7 @@ erDiagram
     MemoryQueryEmbeddingCache {
         uuid workspace_id PK "FK + composite PK"
         string normalized_query PK "lowercased + trimmed"
-        vector embedding "1536차원"
+        halfvec embedding "1536차원 fp16 (Sprint 16 ADR-020)"
         timestamp created_at
     }
 
@@ -326,8 +326,9 @@ erDiagram
 - **EmbeddingChunk → EmbeddingChunk**: `parentChunkId`로 계층적 청킹 구현. Level 2(문단)가 Level 1(화자 구간)을 부모로 참조.
 
 ### 임베딩 (폴리모픽)
-- **EmbeddingChunk**: `sourceType`과 `sourceId`로 Meeting, Note, ActionItem 등 다양한 소스와 연결
-- 1536차원 벡터 (text-embedding-3-small 기준)
+- **EmbeddingChunk**: `sourceType`과 `sourceId`로 Meeting, Note, ActionItem, MemoryItem 등 다양한 소스와 연결
+- 1536차원 **halfvec** 벡터 (text-embedding-3-small 기준 + fp16 저장, Sprint 16 ADR-020 — `pgvector.sqlalchemy.HALFVEC`)
+- 인덱스: HNSW `halfvec_cosine_ops` (`m=16, ef_construction=64`). 세션 변수 `hnsw.ef_search=40` + `iterative_scan='relaxed_order'` (I-21)
 - `chunkLevel`: 0(document) / 1(section) / 2(paragraph) — 검색 대상은 Level 2만
 - `metadata` (JSONB): 화자명, 시간, 토픽 등 동적 메타데이터
 

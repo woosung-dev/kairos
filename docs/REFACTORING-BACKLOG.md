@@ -728,3 +728,152 @@ await page.getByLabel(/email|이메일/i).fill(email);
 **Sprint 묶음 권고:** 별도 hotfix PR 또는 Sprint 16 첫 commit. Sprint 15 PR #29 직전 분리 권고 (PR #29 머지 무관, e2e fail은 동일 상태 유지).
 
 **근거:** Sprint 15 Stage 5-6 qa Exhaustive 후속 진단 2026-05-14 — 사용자 화면 증거로 root cause 정정 (Clerk Account Portal redirect 아님, koKR label mismatch 확정).
+
+---
+
+## BL-022 — embedding_chunks / semantic_caches 파티셔닝 (대규모 도달 시)
+
+**도메인:** embeddings (pgvector HNSW 인덱스 운영)
+**근거:** Sprint 16 ADR-020 §"Alternatives Considered" 2 — 파티셔닝 deferred 결정 (AD-54). 당근(Karrot) DB 밋업 1회 §4 노하우 — 1000만+ row 통테이블에서 HNSW 랜덤 I/O + Vacuum 시간 폭증 시 필요.
+
+**문제 (지연):**
+현재 kairos 데이터 규모는 작음 (chunk 수만 단위). HNSW + halfvec + iterative_scan 으로 충분. 하지만 다음 조건 도달 시 파티셔닝 필요:
+- workspace 100+ (테넌트 격리 단위 증가)
+- embedding_chunks 100만+ row (HNSW 단일 인덱스 메모리 압박)
+- VACUUM ANALYZE 시간 분 단위 (운영 부담)
+- 특정 workspace_id 쿼리 시 partition pruning 효과 ≫ HNSW 그래프 전체 탐색
+
+**옵션:**
+
+1. **workspace_id 기반 LIST 파티셔닝** — 워크스페이스당 인덱스 분리. RBAC 자연스러움. workspace 수가 적을 때 유효 (수십~수백).
+2. **project_id 기반 HASH 파티셔닝** — 프로젝트 수 많을 때. 다만 RAG 쿼리는 project_id 필터 빈도 낮음 (workspace_id 위주).
+3. **created_at 기반 RANGE 파티셔닝** — 시계열 데이터에 유리. 오래된 청크는 cold storage로 분리 가능.
+
+**Trigger 조건 (재진입):**
+- `SELECT count(*) FROM embedding_chunks` ≥ 1,000,000
+- `SELECT count(*) FROM workspaces` ≥ 100
+- `pg_stat_user_tables.n_live_tup` 기반 VACUUM 시간 5분 이상
+- RAG p95 latency baseline × 1.5 이상 (`bench_vector_search.py --mode latency`)
+
+**의존:**
+- ADR-020 Stage 5 측정 통과 후 Accepted 상태 전제
+- alembic 추가 마이그레이션 + 기존 데이터 재배치 (대용량 시 다운타임 가능 — backend.md §9 2단계 배포)
+- 신규 ADR 작성 필요 (파티셔닝 키 + 인덱스 전략)
+
+**예상 LOC delta:** +200~500 (alembic + repository.py 파티션 인지 쿼리 + 운영 스크립트)
+
+**Risk:** 🟡 중간 (데이터 재배치 + planner 동작 변경)
+
+**우선순위:** ★★☆☆☆ (조건부 미래 — Trigger 도달 전 보류)
+
+**Sprint 묶음 권고:** 별도 sprint. ADR-020 후속.
+
+---
+
+## BL-023 — semantic_caches.hit_count 별도 테이블 분리 (당근 §4-B 갱신 잦은 컬럼 분리)
+
+**도메인:** embeddings
+**근거:** Sprint 16 ADR-020 §"AD-59" + 당근 DB 밋업 §4-B "갱신이 잦은 컬럼은 데드 튜플 양산하므로 별도 테이블로 분리".
+
+**문제:**
+`semantic_caches.hit_count`는 매 cache hit마다 `UPDATE ... SET hit_count = hit_count + 1` 발생 (`embeddings/repository.py:189`). 같은 row의 다른 컬럼 (`question`, `answer`, `sources`, `question_embedding`)은 불변. 빈번 UPDATE로 dead tuple 양산 + HOT update 실패 시 인덱스 update 비용.
+
+**단기 대응 (본 sprint Stage 4 적용)**:
+- `fillfactor = 80` → 페이지에 여유 공간 → HOT update 활성화
+- `autovacuum_analyze_scale_factor = 0.02` → 통계 자주 갱신
+
+**중장기 (BL-023)**:
+별도 테이블 `semantic_cache_hits (cache_id PK, hit_count, last_hit_at)` 분리. semantic_caches는 불변 — INSERT 후 UPDATE 없음. hit_count 별도 테이블은 HOT update + 작은 row 사이즈로 dead tuple 영향 최소.
+
+**Trigger:** semantic_caches row 10만+ 또는 fillfactor 적용 후에도 dead tuple ≥30% 측정 시.
+
+**예상 LOC delta:** +120~200 (신규 테이블 + alembic + repository.py 분리 + service 호출 경로)
+
+**Risk:** 🟡 중간 (cache invalidation race condition 검토 필요)
+
+**우선순위:** ★★☆☆☆ (조건부)
+
+**Sprint 묶음 권고:** Sprint 17+ ADR-020 후속.
+
+---
+
+## BL-024 — pg_prewarm 정책 (Cloud Run cold start 시 인덱스 워밍업)
+
+**도메인:** infra / embeddings
+**근거:** 당근 DB 밋업 §4-C "벡터 인덱스가 shared_buffers 캐시에 모두 올라갈 정도의 인스턴스 사양 + 노드 추가 시 pg_prewarm 워밍업".
+
+**문제:**
+Cloud Run + Neon Postgres 환경에서 BE 인스턴스 cold start 시:
+- 첫 RAG 쿼리 → HNSW 인덱스 디스크 I/O → p99 latency spike
+- shared_buffers는 PG instance 메모리에 의존 (Neon compute size)
+
+**제안:**
+1. **인덱스 사양 확인**: `pg_size_pretty(pg_total_relation_size('idx_chunks_hnsw'))` < Neon shared_buffers
+2. **pg_prewarm**:
+   ```sql
+   CREATE EXTENSION pg_prewarm;
+   SELECT pg_prewarm('idx_chunks_hnsw');
+   SELECT pg_prewarm('idx_cache_hnsw');
+   ```
+3. **자동 워밍업** — Cloud Run job 또는 BE startup hook에서 `SELECT pg_prewarm(...)` 실행 (PG 재시작 시점만 의미 있음 — Neon serverless라 빈도 다름)
+4. **모니터링** — `pg_stat_database.blks_hit / (blks_hit + blks_read)` 캐시 hit ratio ≥0.99
+
+**Trigger:** p99 latency baseline × 2 도달 또는 인덱스 크기 > Neon shared_buffers.
+
+**예상 LOC delta:** +60~80 (extension migration + prewarm script + startup hook)
+
+**Risk:** 🟢 낮음 (read-only)
+
+**우선순위:** ★★☆☆☆ (조건부)
+
+**Sprint 묶음 권고:** Sprint 17+ ADR-020 후속 또는 운영 알람 트리거 시.
+
+---
+
+## BL-025 — 읽기 분산 (Neon read replica + 리더 라우팅)
+
+**도메인:** infra / backend.core
+**근거:** 당근 DB 밋업 §4-C "대규모 트래픽 시 읽기 분산(리더 DB 인스턴스)".
+
+**문제:**
+현 kairos는 단일 Neon DB. RAG 쿼리 (CPU heavy — HNSW 그래프 traversal) + capture/promote (write heavy)가 같은 인스턴스 경합.
+
+**제안:**
+1. **Neon read replica 활성화** (Neon plan upgrade 필요)
+2. **app DATABASE_URL_REPLICA** 환경변수 추가 → `common/database.py` 분리
+3. **읽기 쿼리 라우팅** — `vector_search` / `text_search` / `find_similar_cache` / `find_chunks_by_ids` → replica session; capture / promote / `save_chunks` → primary session
+4. **PgBouncer 라운드로빈** — 당근 §5-A 노하우. Cloud Run 다중 인스턴스에서 connection 편차 해소
+
+**Trigger:**
+- RAG p95 ≥ 1초 또는 동시 사용자 50+ 또는 CPU 사용률 ≥80%
+
+**예상 LOC delta:** +200~400 (database 분리 + repository read/write 어노테이션 + 트랜잭션 경계 재정의 + pgbouncer 설정)
+
+**Risk:** 🟡 중간 (read-after-write 일관성 검토 필요 — capture 직후 recall 시나리오)
+
+**우선순위:** ★★☆☆☆ (조건부)
+
+**Sprint 묶음 권고:** Sprint 18+ ADR 신설 (읽기 분산 결정 + 일관성 정책).
+
+---
+
+## BL-026 — 측정 강화: nDCG / precision / 인덱스 빌드 시간 / EXPLAIN ANALYZE 헬퍼
+
+**도메인:** embeddings / tests
+**근거:** Sprint 16 ADR-020 Stage 5 verification 산출물 확장.
+
+**문제:**
+현 `bench_vector_search.py`는 recall@10 + p50/p95 만. 다음 측정 누락:
+- **nDCG@10** — 순위 가중 적합도. recall@10보다 ranking quality 정확 반영
+- **precision@10** — 결과 정확도
+- **인덱스 빌드 시간** — HNSW CREATE INDEX CONCURRENTLY 측정 (ADR-020 §"비용/리스크" 데이터 부재)
+- **EXPLAIN ANALYZE 헬퍼** — `Index Scan using idx_chunks_hnsw` 자동 검증 pytest fixture
+- **다양한 query 종류** — 한국어 / 영어 / 짧은 / 긴 query 분포 분석
+
+**예상 LOC delta:** +150~250 (bench script 확장 + fixture 다양화 + 헬퍼)
+
+**Risk:** 🟢 낮음 (테스트/측정만)
+
+**우선순위:** ★★★☆☆ (Sprint 16 Stage 5 진입 시 통합 권장)
+
+**Sprint 묶음 권고:** **Sprint 16 Stage 5 verification** — 본 sprint 측정 산출물에 포함하거나 직후 sprint.
