@@ -542,10 +542,21 @@ class MemoryService:
                 await repo.commit()
                 return
 
-            chunk_id = await _create_memory_embedding_chunk(
-                session, memory_id, workspace_id, embed_text, embedding
+            # I-9 4-C: EmbeddingRepository.save_chunk 가 workspace_id 매칭 assertion.
+            # source='memory' — recall(R3) source_type 필터.
+            from src.embeddings.repository import EmbeddingRepository
+
+            chunk = await EmbeddingRepository(session).save_chunk(
+                workspace_id=workspace_id,
+                source_workspace_id=workspace_id,
+                source_type="memory",
+                source_id=memory_id,
+                chunk_text=embed_text,
+                embedding=embedding,
+                chunk_index=0,
+                chunk_level=2,
             )
-            await repo.update_embedding(memory_id, chunk_id, "active")
+            await repo.update_embedding(memory_id, chunk.id, "active")
             await repo.commit()
 
     async def _bg_transcribe_distill_embed(
@@ -728,35 +739,6 @@ async def _call_transcribe(
         return "", elapsed, str(exc)
 
 
-async def _create_memory_embedding_chunk(
-    session: AsyncSession,
-    memory_id: uuid.UUID,
-    workspace_id: uuid.UUID,
-    content: str,
-    embedding: list[float],
-) -> uuid.UUID:
-    """memory_id를 source_id로 EmbeddingChunk(level=2) insert.
-
-    source_type='memory' — recall(R3)에서 source_type 필터로 사용.
-    I-9 4-C: EmbeddingRepository.save_chunk 의 진입 assertion 이 workspace_id 매칭을 강제한다.
-    memory_item 자체가 동일 workspace_id로 생성되므로 source_workspace_id = workspace_id.
-    """
-    from src.embeddings.repository import EmbeddingRepository
-
-    repo = EmbeddingRepository(session)
-    chunk = await repo.save_chunk(
-        workspace_id=workspace_id,
-        source_workspace_id=workspace_id,
-        source_type="memory",
-        source_id=memory_id,
-        chunk_text=content,
-        embedding=embedding,
-        chunk_index=0,
-        chunk_level=2,
-    )
-    return chunk.id
-
-
 async def _bg_promote_embed(
     new_memory_id: uuid.UUID,
     target_workspace_id: uuid.UUID,
@@ -791,14 +773,20 @@ async def _bg_promote_embed(
             await session.commit()
             return
 
-        chunk_id = await _create_memory_embedding_chunk(
-            session,
-            new_memory_id,
-            target_workspace_id,
-            embed_text,
-            embedding,
+        # I-9 4-C: EmbeddingRepository.save_chunk 가 target workspace 매칭 assertion.
+        from src.embeddings.repository import EmbeddingRepository
+
+        chunk = await EmbeddingRepository(session).save_chunk(
+            workspace_id=target_workspace_id,
+            source_workspace_id=target_workspace_id,
+            source_type="memory",
+            source_id=new_memory_id,
+            chunk_text=embed_text,
+            embedding=embedding,
+            chunk_index=0,
+            chunk_level=2,
         )
-        await repo.update_embedding(new_memory_id, chunk_id, "active")
+        await repo.update_embedding(new_memory_id, chunk.id, "active")
         await session.execute(
             _update(PromotionAudit)
             .where(PromotionAudit.id == audit_id)
