@@ -205,7 +205,7 @@ shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
 | I-6 | **임베딩 모델 고정**: OpenAI `text-embedding-3-small`, 1536d | `embeddings/service.py` |
 | I-7 | **임베딩 검색 대상은 chunk_level = 2 만**. L0(document)은 코드 미사용, L1은 부모 참조용 | `embeddings/repository.py` |
 | I-8 | **SemanticCache TTL 7일, threshold 0.93** | `embeddings/` (rag는 호출자) |
-| I-9 | **멀티테넌시 격리**: 모든 Repository는 `workspace_id` 필터 강제. 신규 EmbeddingChunk insert 시 `workspace_id`는 신규 entity owner workspace와 매칭 (service layer 검증 + `embeddings/service.py:create_chunk` 진입 assertion). | `<domain>/repository.py` `.where(... .workspace_id == workspace_id)`, `backend/src/embeddings/service.py:create_chunk` |
+| I-9 | **멀티테넌시 격리**: 모든 Repository는 `workspace_id` 필터 강제. 신규 EmbeddingChunk insert 시 `workspace_id`는 신규 entity owner workspace와 매칭 (service layer 검증 + `embeddings/repository.py:save_chunk` 진입 assertion). Sprint 18 PR-A 에서 `embeddings/service.py:create_chunk` 모듈 함수 → Repository 메서드로 이동 (backend rule §3 — AsyncSession은 Repository만 보유). | `<domain>/repository.py` `.where(... .workspace_id == workspace_id)`, `backend/src/embeddings/repository.py:save_chunk` |
 | I-10 | **Inbox confidence 임계값**: 워크스페이스별 `workspaces.inbox_threshold` (기본 0.9). PATCH 가능 | `workspaces/models.py:15`, `meetings/pipeline_service.py:67` |
 | I-11 | **shadcn `components/ui/` 수정 금지** | `frontend/src/components/ui/` |
 | I-12 | **언어 정책**: 사고/문서/주석 한국어, 코드/네이밍 영어 | AGENTS.md §1 |
@@ -250,3 +250,20 @@ shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
 5. `docs/TODO.md` (현재 상태)
 6. `docs/requirements/prd.md` (PRD)
 7. `docs/architecture/*` (상세 설계)
+
+---
+
+## 9. Atomic Update 강제
+
+코드/모델/엔드포인트/Stage 산출물 commit은 같은 PR 안에 관련 docs commit이 함께 들어가야 한다. 동일 commit 권장, 최소 동일 PR 강제.
+
+**Single source — 매트릭스 본문은 [`.ai/common/global.md` §2](.ai/common/global.md) 에만 둔다.** 본 §은 헌법 진입점에서 grep 가능하도록 한 link 만 유지한다 (중복 금지).
+
+**핵심 규칙 (요약)**:
+- Stage 0 grill 결과는 `CONTEXT-MAP.md` §2/§4/§6 patch 와 같은 commit/PR.
+- 코드 변경(`models.py` / `router.py` / `pipeline_service.py` 등)은 대응 `CONTEXT.md` / `docs/architecture/*` patch 와 같은 PR.
+- ADR 신설은 cross-link patch 와 같은 commit.
+
+**검증 절차**: PR 본문에 "Docs sync" 섹션 필수. `git diff --stat docs/ backend/**/CONTEXT.md CONTEXT-MAP.md` 결과를 첨부. 누락 시 stop & retrofit.
+
+**역사**: 2026-05-11 Sprint 5/6 2회 위반 + 2026-05-14 Sprint 15 3회째 위반 (Stage 0 grill → CONTEXT-MAP 누락) 후 `.ai/common/global.md` §2 로 승격. 2026-05-15 Sprint 18 PR-A 에서 헌법 진입점 link 추가 (grep 가능성 보장).
