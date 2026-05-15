@@ -77,9 +77,12 @@ class RagPipelineService:
                     return
 
         # 검증 통과 — RagService.ask로 위임 (AsyncGenerator 위임 표준 패턴)
+        # ISSUE-040: requester 정보 forward — 글로벌 쿼리 visibility filter 위해.
         async for event in self.rag_service.ask(
             question=question,
             workspace_id=workspace_id,
+            requester_user_id=requester_user_id,
+            requester_role=requester_role,
             project_id=project_id,
             time_range=time_range,
             source_type=source_type,
