@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-05-15 (Sprint 18 PR-B)
+> 마지막 업데이트: 2026-05-15 (Sprint 18 머지 — PR #34)
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조 — Completed / Blocked / Questions / Next Actions 4섹션 운영.
 
@@ -16,6 +16,13 @@
 
 ## Completed
 
+- [x] Sprint 18: CLAUDE.md 10원칙 정렬 리팩토링 (머지 2026-05-15, PR #34, 18 commits)
+  - [x] PR-A: 헌법/규칙 위반 4건 fix (embeddings AsyncSession · workspaces wrapper · CONTEXT-MAP §9 · ADR gap log)
+  - [x] PR-B: docs 정리 (superpowers revert · L0~L4 single source · README/TODO 갱신 · stale 2건 git rm)
+  - [x] PR-C: backend 단순화 (ProjectService Optional 제거 · memory wrapper inline · rag/pipeline 유지 결정)
+  - [x] PR-D/E: frontend Thin Component (project-dashboard · today-feed 461→339 · sidebar ProjectsList 분리)
+  - [x] PR-F: cleanup (미사용 shadcn 4 · ui.ts cross-domain decouple · (app) ErrorBoundary/Suspense)
+  - [x] BL-028~033 등재 (memory 분할 · rag SSE helper · transcription fixture · ErrorBoundary 도메인별 · superpowers archive 정책 · pyright/SQLModel 진단)
 - [x] Phase 0: 기획 · 아키텍처 · 디자인 (PRD, ERD, API 명세, DESIGN.md)
 - [x] ADR-001: 기술 스택 선정
 - [x] ADR-002: 실행 전략 — Vertical Slice Sprint 채택
