@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { koKR } from "@clerk/localizations";
+import { ThemeProvider } from "@/components/layout/theme-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -37,7 +38,11 @@ export default function RootLayout({
           />
         </head>
         <body>
-          {children}
+          {/* ThemeProvider 는 root layout body 최상위에 위치해야 inline FOUC
+              방지 script 가 React component tree 깊은 곳에서 렌더되어 발생하는
+              "Encountered a script tag while rendering React component" 경고
+              회피 가능 (next-themes 0.4 + Next.js 16 정합). */}
+          <ThemeProvider>{children}</ThemeProvider>
         </body>
       </html>
     </ClerkProvider>
