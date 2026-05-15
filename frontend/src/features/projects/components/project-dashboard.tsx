@@ -131,6 +131,14 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
 
   const updateAction = useUpdateActionItem(wid);
 
+  /* React Hooks 규칙: 모든 훅은 early return 이전에 호출되어야 함 (ISSUE-009 fix) */
+  const actions = actionsData?.items ?? [];
+  const projectMeetings = meetingsData?.items ?? [];
+  const notes = notesData?.items ?? [];
+
+  /* 최근 아이템: 회의 + 노트 합쳐 날짜순 정렬, 5개 — hooks.ts:useRecentItems */
+  const recentItems = useRecentItems(projectMeetings, notes);
+
   /* 로딩 */
   if (projectLoading) return <DashboardSkeleton />;
 
@@ -145,13 +153,6 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
       </div>
     );
   }
-
-  const actions = actionsData?.items ?? [];
-  const projectMeetings = meetingsData?.items ?? [];
-  const notes = notesData?.items ?? [];
-
-  /* 최근 아이템: 회의 + 노트 합쳐 날짜순 정렬, 5개 — hooks.ts:useRecentItems */
-  const recentItems = useRecentItems(projectMeetings, notes);
 
   const isContentLoading = actionsLoading || meetingsLoading || notesLoading;
 
