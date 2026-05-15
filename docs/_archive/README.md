@@ -7,9 +7,10 @@
 
 | 경로 | 사유 | 이동 일자 |
 |---|---|---|
-| `_archive/superpowers/` | Phase 0~Sprint 5 자동 생성 plan/spec (`docs/superpowers/`). 2026-04-02 stale, 후속 참조 0. | 2026-05-15 Sprint 18 PR-B |
 | `_archive/requirements/para-methodology.md` | PARA → CODE pivot (ADR-004) 으로 대체. | 2026-05-15 Sprint 18 PR-B |
 | `_archive/dev-log/sprint-11-session-prompt.md` | 세션 prompt template. 후속 참조 0. | 2026-05-15 Sprint 18 PR-B |
+
+> 주의: `docs/superpowers/` 는 `superpowers:writing-plans` / `subagent-driven-development` 스킬이 신규 plan/spec 을 자동 생성하는 위치. archive 금지 (스킬 재실행 시 동일 위치 누적).
 
 ## 정책
 

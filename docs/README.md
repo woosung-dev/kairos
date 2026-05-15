@@ -9,6 +9,7 @@
 | `api/`           | API 명세서, 프론트-백엔드 통신 규약        |
 | `guides/`        | 로컬 셋업, 배포, secrets, prompt, 세션 루틴 |
 | `dev-log/`       | ADR (Architecture Decision Records) + Sprint plan/verification |
+| `superpowers/`   | `superpowers:writing-plans` 스킬 자동 산출 — plans/ + specs/ (Sprint 단위 plan/design) |
 | `_archive/`      | superseded/stale 문서 (검색 제외) — `_archive/README.md` 참조 |
 | `TODO.md`        | 작업 현황 (Completed / In Progress / Blocked) |
 | `REFACTORING-BACKLOG.md` | BL-NNN 리팩토링 백로그 (P0~P3 분류) |
@@ -82,6 +83,12 @@
 
 **Multi-agent QA (Sprint 13)**
 - [Multi-agent QA reports](dev-log/2026-05-13-multi-agent-qa/) — Sentinel / Curious / Casual 3축 통합 검증
+
+### superpowers/ (Sprint 자동 산출)
+
+> `superpowers:writing-plans` + `superpowers:executing-plans` / `subagent-driven-development` 스킬이 Sprint 진행 시 자동 생성.
+> `plans/YYYY-MM-DD-<topic>.md` (실행 계획 + Task 의존도) + `specs/YYYY-MM-DD-<topic>-design.md` (설계 결정).
+> 산출물은 그대로 유지 — 스킬이 다시 호출되면 동일 위치에 누적.
 
 ### _archive/ (보관)
 
