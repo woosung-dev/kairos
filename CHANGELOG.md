@@ -4,6 +4,20 @@ All notable changes to Kairos are documented here.
 
 ---
 
+## [0.1.1.0] - 2026-05-15
+
+### Fixed
+- **`/notes` 메모 저장 BE 연결** (ISSUE-005) — `quick-memo.tsx` 가 `MOCK_PROJECTS` / `INITIAL_MEMOS` 하드코딩 + `setMemos()` 로컬 state-only "save" 였음. 저장 후 reload 시 노트 사라지던 P1 회귀 해결. `useNotes` / `useCreateNote` / `useProjects` 사용 + tiptap 호환 doc 변환.
+- **`/invite/[code]` HTTP 500** (ISSUE-008) — `QueryProvider` 가 `(app)/layout.tsx` 안에만 위치해 (app) 그룹 외부 라우트 (/invite, /sign-in 등) 에서 React Query hook 호출 시 "No QueryClient set" crash. `QueryProvider` + `Toaster` 를 root layout 으로 이동.
+- **`/projects/[id]` ErrorBoundary 발동** (ISSUE-009) — `ProjectDashboard` 가 `projectLoading` early return 한 뒤 `useRecentItems` 호출. React hooks 규칙 위반 ("Rendered more hooks than during the previous render"). `useRecentItems` 와 데이터 풀기를 early return 이전으로 이동.
+
+### Documentation
+- `docs/dev-log/2026-05-15-sprint17-qa-verification.md` 신설 — Sprint 17 Exhaustive QA 결과 + 성공 조건 C1~C6 표 + Fix 결과.
+- `docs/REFACTORING-BACKLOG.md` — BL-034 ~ BL-039 등재 (asyncpg pool · workspace 중복 · sidebar perf · Satoshi FOIT · invite cache · settings 403 UX).
+- `docs/TODO.md` — Sprint 17 Completed + Next Actions.
+
+---
+
 ## [0.1.0.2] - 2026-05-12
 
 ### Refactored

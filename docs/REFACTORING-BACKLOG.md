@@ -1072,3 +1072,125 @@ group-level fallback 만 있으면 한 도메인 에러가 전체 (app) area 리
 **Sprint 묶음:** 단독.
 
 **근거:** Sprint 18 PR-A diagnostic 누적.
+
+---
+
+## BL-034
+
+**제목**: asyncpg.InterfaceError "connection is closed" intermittent — Neon pool stale connection
+
+**도메인**: backend / DB pool
+
+**증상**: 다양한 API 호출 (clerk_id 기반 user lookup 등) 첫 호출 시 sqlalchemy.exc.InterfaceError "connection is closed" 발생 → 재시도 시 200. console 에 간헐적 500 에러 노출.
+
+**원인 가설**:
+- asyncpg connection pool 의 idle connection 재사용 시 Neon idle timeout 으로 이미 닫힌 connection 사용
+- `pool_pre_ping` 미설정
+- pool recycle 시간 미설정
+
+**해결 방향**:
+- `backend/src/core/db.py` 또는 engine config 에 `pool_pre_ping=True`, `pool_recycle=300` 추가
+- 또는 asyncpg 의 `connection_class` 에서 `before_first_query` health-check
+
+**우선순위**: ★★★☆☆ (P1 deferred — intermittent, 사용자 noticeable 하지만 retry 로 우회)
+
+**근거**: Sprint 17 QA verification (2026-05-15), ISSUE-006. `/tmp/kairos-be.log` 스택트레이스 다수.
+
+**Sprint 묶음**: 단독 또는 Sprint 18 DB hygiene.
+
+---
+
+## BL-035
+
+**제목**: workspace switcher 중복 이름 표시 — 5 duplicate "E2E 테스트 워크스페이스" 구분 불가
+
+**도메인**: frontend / workspace switcher UX
+
+**증상**: workspace switcher 에 5개 동일 이름 항목 표시. UUID 다름. 사용자가 어느 것을 고를지 알 수 없음. auth.setup.ts 의 "워크스페이스 보장" 로직이 race 또는 반복 실행으로 누적된 결과.
+
+**해결 방향**:
+- FE: 같은 이름 workspace 가 2+ 일 때 created_at 또는 ID 접미사 표시 (`E2E 테스트 워크스페이스 (1)` ... `(5)` 또는 `#1` 등)
+- BE: 동일 owner + 동일 name + 동일 type unique constraint (alembic migration)
+- Data: dev 환경 cleanup 스크립트
+
+**우선순위**: ★★☆☆☆ (P2 — UX 만, 데이터 손실 없음)
+
+**근거**: Sprint 17 QA, ISSUE-002.
+
+---
+
+## BL-036
+
+**제목**: 비 dashboard 라우트 sidebar project list 3-6s 지연 로딩
+
+**도메인**: frontend / React Query staleTime + API perf
+
+**증상**: /inbox, /memory, /notes, /search, /settings 등 진입 시 sidebar 가 "프로젝트 없음" 로 3-6s 표시 → 이후 project list 표시.
+
+**원인 가설**:
+- `useProjects` 의 staleTime / cacheTime 부족
+- 라우트 변경 시 cache 무효화 후 refetch
+- BE projects?status=active 응답 자체 느림 (2-4s)
+
+**해결 방향**:
+- React Query staleTime 1-2분 설정 (router 변경에 cache 유지)
+- BE projects N+1 또는 join 패턴 확인
+
+**우선순위**: ★☆☆☆☆ (P3 perf — 사용자 체감 가능하지만 blocking 0)
+
+**근거**: Sprint 17 QA, ISSUE-003.
+
+---
+
+## BL-037
+
+**제목**: Google Fonts Satoshi 요청 pending → FOIT 가능성
+
+**도메인**: frontend / typography network
+
+**증상**: `https://fonts.googleapis.com/css2?family=Satoshi:...` 가 network 에서 pending 상태로 남음. fallback font 로 렌더되거나 FOIT 발생 가능.
+
+**해결 방향**:
+- Satoshi 가 Google Fonts 에 미공개 폰트 (이름 충돌? 직접 호스팅 필요?) — 확인 필요
+- `font-display: swap` 또는 fallback 명시
+- 또는 self-host (`/public/fonts/` + `@font-face`)
+
+**우선순위**: ★☆☆☆☆ (P3 cosmetic, DESIGN.md 확인 필요)
+
+**근거**: Sprint 17 QA, ISSUE-004.
+
+---
+
+## BL-038
+
+**제목**: 초대 링크 생성 직후 invite list 미반영 — React Query cache invalidation 누락
+
+**도메인**: frontend / `features/members`
+
+**증상**: settings → 초대 → "초대 링크 생성" → toast "초대 링크가 생성되었습니다" 성공 → invite list 는 "아직 초대 링크가 없습니다" 유지 → reload + tab 재진입 시에야 표시.
+
+**해결 방향**:
+- `useCreateInvite` (또는 동등 mutation) `onSuccess` 에 `queryClient.invalidateQueries({ queryKey: inviteKeys.list(wid) })` 추가
+
+**우선순위**: ★★☆☆☆ (P2 — UX, 1-2 line fix)
+
+**근거**: Sprint 17 QA, ISSUE-007.
+
+---
+
+## BL-039
+
+**제목**: /settings 초대 탭에서 member 진입 시 빈 헤더만 노출 — 명시적 권한 에러 메시지 미표시
+
+**도메인**: frontend / `app/(app)/settings/page.tsx` + 초대 panel
+
+**증상**: member 역할로 /settings → 초대 탭 → 헤더 "초대 링크" 만 보이고 list / 생성 버튼 / 권한 부족 메시지 모두 미표시. BE 가 403 반환하지만 FE 가 명시 에러 처리 안 함.
+
+**해결 방향**:
+- `useInvites` (또는 동등) 에서 403 응답 시 "관리자 권한 필요" 등 명시 placeholder 렌더
+- 또는 `hasRole("admin")` 가드로 탭 자체 비활성/숨김
+
+**우선순위**: ★☆☆☆☆ (P3 UX — 동작은 정상 (member 가 못 만듦), 메시지만 미흡)
+
+**근거**: Sprint 17 QA, ISSUE-010.
+
