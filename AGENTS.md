@@ -162,7 +162,7 @@ test: 테스트 추가/수정
 | Auth | Clerk (Google OAuth) | |
 | Storage | Cloudflare R2 | |
 | STT | Whisper API + pyannote-audio | |
-| AI | Gemini `gemini-2.5-flash` (고정) | `docs/architecture/ai-pipeline.md` |
+| AI | Gemini `gemini-3.1-flash-lite` (고정, ADR-019 Phase B) | `docs/architecture/ai-pipeline.md` |
 | Embedding | OpenAI text-embedding-3-small (1536d) | `docs/architecture/rag-pipeline.md` |
 | Deploy | Vercel (FE) + GCP Cloud Run (BE) | |
 
@@ -207,7 +207,7 @@ Note, EmbeddingChunk(계층적), SemanticCache
 
 ### AI 제약사항
 
-- Gemini 모델 고정: `gemini-2.5-flash` (임의 변경 금지)
+- Gemini 모델 고정: `gemini-3.1-flash-lite` (임의 변경 금지, ADR-019 Phase B 적용. 이전: `gemini-2.5-flash` EOL 2026-06-17)
 - 프롬프트 중앙 관리: `backend/src/common/prompts.py` 상수 (인라인 금지)
 - 크로스 도메인: `pipeline_service.py` 오케스트레이터만 — 도메인 간 직접 import 금지
 - 장기 작업: BackgroundTasks + 202 Accepted + polling

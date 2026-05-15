@@ -116,7 +116,7 @@ Query Processing (범위 필터 결정, 질문 정규화)
 │  + Re-ranked 검색 결과 Top-10                            │
 │  + 출처 메타데이터 (회의명, 날짜, 발언자)                    │
 │  + 사용자 질문                                            │
-│  → Gemini (gemini-2.5-flash) → 스트리밍 답변 + 출처 표기  │
+│  → Gemini (gemini-3.1-flash-lite) → 스트리밍 답변 + 출처 표기  │
 └─────────────────────┬───────────────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -728,6 +728,6 @@ Kairos RAG 설계는 truewords-platform의 아키텍처를 참조하되, **프�
 | 멀티테넌시 | 없음 (단일 챗봇) | 워크스페이스 격리 (필수) |
 | 검색 범위 | payload 필터 (A\|B\|C 챗봇 버전) | 프로젝트 범위 + 시간 + 소스 타입 |
 | 캐시 | Qdrant semantic_cache 컬렉션 | PostgreSQL semantic_caches 테이블 |
-| 생성 모델 | Gemini 2.5 | Gemini gemini-2.5-flash |
+| 생성 모델 | Gemini 2.5 | Gemini gemini-3.1-flash-lite (ADR-019 Phase B) |
 
 **핵심 차이:** Kairos는 워크스페이스 단위 소규모 데이터이므로 별도 벡터 DB 불필요. PostgreSQL 하나로 운영 데이터 + 벡터 검색 + Full-text 검색 + 캐시를 모두 처리한다.

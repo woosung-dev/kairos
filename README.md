@@ -16,7 +16,7 @@
 | Database | PostgreSQL (Neon) + pgvector |
 | Auth | Clerk |
 | Storage | Cloudflare R2 |
-| AI | Gemini `gemini-2.5-flash` + Whisper STT |
+| AI | Gemini `gemini-3.1-flash-lite` + Whisper STT |
 | Deploy | Vercel (FE) + GCP Cloud Run (BE) |
 
 ---
