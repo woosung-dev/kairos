@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-05-15 (Sprint 18 머지 — PR #34)
+> 마지막 업데이트: 2026-05-15 (Sprint 17 Exhaustive QA + 3 atomic fix)
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조 — Completed / Blocked / Questions / Next Actions 4섹션 운영.
 
@@ -14,8 +14,26 @@
 
 ---
 
+## Next Actions
+
+- [ ] **Sprint 22 push 승인** — sprint-22/theme-provider-root 에 4 commits (theme + 3 QA fix). user 승인 후 push → PR.
+- [ ] **C.1 음성 녹음 full e2e** — Playwright MCP + fake mic stream (별도 세션)
+- [ ] **C.3b RAG visibility=private post-filter deep test** — project + content seeding 필요 (별도 세션)
+- [ ] **BL-034 asyncpg pool stale connection** — Neon pool_pre_ping 적용
+
+---
+
 ## Completed
 
+- [x] Sprint 17: Exhaustive QA + 3 atomic fix (2026-05-15, branch sprint-22/theme-provider-root)
+  - [x] ISSUE-005 fix (P1): /notes mock 데이터 제거, BE API 연결 (`6791783`)
+  - [x] ISSUE-008 fix (P1): /invite/[code] HTTP 500 → 200 (QueryProvider root 이동, `33c9f1c`)
+  - [x] ISSUE-009 fix (P1): /projects/[id] hooks order 회귀 (`ae35f53`)
+  - [x] ISSUE-001 closed (외부 `1e903e8`): script tag warning (ThemeProvider 위치)
+  - [x] BL-034~039 등재 (asyncpg pool · workspace 중복 · sidebar perf · Satoshi FOIT · invite cache · settings 403 UX)
+  - [x] 성공 조건 C1~C6 PASS (C2 음성 full e2e / C.3b RAG private deep 은 후속)
+  - [x] 회귀 0 — typecheck clean / pytest 108 pass / lint baseline 동등
+  - 산출물: `docs/dev-log/2026-05-15-sprint17-qa-verification.md` · `.gstack/qa-reports/qa-report-kairos-sprint17-2026-05-15.md`
 - [x] Sprint 18: CLAUDE.md 10원칙 정렬 리팩토링 (머지 2026-05-15, PR #34, 18 commits)
   - [x] PR-A: 헌법/규칙 위반 4건 fix (embeddings AsyncSession · workspaces wrapper · CONTEXT-MAP §9 · ADR gap log)
   - [x] PR-B: docs 정리 (superpowers revert · L0~L4 single source · README/TODO 갱신 · stale 2건 git rm)
