@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback } from "react";
 import { useUIStore } from "@/store/ui";
+import { useSourceViewerStore } from "@/features/sources/store";
 import { useBreakpoint } from "@/hooks/use-media-query";
 import { Sidebar } from "./sidebar";
 import { RagPanel } from "./rag-panel";
@@ -24,10 +25,12 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
     toggleRagOverlay,
     setSidebarCollapsed,
     setIsMobile,
-    sourceViewerSource,
-    sourceViewerHighlights,
-    closeSourceViewer,
   } = useUIStore();
+  const {
+    source: sourceViewerSource,
+    highlights: sourceViewerHighlights,
+    close: closeSourceViewer,
+  } = useSourceViewerStore();
 
   // breakpoint 변경 시 Zustand 동기화
   useEffect(() => {

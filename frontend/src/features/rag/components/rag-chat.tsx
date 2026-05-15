@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState, type ReactNode } from "react";
 import { useRagStore } from "../store";
-import { useUIStore } from "@/store/ui";
+import { useSourceViewerStore } from "@/features/sources/store";
 import { RagSources } from "./rag-sources";
 import { CitationBadge } from "./citation-badge";
 import { MessageActions } from "./message-actions";
@@ -69,7 +69,7 @@ function toHighlightChunk(source: RagSource, citationNumber: number): HighlightC
 
 export function RagChat() {
   const { messages, isStreaming } = useRagStore();
-  const openSourceViewer = useUIStore((s) => s.openSourceViewer);
+  const openSourceViewer = useSourceViewerStore((s) => s.open);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [activeCitation, setActiveCitation] = useState<number | null>(null);
 

@@ -1,8 +1,16 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-05-13
+> 마지막 업데이트: 2026-05-15 (Sprint 18 PR-B)
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
-> 형식 규칙: `.ai/common/global.md` §2 참조
+> 형식 규칙: `.ai/common/global.md` §2 참조 — Completed / Blocked / Questions / Next Actions 4섹션 운영.
+
+---
+
+## Blocked
+
+> 차단(Blocked) 항목은 이유 + 필요한 조치를 함께 기록. AI가 사용자에게 빈번하게 질문하는 대신 본 섹션에 누적 후 자연스러운 타이밍에 일괄 전달.
+
+- _현재 차단 항목 없음._
 
 ---
 

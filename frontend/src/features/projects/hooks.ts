@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -23,6 +24,36 @@ import type {
   UpdateProjectRequest,
 } from "./types";
 import { meetingKeys } from "../meetings/api";
+import type { Meeting } from "../meetings/types";
+import type { Note } from "../notes/types";
+
+/** project-dashboard 의 최근 회의+노트 합본. created/recorded 순. */
+export type RecentItem =
+  | { kind: "meeting"; data: Meeting }
+  | { kind: "note"; data: Note };
+
+/** 회의 + 노트 (최신 5개씩) 를 합쳐 날짜 내림차순으로 정렬한 후 상위 5개 반환. */
+export function useRecentItems(
+  meetings: Meeting[],
+  notes: Note[],
+  limit: number = 5,
+): RecentItem[] {
+  return useMemo(() => {
+    const combined: RecentItem[] = [
+      ...meetings.map((m): RecentItem => ({ kind: "meeting", data: m })),
+      ...notes.slice(0, limit).map((n): RecentItem => ({ kind: "note", data: n })),
+    ];
+    return combined
+      .sort((a, b) => {
+        const aDate =
+          a.kind === "meeting" ? (a.data.recordedAt ?? a.data.createdAt) : a.data.createdAt;
+        const bDate =
+          b.kind === "meeting" ? (b.data.recordedAt ?? b.data.createdAt) : b.data.createdAt;
+        return new Date(bDate).getTime() - new Date(aDate).getTime();
+      })
+      .slice(0, limit);
+  }, [meetings, notes, limit]);
+}
 
 /**
  * 워크스페이스 내 프로젝트 목록 조회

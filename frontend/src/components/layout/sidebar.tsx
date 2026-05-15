@@ -141,18 +141,19 @@ function ProjectSources({
   );
 }
 
-export function Sidebar({ collapsed = false }: SidebarProps) {
-  const pathname = usePathname();
+/**
+ * 프로젝트 리스트 + Archive 섹션 — 펼침 상태/토글 자체 관리.
+ * sidebar 본체에서 분리되어 Sidebar 메인 함수의 시각적 비중을 낮춤.
+ */
+function ProjectsList({
+  workspaceId,
+  pathname,
+}: {
+  workspaceId: string;
+  pathname: string;
+}) {
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const hasRole = useWorkspaceStore((s) => s.hasRole);
-
-  // Sprint 14 T-9: Inbox 카운트 정책 = 미처리(!isProcessed) 항목 수.
-  // /inbox 페이지의 "미처리" 필터 결과와 동일 source-of-truth (동일 query key 캐시 공유).
-  const { data: inboxData } = useInbox(activeWorkspaceId ?? undefined);
-  const unprocessedInboxCount =
-    inboxData?.items.filter((it) => !it.isProcessed).length ?? 0;
 
   const toggleProject = (projectId: string) => {
     setExpandedProjects((prev) => {
@@ -166,15 +167,136 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
     });
   };
 
-  const { data: activeData } = useProjects(activeWorkspaceId ?? undefined, {
-    status: "active",
-  });
-  const { data: archivedData } = useProjects(activeWorkspaceId ?? undefined, {
-    status: "archived",
-  });
+  const { data: activeData } = useProjects(workspaceId, { status: "active" });
+  const { data: archivedData } = useProjects(workspaceId, { status: "archived" });
 
   const projects = activeData?.items ?? [];
   const archivedProjects = archivedData?.items ?? [];
+
+  return (
+    <div
+      className="px-4 py-3 border-t flex-1"
+      style={{ borderColor: "var(--border-subtle)" }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span
+          className="text-xs font-medium uppercase tracking-wider"
+          style={{ color: "var(--text-muted)" }}
+        >
+          프로젝트
+        </span>
+      </div>
+      {projects.length === 0 ? (
+        <p
+          className="text-xs py-4 text-center"
+          style={{ color: "var(--text-muted)" }}
+        >
+          프로젝트 없음
+        </p>
+      ) : (
+        <div className="space-y-0.5">
+          {projects.map((project) => {
+            const isActive =
+              pathname === `/projects/${project.id}` ||
+              pathname.startsWith(`/projects/${project.id}/`);
+            const isExpanded = expandedProjects.has(project.id);
+
+            return (
+              <div key={project.id}>
+                <div
+                  className="flex items-center rounded text-xs transition-colors"
+                  style={{
+                    background: isActive ? "var(--surface-active)" : "transparent",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleProject(project.id)}
+                    className="shrink-0 p-1 rounded transition-colors hover:opacity-80"
+                    style={{ color: "var(--text-muted)" }}
+                    aria-label={isExpanded ? "접기" : "펼치기"}
+                  >
+                    {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  </button>
+                  <Link
+                    href={`/projects/${project.id}`}
+                    className="flex-1 py-1.5 pr-2 truncate"
+                    style={{
+                      color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
+                    }}
+                  >
+                    {project.title}
+                  </Link>
+                </div>
+
+                {isExpanded && (
+                  <ProjectSources workspaceId={workspaceId} projectId={project.id} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {archivedProjects.length > 0 && (
+        <div className="mt-4">
+          <button
+            onClick={() => setIsArchiveOpen(!isArchiveOpen)}
+            className="flex items-center gap-1.5 w-full text-xs font-medium uppercase tracking-wider mb-1 transition-colors hover:opacity-80"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {isArchiveOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            <Archive size={12} />
+            <span>Archive</span>
+            <span
+              className="ml-auto text-[10px]"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {archivedProjects.length}
+            </span>
+          </button>
+          {isArchiveOpen && (
+            <div className="space-y-0.5">
+              {archivedProjects.map((project) => {
+                const isActive = pathname === `/projects/${project.id}`;
+                return (
+                  <Link
+                    key={project.id}
+                    href={`/projects/${project.id}`}
+                    className="block px-2 py-1.5 rounded text-xs truncate transition-colors"
+                    style={{
+                      background: isActive
+                        ? "var(--surface-active)"
+                        : "transparent",
+                      color: isActive
+                        ? "var(--text-primary)"
+                        : "var(--text-muted)",
+                      borderRadius: "var(--radius-sm)",
+                    }}
+                  >
+                    {project.title}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Sidebar({ collapsed = false }: SidebarProps) {
+  const pathname = usePathname();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const hasRole = useWorkspaceStore((s) => s.hasRole);
+
+  // Sprint 14 T-9: Inbox 카운트 정책 = 미처리(!isProcessed) 항목 수.
+  // /inbox 페이지의 "미처리" 필터 결과와 동일 source-of-truth (동일 query key 캐시 공유).
+  const { data: inboxData } = useInbox(activeWorkspaceId ?? undefined);
+  const unprocessedInboxCount =
+    inboxData?.items.filter((it) => !it.isProcessed).length ?? 0;
 
   const renderNavItem = (item: NavItem) => {
     const isActive = pathname === item.href;
@@ -286,126 +408,8 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
       </nav>
 
       {/* 프로젝트 리스트: collapsed에서 숨김 */}
-      {!collapsed && (
-        <div
-          className="px-4 py-3 border-t flex-1"
-          style={{ borderColor: "var(--border-subtle)" }}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span
-              className="text-xs font-medium uppercase tracking-wider"
-              style={{ color: "var(--text-muted)" }}
-            >
-              프로젝트
-            </span>
-          </div>
-          {projects.length === 0 ? (
-            <p
-              className="text-xs py-4 text-center"
-              style={{ color: "var(--text-muted)" }}
-            >
-              프로젝트 없음
-            </p>
-          ) : (
-            <div className="space-y-0.5">
-              {projects.map((project) => {
-                const isActive = pathname === `/projects/${project.id}` ||
-                  pathname.startsWith(`/projects/${project.id}/`);
-                const isExpanded = expandedProjects.has(project.id);
-
-                return (
-                  <div key={project.id}>
-                    {/* 프로젝트 행: 펼침 토글 + 링크 */}
-                    <div
-                      className="flex items-center rounded text-xs transition-colors"
-                      style={{
-                        background: isActive ? "var(--surface-active)" : "transparent",
-                        borderRadius: "var(--radius-sm)",
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleProject(project.id)}
-                        className="shrink-0 p-1 rounded transition-colors hover:opacity-80"
-                        style={{ color: "var(--text-muted)" }}
-                        aria-label={isExpanded ? "접기" : "펼치기"}
-                      >
-                        {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                      </button>
-                      <Link
-                        href={`/projects/${project.id}`}
-                        className="flex-1 py-1.5 pr-2 truncate"
-                        style={{
-                          color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                        }}
-                      >
-                        {project.title}
-                      </Link>
-                    </div>
-
-                    {/* 하위 소스 트리 — 펼쳐졌을 때만 mount (불필요한 쿼리 방지) */}
-                    {isExpanded && activeWorkspaceId && (
-                      <ProjectSources
-                        workspaceId={activeWorkspaceId}
-                        projectId={project.id}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Archive 섹션 (접이식) */}
-          {archivedProjects.length > 0 && (
-            <div className="mt-4">
-              <button
-                onClick={() => setIsArchiveOpen(!isArchiveOpen)}
-                className="flex items-center gap-1.5 w-full text-xs font-medium uppercase tracking-wider mb-1 transition-colors hover:opacity-80"
-                style={{ color: "var(--text-muted)" }}
-              >
-                {isArchiveOpen ? (
-                  <ChevronDown size={12} />
-                ) : (
-                  <ChevronRight size={12} />
-                )}
-                <Archive size={12} />
-                <span>Archive</span>
-                <span
-                  className="ml-auto text-[10px]"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  {archivedProjects.length}
-                </span>
-              </button>
-              {isArchiveOpen && (
-                <div className="space-y-0.5">
-                  {archivedProjects.map((project) => {
-                    const isActive = pathname === `/projects/${project.id}`;
-                    return (
-                      <Link
-                        key={project.id}
-                        href={`/projects/${project.id}`}
-                        className="block px-2 py-1.5 rounded text-xs truncate transition-colors"
-                        style={{
-                          background: isActive
-                            ? "var(--surface-active)"
-                            : "transparent",
-                          color: isActive
-                            ? "var(--text-primary)"
-                            : "var(--text-muted)",
-                          borderRadius: "var(--radius-sm)",
-                        }}
-                      >
-                        {project.title}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+      {!collapsed && activeWorkspaceId && (
+        <ProjectsList workspaceId={activeWorkspaceId} pathname={pathname} />
       )}
 
       {/* 설정 링크 — 하단 고정 */}

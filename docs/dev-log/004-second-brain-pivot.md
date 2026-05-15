@@ -154,7 +154,7 @@ Express  → RAG 검색 + 프로액티브 인사이트 + 보고서
 ### 문서 수정 필요
 
 - `docs/requirements/prd.md` — 핵심 가치, 파이프라인, Phase 로드맵
-- `docs/requirements/para-methodology.md` → `second-brain.md` 대체
+- ~~`docs/requirements/para-methodology.md`~~ → `second-brain.md` 대체 (2026-05-15 Sprint 18 PR-B 에서 완전 삭제)
 - `docs/architecture/erd.md` — ParaItem → Project + Tag 구조
 - `docs/architecture/ai-pipeline.md` — PARA 분류 → 프로젝트 연결 + 태그
 - `docs/architecture/cross-domain-pipeline.md` — PARA 서비스 참조
