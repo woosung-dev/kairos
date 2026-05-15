@@ -10,11 +10,10 @@
 | `guides/`        | 로컬 셋업, 배포, secrets, prompt, 세션 루틴 |
 | `dev-log/`       | ADR (Architecture Decision Records) + Sprint plan/verification |
 | `superpowers/`   | `superpowers:writing-plans` 스킬 자동 산출 — plans/ + specs/ (Sprint 단위 plan/design) |
-| `_archive/`      | superseded/stale 문서 (검색 제외) — `_archive/README.md` 참조 |
 | `TODO.md`        | 작업 현황 (Completed / In Progress / Blocked) |
 | `REFACTORING-BACKLOG.md` | BL-NNN 리팩토링 백로그 (P0~P3 분류) |
 
-> **본 색인이 active doc 의 유일한 entry point.** `_archive/` 는 history 보존용 — 검색 대상 아님.
+> **본 색인이 active doc 의 유일한 entry point.** stale 문서는 즉시 `git rm` (history 는 git log 로 복구).
 
 ## 문서 목록
 
@@ -89,11 +88,6 @@
 > `superpowers:writing-plans` + `superpowers:executing-plans` / `subagent-driven-development` 스킬이 Sprint 진행 시 자동 생성.
 > `plans/YYYY-MM-DD-<topic>.md` (실행 계획 + Task 의존도) + `specs/YYYY-MM-DD-<topic>-design.md` (설계 결정).
 > 산출물은 그대로 유지 — 스킬이 다시 호출되면 동일 위치에 누적.
-
-### _archive/ (보관)
-
-> 2026-05-15 Sprint 18 PR-B 에서 stale 문서 분리. 진입 색인에서 제외, history 보존.
-> 자세한 이동 이력은 [`_archive/README.md`](_archive/README.md) 참조.
 
 ### Meta docs
 
