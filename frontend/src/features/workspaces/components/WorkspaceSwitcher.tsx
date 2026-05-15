@@ -14,37 +14,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useWorkspaces, useCreateWorkspace } from "../hooks";
 import { useWorkspaceStore } from "../store";
-import type { Workspace } from "../types";
 import { WorkspaceTypeBadge } from "./WorkspaceTypeBadge";
-import { inferWorkspaceType } from "../utils";
+import { inferWorkspaceType, buildDisambiguationMap } from "../utils";
 
 interface WorkspaceSwitcherProps {
   memberCount?: number;
-}
-
-/**
- * BL-035: 동일 이름 워크스페이스가 2개 이상이면 created_at 오름차순 기준 #N 접미사 부여.
- * 단일 이름은 접미사 없음. type 별로 그룹핑 — team / personal 끼리만 비교.
- */
-function buildDisambiguationMap(
-  workspaces: Workspace[],
-): Map<string, string> {
-  const suffixMap = new Map<string, string>();
-  const groups = new Map<string, Workspace[]>();
-  workspaces.forEach((ws) => {
-    const key = `${inferWorkspaceType(ws)}:${ws.name}`;
-    const arr = groups.get(key);
-    if (arr) arr.push(ws);
-    else groups.set(key, [ws]);
-  });
-  groups.forEach((group) => {
-    if (group.length < 2) return;
-    const sorted = [...group].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    sorted.forEach((ws, idx) => {
-      suffixMap.set(ws.id, `#${idx + 1}`);
-    });
-  });
-  return suffixMap;
 }
 
 export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
