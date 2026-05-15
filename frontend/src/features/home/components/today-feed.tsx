@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Inbox,
@@ -12,51 +12,11 @@ import {
   GraduationCap,
   FolderOpen,
 } from "lucide-react";
-import { useInbox } from "@/features/inbox/hooks";
-import { useActionItems } from "@/features/actions/hooks";
-import { useMeetings } from "@/features/meetings/hooks";
-import { useNotes } from "@/features/notes/hooks";
-import { useProjects } from "@/features/projects/hooks";
-import type { ActionItem } from "@/features/actions/types";
-
-/* ─── 타입 ─── */
-
-interface ActionDueEntry {
-  id: string;
-  title: string;
-  projectName: string;
-}
-
-type ActivityType = "meeting" | "note" | "action";
-
-interface RecentActivity {
-  id: string;
-  type: ActivityType;
-  title: string;
-  /** 정렬용 원본 ISO 타임스탬프 */
-  rawTime: string;
-  /** 표시용 상대 시간 */
-  timestamp: string;
-}
-
-/* ─── Utils ─── */
-
-const MS_PER_MIN = 60 * 1000;
-const MS_PER_HOUR = 60 * MS_PER_MIN;
-const MS_PER_DAY = 24 * MS_PER_HOUR;
-
-function formatRelative(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  if (diff < MS_PER_MIN) return "방금 전";
-  if (diff < MS_PER_HOUR) return `${Math.floor(diff / MS_PER_MIN)}분 전`;
-  if (diff < MS_PER_DAY) return `${Math.floor(diff / MS_PER_HOUR)}시간 전`;
-  if (diff < 2 * MS_PER_DAY) return "어제";
-  if (diff < 7 * MS_PER_DAY) return `${Math.floor(diff / MS_PER_DAY)}일 전`;
-  return new Date(iso).toLocaleDateString("ko-KR", {
-    month: "short",
-    day: "numeric",
-  });
-}
+import {
+  useActivityFeed,
+  type ActionDueEntry,
+  type RecentActivity,
+} from "../hooks";
 
 /* ─── 서브 컴포넌트 ─── */
 
@@ -344,90 +304,9 @@ interface TodayFeedProps {
   workspaceId: string | undefined;
 }
 
-const RECENT_LIMIT = 5;
-const ACTIONS_LIMIT = 5;
-
 export function TodayFeed({ workspaceId }: TodayFeedProps) {
-  const inboxQuery = useInbox(workspaceId);
-  const actionsQuery = useActionItems(workspaceId);
-  const meetingsQuery = useMeetings(workspaceId);
-  const notesQuery = useNotes(workspaceId);
-  const projectsQuery = useProjects(workspaceId);
-
-  const inboxCount = useMemo(() => {
-    const items = inboxQuery.data?.items ?? [];
-    return items.filter((it) => !it.isProcessed).length;
-  }, [inboxQuery.data]);
-
-  const actionsDue = useMemo<ActionDueEntry[]>(() => {
-    const actions = actionsQuery.data?.items ?? [];
-    const projects = projectsQuery.data?.items ?? [];
-    const projectNameById = new Map(projects.map((p) => [p.id, p.title]));
-
-    return actions
-      .filter((a: ActionItem) => a.status === "todo")
-      .slice(0, ACTIONS_LIMIT)
-      .map((a) => ({
-        id: a.id,
-        title: a.title,
-        projectName: a.projectId
-          ? projectNameById.get(a.projectId) ?? "—"
-          : "—",
-      }));
-  }, [actionsQuery.data, projectsQuery.data]);
-
-  const activities = useMemo<RecentActivity[]>(() => {
-    const entries: RecentActivity[] = [];
-
-    for (const m of meetingsQuery.data?.items ?? []) {
-      const raw = m.updatedAt ?? m.createdAt;
-      entries.push({
-        id: m.id,
-        type: "meeting",
-        title: m.title,
-        rawTime: raw,
-        timestamp: formatRelative(raw),
-      });
-    }
-    for (const n of notesQuery.data?.items ?? []) {
-      entries.push({
-        id: n.id,
-        type: "note",
-        title: n.title || "(제목 없음)",
-        rawTime: n.updatedAt,
-        timestamp: formatRelative(n.updatedAt),
-      });
-    }
-    for (const a of actionsQuery.data?.items ?? []) {
-      entries.push({
-        id: a.id,
-        type: "action",
-        title: a.title,
-        rawTime: a.updatedAt,
-        timestamp: formatRelative(a.updatedAt),
-      });
-    }
-
-    return entries
-      .sort(
-        (x, y) => new Date(y.rawTime).getTime() - new Date(x.rawTime).getTime(),
-      )
-      .slice(0, RECENT_LIMIT);
-  }, [meetingsQuery.data, notesQuery.data, actionsQuery.data]);
-
-  const isReady =
-    !!workspaceId &&
-    !inboxQuery.isLoading &&
-    !actionsQuery.isLoading &&
-    !meetingsQuery.isLoading &&
-    !notesQuery.isLoading;
-
-  const hasContent =
-    inboxCount > 0 ||
-    actionsDue.length > 0 ||
-    activities.length > 0 ||
-    (meetingsQuery.data?.total ?? 0) > 0 ||
-    (notesQuery.data?.total ?? 0) > 0;
+  const { inboxCount, actionsDue, activities, isReady, hasContent } =
+    useActivityFeed(workspaceId);
 
   return (
     <div className="px-6 py-8 overflow-y-auto max-w-3xl mx-auto">
@@ -458,4 +337,3 @@ export function TodayFeed({ workspaceId }: TodayFeedProps) {
     </div>
   );
 }
-
