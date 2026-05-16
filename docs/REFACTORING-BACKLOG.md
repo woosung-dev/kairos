@@ -994,32 +994,20 @@ def _yield_error(message: str) -> AsyncGenerator[dict, None]:
 
 ---
 
-## BL-031 — ErrorBoundary 도메인별 page-level 점진 도입
+## BL-031 ✅ RESOLVED (Sprint 18, qa-fix-bl031-domain-error-boundaries) — ErrorBoundary 도메인별 page-level 도입
 
 **도메인:** frontend / reliability
-**근거:** Sprint 18 PR-F2 에서 `app/(app)/error.tsx` + `loading.tsx` group-level 1개만 도입. 도메인별 (`projects/[id]`, `meetings/[id]`, `inbox/`, `memory/`, `search/`) page-level 도입은 후속.
 
-**문제:**
-group-level fallback 만 있으면 한 도메인 에러가 전체 (app) area 리렌더. 도메인별 fallback 으로 격리 가능.
+**해결:** 5 도메인 error.tsx 신설 — 한 도메인 에러가 (app) 전체로 번지지 않도록 격리.
+- `app/(app)/projects/[id]/error.tsx` — 프로젝트 권한/삭제 fallback + "대시보드로" 이탈 CTA
+- `app/(app)/meetings/[id]/error.tsx` — STT/AI 처리 중 폴링 실패 fallback + "대시보드로"
+- `app/(app)/inbox/error.tsx` — AI classify 서버 일시 장애 fallback
+- `app/(app)/memory/error.tsx` — recall/promote 지연 fallback + "이미 저장된 메모는 안전" 안내
+- `app/(app)/search/error.tsx` — RAG 임베딩 검색 장애 fallback + 키워드 단순화 안내
 
-**해결:**
-- `app/(app)/projects/[id]/error.tsx` 신설
-- `app/(app)/meetings/[id]/error.tsx`
-- `app/(app)/inbox/error.tsx`
-- `app/(app)/memory/error.tsx`
-- `app/(app)/search/error.tsx`
+각 파일은 `reset()` + `digest` 표시 + 도메인 아이콘 (📁🎙️📥🧠🔎). group-level (`(app)/error.tsx`) 는 fallback-of-fallback 으로 유지.
 
-각각 도메인 특화 fallback 메시지 + reset 핸들러.
-
-**예상 LOC delta:** +200 (5 파일 × ~40줄).
-
-**Risk:** 🟢 낮음.
-
-**우선순위:** ★★☆☆☆.
-
-**Sprint 묶음:** 단독 또는 frontend QA sprint 묶음.
-
-**근거:** Sprint 18 PR-F2 후속.
+**근거:** Sprint 18 BL-031 follow-up.
 
 ---
 
