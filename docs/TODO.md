@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-05-15 (Sprint 17 Exhaustive QA + 3 atomic fix)
+> 마지막 업데이트: 2026-05-16 (Sprint 17 Exhaustive QA + /loop qa-fix closeout)
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조 — Completed / Blocked / Questions / Next Actions 4섹션 운영.
 
@@ -14,18 +14,29 @@
 
 ---
 
-## Next Actions
+## Next Actions (Sprint 18 후보)
 
-- [ ] **Sprint 22 push 승인** — sprint-22/theme-provider-root 에 4 commits (theme + 3 QA fix). user 승인 후 push → PR.
-- [ ] **C.1 음성 녹음 full e2e** — Playwright MCP + fake mic stream (별도 세션)
-- [ ] **C.3b RAG visibility=private post-filter deep test** — project + content seeding 필요 (별도 세션)
-- [ ] **BL-034 asyncpg pool stale connection** — Neon pool_pre_ping 적용
+- [ ] **BL-044 SourceAddModal upload** (P1) — 실제 attachment upload 구현
+- [ ] **ADR-019 Phase B verify** (Sprint 15 carry-over) — Gemini 3.1-flash-lite 정착 확인
+- [ ] **BL-043 nightly heavy e2e** — meeting-upload + R2 cleanup script
+- [ ] **production observability** — Cloud Run logs / Sentry 검토
+- [ ] **BL-040/BL-036 production measure** — RAG visibility filter + perf indexes 효과 측정
+- [ ] **mobile 반응형 QA** — 데스크탑 only 였음
+- [ ] **BL-045 Satoshi 폰트 결정** — DESIGN.md 검토
 
 ---
 
 ## Completed
 
-- [x] Sprint 17: Exhaustive QA + 3 atomic fix (2026-05-15, branch sprint-22/theme-provider-root)
+- [x] **Sprint 17 Closeout (2026-05-16)** — 19 PR / 2일 / C1~C6 8/8 PASS
+  - [x] Phase A (#39~#46) — 3 P1 fix + BL-034/035/036/038/039 + ISSUE-040 보안
+  - [x] Phase B (#47~#67) — 회귀 가드 21건 + BL-041/042 보안 후속 + e2e local BE 자립
+  - [x] 보안 3-layer 정합 (pipeline / vector_search / find_similar_cache + max_visibility fast path)
+  - [x] 회귀 0 — typecheck / pytest 108+ / lint baseline 동등
+  - [x] qa-fix 통합 브랜치 + sub-branch /loop 워크플로우 검증 완료
+  - 산출물: `docs/dev-log/2026-05-16-sprint17-closeout.md` 참조
+
+- [x] Sprint 17 Exhaustive QA + 3 atomic fix (2026-05-15)
   - [x] ISSUE-005 fix (P1): /notes mock 데이터 제거, BE API 연결 (`6791783`)
   - [x] ISSUE-008 fix (P1): /invite/[code] HTTP 500 → 200 (QueryProvider root 이동, `33c9f1c`)
   - [x] ISSUE-009 fix (P1): /projects/[id] hooks order 회귀 (`ae35f53`)
