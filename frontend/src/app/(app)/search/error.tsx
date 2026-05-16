@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { trackError } from "@/lib/track-error";
 
 export default function SearchError({
   error,
@@ -11,8 +12,7 @@ export default function SearchError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.error("[search error boundary]", error);
+    trackError(error, { scope: "search", digest: error.digest });
   }, [error]);
 
   return (

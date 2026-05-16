@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { trackError } from "@/lib/track-error";
 
 export default function InboxError({
   error,
@@ -11,8 +12,7 @@ export default function InboxError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.error("[inbox error boundary]", error);
+    trackError(error, { scope: "inbox", digest: error.digest });
   }, [error]);
 
   return (

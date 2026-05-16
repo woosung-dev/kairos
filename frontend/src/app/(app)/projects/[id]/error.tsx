@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { trackError } from "@/lib/track-error";
 
 export default function ProjectError({
   error,
@@ -11,8 +12,7 @@ export default function ProjectError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.error("[projects/[id] error boundary]", error);
+    trackError(error, { scope: "projects/[id]", digest: error.digest });
   }, [error]);
 
   return (

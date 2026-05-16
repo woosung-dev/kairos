@@ -2,6 +2,7 @@
 
 // (app) 그룹 ErrorBoundary — 페이지 trigger 에러를 graceful fallback 으로 처리
 import { useEffect } from "react";
+import { trackError } from "@/lib/track-error";
 
 export default function AppError({
   error,
@@ -11,8 +12,7 @@ export default function AppError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.error("[(app) error boundary]", error);
+    trackError(error, { scope: "(app)", digest: error.digest });
   }, [error]);
 
   return (

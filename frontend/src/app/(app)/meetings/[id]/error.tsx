@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { trackError } from "@/lib/track-error";
 
 export default function MeetingError({
   error,
@@ -11,8 +12,7 @@ export default function MeetingError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.error("[meetings/[id] error boundary]", error);
+    trackError(error, { scope: "meetings/[id]", digest: error.digest });
   }, [error]);
 
   return (
