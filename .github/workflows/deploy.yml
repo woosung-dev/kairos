@@ -80,7 +80,19 @@ jobs:
           # --no-cpu-throttling: 응답 외 시간에도 CPU 유지 — startup probe 통과 후 idle 안정
           # 비용 영향 0 — min-instances=0 유지 (scale to zero), instance 활성 시 부스트만.
           # BL-FIX(cold-start): 503 e2e 실패 회귀 방지 — deploy 직후 외 cold start 도 통과 보장
-          flags: --allow-unauthenticated --port=8000 --memory=1Gi --min-instances=0 --max-instances=3 --cpu-boost --no-cpu-throttling
+          #
+          # Sprint 18 — startup probe HTTP GET /api/v1/ready (DB connection 확인 후 serve)
+          # 총 startup budget: initial-delay 5s + period 10s × failure-threshold 30 = 305s.
+          # ready 가 503 (DB degraded) 응답 시 트래픽 라우팅 안 함 → 사용자 503 회피.
+          flags: >-
+            --allow-unauthenticated --port=8000 --memory=1Gi
+            --min-instances=0 --max-instances=3
+            --cpu-boost --no-cpu-throttling
+            --startup-probe-http-get-path=/api/v1/ready
+            --startup-probe-initial-delay=5
+            --startup-probe-period=10
+            --startup-probe-timeout=5
+            --startup-probe-failure-threshold=30
           # CORS_ORIGINS: deploy-cloudrun@v2의 env_vars: 형식이 콤마를 변수 구분자로
           # 해석하므로 multi-URL(GH Secret의 "url1,url2")이 깨진다. prod는 vercel URL
           # 단일이면 충분하므로 FRONTEND_URL을 재사용해 단일 값 보장.
