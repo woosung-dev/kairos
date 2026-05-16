@@ -241,6 +241,8 @@ async def test_semantic_cache_find_and_hit_count(integration_session):
     hit = await repo.find_similar_cache(
         question_embedding=_make_vec(seed=10),
         workspace_id=workspace_id,
+        requester_user_id=uuid.uuid4(),
+        requester_role="owner",  # admin/owner 는 visibility 우회 — 본 테스트는 hit 자체 검증
         threshold=0.90,  # 자기 자신은 ~1.0
     )
     assert hit is not None
@@ -254,6 +256,8 @@ async def test_semantic_cache_find_and_hit_count(integration_session):
     hit_again = await repo.find_similar_cache(
         question_embedding=_make_vec(seed=10),
         workspace_id=workspace_id,
+        requester_user_id=uuid.uuid4(),
+        requester_role="owner",
         threshold=0.90,
     )
     assert hit_again is not None
