@@ -266,10 +266,17 @@ class EmbeddingRepository:
         self,
         question_embedding: list[float],
         workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID,
+        requester_role: str,
         project_id: uuid.UUID | None = None,
         threshold: float = 0.93,
     ) -> dict | None:
-        """시맨틱 캐시 검색. similarity >= threshold → HIT (HNSW halfvec, Sprint 16 ADR-020)."""
+        """시맨틱 캐시 검색. similarity >= threshold → HIT (HNSW halfvec, Sprint 16 ADR-020).
+
+        BL-041: cache hit 시 sources 의 chunk 들 중 하나라도 requester 가 visibility
+        규칙상 접근 불가하면 cache miss 처리 → 데이터 누출 차단. admin 이 만든
+        cache 가 비-멤버 hit 시 private project 노출되던 ISSUE-040 후속 fix.
+        """
         # I-21: 트랜잭션 진입 시 SET LOCAL ef_search/iterative_scan/max_scan_tuples
         await _apply_hnsw_session_params(self.session)
 
@@ -293,13 +300,72 @@ class EmbeddingRepository:
 
         result = await self.session.execute(query, params)
         row = result.first()
-        if row:
-            await self.session.execute(
-                text("UPDATE semantic_caches SET hit_count = hit_count + 1 WHERE id = :id"),
-                {"id": str(row._mapping["id"])},
-            )
-            return dict(row._mapping)
-        return None
+        if not row:
+            return None
+
+        # BL-041: cache hit 시 sources visibility 검증.
+        # admin/owner 는 바로 통과 — 모든 visibility 접근 가능.
+        if requester_role not in ("admin", "owner"):
+            sources = row._mapping["sources"] or []
+            chunk_ids = [s["id"] for s in sources if isinstance(s, dict) and "id" in s]
+            if chunk_ids and not await self._all_chunks_visible(
+                chunk_ids, requester_user_id
+            ):
+                # 누출 위험 — cache miss 처리. hit_count 증가도 skip.
+                return None
+
+        await self.session.execute(
+            text("UPDATE semantic_caches SET hit_count = hit_count + 1 WHERE id = :id"),
+            {"id": str(row._mapping["id"])},
+        )
+        return dict(row._mapping)
+
+    async def _all_chunks_visible(
+        self,
+        chunk_ids: list[str],
+        requester_user_id: uuid.UUID,
+    ) -> bool:
+        """BL-041: cache sources 의 모든 chunk 가 requester 에게 visibility 통과하는지.
+
+        한 chunk 라도 fail → False 반환 → 호출자가 cache miss 처리.
+        visibility 규칙은 _visibility_filter_sql 와 동일 (ADR-014):
+        - chunk.project_id IS NULL → 통과
+        - project.visibility = 'public' → 통과
+        - project.visibility = 'draft' AND created_by_id = requester → 통과
+        - project.visibility = 'private' AND ProjectMember 매핑 → 통과
+        """
+        if not chunk_ids:
+            return True
+
+        # 위반 chunk 1개라도 있는지 — anti-join 으로 1 round-trip 처리.
+        # 위반 정의: project_id 있고, visibility 규칙 통과 안 함.
+        query = text("""
+            SELECT 1 FROM embedding_chunks ec
+            WHERE ec.id = ANY(:chunk_ids)
+              AND ec.project_id IS NOT NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM projects p
+                WHERE p.id = ec.project_id
+                  AND (
+                    p.visibility = 'public'
+                    OR (p.visibility = 'draft' AND p.created_by_id = :req_uid)
+                    OR (p.visibility = 'private' AND EXISTS (
+                      SELECT 1 FROM project_members pm
+                      WHERE pm.project_id = p.id AND pm.user_id = :req_uid
+                    ))
+                  )
+              )
+            LIMIT 1
+        """)
+        result = await self.session.execute(
+            query,
+            {
+                "chunk_ids": [str(cid) for cid in chunk_ids],
+                "req_uid": str(requester_user_id),
+            },
+        )
+        violation = result.first()
+        return violation is None
 
     async def save_cache(self, cache: SemanticCache) -> None:
         """캐시 항목 저장."""

@@ -46,9 +46,13 @@ class RagService:
         embeddings = await self.embedding_service.generate_embeddings([question])
         question_embedding = embeddings[0]
 
-        # [2] Semantic Cache 확인
+        # [2] Semantic Cache 확인 — BL-041: requester visibility 검증 포함
         cache_hit = await self.embedding_repo.find_similar_cache(
-            question_embedding, workspace_id, project_id
+            question_embedding,
+            workspace_id,
+            requester_user_id=requester_user_id,
+            requester_role=requester_role,
+            project_id=project_id,
         )
         if cache_hit:
             yield {
