@@ -938,31 +938,19 @@ Cloud Run + Neon Postgres 환경에서 BE 인스턴스 cold start 시:
 
 ---
 
-## BL-029 — rag/pipeline_service.py SSE error 공용 helper
+## BL-029 ✅ RESOLVED (Sprint 18, qa-fix-bl029-rag-sse-helper) — rag/pipeline_service.py SSE error 공용 helper
 
 **도메인:** backend / rag
-**근거:** Sprint 18 PR-C2 분석. RagPipelineService 87줄 중 33줄이 visibility 검증 + SSE error yield + done yield 반복. ADR-014 옵션 A 로 도입됐으나 yield 패턴이 3회 동일 (project 부재 / draft 작성자 미스 / private 멤버 아님).
 
-**문제:**
-SSE error event yield 보일러플레이트 3중 중복. error 메시지만 다름.
+**해결:** 2 helper 추출.
+- `_sse_error_done(message: str) -> tuple[dict, dict]` — error + done 이벤트 쌍 한 번에 (모듈 레벨 함수)
+- `_check_project_access()` 메서드 — find/draft/private 3 분기를 하나의 `str | None` 반환 헬퍼로 통합
 
-**해결:**
-```python
-def _yield_error(message: str) -> AsyncGenerator[dict, None]:
-    yield {"event": "error", "data": json.dumps({"message": message}, ensure_ascii=False)}
-    yield {"event": "done", "data": json.dumps({"cached": False, "sourceCount": 0})}
-```
-3 yield 블록 → 1 호출.
+3 yield 블록 (각 8 줄) → 1 호출 + for-yield 2 줄. 본문 87 줄 → 96 줄 (helper 분리로 net +9 줄이지만 응집도 ↑, ADR-014 옵션 A 검증 정합 확보).
 
-**예상 LOC delta:** −30 (현 87 → ~55).
+**테스트 추가:** `tests/rag/test_pipeline_service.py` 9 케이스 — helper + 7 visibility 시나리오 (admin 우회 / project 부재 / draft 미작성자 / private 미멤버 / private 멤버 OK / public OK / project_id 없음).
 
-**Risk:** 🟢 낮음 — 동작 동등.
-
-**우선순위:** ★★☆☆☆
-
-**Sprint 묶음:** 단독.
-
-**근거:** Sprint 18 PR-C2 skip 시 재평가 (헌법 D-3 부채 매핑).
+**근거:** Sprint 18 BL-029 follow-up.
 
 ---
 
@@ -994,32 +982,20 @@ def _yield_error(message: str) -> AsyncGenerator[dict, None]:
 
 ---
 
-## BL-031 — ErrorBoundary 도메인별 page-level 점진 도입
+## BL-031 ✅ RESOLVED (Sprint 18, qa-fix-bl031-domain-error-boundaries) — ErrorBoundary 도메인별 page-level 도입
 
 **도메인:** frontend / reliability
-**근거:** Sprint 18 PR-F2 에서 `app/(app)/error.tsx` + `loading.tsx` group-level 1개만 도입. 도메인별 (`projects/[id]`, `meetings/[id]`, `inbox/`, `memory/`, `search/`) page-level 도입은 후속.
 
-**문제:**
-group-level fallback 만 있으면 한 도메인 에러가 전체 (app) area 리렌더. 도메인별 fallback 으로 격리 가능.
+**해결:** 5 도메인 error.tsx 신설 — 한 도메인 에러가 (app) 전체로 번지지 않도록 격리.
+- `app/(app)/projects/[id]/error.tsx` — 프로젝트 권한/삭제 fallback + "대시보드로" 이탈 CTA
+- `app/(app)/meetings/[id]/error.tsx` — STT/AI 처리 중 폴링 실패 fallback + "대시보드로"
+- `app/(app)/inbox/error.tsx` — AI classify 서버 일시 장애 fallback
+- `app/(app)/memory/error.tsx` — recall/promote 지연 fallback + "이미 저장된 메모는 안전" 안내
+- `app/(app)/search/error.tsx` — RAG 임베딩 검색 장애 fallback + 키워드 단순화 안내
 
-**해결:**
-- `app/(app)/projects/[id]/error.tsx` 신설
-- `app/(app)/meetings/[id]/error.tsx`
-- `app/(app)/inbox/error.tsx`
-- `app/(app)/memory/error.tsx`
-- `app/(app)/search/error.tsx`
+각 파일은 `reset()` + `digest` 표시 + 도메인 아이콘 (📁🎙️📥🧠🔎). group-level (`(app)/error.tsx`) 는 fallback-of-fallback 으로 유지.
 
-각각 도메인 특화 fallback 메시지 + reset 핸들러.
-
-**예상 LOC delta:** +200 (5 파일 × ~40줄).
-
-**Risk:** 🟢 낮음.
-
-**우선순위:** ★★☆☆☆.
-
-**Sprint 묶음:** 단독 또는 frontend QA sprint 묶음.
-
-**근거:** Sprint 18 PR-F2 후속.
+**근거:** Sprint 18 BL-031 follow-up.
 
 ---
 
@@ -1235,44 +1211,40 @@ group-level fallback 만 있으면 한 도메인 에러가 전체 (app) area 리
 
 ---
 
-## BL-043
-
-**제목**: meeting-upload e2e 가 CI 에서 무거움 (Whisper + R2 + ffmpeg) — nightly job 으로 분리
+## BL-043 ✅ PARTIAL RESOLVED — meeting-upload e2e nightly + R2 cleanup script
 
 **도메인**: ci / e2e
 
-**증상**: `frontend/e2e/tests/meeting-upload.spec.ts` 가 매 PR e2e 마다 OpenAI Whisper API + R2 prod bucket + ffmpeg full chain 호출. 비용 + R2 객체 누적 + 매 CI 5분 더.
+**해결 (PR #69)**: `.github/workflows/nightly-e2e.yml` cron 으로 heavy spec 분리.
 
-**현 처리**: `E2E_RUN_HEAVY=true` 환경에서만 실행 (PR #67). CI default skip.
+**해결 (Sprint 18, qa-fix-r2-cleanup-script)**: R2 nightly cleanup script + workflow.
+- `backend/scripts/r2_cleanup.py` — aioboto3 비동기, uploads/ prefix 의 N 일 이상 객체 dry run/--delete
+- `.github/workflows/r2-cleanup.yml` — workflow_dispatch 수동 트리거 전용 (cron 은 사용자 검증 후)
+- 안전 기본값: DRY RUN, max-keys 10000, prefix uploads/
 
-**해결 방향**:
-- `.github/workflows/nightly-e2e.yml` 신설 — cron 으로 main 에서 heavy spec 실행
-- R2 객체 nightly cleanup script
-- 또는 fake Whisper response mock (정합성 손실)
+**잔여**: cron 자동화 (사용자 검증 후 추가). fake Whisper response mock 은 별도 결정.
 
-**우선순위**: ★★☆☆☆ (P2 — full pipeline regression coverage 부분 손실 회복)
-
-**근거**: Sprint 17 closeout, PR #67.
+**근거**: Sprint 17 closeout, PR #67/#69 + Sprint 18 R2 cleanup.
 
 ---
 
-## BL-044
+## BL-044 — RESOLVED (Sprint 18, qa-fix-bl044-source-upload)
 
 **제목**: SourceAddModal 의 attachment 실제 업로드 구현 — toast-only placeholder
 
 **도메인**: frontend / `features/upload/components/source-add-modal.tsx`
 
-**증상**: file / url / paste 3 탭의 handleSubmit 이 toast 만 띄우고 실제 API 호출 없음. PRD 의 "자료 업로드" 기능 사용자 face 누락.
+**해결**: 새 BE 도메인 신설 대신 기존 notes / meetings API 재사용:
+- **paste 탭** → `useCreateNote` + tiptap 문서 (제목 옵션, 본문 textarea → paragraph 노드)
+- **url 탭** → `useCreateNote` + URL 링크 마크 + 선택 메모. 호스트명 자동 추출하여 노트 제목 사용
+- **file 탭** — 형식별 분기:
+  - 오디오/비디오 (`audio/*` / `video/*`) → `usePresignedUpload` + `useCreateMeeting` → STT 파이프라인 (기존 /new Upload 와 동일)
+  - 텍스트 파일 (.txt/.md, `text/*`) → `file.text()` → `useCreateNote`
+  - 기타 (PDF/이미지/doc) → "곧 지원될 예정" toast (BL-044 후속)
 
-**해결 방향**:
-- BE 에 attachment / source 도메인 신설 (또는 meetings 도메인 확장)
-- presigned URL pattern 재사용 (현 meeting upload 와 동일)
-- DB 모델 추가 (source / attachment table)
-- FE handleSubmit 을 useCreateSource 등으로 교체
+**근거 (취소된 원안)**: 새 BE source 도메인 + alembic 신설은 큰 scope. 실제 사용자 face 는 메모로 적재되면 충분 — notes 가 워크스페이스 단위 자료 보관소 역할을 이미 수행. PDF/이미지는 후속 BL 으로 분리.
 
-**우선순위**: ★★★☆☆ (P1 — 실제 사용자 워크플로우 누락, 큰 scope)
-
-**근거**: Sprint 17 QA, /new attachment placeholder.
+**잔여 후속**: PDF/이미지/docx 파싱 (텍스트 추출 후 note 적재) 별도 BL 등재 필요 시 추가.
 
 ---
 

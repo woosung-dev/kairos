@@ -75,3 +75,48 @@ async def test_role_checker_rejects_non_member():
                 session=AsyncMock(),
             )
     assert exc_info.value.status_code == 403
+
+
+# ──────────────────────────────────────────────────────────────────────
+# 4 × 4 RBAC 매트릭스 — fence-post 회귀 가드 (FE store.test.ts 와 정합)
+# ──────────────────────────────────────────────────────────────────────
+
+ROLES = ["owner", "admin", "member", "viewer"]
+EXPECTED_MATRIX: dict[str, dict[str, bool]] = {
+    # current: { required: allowed? }
+    "owner": {"owner": True, "admin": True, "member": True, "viewer": True},
+    "admin": {"owner": False, "admin": True, "member": True, "viewer": True},
+    "member": {"owner": False, "admin": False, "member": True, "viewer": True},
+    "viewer": {"owner": False, "admin": False, "member": False, "viewer": True},
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("current_role", ROLES)
+@pytest.mark.parametrize("required_role", ROLES)
+async def test_rbac_matrix_full_coverage(current_role: str, required_role: str):
+    """16 cell 매트릭스 전수 — viewer/member/admin/owner 각각 4 요구 권한."""
+    checker = RoleChecker(required_role)
+    mock_member = MagicMock(spec=WorkspaceMember)
+    mock_member.role = current_role
+    expected_allowed = EXPECTED_MATRIX[current_role][required_role]
+
+    with patch("src.auth.rbac.WorkspaceRepository") as MockRepo:
+        instance = MockRepo.return_value
+        instance.find_member = AsyncMock(return_value=mock_member)
+
+        if expected_allowed:
+            result = await checker(
+                workspace_id=uuid.uuid4(),
+                current_user=MagicMock(id=uuid.uuid4()),
+                session=AsyncMock(),
+            )
+            assert result is mock_member
+        else:
+            with pytest.raises(HTTPException) as exc_info:
+                await checker(
+                    workspace_id=uuid.uuid4(),
+                    current_user=MagicMock(id=uuid.uuid4()),
+                    session=AsyncMock(),
+                )
+            assert exc_info.value.status_code == 403

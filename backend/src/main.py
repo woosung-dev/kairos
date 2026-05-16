@@ -1,9 +1,13 @@
 import logging
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.common.database import get_async_session
 
 from src.actions.router import router as actions_router
 from src.auth.router import router as auth_router
@@ -116,4 +120,23 @@ app.include_router(invite_public_router)
 
 @app.get("/api/v1/health")
 async def health_check():
+    """Liveness probe — uvicorn 가 응답하면 OK. DB 검증은 /api/v1/ready."""
     return {"status": "ok", "version": "0.1.0"}
+
+
+@app.get("/api/v1/ready")
+async def readiness_check(session: AsyncSession = Depends(get_async_session)):
+    """Readiness probe — DB connectivity 포함. Cloud Run startup probe 대상.
+
+    BL-034 (asyncpg pool_pre_ping) 효과 검증 동시 가능 — SELECT 1 으로
+    실제 pool checkout + ping 확인.
+    """
+    try:
+        result = await session.execute(text("SELECT 1"))
+        result.scalar_one()
+        return {"status": "ready", "db": "ok", "version": "0.1.0"}
+    except Exception as exc:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "degraded", "db": f"error: {type(exc).__name__}"},
+        )

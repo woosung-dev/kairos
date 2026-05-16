@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, prod]
   pull_request:
-    branches: [main]
+    branches: [main, qa-fix]
 
 jobs:
   backend-test:
@@ -55,6 +55,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Unit tests (vitest)
+        run: pnpm test
 
       - name: Build (includes type check)
         run: pnpm build
