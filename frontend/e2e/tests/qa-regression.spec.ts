@@ -22,27 +22,48 @@ test.describe("Sprint 17 QA regression 모음", () => {
       if (msg.type() === "error") consoleErrors.push(msg.text());
     });
 
-    // 사이드바에서 첫 프로젝트 링크 진입 (link href 기반).
-    // 대시보드에서 시작 — 사이드바 프로젝트 list 로드 대기.
+    // local BE 환경 (CI) 에서는 sidebar 가 비어있을 수 있으므로 API 로
+    // 직접 project 1개 생성한 뒤 /projects/{id} 진입.
     await page.goto("/dashboard");
     await expect(page.getByRole("heading", { name: "오늘의 Kairos" })).toBeVisible({
       timeout: 15_000,
     });
 
-    // 사이드바의 프로젝트 링크 한 개 클릭 (첫번째).
-    const firstProjectLink = page
-      .getByRole("link")
-      .filter({ hasText: /^[🚀💡📋]/ })
-      .first();
-    await firstProjectLink.waitFor({ timeout: 10_000 });
-    await firstProjectLink.click();
+    // 1. Clerk 토큰 + activeWorkspaceId 확보 (페이지 안에서 fetch)
+    const ctx = await page.evaluate(async () => {
+      // @ts-ignore — Clerk SDK 가 window 에 주입
+      const token = await window.Clerk?.session?.getToken();
+      const stored = window.localStorage.getItem("kairos-workspace");
+      const parsed = stored ? JSON.parse(stored) : null;
+      const wid = parsed?.state?.activeWorkspaceId;
+      return { token, wid };
+    });
+    expect(ctx.token).toBeTruthy();
+    expect(ctx.wid).toBeTruthy();
 
-    // 프로젝트 detail 페이지 URL 패턴.
-    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/, { timeout: 10_000 });
+    // 2. project 1개 생성 (API 직접) — 환경 의존성 제거
+    const apiUrl = process.env.E2E_API_URL ?? "http://localhost:8000";
+    const createRes = await page.request.post(
+      `${apiUrl}/api/v1/workspaces/${ctx.wid}/projects`,
+      {
+        headers: { Authorization: `Bearer ${ctx.token}`, "Content-Type": "application/json" },
+        data: { title: "ISSUE-009 e2e", description: "regression test" },
+      },
+    );
+    expect(createRes.ok()).toBeTruthy();
+    const project = await createRes.json();
+    expect(project.id).toBeTruthy();
+
+    // 3. /projects/{id} 직접 진입 — sidebar 의존 없음
+    await page.goto(`/projects/${project.id}`);
 
     // ErrorBoundary 의 "문제가 발생했습니다" 텍스트 미노출.
-    const errorBoundary = page.getByText("문제가 발생했습니다");
-    await expect(errorBoundary).toHaveCount(0);
+    await expect(page.getByText("문제가 발생했습니다")).toHaveCount(0);
+
+    // 페이지 안정 대기 (React Query mount + 첫 fetch)
+    await page
+      .waitForLoadState("networkidle", { timeout: 15_000 })
+      .catch(() => {});
 
     // 핵심: hooks order 위반 에러 부재.
     const hooksOrderErrors = consoleErrors.filter((m) =>
