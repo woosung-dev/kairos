@@ -938,31 +938,19 @@ Cloud Run + Neon Postgres 환경에서 BE 인스턴스 cold start 시:
 
 ---
 
-## BL-029 — rag/pipeline_service.py SSE error 공용 helper
+## BL-029 ✅ RESOLVED (Sprint 18, qa-fix-bl029-rag-sse-helper) — rag/pipeline_service.py SSE error 공용 helper
 
 **도메인:** backend / rag
-**근거:** Sprint 18 PR-C2 분석. RagPipelineService 87줄 중 33줄이 visibility 검증 + SSE error yield + done yield 반복. ADR-014 옵션 A 로 도입됐으나 yield 패턴이 3회 동일 (project 부재 / draft 작성자 미스 / private 멤버 아님).
 
-**문제:**
-SSE error event yield 보일러플레이트 3중 중복. error 메시지만 다름.
+**해결:** 2 helper 추출.
+- `_sse_error_done(message: str) -> tuple[dict, dict]` — error + done 이벤트 쌍 한 번에 (모듈 레벨 함수)
+- `_check_project_access()` 메서드 — find/draft/private 3 분기를 하나의 `str | None` 반환 헬퍼로 통합
 
-**해결:**
-```python
-def _yield_error(message: str) -> AsyncGenerator[dict, None]:
-    yield {"event": "error", "data": json.dumps({"message": message}, ensure_ascii=False)}
-    yield {"event": "done", "data": json.dumps({"cached": False, "sourceCount": 0})}
-```
-3 yield 블록 → 1 호출.
+3 yield 블록 (각 8 줄) → 1 호출 + for-yield 2 줄. 본문 87 줄 → 96 줄 (helper 분리로 net +9 줄이지만 응집도 ↑, ADR-014 옵션 A 검증 정합 확보).
 
-**예상 LOC delta:** −30 (현 87 → ~55).
+**테스트 추가:** `tests/rag/test_pipeline_service.py` 9 케이스 — helper + 7 visibility 시나리오 (admin 우회 / project 부재 / draft 미작성자 / private 미멤버 / private 멤버 OK / public OK / project_id 없음).
 
-**Risk:** 🟢 낮음 — 동작 동등.
-
-**우선순위:** ★★☆☆☆
-
-**Sprint 묶음:** 단독.
-
-**근거:** Sprint 18 PR-C2 skip 시 재평가 (헌법 D-3 부채 매핑).
+**근거:** Sprint 18 BL-029 follow-up.
 
 ---
 
