@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { trackError } from "@/lib/track-error";
 
 export default function MemoryError({
   error,
@@ -11,8 +12,7 @@ export default function MemoryError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.error("[memory error boundary]", error);
+    trackError(error, { scope: "memory", digest: error.digest });
   }, [error]);
 
   return (
