@@ -1211,24 +1211,20 @@ Cloud Run + Neon Postgres 환경에서 BE 인스턴스 cold start 시:
 
 ---
 
-## BL-043
-
-**제목**: meeting-upload e2e 가 CI 에서 무거움 (Whisper + R2 + ffmpeg) — nightly job 으로 분리
+## BL-043 ✅ PARTIAL RESOLVED — meeting-upload e2e nightly + R2 cleanup script
 
 **도메인**: ci / e2e
 
-**증상**: `frontend/e2e/tests/meeting-upload.spec.ts` 가 매 PR e2e 마다 OpenAI Whisper API + R2 prod bucket + ffmpeg full chain 호출. 비용 + R2 객체 누적 + 매 CI 5분 더.
+**해결 (PR #69)**: `.github/workflows/nightly-e2e.yml` cron 으로 heavy spec 분리.
 
-**현 처리**: `E2E_RUN_HEAVY=true` 환경에서만 실행 (PR #67). CI default skip.
+**해결 (Sprint 18, qa-fix-r2-cleanup-script)**: R2 nightly cleanup script + workflow.
+- `backend/scripts/r2_cleanup.py` — aioboto3 비동기, uploads/ prefix 의 N 일 이상 객체 dry run/--delete
+- `.github/workflows/r2-cleanup.yml` — workflow_dispatch 수동 트리거 전용 (cron 은 사용자 검증 후)
+- 안전 기본값: DRY RUN, max-keys 10000, prefix uploads/
 
-**해결 방향**:
-- `.github/workflows/nightly-e2e.yml` 신설 — cron 으로 main 에서 heavy spec 실행
-- R2 객체 nightly cleanup script
-- 또는 fake Whisper response mock (정합성 손실)
+**잔여**: cron 자동화 (사용자 검증 후 추가). fake Whisper response mock 은 별도 결정.
 
-**우선순위**: ★★☆☆☆ (P2 — full pipeline regression coverage 부분 손실 회복)
-
-**근거**: Sprint 17 closeout, PR #67.
+**근거**: Sprint 17 closeout, PR #67/#69 + Sprint 18 R2 cleanup.
 
 ---
 
