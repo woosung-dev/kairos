@@ -1075,7 +1075,7 @@ group-level fallback 만 있으면 한 도메인 에러가 전체 (app) area 리
 
 ---
 
-## BL-034
+## BL-034 ✅ RESOLVED (PR #41, 2026-05-15)
 
 **제목**: asyncpg.InterfaceError "connection is closed" intermittent — Neon pool stale connection
 
@@ -1100,7 +1100,7 @@ group-level fallback 만 있으면 한 도메인 에러가 전체 (app) area 리
 
 ---
 
-## BL-035
+## BL-035 ✅ RESOLVED (PR #43, 2026-05-15)
 
 **제목**: workspace switcher 중복 이름 표시 — 5 duplicate "E2E 테스트 워크스페이스" 구분 불가
 
@@ -1119,7 +1119,7 @@ group-level fallback 만 있으면 한 도메인 에러가 전체 (app) area 리
 
 ---
 
-## BL-036
+## BL-036 ✅ RESOLVED (PR #45, 2026-05-16) — production 효과 측정은 별도
 
 **제목**: 비 dashboard 라우트 sidebar project list 3-6s 지연 로딩
 
@@ -1142,7 +1142,7 @@ group-level fallback 만 있으면 한 도메인 에러가 전체 (app) area 리
 
 ---
 
-## BL-037
+## BL-037 ⚠️ DEFERRED (PR #44 closed by user, 2026-05-15) — DESIGN.md 결정 대기
 
 **제목**: Google Fonts Satoshi 요청 pending → FOIT 가능성
 
@@ -1161,7 +1161,7 @@ group-level fallback 만 있으면 한 도메인 에러가 전체 (app) area 리
 
 ---
 
-## BL-038
+## BL-038 ✅ RESOLVED (PR #42, 2026-05-15)
 
 **제목**: 초대 링크 생성 직후 invite list 미반영 — React Query cache invalidation 누락
 
@@ -1178,7 +1178,7 @@ group-level fallback 만 있으면 한 도메인 에러가 전체 (app) area 리
 
 ---
 
-## BL-039
+## BL-039 ✅ RESOLVED (PR #42, 2026-05-15)
 
 **제목**: /settings 초대 탭에서 member 진입 시 빈 헤더만 노출 — 명시적 권한 에러 메시지 미표시
 
@@ -1194,3 +1194,100 @@ group-level fallback 만 있으면 한 도메인 에러가 전체 (app) area 리
 
 **근거**: Sprint 17 QA, ISSUE-010.
 
+
+---
+
+## BL-040 ✅ RESOLVED (PR #46, 2026-05-16)
+
+**제목**: 글로벌 RAG 쿼리 visibility leak — vector_search / text_search 에 ADR-014 필터 누락
+
+**도메인**: backend / rag + embeddings (security)
+
+**증상**: Member (non-ProjectMember) 가 글로벌 RAG 쿼리 (project_id=None) 시 private project 의 embedding chunks 가 결과 + AI 답변에 포함됨. ADR-014 R-10 위반.
+
+**해결**: `_visibility_filter_sql()` 헬퍼 + vector_search / text_search 에 requester_user_id + requester_role 추가. admin/owner 우회, member/viewer 는 public/draft(creator)/private(ProjectMember) 분기.
+
+**원래 BL 등재 시 ISSUE-040**. Sprint 17 본 세션에서 발견 + 즉시 PR #46 으로 fix.
+
+---
+
+## BL-041 ✅ RESOLVED (PR #54, 2026-05-16)
+
+**제목**: find_similar_cache leak — admin 이 만든 private 포함 cache 가 비-멤버 hit 시 노출
+
+**도메인**: backend / embeddings + rag (security)
+
+**증상**: ISSUE-040 후속 — vector_search 는 가드 적용했지만 semantic_caches 에 저장된 답변/sources 는 cache hit 경로로 누출 가능. 7일 TTL 안 noticeable.
+
+**해결**: find_similar_cache 가 cache hit 시 sources chunks 의 visibility 를 anti-join 으로 검증. 위반 시 cache miss 처리. admin/owner 는 우회 (정책 일관).
+
+---
+
+## BL-042 ✅ RESOLVED (PR #59, 2026-05-16)
+
+**제목**: semantic_caches.max_visibility 컬럼 — BL-041 검증 fast path
+
+**도메인**: backend / embeddings
+
+**증상**: BL-041 fix 가 cache hit 마다 _all_chunks_visible anti-join 1회 실행. public-only cache (대다수) 도 검증 비용 발생.
+
+**해결**: alembic d4e5f6a7b8c9 — semantic_caches.max_visibility (text NOT NULL DEFAULT 'public') 추가. cache 저장 시 sources 의 max visibility 계산. read path 에서 max_visibility='public' 이면 검증 skip (fast path), 그 외 BL-041 anti-join 진행.
+
+---
+
+## BL-043
+
+**제목**: meeting-upload e2e 가 CI 에서 무거움 (Whisper + R2 + ffmpeg) — nightly job 으로 분리
+
+**도메인**: ci / e2e
+
+**증상**: `frontend/e2e/tests/meeting-upload.spec.ts` 가 매 PR e2e 마다 OpenAI Whisper API + R2 prod bucket + ffmpeg full chain 호출. 비용 + R2 객체 누적 + 매 CI 5분 더.
+
+**현 처리**: `E2E_RUN_HEAVY=true` 환경에서만 실행 (PR #67). CI default skip.
+
+**해결 방향**:
+- `.github/workflows/nightly-e2e.yml` 신설 — cron 으로 main 에서 heavy spec 실행
+- R2 객체 nightly cleanup script
+- 또는 fake Whisper response mock (정합성 손실)
+
+**우선순위**: ★★☆☆☆ (P2 — full pipeline regression coverage 부분 손실 회복)
+
+**근거**: Sprint 17 closeout, PR #67.
+
+---
+
+## BL-044
+
+**제목**: SourceAddModal 의 attachment 실제 업로드 구현 — toast-only placeholder
+
+**도메인**: frontend / `features/upload/components/source-add-modal.tsx`
+
+**증상**: file / url / paste 3 탭의 handleSubmit 이 toast 만 띄우고 실제 API 호출 없음. PRD 의 "자료 업로드" 기능 사용자 face 누락.
+
+**해결 방향**:
+- BE 에 attachment / source 도메인 신설 (또는 meetings 도메인 확장)
+- presigned URL pattern 재사용 (현 meeting upload 와 동일)
+- DB 모델 추가 (source / attachment table)
+- FE handleSubmit 을 useCreateSource 등으로 교체
+
+**우선순위**: ★★★☆☆ (P1 — 실제 사용자 워크플로우 누락, 큰 scope)
+
+**근거**: Sprint 17 QA, /new attachment placeholder.
+
+---
+
+## BL-045
+
+**제목**: Satoshi 폰트 정합 — Google Fonts URL 영구 pending, DESIGN.md 결정 필요
+
+**도메인**: frontend / typography
+
+**증상**: BL-037 fix (Fontshare URL 교체) PR #44 가 user 거절로 closed. DESIGN.md 의 의도된 Satoshi 사용 방법이 무엇인지 미정 (Fontshare CDN / self-host / Google Sans 대체).
+
+**현 상태**: globals.css 의 `--font-display: 'Satoshi'` 에 대한 link 가 layout.tsx 에서 Google Fonts 404 → fallback 'sans-serif' 로 렌더.
+
+**해결 방향**: DESIGN.md 검토 + 디자이너 결정 → fix.
+
+**우선순위**: ★☆☆☆☆ (P3 cosmetic, fallback 으로 사용자 체감 영향 작음)
+
+**근거**: Sprint 17 QA, PR #44 close.
