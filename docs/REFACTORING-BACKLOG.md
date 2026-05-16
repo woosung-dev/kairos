@@ -1256,23 +1256,23 @@ group-level fallback 만 있으면 한 도메인 에러가 전체 (app) area 리
 
 ---
 
-## BL-044
+## BL-044 — RESOLVED (Sprint 18, qa-fix-bl044-source-upload)
 
 **제목**: SourceAddModal 의 attachment 실제 업로드 구현 — toast-only placeholder
 
 **도메인**: frontend / `features/upload/components/source-add-modal.tsx`
 
-**증상**: file / url / paste 3 탭의 handleSubmit 이 toast 만 띄우고 실제 API 호출 없음. PRD 의 "자료 업로드" 기능 사용자 face 누락.
+**해결**: 새 BE 도메인 신설 대신 기존 notes / meetings API 재사용:
+- **paste 탭** → `useCreateNote` + tiptap 문서 (제목 옵션, 본문 textarea → paragraph 노드)
+- **url 탭** → `useCreateNote` + URL 링크 마크 + 선택 메모. 호스트명 자동 추출하여 노트 제목 사용
+- **file 탭** — 형식별 분기:
+  - 오디오/비디오 (`audio/*` / `video/*`) → `usePresignedUpload` + `useCreateMeeting` → STT 파이프라인 (기존 /new Upload 와 동일)
+  - 텍스트 파일 (.txt/.md, `text/*`) → `file.text()` → `useCreateNote`
+  - 기타 (PDF/이미지/doc) → "곧 지원될 예정" toast (BL-044 후속)
 
-**해결 방향**:
-- BE 에 attachment / source 도메인 신설 (또는 meetings 도메인 확장)
-- presigned URL pattern 재사용 (현 meeting upload 와 동일)
-- DB 모델 추가 (source / attachment table)
-- FE handleSubmit 을 useCreateSource 등으로 교체
+**근거 (취소된 원안)**: 새 BE source 도메인 + alembic 신설은 큰 scope. 실제 사용자 face 는 메모로 적재되면 충분 — notes 가 워크스페이스 단위 자료 보관소 역할을 이미 수행. PDF/이미지는 후속 BL 으로 분리.
 
-**우선순위**: ★★★☆☆ (P1 — 실제 사용자 워크플로우 누락, 큰 scope)
-
-**근거**: Sprint 17 QA, /new attachment placeholder.
+**잔여 후속**: PDF/이미지/docx 파싱 (텍스트 추출 후 note 적재) 별도 BL 등재 필요 시 추가.
 
 ---
 

@@ -1,7 +1,63 @@
+// 소스 추가 모달 — 4가지 입력 방법 (파일/메모/URL/텍스트) → 기존 notes / meetings API 재사용
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useCreateNote } from "@/features/notes/hooks";
+import { useCreateMeeting } from "@/features/meetings/hooks";
+import { usePresignedUpload } from "@/features/upload/hooks";
+import { useWorkspaceStore } from "@/features/workspaces/store";
+
+/* ── 헬퍼: 일반 텍스트 → tiptap JSON 문서 ── */
+function textToTiptapDoc(text: string): Record<string, unknown> {
+  const trimmed = text.trim();
+  if (!trimmed) return { type: "doc", content: [] };
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: trimmed }],
+      },
+    ],
+  };
+}
+
+/* ── 헬퍼: URL → tiptap 링크 문서 ── */
+function urlToTiptapDoc(url: string, note?: string): Record<string, unknown> {
+  const paragraphs: Array<Record<string, unknown>> = [
+    {
+      type: "paragraph",
+      content: [
+        {
+          type: "text",
+          marks: [{ type: "link", attrs: { href: url } }],
+          text: url,
+        },
+      ],
+    },
+  ];
+  if (note && note.trim()) {
+    paragraphs.push({
+      type: "paragraph",
+      content: [{ type: "text", text: note.trim() }],
+    });
+  }
+  return { type: "doc", content: paragraphs };
+}
+
+/* ── 헬퍼: 파일이 오디오/비디오인지 — STT 파이프라인 진입 분기 ── */
+function isAudioOrVideo(file: File): boolean {
+  return file.type.startsWith("audio/") || file.type.startsWith("video/");
+}
+
+/* ── 헬퍼: 파일이 텍스트 계열인지 — note 적재 분기 ── */
+function isPlainText(file: File): boolean {
+  if (file.type.startsWith("text/")) return true;
+  const lower = file.name.toLowerCase();
+  return lower.endsWith(".txt") || lower.endsWith(".md");
+}
 
 /* ── 입력 방법 타입 ── */
 
@@ -159,8 +215,15 @@ export function SourceAddModal({ isOpen, onClose, onNavigateToMemo }: SourceAddM
 /* ── 파일 업로드 뷰 ── */
 
 function FileUploadView({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const presignedUpload = usePresignedUpload(wid ?? undefined);
+  const createMeeting = useCreateMeeting(wid ?? undefined);
+  const createNote = useCreateNote(wid ?? undefined);
+
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -189,11 +252,46 @@ function FileUploadView({ onClose }: { onClose: () => void }) {
     }
   }
 
-  function handleSubmit() {
-    if (!file) return;
-    toast.success(`"${file.name}" 업로드가 시작되었습니다`);
-    onClose();
+  async function handleSubmit() {
+    if (!file || !wid || isSubmitting) return;
+    setIsSubmitting(true);
+    const baseTitle = file.name.replace(/\.[^/.]+$/, "");
+
+    try {
+      if (isAudioOrVideo(file)) {
+        // 오디오/비디오 → 회의 STT 파이프라인 (presigned upload + create meeting)
+        toast.message("파일 업로드 중...");
+        const fileKey = await presignedUpload.upload(file);
+        const meeting = await createMeeting.mutateAsync({
+          title: baseTitle,
+          fileKey,
+        });
+        toast.success(`"${file.name}" 처리를 시작합니다`);
+        onClose();
+        router.push(`/meetings/${meeting.id}`);
+      } else if (isPlainText(file)) {
+        // 텍스트 파일 (.txt/.md) → 노트 적재
+        const text = await file.text();
+        await createNote.mutateAsync({
+          title: baseTitle,
+          content: textToTiptapDoc(text),
+        });
+        toast.success(`"${file.name}" 메모로 저장됨`);
+        onClose();
+      } else {
+        toast.message(`"${file.name}" 형식은 곧 지원될 예정입니다 (BL-044 후속)`);
+        setIsSubmitting(false);
+        return;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "업로드 실패";
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
+
+  const canSubmit = !!file && !!wid && !isSubmitting;
 
   return (
     <div className="space-y-4">
@@ -234,7 +332,7 @@ function FileUploadView({ onClose }: { onClose: () => void }) {
               파일을 여기에 드래그하거나 클릭하여 선택
             </p>
             <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>
-              오디오, PDF, 문서, 이미지
+              오디오/비디오 → 회의, 텍스트(.txt/.md) → 노트
             </p>
           </>
         )}
@@ -244,17 +342,17 @@ function FileUploadView({ onClose }: { onClose: () => void }) {
       <div className="flex justify-end">
         <button
           onClick={handleSubmit}
-          disabled={!file}
+          disabled={!canSubmit}
           className="px-4 py-2 rounded text-sm font-medium transition-colors"
           style={{
-            background: file ? "var(--accent)" : "var(--surface-active)",
-            color: file ? "var(--background)" : "var(--text-muted)",
+            background: canSubmit ? "var(--accent)" : "var(--surface-active)",
+            color: canSubmit ? "var(--background)" : "var(--text-muted)",
             borderRadius: "var(--radius-sm)",
-            cursor: file ? "pointer" : "not-allowed",
+            cursor: canSubmit ? "pointer" : "not-allowed",
             minHeight: "44px",
           }}
         >
-          업로드
+          {isSubmitting ? "처리 중..." : "업로드"}
         </button>
       </div>
     </div>
@@ -264,13 +362,40 @@ function FileUploadView({ onClose }: { onClose: () => void }) {
 /* ── URL 입력 뷰 ── */
 
 function UrlInputView({ onClose }: { onClose: () => void }) {
+  const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const createNote = useCreateNote(wid ?? undefined);
   const [url, setUrl] = useState("");
+  const [note, setNote] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit() {
-    if (!url.trim()) return;
-    toast.success("URL에서 콘텐츠를 가져오는 중...");
-    onClose();
+  async function handleSubmit() {
+    const trimmed = url.trim();
+    if (!trimmed || !wid || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      // URL parsing: 도메인을 노트 제목으로 사용
+      let host = trimmed;
+      try {
+        host = new URL(trimmed).hostname || trimmed;
+      } catch {
+        // invalid URL - 전체 문자열을 제목으로
+      }
+      await createNote.mutateAsync({
+        title: `🔗 ${host}`,
+        content: urlToTiptapDoc(trimmed, note),
+      });
+      toast.success("URL이 메모로 저장되었습니다");
+      onClose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "저장 실패";
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
+
+  const canSubmit = !!url.trim() && !!wid && !isSubmitting;
 
   return (
     <div className="space-y-4">
@@ -291,20 +416,37 @@ function UrlInputView({ onClose }: { onClose: () => void }) {
           }}
         />
       </div>
+      <div>
+        <label className="block text-xs mb-1.5" style={{ color: "var(--text-secondary)" }}>
+          메모 (선택)
+        </label>
+        <textarea
+          placeholder="URL에 대한 짧은 설명을 남기세요"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={3}
+          className="w-full px-3 py-2 rounded border text-sm bg-transparent outline-none resize-none"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--text-primary)",
+            borderRadius: "var(--radius-sm)",
+          }}
+        />
+      </div>
       <div className="flex justify-end">
         <button
           onClick={handleSubmit}
-          disabled={!url.trim()}
+          disabled={!canSubmit}
           className="px-4 py-2 rounded text-sm font-medium transition-colors"
           style={{
-            background: url.trim() ? "var(--accent)" : "var(--surface-active)",
-            color: url.trim() ? "var(--background)" : "var(--text-muted)",
+            background: canSubmit ? "var(--accent)" : "var(--surface-active)",
+            color: canSubmit ? "var(--background)" : "var(--text-muted)",
             borderRadius: "var(--radius-sm)",
-            cursor: url.trim() ? "pointer" : "not-allowed",
+            cursor: canSubmit ? "pointer" : "not-allowed",
             minHeight: "44px",
           }}
         >
-          가져오기
+          {isSubmitting ? "저장 중..." : "가져오기"}
         </button>
       </div>
     </div>
@@ -314,14 +456,34 @@ function UrlInputView({ onClose }: { onClose: () => void }) {
 /* ── 텍스트 붙여넣기 뷰 ── */
 
 function PasteView({ onClose }: { onClose: () => void }) {
+  const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const createNote = useCreateNote(wid ?? undefined);
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit() {
-    if (!text.trim()) return;
-    toast.success("텍스트가 저장되었습니다");
-    onClose();
+  async function handleSubmit() {
+    const trimmedText = text.trim();
+    if (!trimmedText || !wid || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      const noteTitle = title.trim() || trimmedText.slice(0, 40);
+      await createNote.mutateAsync({
+        title: noteTitle,
+        content: textToTiptapDoc(trimmedText),
+      });
+      toast.success("텍스트가 저장되었습니다");
+      onClose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "저장 실패";
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
+
+  const canSubmit = !!text.trim() && !!wid && !isSubmitting;
 
   return (
     <div className="space-y-4">
@@ -362,17 +524,17 @@ function PasteView({ onClose }: { onClose: () => void }) {
       <div className="flex justify-end">
         <button
           onClick={handleSubmit}
-          disabled={!text.trim()}
+          disabled={!canSubmit}
           className="px-4 py-2 rounded text-sm font-medium transition-colors"
           style={{
-            background: text.trim() ? "var(--accent)" : "var(--surface-active)",
-            color: text.trim() ? "var(--background)" : "var(--text-muted)",
+            background: canSubmit ? "var(--accent)" : "var(--surface-active)",
+            color: canSubmit ? "var(--background)" : "var(--text-muted)",
             borderRadius: "var(--radius-sm)",
-            cursor: text.trim() ? "pointer" : "not-allowed",
+            cursor: canSubmit ? "pointer" : "not-allowed",
             minHeight: "44px",
           }}
         >
-          저장
+          {isSubmitting ? "저장 중..." : "저장"}
         </button>
       </div>
     </div>
