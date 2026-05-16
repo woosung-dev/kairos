@@ -76,7 +76,11 @@ jobs:
           service: ${{ env.SERVICE_NAME }}
           region: ${{ env.GCP_REGION }}
           image: ${{ env.IMAGE_URI }}
-          flags: --allow-unauthenticated --port=8000 --memory=1Gi --min-instances=0 --max-instances=3
+          # --cpu-boost: cold start 시 CPU 2x 부스트 (asyncpg pool init + alembic 빠른 시작)
+          # --no-cpu-throttling: 응답 외 시간에도 CPU 유지 — startup probe 통과 후 idle 안정
+          # 비용 영향 0 — min-instances=0 유지 (scale to zero), instance 활성 시 부스트만.
+          # BL-FIX(cold-start): 503 e2e 실패 회귀 방지 — deploy 직후 외 cold start 도 통과 보장
+          flags: --allow-unauthenticated --port=8000 --memory=1Gi --min-instances=0 --max-instances=3 --cpu-boost --no-cpu-throttling
           # CORS_ORIGINS: deploy-cloudrun@v2의 env_vars: 형식이 콤마를 변수 구분자로
           # 해석하므로 multi-URL(GH Secret의 "url1,url2")이 깨진다. prod는 vercel URL
           # 단일이면 충분하므로 FRONTEND_URL을 재사용해 단일 값 보장.
