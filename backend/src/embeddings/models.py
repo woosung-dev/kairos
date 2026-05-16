@@ -61,5 +61,8 @@ class SemanticCache(SQLModel, table=True):
     answer: str = Field(sa_column=Column(Text, nullable=False))
     sources: list = Field(default_factory=list, sa_type=JSON)
     hit_count: int = Field(default=0)
+    # BL-042: 캐시된 sources 중 가장 제한적인 visibility (public < draft < private).
+    # find_similar_cache 의 fast path — public 은 visibility 검증 skip 가능.
+    max_visibility: str = Field(default="public")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: datetime = Field(default_factory=_default_expires_at)
