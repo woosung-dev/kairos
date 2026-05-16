@@ -288,7 +288,7 @@ class EmbeddingRepository:
             params["pid"] = str(project_id)
 
         query = text(f"""
-            SELECT id, answer, sources, hit_count,
+            SELECT id, answer, sources, hit_count, max_visibility,
                    1 - (question_embedding <=> CAST(:qvec AS halfvec)) AS similarity
             FROM semantic_caches
             WHERE {filters}
@@ -303,9 +303,13 @@ class EmbeddingRepository:
         if not row:
             return None
 
-        # BL-041: cache hit 시 sources visibility 검증.
-        # admin/owner 는 바로 통과 — 모든 visibility 접근 가능.
-        if requester_role not in ("admin", "owner"):
+        # BL-041 + BL-042: cache hit 시 sources visibility 검증.
+        # - admin/owner : 모든 visibility 통과
+        # - max_visibility = 'public' : fast path (모든 사용자 통과)
+        # - 그 외 : _all_chunks_visible anti-join 으로 chunk 별 검증
+        is_admin = requester_role in ("admin", "owner")
+        max_vis = row._mapping.get("max_visibility", "public")
+        if not is_admin and max_vis != "public":
             sources = row._mapping["sources"] or []
             chunk_ids = [s["id"] for s in sources if isinstance(s, dict) and "id" in s]
             if chunk_ids and not await self._all_chunks_visible(
@@ -319,6 +323,38 @@ class EmbeddingRepository:
             {"id": str(row._mapping["id"])},
         )
         return dict(row._mapping)
+
+    async def compute_max_visibility(self, chunk_ids: list[str]) -> str:
+        """BL-042: sources 의 chunk 들이 참조하는 project 들 중 가장 제한적인
+        visibility 반환 ('public' < 'draft' < 'private').
+
+        cache 저장 시 호출 — find_similar_cache 의 fast path 인덱스용.
+        chunk.project_id IS NULL 또는 chunk 자체 없으면 'public' (대응 안 함).
+        """
+        if not chunk_ids:
+            return "public"
+        query = text("""
+            SELECT MAX(
+              CASE p.visibility
+                WHEN 'private' THEN 3
+                WHEN 'draft' THEN 2
+                WHEN 'public' THEN 1
+                ELSE 0
+              END
+            ) AS rank
+            FROM embedding_chunks ec
+            JOIN projects p ON p.id = ec.project_id
+            WHERE ec.id = ANY(:chunk_ids)
+        """)
+        result = await self.session.execute(
+            query, {"chunk_ids": [str(cid) for cid in chunk_ids]}
+        )
+        rank = result.scalar_one_or_none()
+        if rank is None or rank <= 1:
+            return "public"
+        if rank == 2:
+            return "draft"
+        return "private"
 
     async def _all_chunks_visible(
         self,
