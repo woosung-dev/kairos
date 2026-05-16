@@ -114,6 +114,26 @@ jobs:
       - name: Wait for app
         run: npx wait-on http://localhost:3003/ -t 60000
 
+      # Cloud Run BE 가 scale-to-zero 후 cold start 시 503 일관 — 최대 3분 warm-up.
+      # deploy.yml 의 --cpu-boost 와 보강 가드. 503 으로 매 PR 머지 차단되는
+      # 회귀 방지. BE 안 깨어나면 명시 실패 + 재실행 안내.
+      - name: Warm up Cloud Run backend (503 cold start guard)
+        env:
+          E2E_API_URL: ${{ secrets.E2E_API_URL }}
+        run: |
+          for i in $(seq 1 18); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$E2E_API_URL/api/v1/health" || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ BE warm (attempt $i, status=$STATUS)"
+              exit 0
+            fi
+            echo "⏳ attempt $i: status=$STATUS, retry in 10s"
+            sleep 10
+          done
+          echo "❌ BE failed to warm after 3 minutes — Cloud Run cold start hang."
+          echo "워크어라운드: 본 job 을 ~5분 후 재실행 (BE 다음 deploy 시 warm)."
+          exit 1
+
       - name: Run Playwright tests
         run: pnpm e2e
         env:
