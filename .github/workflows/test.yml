@@ -72,15 +72,102 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     # Clerk testing credentials 설정된 환경에서만 실행 (secrets 등록 이후 활성화).
-    # 미설정 상태에서는 조기 exit 하여 CI 붉은줄 방지.
     if: ${{ vars.E2E_ENABLED == 'true' }}
     needs: frontend-build
-    defaults:
-      run:
-        working-directory: frontend
+
+    # Postgres + pgvector + halfvec (pg16) service container — local BE 백킹.
+    # prod Cloud Run BE 의존 제거 (cold start 503 회귀 차단).
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: kairos
+          POSTGRES_PASSWORD: kairos
+          POSTGRES_DB: kairos_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kairos"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # local BE URL — Playwright + Next.js build 모두 사용
+      LOCAL_API_URL: http://localhost:8000
+      LOCAL_DATABASE_URL: postgresql+asyncpg://kairos:kairos@localhost:5432/kairos_e2e
+
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
+      # ── pgvector 확장 활성화 (CREATE EXTENSION vector + pg_trgm) ─────
+      - name: Enable Postgres extensions
+        run: |
+          PGPASSWORD=kairos psql -h localhost -U kairos -d kairos_e2e -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          PGPASSWORD=kairos psql -h localhost -U kairos -d kairos_e2e -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+
+      # ── 백엔드 (uvicorn) 부팅 ─────────────────────────────────────────
+      - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f  # v4
+        with:
+          version: "latest"
+
+      - name: Install backend deps
+        working-directory: backend
+        run: uv sync
+
+      - name: Run alembic upgrade head
+        working-directory: backend
+        # alembic env.py 가 src.core.config.get_settings 호출 → pydantic Settings 의
+        # 모든 SecretStr 필드 (Clerk/AI/R2) 필요. DATABASE_URL 만으론 ValidationError.
+        env:
+          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
+          APP_ENV: test
+          CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+          CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: uv run alembic upgrade head
+
+      - name: Start backend (uvicorn background)
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
+          APP_ENV: test
+          CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+          CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          CORS_ORIGINS: http://localhost:3003
+          FRONTEND_URL: http://localhost:3003
+        run: |
+          uv run uvicorn src.main:app --host 0.0.0.0 --port 8000 > /tmp/backend.log 2>&1 &
+          echo "Backend PID $!"
+
+      - name: Wait for backend /health
+        run: |
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/health || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Backend ready (attempt $i)"
+              exit 0
+            fi
+            echo "⏳ attempt $i: status=$STATUS, retry in 2s"
+            sleep 2
+          done
+          echo "❌ Backend failed to start"
+          echo "--- backend log ---"
+          cat /tmp/backend.log
+          exit 1
+
+      # ── 프론트엔드 (Next.js) 빌드 + 부팅 ───────────────────────────────
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa  # v4
         with:
           version: 9
@@ -91,37 +178,50 @@ jobs:
           cache: "pnpm"
           cache-dependency-path: frontend/pnpm-lock.yaml
 
-      - name: Install dependencies
+      - name: Install frontend deps
+        working-directory: frontend
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
+        working-directory: frontend
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Build Next.js app
-        run: pnpm build
+        working-directory: frontend
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
-          NEXT_PUBLIC_API_URL: ${{ secrets.E2E_API_URL }}
+          NEXT_PUBLIC_API_URL: ${{ env.LOCAL_API_URL }}
           CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+        run: pnpm build
 
       - name: Start Next.js app
-        run: pnpm start -p 3003 &
+        working-directory: frontend
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
-          NEXT_PUBLIC_API_URL: ${{ secrets.E2E_API_URL }}
+          NEXT_PUBLIC_API_URL: ${{ env.LOCAL_API_URL }}
           CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+        run: pnpm start -p 3003 &
 
-      - name: Wait for app
+      - name: Wait for Next.js app
         run: npx wait-on http://localhost:3003/ -t 60000
 
+      # ── Playwright 실행 (local BE 사용) ────────────────────────────────
       - name: Run Playwright tests
-        run: pnpm e2e
+        working-directory: frontend
         env:
           CI: "true"
           E2E_PORT: "3003"
           E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
           E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
-          E2E_API_URL: ${{ secrets.E2E_API_URL }}
+          E2E_API_URL: ${{ env.LOCAL_API_URL }}
+        run: pnpm e2e
+
+      # ── 디버그 / 산출물 ────────────────────────────────────────────────
+      - name: Backend log on failure
+        if: failure()
+        run: |
+          echo "--- /tmp/backend.log ---"
+          cat /tmp/backend.log || true
 
       - name: Upload traces on failure
         if: failure()

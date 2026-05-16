@@ -4,8 +4,15 @@ import path from "path";
 
 const FIXTURE = path.join(__dirname, "../fixtures/test.m4a");
 
+// CI 의 local BE 환경에서는 ffmpeg / R2 prod bucket / Whisper full chain 의존이
+// 큼 — 매 CI 마다 ~$0.01 + R2 객체 누적. 본 spec 은 가장 무거운 e2e 라
+// E2E_RUN_HEAVY=true 일 때만 실행 (nightly 또는 manual).
+const SHOULD_RUN_HEAVY = process.env.E2E_RUN_HEAVY === "true";
+
 // serial: 향후 테스트 추가 대비 (단일 테스트 구조 유지)
 test.describe.serial("미팅 업로드 파이프라인", () => {
+  test.skip(!SHOULD_RUN_HEAVY, "E2E_RUN_HEAVY=true 환경에서만 실행 (Whisper API + R2 의존)");
+
   test("오디오 파일 업로드 후 STT 처리 완료 및 요약이 렌더링된다", async ({
     page,
   }) => {

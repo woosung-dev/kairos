@@ -170,8 +170,13 @@ class RagService:
             }
             return
 
-        # [9] Cache Store
+        # [9] Cache Store — BL-042: max_visibility 동시 저장 (fast path 인덱스)
         try:
+            source_chunk_ids = [
+                s["id"] for s in sources_for_client
+                if isinstance(s, dict) and "id" in s
+            ]
+            max_vis = await self.embedding_repo.compute_max_visibility(source_chunk_ids)
             cache = SemanticCache(
                 workspace_id=workspace_id,
                 project_id=project_id,
@@ -179,6 +184,7 @@ class RagService:
                 question_embedding=question_embedding,
                 answer=full_answer,
                 sources=sources_for_client,
+                max_visibility=max_vis,
                 expires_at=datetime.utcnow() + timedelta(days=7),
             )
             await self.embedding_repo.save_cache(cache)
