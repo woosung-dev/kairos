@@ -19,7 +19,7 @@
 - **Data/Tables:** Geist Mono (400/500) — tabular-nums 지원, 숫자 정렬에 최적.
 - **Code:** Geist Mono
 - **Loading:**
-  - Satoshi: Google Fonts (`family=Satoshi:wght@400;500;600;700`)
+  - Satoshi: Fontshare (`api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&display=swap`) — Indian Type Foundry 공식 호스팅. Google Fonts 미배포 (BL-045 fix 2026-05-16)
   - Pretendard: CDN (`cdn.jsdelivr.net/gh/orioncactus/pretendard`)
   - Geist Mono: Google Fonts (`family=Geist+Mono:wght@400;500`)
 - **Scale:**
