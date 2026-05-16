@@ -15,6 +15,14 @@ from src.rag.service import RagService
 logger = logging.getLogger(__name__)
 
 
+def _sse_error_done(message: str) -> tuple[dict, dict]:
+    """SSE error + done 이벤트 쌍 — 권한 위반 시 보일러플레이트 통합 (BL-029)."""
+    return (
+        {"event": "error", "data": json.dumps({"message": message}, ensure_ascii=False)},
+        {"event": "done", "data": json.dumps({"cached": False, "sourceCount": 0})},
+    )
+
+
 class RagPipelineService:
     def __init__(
         self,
@@ -23,6 +31,27 @@ class RagPipelineService:
     ) -> None:
         self.rag_service = rag_service
         self.project_repo = project_repo
+
+    async def _check_project_access(
+        self,
+        project_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID,
+    ) -> str | None:
+        """프로젝트 접근 검증. 위반 시 사용자용 에러 메시지 반환, 통과 시 None.
+
+        admin/owner 우회는 caller 책임 (ADR-014 옵션 A).
+        """
+        project = await self.project_repo.find_by_id(project_id)
+        if project is None or project.workspace_id != workspace_id:
+            return "프로젝트를 찾을 수 없거나 접근 권한이 없습니다."
+        if project.visibility == "draft" and project.created_by_id != requester_user_id:
+            return "Draft 프로젝트는 작성자만 접근 가능합니다."
+        if project.visibility == "private":
+            is_member = await self.project_repo.is_member(project_id, requester_user_id)
+            if not is_member:
+                return "Private 프로젝트는 명시적 멤버만 접근 가능합니다."
+        return None
 
     async def ask(
         self,
@@ -41,40 +70,13 @@ class RagPipelineService:
         """
         # 권한 검증 (project_id 있을 때만, admin 이상은 우회)
         if project_id is not None and requester_role not in ("admin", "owner"):
-            project = await self.project_repo.find_by_id(project_id)
-            if project is None or project.workspace_id != workspace_id:
-                yield {
-                    "event": "error",
-                    "data": json.dumps(
-                        {"message": "프로젝트를 찾을 수 없거나 접근 권한이 없습니다."},
-                        ensure_ascii=False,
-                    ),
-                }
-                yield {"event": "done", "data": json.dumps({"cached": False, "sourceCount": 0})}
+            error_msg = await self._check_project_access(
+                project_id, workspace_id, requester_user_id
+            )
+            if error_msg is not None:
+                for event in _sse_error_done(error_msg):
+                    yield event
                 return
-            if project.visibility == "draft":
-                if project.created_by_id != requester_user_id:
-                    yield {
-                        "event": "error",
-                        "data": json.dumps(
-                            {"message": "Draft 프로젝트는 작성자만 접근 가능합니다."},
-                            ensure_ascii=False,
-                        ),
-                    }
-                    yield {"event": "done", "data": json.dumps({"cached": False, "sourceCount": 0})}
-                    return
-            elif project.visibility == "private":
-                is_member = await self.project_repo.is_member(project_id, requester_user_id)
-                if not is_member:
-                    yield {
-                        "event": "error",
-                        "data": json.dumps(
-                            {"message": "Private 프로젝트는 명시적 멤버만 접근 가능합니다."},
-                            ensure_ascii=False,
-                        ),
-                    }
-                    yield {"event": "done", "data": json.dumps({"cached": False, "sourceCount": 0})}
-                    return
 
         # 검증 통과 — RagService.ask로 위임 (AsyncGenerator 위임 표준 패턴)
         # ISSUE-040: requester 정보 forward — 글로벌 쿼리 visibility filter 위해.
