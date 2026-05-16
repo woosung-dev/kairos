@@ -137,6 +137,8 @@ async def test_insert_halfvec_and_cosine_search(integration_session):
     results = await repo.vector_search(
         query_embedding=query_vec,
         workspace_id=workspace_id,
+        requester_user_id=uuid.uuid4(),
+        requester_role="owner",
         limit=10,
     )
     assert len(results) >= 1
@@ -177,6 +179,8 @@ async def test_vector_search_invokes_hnsw_params(integration_session):
     await repo.vector_search(
         query_embedding=_make_vec(seed=42),
         workspace_id=workspace_id,
+        requester_user_id=uuid.uuid4(),
+        requester_role="owner",
         limit=5,
     )
     # vector_search 안에서 SET LOCAL 호출됐는지 SHOW로 확인

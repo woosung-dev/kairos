@@ -68,7 +68,7 @@ async def test_cache_hit_returns_cached_answer():
     )
 
     events = []
-    async for event in service.ask("테스트 질문", uuid.uuid4()):
+    async for event in service.ask("테스트 질문", uuid.uuid4(), requester_user_id=uuid.uuid4(), requester_role="owner"):
         events.append(event)
 
     # Gemini 호출 없어야 함
@@ -101,7 +101,7 @@ async def test_cache_miss_no_results():
     )
 
     events = []
-    async for event in service.ask("테스트 질문", uuid.uuid4()):
+    async for event in service.ask("테스트 질문", uuid.uuid4(), requester_user_id=uuid.uuid4(), requester_role="owner"):
         events.append(event)
 
     # 검색 결과 없으면 "정보 없음" 답변
@@ -231,7 +231,7 @@ async def test_gemini_safety_filter_raises_graceful_error_event():
     )
 
     events = []
-    async for event in service.ask("악의적 입력?", _uuid.uuid4()):
+    async for event in service.ask("악의적 입력?", _uuid.uuid4(), requester_user_id=_uuid.uuid4(), requester_role="owner"):
         events.append(event)
 
     # error 이벤트 + done 이벤트 (순서 보장)
@@ -277,7 +277,7 @@ async def test_gemini_empty_answer_skips_cache_store():
     )
 
     events = []
-    async for event in service.ask("정상 질문입니다?", _uuid.uuid4()):
+    async for event in service.ask("정상 질문입니다?", _uuid.uuid4(), requester_user_id=_uuid.uuid4(), requester_role="owner"):
         events.append(event)
 
     # 정상 흐름은 진행됐지만 캐시 저장 안 됨
@@ -309,7 +309,7 @@ async def test_gemini_successful_answer_saves_cache():
         ai_service=mock_ai,
     )
 
-    async for _event in service.ask("정상 질문?", _uuid.uuid4()):
+    async for _event in service.ask("정상 질문?", _uuid.uuid4(), requester_user_id=_uuid.uuid4(), requester_role="owner"):
         pass
 
     mock_repo.save_cache.assert_called_once()

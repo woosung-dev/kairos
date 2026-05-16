@@ -29,11 +29,18 @@ class RagService:
         self,
         question: str,
         workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID,
+        requester_role: str,
         project_id: uuid.UUID | None = None,
         time_range: str | None = None,
         source_type: str | None = None,
     ) -> AsyncGenerator[dict, None]:
-        """RAG 파이프라인. SSE 이벤트를 yield."""
+        """RAG 파이프라인. SSE 이벤트를 yield.
+
+        ISSUE-040 fix: requester_user_id + requester_role 을 받아 vector/text
+        검색에서 ADR-014 visibility filter 적용. 글로벌 쿼리 (project_id=None)
+        에서도 private project chunks 가 비-멤버에게 노출되지 않도록.
+        """
 
         # [1] 질문 임베딩
         embeddings = await self.embedding_service.generate_embeddings([question])
@@ -70,19 +77,23 @@ class RagService:
             "data": json.dumps({"status": "검색 중..."}, ensure_ascii=False),
         }
 
-        # [4] Hybrid Search
+        # [4] Hybrid Search — visibility filter 포함 (ISSUE-040)
         vector_results = await self.embedding_repo.vector_search(
             question_embedding,
             workspace_id,
-            project_id,
-            source_type,
+            requester_user_id=requester_user_id,
+            requester_role=requester_role,
+            project_id=project_id,
+            source_type=source_type,
             limit=50,
         )
         text_results = await self.embedding_repo.text_search(
             question,
             workspace_id,
-            project_id,
-            source_type,
+            requester_user_id=requester_user_id,
+            requester_role=requester_role,
+            project_id=project_id,
+            source_type=source_type,
             limit=50,
         )
 
