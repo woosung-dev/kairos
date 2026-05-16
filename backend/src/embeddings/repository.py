@@ -119,10 +119,45 @@ class EmbeddingRepository:
 
     # --- 검색 ---
 
+    @staticmethod
+    def _visibility_filter_sql() -> str:
+        """ADR-014 R-10: 검색 결과에서 requester 가 접근 불가한 project chunks 제외.
+
+        chunk 의 project_id 가:
+        - NULL : 프로젝트 미연결 chunk → 통과
+        - admin/owner role : 모든 visibility 통과
+        - public project : 통과
+        - draft project : created_by_id == requester 일 때만 통과
+        - private project : ProjectMember 매핑 있을 때만 통과
+
+        ISSUE-040 fix — 이전엔 workspace_id + (optional)project_id 만 필터 →
+        member 가 global RAG 쿼리 시 private project 의 chunks 가 응답에 포함.
+        """
+        return """
+            AND (
+                project_id IS NULL
+                OR :req_role IN ('admin', 'owner')
+                OR EXISTS (
+                    SELECT 1 FROM projects p
+                    WHERE p.id = embedding_chunks.project_id
+                      AND (
+                        p.visibility = 'public'
+                        OR (p.visibility = 'draft' AND p.created_by_id = :req_uid)
+                        OR (p.visibility = 'private' AND EXISTS (
+                            SELECT 1 FROM project_members pm
+                            WHERE pm.project_id = p.id AND pm.user_id = :req_uid
+                        ))
+                      )
+                )
+            )
+        """
+
     async def vector_search(
         self,
         query_embedding: list[float],
         workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID,
+        requester_role: str,
         project_id: uuid.UUID | None = None,
         source_type: str | None = None,
         limit: int = 50,
@@ -132,7 +167,12 @@ class EmbeddingRepository:
         await _apply_hnsw_session_params(self.session)
 
         filters = "workspace_id = :wid AND chunk_level = 2"
-        params: dict = {"wid": str(workspace_id), "limit": limit}
+        params: dict = {
+            "wid": str(workspace_id),
+            "limit": limit,
+            "req_uid": str(requester_user_id),
+            "req_role": requester_role,
+        }
 
         if project_id:
             filters += " AND project_id = :pid"
@@ -141,12 +181,15 @@ class EmbeddingRepository:
             filters += " AND source_type = :stype"
             params["stype"] = source_type
 
+        visibility_clause = self._visibility_filter_sql()
+
         query = text(f"""
             SELECT id, chunk_text, source_id, source_type, metadata_json,
                    parent_chunk_id, created_at,
                    1 - (embedding <=> CAST(:qvec AS halfvec)) AS score
             FROM embedding_chunks
             WHERE {filters}
+              {visibility_clause}
             ORDER BY embedding <=> CAST(:qvec AS halfvec)
             LIMIT :limit
         """)
@@ -159,13 +202,21 @@ class EmbeddingRepository:
         self,
         query_text: str,
         workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID,
+        requester_role: str,
         project_id: uuid.UUID | None = None,
         source_type: str | None = None,
         limit: int = 50,
     ) -> list[dict]:
         """pg_trgm 트라이그램 유사도 검색."""
         filters = "workspace_id = :wid AND chunk_level = 2"
-        params: dict = {"wid": str(workspace_id), "query": query_text, "limit": limit}
+        params: dict = {
+            "wid": str(workspace_id),
+            "query": query_text,
+            "limit": limit,
+            "req_uid": str(requester_user_id),
+            "req_role": requester_role,
+        }
 
         if project_id:
             filters += " AND project_id = :pid"
@@ -174,12 +225,15 @@ class EmbeddingRepository:
             filters += " AND source_type = :stype"
             params["stype"] = source_type
 
+        visibility_clause = self._visibility_filter_sql()
+
         query = text(f"""
             SELECT id, chunk_text, source_id, source_type, metadata_json,
                    parent_chunk_id, created_at,
                    similarity(chunk_text, :query) AS score
             FROM embedding_chunks
             WHERE {filters}
+              {visibility_clause}
               AND chunk_text % :query
             ORDER BY similarity(chunk_text, :query) DESC
             LIMIT :limit
