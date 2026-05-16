@@ -421,8 +421,48 @@ export default function NewContentPage() {
         </div>
       )}
 
-      {/* 노트 / 자료 (Sprint 2+) */}
-      {(selected === "note" || selected === "attachment") && (
+      {/* 노트 작성 — /notes 의 빠른 메모로 안내 */}
+      {selected === "note" && (
+        <div
+          className="p-8 rounded border text-center space-y-4"
+          style={{
+            background: "var(--surface)",
+            borderColor: "var(--border-subtle)",
+            borderRadius: "var(--radius-md)",
+          }}
+        >
+          <div>
+            <p
+              className="text-base font-semibold mb-1"
+              style={{
+                color: "var(--text-primary)",
+                fontFamily: "var(--font-display)",
+              }}
+            >
+              📝 빠른 메모로 이동
+            </p>
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+              아이디어 · 회의록 · 자유 메모는 빠른 메모에서 작성합니다.
+            </p>
+          </div>
+          <button
+            onClick={() => router.push("/notes")}
+            className="px-4 py-2 rounded text-sm font-medium transition-colors"
+            style={{
+              background: "var(--accent)",
+              color: "var(--background)",
+              borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              minHeight: "44px",
+            }}
+          >
+            빠른 메모 열기
+          </button>
+        </div>
+      )}
+
+      {/* 자료 업로드 placeholder — 추후 SourceAddModal 또는 별도 페이지 통합 */}
+      {selected === "attachment" && (
         <div
           className="p-6 rounded border text-center"
           style={{
@@ -432,7 +472,7 @@ export default function NewContentPage() {
           }}
         >
           <p style={{ color: "var(--text-muted)" }}>
-            {selected === "note" ? "노트 작성" : "자료 업로드"}은 Sprint 2에서 구현됩니다
+            자료 업로드는 곧 제공됩니다 (문서·PDF·이미지)
           </p>
         </div>
       )}
