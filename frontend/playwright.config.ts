@@ -19,6 +19,9 @@ const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
+  // Multi-Agent QA spec (qa-*.spec.ts) 은 로컬 수동 QA 전용 — seed DB / JWT /
+  // R2 의존성이 크고 5계정 fixture 필요. CI 게이트 통합 금지.
+  testIgnore: process.env.CI ? [/qa-.*\.spec\.ts/] : undefined,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

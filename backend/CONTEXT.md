@@ -110,3 +110,22 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 - `models.py` 변경 시 반드시 Alembic 마이그레이션 생성 + 커밋 포함
 - 프로덕션 배포 entrypoint에서 `alembic upgrade head` 자동 실행
 - 컬럼 삭제는 2단계 배포 (사용 중단 → 다음 배포에서 삭제)
+
+---
+
+## 9. 스크립트 (backend/scripts/)
+
+운영 전용 단독 실행 스크립트. router/service/repository 아닌 독립 entry point.
+
+| 파일 | 목적 | 호출 패턴 |
+|---|---|---|
+| `dogfood_smoke.py` | 일일 dogfood 자동 검증 (JWT 직접 입력 패턴) | manual |
+| `reindex_vectors.py` | EmbeddingService 통한 청크 재인덱싱 | manual |
+| `samples/` | Sprint 15 Day 0 음성 sample (gitignore) | manual upload |
+| `seed_qa_fixtures.py` | Multi-Agent QA 시드 fixture 생성 + cleanup (Sprint 18 → 19) | `--env <credentials.env> --out <fixtures.json>` / `--dry-run-cleanup` / `--cleanup` |
+
+**seed_qa_fixtures.py 안전망**:
+- WS_PREFIX 매칭 (`WS-QA-...`) — cleanup 대상 식별
+- `KAIROS_FOUNDER_CLERK_ID` ENV — founder 워크스페이스 매칭 시 ABORT
+- User row 보존 (Clerk dashboard 수동 정리)
+- R2 object 별도 정리

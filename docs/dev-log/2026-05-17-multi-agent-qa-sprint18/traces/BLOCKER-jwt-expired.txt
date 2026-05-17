@@ -1,0 +1,38 @@
+# BLOCKER — JWT 5종 모두 만료 (재추출 필요)
+# 캡처 시각: 2026-05-17 07:41:07 KST (= 2026-05-16 22:41:07 UTC)
+
+## 1. JWT exp (Unix epoch → UTC)
+QA_SENTINEL_A : exp=1778970732 → 2026-05-16 22:32:12 UTC  (8분 55초 전 만료)
+QA_SENTINEL_B : exp=1778970751 → 2026-05-16 22:32:31 UTC  (8분 36초 전 만료)
+QA_CASUAL     : exp=1778970762 → 2026-05-16 22:32:42 UTC  (8분 25초 전 만료)
+QA_MOBILE     : exp=1778970772 → 2026-05-16 22:32:52 UTC  (8분 15초 전 만료)
+QA_POWER      : exp=1778970782 → 2026-05-16 22:33:02 UTC  (8분 05초 전 만료)
+
+## 2. 실제 BE 호출 검증
+$ curl -H "Authorization: Bearer <QA_SENTINEL_A_JWT>" \
+       http://localhost:8000/api/v1/workspaces/9966a04e-0db3-4d65-a5fe-6c5c4f49901d
+HTTP/1.1 401 Unauthorized
+Content-Type: application/json
+{"detail":"토큰이 만료되었습니다"}
+
+## 3. 헬스 확인
+FE  http://localhost:3000/        → 200 OK
+BE  http://localhost:8000/health  → 404 (헬스 endpoint 미존재, 정상 동작 중)
+BE  /api/v1/workspaces/{ws_id}    → 401 (auth gate 정상 작동, JWT 만료만 차단 원인)
+
+## 4. 진단
+Clerk dev JWT 는 60초 짧은 토큰. seed-credentials.env 의 토큰들은
+seeded_at=2026-05-16T22:33:47Z 직전에 발급되어 22:32:12~22:33:02 UTC 에 일괄 만료.
+페이로드의 iat/exp 가 정확히 60초 간격이므로 Clerk default short-lived token.
+
+## 5. 차단 범위
+P0-1 (RAG visibility 12 케이스) — 전부 401 차단
+P0-2 (Workspace IDOR 13 endpoint) — 전부 401 차단
+P0-3 (오디오 파이프라인 endpoint) — 전부 401 차단
+
+## 6. 복구 절차 (사용자 액션)
+A. 5계정 (Sentinel A/B, Casual, Mobile, Power) 으로 /sign-in 후
+   DevTools Application → Cookies → __clerk_db_jwt_* 값 복사
+B. seed-credentials.env 의 QA_*_JWT 5개 + QA_*_JWT_EXPIRES_AT 5개 갱신
+C. seed-fixtures.json 의 personas.*.jwt_expires_at 5개 갱신
+D. Sentinel 재기동
