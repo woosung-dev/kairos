@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-05-16 (Sprint 17 Exhaustive QA + /loop qa-fix closeout)
+> 마지막 업데이트: 2026-05-17 (Multi-Agent QA Sprint 18 → 19 closeout + BUG-C01 fix + Sprint 19 plan 초안)
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조 — Completed / Blocked / Questions / Next Actions 4섹션 운영.
 
@@ -14,15 +14,43 @@
 
 ---
 
-## Next Actions (Sprint 18 후보)
+## Next Actions (Sprint 19 후보 — P0/P1/P2 재분류, 12항목 #8 적용)
 
-- [ ] **BL-044 SourceAddModal upload** (P1) — 실제 attachment upload 구현
+### P0 (Sprint 19 최우선)
+- [ ] **BUG-C01-EXT** — meetings / notes / inbox / actions router `require_viewer`/`require_member` 일관성 매트릭스 점검 + 통합 회귀 테스트 (`backend/tests/integration/test_workspace_idor_matrix.py`)
+- [ ] **Multi-Agent QA Top Critical/High fix** — 4 페르소나 + Sentinel-P1 결과 (`docs/dev-log/sprint-19-plan.md` §2(b))
+
+### P1
+- [ ] **IDOR 응답 일관화** — 404 vs 403 timing side-channel 차단, cross-tenant 403 통일
+- [ ] **BL-017 Mobile FAB collision** — Mobile 페르소나 검증과 묶음
+- [ ] **BL-024 pg_prewarm** — Cloud Run cold start 시 인덱스 워밍업 (production 측정과 묶음)
+- [ ] **온보딩 첫인상 / TTFV 개선** — Curious 결과 기반 (`sprint-19-plan.md` §2(d))
 - [ ] **ADR-019 Phase B verify** (Sprint 15 carry-over) — Gemini 3.1-flash-lite 정착 확인
-- [ ] **BL-043 nightly heavy e2e** — meeting-upload + R2 cleanup script
 - [ ] **production observability** — Cloud Run logs / Sentry 검토
 - [ ] **BL-040/BL-036 production measure** — RAG visibility filter + perf indexes 효과 측정
-- [ ] **mobile 반응형 QA** — 데스크탑 only 였음
-- [ ] **BL-045 Satoshi 폰트 결정** — DESIGN.md 검토
+
+### P2
+- [ ] **BL-016** PromoteModal 동명 workspace 구분
+- [ ] **BL-019** Recall metrics 신선도 + sparkline
+- [ ] **BL-026** 측정 강화 nDCG/precision/EXPLAIN
+- [ ] **BL-028** memory/service.py BackgroundMemoryService 분할 (Sprint 20 후보)
+- [ ] **BL-045** Satoshi 폰트 결정 — DESIGN.md 의존
+- [ ] **spec PASSWORD ENV화 확장** — 다른 spec/script도 같은 패턴 점검
+
+---
+
+## Recently Completed (2026-05-17 Multi-Agent QA + BUG-C01)
+
+- [x] **Multi-Agent QA Sprint 18 → 19 (2026-05-17)** — 1세션 단일 PR 통합
+  - [x] Sentinel-P0 28/28 PASS 재검증 (BUG-C01 fix 후 v2)
+  - [x] BUG-C01 (workspace IDOR) fix (`19eb363`) + 회귀 테스트 2/2 PASS
+  - [x] 4 페르소나 smoke (Curious / Casual / Mobile / Power) + Sentinel-P1
+  - [x] 통합 HTML + Sprint 19 plan 초안 (4축: 캐리오버 BL + QA 후속 + Mobile + 온보딩)
+  - [x] Secret 격리 (~/.kairos-qa-secrets/) + .gitignore + spec PASSWORD ENV화
+  - [x] QA harness (seed_qa_fixtures.py 489 LOC + founder guard) + Playwright spec 2개
+  - 산출물: `docs/dev-log/2026-05-17-multi-agent-qa-sprint18/integrated-report.html` + `docs/dev-log/sprint-19-plan.md`
+
+> Sprint 18 본 작업(BL-029/031/041~045 + RBAC 매트릭스 + CI vitest + R2 cleanup + observability) 은 2e426c2 머지에서 closeout.
 
 ---
 
