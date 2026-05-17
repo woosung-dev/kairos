@@ -11,6 +11,11 @@ frontend/out/
 .env.local
 .env.*.local
 
+# QA 자격증명 (Multi-Agent QA Sprint 18~ — JWT/password 절대 commit 금지)
+**/seed-credentials.env
+backend/scripts/seed-credentials.env
+docs/dev-log/**/seed-credentials.env
+
 # IDE
 .idea/
 .vscode/
