@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
-from src.auth.rbac import require_owner
+from src.auth.rbac import require_owner, require_viewer
 from src.workspaces.dependencies import get_workspace_service
 from src.workspaces.models import WorkspaceMember
 from src.workspaces.schemas import CreateWorkspaceRequest, UpdateWorkspaceSettingsRequest
@@ -35,7 +35,9 @@ async def list_workspaces(
 @router.get("/{workspace_id}")
 async def get_workspace(
     workspace_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    # BUG-C01 (Sentinel P0 2026-05-17): require_viewer 누락으로 비멤버가 ws 상세 leak
+    # → ws name/owner/memberCount/threshold 노출. Codex 정적 분석 의심 → 실 검증 확정.
+    member: WorkspaceMember = Depends(require_viewer),
     service: WorkspaceService = Depends(get_workspace_service),
 ):
     return await service.get_workspace(workspace_id)
