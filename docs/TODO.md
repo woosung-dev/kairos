@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-05-17 (Multi-Agent QA Sprint 18 → 19 closeout + BUG-C01 fix + Sprint 19 plan 초안)
+> 마지막 업데이트: 2026-05-17 (Sprint 19 v3 진입 — 2차 codex BLOCK → tenant/auth boundary fix scope 축소 + matrix 45 lock-in)
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조 — Completed / Blocked / Questions / Next Actions 4섹션 운영.
 
@@ -14,28 +14,35 @@
 
 ---
 
-## Next Actions (Sprint 19 후보 — P0/P1/P2 재분류, 12항목 #8 적용)
+## Next Actions (Sprint 19 v3 — P0 9건만, P1 전부 Sprint 20 carry-over)
 
-### P0 (Sprint 19 최우선)
-- [ ] **BUG-C01-EXT** — meetings / notes / inbox / actions router `require_viewer`/`require_member` 일관성 매트릭스 점검 + 통합 회귀 테스트 (`backend/tests/integration/test_workspace_idor_matrix.py`)
-- [ ] **Multi-Agent QA Top Critical/High fix** — 4 페르소나 + Sentinel-P1 결과 (`docs/dev-log/sprint-19-plan.md` §2(b))
+> v3 lock-in (2026-05-17, post-2차-codex BLOCK): `docs/dev-log/sprint-19-plan.md` §9 + `~/.claude/plans/read-docs-dev-log-sprint-19-plan-md-hazy-catmull.md`
+> Sprint 기간: 2주 (2026-05-17 ~ 06-01 추정). 워크트리 `../kairos-sprint-19/`, 브랜치 `sprint-19/tenant-boundary-hardening`.
 
-### P1
-- [ ] **IDOR 응답 일관화** — 404 vs 403 timing side-channel 차단, cross-tenant 403 통일
-- [ ] **BL-017 Mobile FAB collision** — Mobile 페르소나 검증과 묶음
-- [ ] **BL-024 pg_prewarm** — Cloud Run cold start 시 인덱스 워밍업 (production 측정과 묶음)
-- [ ] **온보딩 첫인상 / TTFV 개선** — Curious 결과 기반 (`sprint-19-plan.md` §2(d))
-- [ ] **ADR-019 Phase B verify** (Sprint 15 carry-over) — Gemini 3.1-flash-lite 정착 확인
-- [ ] **production observability** — Cloud Run logs / Sentry 검토
-- [ ] **BL-040/BL-036 production measure** — RAG visibility filter + perf indexes 효과 측정
+### P0 (Sprint 19 — 9 PR stack, ~92-132h)
+- [ ] **PR #1 BUG-C01-EXT v3** — workspace-scoped endpoint **45** workspace_id 강제 (matrix lock-in: projects 11 / meetings 6 / notes 6 / memory 5 / workspaces 8 / inbox 3 / actions 3 / upload 2 / rag 1). 42-60h. **회귀 테스트 골격 완료 (failing TDD, 2026-05-17)** → 도메인별 commit fix 진행.
+- [ ] **PR #2 BUG-C01-EXT-FK** — inbox.classify + actions.create FK cross-workspace 검증 (6-8h)
+- [ ] **PR #3 BUG-AUTH-WH** — Clerk webhook Svix 서명 검증 + event allowlist + idempotency (4-6h)
+- [ ] **PR #4 BUG-UPL-OWN** — upload_assets DB ledger + alembic migration (6-10h)
+- [ ] **PR #5 BUG-PROJ-DEL** — project delete cascade 정책 + alembic (8-12h, 진입 시 cascade vs archive 사용자 결정)
+- [ ] **PR #6 BUG-PIPE-LLM** — meetings pipeline LLM 추천 project_id set membership 검증 (2-3h)
+- [ ] **PR #7 BUG-P1-05 + P1-06** — 보안 헤더 6종 + SlowAPI middleware ordering (12-14h)
+- [ ] **PR #8 BUG-C02 + BUG-C03** — `/projects` `/meetings` page + FE/BE API contract 통일 (8-13h)
+- [ ] **PR #9 closeout** — verification + nightly heavy spec + retro + Sprint 20 carry-over BL 등재 (4-6h)
 
-### P2
-- [ ] **BL-016** PromoteModal 동명 workspace 구분
-- [ ] **BL-019** Recall metrics 신선도 + sparkline
-- [ ] **BL-026** 측정 강화 nDCG/precision/EXPLAIN
-- [ ] **BL-028** memory/service.py BackgroundMemoryService 분할 (Sprint 20 후보)
-- [ ] **BL-045** Satoshi 폰트 결정 — DESIGN.md 의존
-- [ ] **spec PASSWORD ENV화 확장** — 다른 spec/script도 같은 패턴 점검
+### P1 / P2 — Sprint 20 carry-over (전부)
+- BL-017 Mobile FAB collision / BL-024 pg_prewarm / 온보딩 (ISSUE-OBN-01~04) / BUG-C04 Export UI
+- ADR-019 Phase B verify / production observability / BL-040/036 measure
+- BL-016 / BL-019 / BL-026 / BL-028 / BL-045 / spec PASSWORD ENV화 확장
+- IDOR timing side-channel nightly (Codex M3) / G.3 SSE BE cleanup (Codex H10-7 verification)
+- H10-8 React Query workspace switch RAG state clear / H10-9 Clerk session lazy create / M10-1 invite race
+
+### PR #1 진입 직전 [확인 필요]
+- [x] ~~endpoint matrix 30+ 자동 생성 후 사용자 확정~~ → DONE 2026-05-17 (45 lock-in)
+- [ ] BUG-PROJ-DEL 정책 (cascade vs archive only) — PR #5 진입 시. 권장: archive only
+- [ ] BUG-UPL-OWN 기존 R2 객체 backfill 정책 — PR #4 진입 시
+- [ ] CSP report endpoint (BE vs Sentry) — PR #7 진입 시
+- [ ] BUG-C03 실제 진입점 — Casual 페르소나 보고서 재확인 (PR #8 진입 시)
 
 ---
 
