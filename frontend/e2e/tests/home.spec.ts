@@ -23,6 +23,14 @@ test.describe("홈 — 인증 후 네비게이션", () => {
     await expect(
       page.getByRole("button", { name: /검색하거나 질문 입력/ }),
     ).toBeVisible({ timeout: 15_000 });
+
+    // G1 (Sprint 22 OBN-02): onboarding banner 또는 isCompleted hide 둘 중 하나
+    // banner 가 존재하면 Step N/4 텍스트 visible. 없으면 step=4 도달 (hide).
+    const banner = page.getByTestId("onboarding-banner");
+    const bannerCount = await banner.count();
+    if (bannerCount > 0) {
+      await expect(banner.getByText(/[1-4]\s*\/\s*4/)).toBeVisible({ timeout: 5_000 });
+    }
   });
 
   test("사이드바 프로젝트 목록 렌더 (템플릿 시딩 포함)", async ({ page }) => {
