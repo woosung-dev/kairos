@@ -1291,3 +1291,75 @@ Cloud Run + Neon Postgres 환경에서 BE 인스턴스 cold start 시:
 **우선순위**: ★★★☆☆ (P2 hardening, 본 PR scope 외 — generator regression 방지)
 
 **근거**: Sprint 17 QA, PR #44 close.
+
+---
+
+## BL-049 — production-scale alembic guard (NOT VALID + VALIDATE 2단계 + CONCURRENTLY)
+
+**도메인**: backend / alembic / DBA runbook
+
+**증상**: Sprint 19 PR #2 BUG-C01-EXT-FK 의 alembic migration `e5f6g7h8i9ja` 가 단순 `op.create_foreign_key` + `op.alter_column ... SET NOT NULL` 패턴 사용. dogfooding scale (~수십 row) 에서는 ms 단위 lock — 안전.
+
+production scale (>1만 row 또는 동시 트래픽) 진입 시 다음 패턴 권장:
+- `ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY ... NOT VALID` + 별도 `ALTER TABLE ... VALIDATE CONSTRAINT ...` (lock 격하)
+- `CREATE UNIQUE INDEX CONCURRENTLY` + `ALTER TABLE ... ADD CONSTRAINT ... USING INDEX`
+- `ALTER COLUMN ... SET NOT NULL` 의 `CHECK (col IS NOT NULL) NOT VALID` → `VALIDATE` → `SET NOT NULL` 패턴
+- `LOCK TABLE ... IN EXCLUSIVE MODE` (backfill 중 신규 insert 차단)
+
+**현 상태**: PR #2 머지 시점 = dogfooding scale + Cloud Run entrypoint = 자연 maintenance window. 본 BL 은 첫 외부 user 온보딩 직전 audit 트리거.
+
+**해결 방향**: 단일 테이블 1만 row 이상 또는 production traffic 발생 시 위 패턴으로 alembic template 갱신.
+
+**우선순위**: ★★☆☆☆ (P2 production hardening, 현 시점 risk 0)
+
+**근거**: Sprint 19 PR #2 plan agent 평가, Codex 1차 F-6 review.
+
+---
+
+## BL-050 — 잔여 cross-workspace single-FK entity audit + composite FK 신설 (BUG-C01-EXT-FK 잔여)
+
+**도메인**: backend / multiple (inbox / embeddings / memory / promotion)
+
+**증상**: Sprint 19 PR #2 BUG-C01-EXT-FK = **project_id only hardening** (action_items / notes / mpl / project_members). 다음 7+ entity 는 cross-workspace single-FK 로 남음:
+- `action_items.meeting_id` ↔ meetings.workspace_id (audit 없음)
+- `inbox.ai_suggested_project_id` ↔ projects.workspace_id
+- `embeddings.project_id` ↔ projects.workspace_id
+- `semantic_cache.project_id` ↔ projects.workspace_id
+- `memory_items.embedding_chunk_id` ↔ embedding_chunks.workspace_id
+- `memory_ai_calls.memory_id` ↔ memory_items.workspace_id
+- `promotion_audit` (source + target workspace_id 2개 보유, intentional cross-workspace — 별도 분석)
+
+PR #1 audit 4 case (action_items.project_id / notes.project_id / mpl / project_members) 외 영역.
+
+**해결 방향**:
+1. integration audit SQL 7+ 추가 (`test_workspace_integrity_audit.py` 확장)
+2. mismatch 0 보장 확인 후 composite FK 신설 (PR #2 패턴 그대로)
+3. nullable 컬럼은 MATCH SIMPLE 면제 test 추가
+4. alembic 단일 revision 으로 묶음
+
+**우선순위**: ★★★☆☆ (P2 defense-in-depth 확장, Sprint 20 carry-over)
+
+**근거**: Sprint 19 PR #2 plan agent §D scope omission, Codex 1차 F-8.
+
+---
+
+## BL-051 — Sprint 15/16 기존 schema drift 정리 (compare_metadata 잔여 finding)
+
+**도메인**: backend / SQLModel models / alembic
+
+**증상**: Sprint 19 PR #2 D7.5b `test_alembic_upgrade.py` 신설 (alembic.compare_metadata) 시 PR #2 scope 외 다수 drift 검출. PR #2 의 `_is_pr2_scope_drift` filter 가 BL-051 카테고리로 분리:
+- `memory_ai_calls.created_at` / `memory_events.created_at` / `memory_items.created_at` 등 TIMESTAMP(timezone=True) vs DateTime() (Sprint 15)
+- `embedding_chunks` / `semantic_caches` 의 HNSW + halfvec 인덱스 model 미명시 (Sprint 16 ADR-020)
+- `workspaces.type` / `workspaces.inbox_threshold` / `workspace_invites.default_project_visibility` server_default 차이 (Sprint 15)
+- `idx_workspace_members_ws_user` / `idx_projects_workspace_status` / `idx_projects_workspace_sort` 등 인덱스 명시 누락 (Sprint 16 BL-036)
+- `notes.content` JSON server_default
+
+**해결 방향**:
+1. 각 model `__table_args__` 또는 Field 에 `sa_column=Column(..., server_default=...)` 명시
+2. 인덱스는 `Index(...)` 또는 `Field(..., index=True)` + 복합 인덱스는 `__table_args__` 에 `Index(...)` 추가
+3. TIMESTAMP(timezone=True) ↔ DateTime() 통일 — Sprint 15 의 timezone-aware 마이그레이션 fix
+4. drift filter 의 `_is_pr2_scope_drift` op_type filter (modify_default / modify_type 등) 점진적 축소
+
+**우선순위**: ★☆☆☆☆ (P3 cleanup, runtime 영향 0 — 단 향후 신규 model 추가 시 alembic 누락 catch 약화)
+
+**근거**: Sprint 19 PR #2 D7.5b drift detection 도입 후 catch 한 기존 부채.
