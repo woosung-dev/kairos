@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>Sprint 22 expressive-squirrel — Final Result Report</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .gradient-header { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%); }
+  .commit-sha { font-family: "SF Mono", Menlo, Monaco, monospace; font-size: 0.85em; }
+</style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+<header class="gradient-header text-white">
+  <div class="max-w-6xl mx-auto px-6 py-12">
+    <p class="text-sm opacity-80 mb-2">2026-05-19 · Sprint 22 · expressive-squirrel</p>
+    <h1 class="text-4xl font-bold tracking-tight">Onboarding + Playwright G2/G7/G8 + Sentry Observability</h1>
+    <p class="mt-3 text-lg opacity-90">첫 외부 user 가 가입 → 첫 RAG 응답까지 24h 내 도달, production-observable 한 funnel.</p>
+    <div class="mt-6 flex flex-wrap gap-3 text-sm">
+      <span class="bg-white/20 px-3 py-1 rounded-full">PR <a class="font-bold underline" href="https://github.com/woosung-dev/kairos/pull/97">#97</a></span>
+      <span class="bg-white/20 px-3 py-1 rounded-full">30 commits</span>
+      <span class="bg-white/20 px-3 py-1 rounded-full">base: main</span>
+      <span class="bg-white/20 px-3 py-1 rounded-full">branch: sprint-22/onboarding-e2e-obs</span>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-6 py-10 space-y-10">
+
+  <!-- 1. Summary metrics -->
+  <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+    <h2 class="text-xl font-bold mb-6">1. Summary metrics</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+        <div class="text-emerald-700 text-sm font-medium">pytest</div>
+        <div class="text-2xl font-bold mt-1">352 PASS</div>
+        <div class="text-emerald-600 text-xs mt-1">baseline 325 → +27 신규, 회귀 0</div>
+      </div>
+      <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+        <div class="text-emerald-700 text-sm font-medium">pyright (신규 코드)</div>
+        <div class="text-2xl font-bold mt-1">0 errors</div>
+        <div class="text-emerald-600 text-xs mt-1">baseline 132 → 135 (test_config.py +3 무관)</div>
+      </div>
+      <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+        <div class="text-emerald-700 text-sm font-medium">FE typecheck</div>
+        <div class="text-2xl font-bold mt-1">0 errors</div>
+        <div class="text-emerald-600 text-xs mt-1">신규 onboarding feature 포함</div>
+      </div>
+      <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+        <div class="text-emerald-700 text-sm font-medium">alembic drift gate</div>
+        <div class="text-2xl font-bold mt-1">PASS</div>
+        <div class="text-emerald-600 text-xs mt-1">PR2_MANAGED_COLUMNS tuple 등재</div>
+      </div>
+      <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+        <div class="text-indigo-700 text-sm font-medium">FE build</div>
+        <div class="text-2xl font-bold mt-1">12/12 OK</div>
+        <div class="text-indigo-600 text-xs mt-1">static pages, Sentry instrumentation 로드</div>
+      </div>
+      <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+        <div class="text-indigo-700 text-sm font-medium">신규 BE tests</div>
+        <div class="text-2xl font-bold mt-1">27</div>
+        <div class="text-indigo-600 text-xs mt-1">onboarding service/repo/router + race 3 + hooks 6</div>
+      </div>
+      <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+        <div class="text-indigo-700 text-sm font-medium">신규 E2E specs</div>
+        <div class="text-2xl font-bold mt-1">3 + 보강 1</div>
+        <div class="text-indigo-600 text-xs mt-1">G2/G7/G8 NEW + G1 onboarding-banner</div>
+      </div>
+      <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+        <div class="text-indigo-700 text-sm font-medium">Codex reviews</div>
+        <div class="text-2xl font-bold mt-1">3</div>
+        <div class="text-indigo-600 text-xs mt-1">1차 REVISE → 1.5차 APPROVE → 2차 진행</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. OBN-01~04 결과 -->
+  <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+    <h2 class="text-xl font-bold mb-6">2. OBN-01~04 구현 결과</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-100 text-gray-700">
+          <tr>
+            <th class="px-3 py-2 text-left w-24">ISSUE</th>
+            <th class="px-3 py-2 text-left">정의</th>
+            <th class="px-3 py-2 text-left">구현 핵심</th>
+            <th class="px-3 py-2 text-left w-24">상태</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <tr>
+            <td class="px-3 py-3 font-mono text-xs">OBN-01</td>
+            <td class="px-3 py-3">Personal workspace 자동 시드 + race 방지 (Sprint 15 lazy seed 회귀 검증)</td>
+            <td class="px-3 py-3"><code>tests/auth/test_personal_workspace_race.py</code> 3 PASS — partial unique index + ON CONFLICT idempotency. 신규 코드 0건 (회귀 test only).</td>
+            <td class="px-3 py-3 text-emerald-700 font-bold">✅</td>
+          </tr>
+          <tr>
+            <td class="px-3 py-3 font-mono text-xs">OBN-02</td>
+            <td class="px-3 py-3">Progress indicator 1/4~4/4 + state persistence (server-side)</td>
+            <td class="px-3 py-3"><code>User.onboarding_step</code>/<code>onboarded_at</code> column + onboarding 도메인 신설 + 4 단계 BE event hook + FE <code>useOnboarding()</code> + <code>OnboardingBanner</code> server state refactor.</td>
+            <td class="px-3 py-3 text-emerald-700 font-bold">✅</td>
+          </tr>
+          <tr>
+            <td class="px-3 py-3 font-mono text-xs">OBN-03</td>
+            <td class="px-3 py-3">첫 회의 업로드 가이드 + 빈 state copy</td>
+            <td class="px-3 py-3"><code>EmptyState</code> 에 <code>onboardingStep</code>+<code>context</code> prop — meetings/projects/notes 3 위치 적용. Export discoverability (BUG-C04) 도 동반.</td>
+            <td class="px-3 py-3 text-emerald-700 font-bold">✅</td>
+          </tr>
+          <tr>
+            <td class="px-3 py-3 font-mono text-xs">OBN-04</td>
+            <td class="px-3 py-3">Mobile onboarding 최적화 + BL-017 FAB collision fix</td>
+            <td class="px-3 py-3">FAB↔BottomNav collision (memory page) fix + banner flex-wrap (header/dots/CTA 3 위치) + mobile-responsive spec OBN-04 case.</td>
+            <td class="px-3 py-3 text-emerald-700 font-bold">✅</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 3. Playwright E2E -->
+  <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+    <h2 class="text-xl font-bold mb-6">3. Playwright E2E G1~G8 결과</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-100 text-gray-700">
+          <tr>
+            <th class="px-3 py-2 text-left w-12">#</th>
+            <th class="px-3 py-2 text-left">시나리오</th>
+            <th class="px-3 py-2 text-left">Spec</th>
+            <th class="px-3 py-2 text-left w-32">상태</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <tr><td class="px-3 py-2 font-mono">G1</td><td class="px-3 py-2">signup → workspace 자동 → Step 1/4</td><td class="px-3 py-2"><code>home.spec.ts</code></td><td class="px-3 py-2 text-emerald-700 font-bold">✅ 보강</td></tr>
+          <tr><td class="px-3 py-2 font-mono">G2</td><td class="px-3 py-2">첫 프로젝트 생성 → Step 2/4</td><td class="px-3 py-2"><code>first-project.spec.ts</code></td><td class="px-3 py-2 text-emerald-700 font-bold">✅ NEW</td></tr>
+          <tr><td class="px-3 py-2 font-mono">G3</td><td class="px-3 py-2">회의 distillation → Step 3/4</td><td class="px-3 py-2"><code>meeting-upload.spec.ts</code> (HEAVY)</td><td class="px-3 py-2 text-amber-700 font-bold">⚠️ CO</td></tr>
+          <tr><td class="px-3 py-2 font-mono">G4</td><td class="px-3 py-2">RAG ask → citation + Step 4/4 → banner hide</td><td class="px-3 py-2"><code>rag-citation.spec.ts</code></td><td class="px-3 py-2 text-amber-700 font-bold">⚠️ CO (skip)</td></tr>
+          <tr><td class="px-3 py-2 font-mono">G5</td><td class="px-3 py-2">action 완료 → 통계 갱신</td><td class="px-3 py-2"><code>qa-sentinel-p0.spec.ts</code></td><td class="px-3 py-2 text-amber-700 font-bold">⚠️ CO</td></tr>
+          <tr><td class="px-3 py-2 font-mono">G6</td><td class="px-3 py-2">두 번째 user 초대 → IDOR</td><td class="px-3 py-2"><code>invite-page-regression.spec.ts</code> + p0</td><td class="px-3 py-2 text-amber-700 font-bold">⚠️ CO</td></tr>
+          <tr><td class="px-3 py-2 font-mono">G7</td><td class="px-3 py-2">logout → login → state 보존</td><td class="px-3 py-2"><code>auth-relogin.spec.ts</code></td><td class="px-3 py-2 text-emerald-700 font-bold">✅ NEW</td></tr>
+          <tr><td class="px-3 py-2 font-mono">G8</td><td class="px-3 py-2">meeting export discoverability + Markdown download</td><td class="px-3 py-2"><code>meeting-export.spec.ts</code></td><td class="px-3 py-2 text-emerald-700 font-bold">✅ NEW</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-4 text-sm text-gray-600">📌 G3/G5/G6 progress assertion 보강 + G4 SSE mock 디버깅 = Sprint 23+ Carry-over (CO-11/12). 본 sprint 는 NEW 3 + 보강 1 + Sprint 21 의 기존 11 spec 유지.</p>
+  </section>
+
+  <!-- 4. Codex review timeline -->
+  <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+    <h2 class="text-xl font-bold mb-6">4. Codex Review Timeline</h2>
+    <div class="space-y-4">
+      <div class="border-l-4 border-amber-500 pl-4">
+        <div class="flex items-baseline gap-2">
+          <span class="font-bold">1차 Plan Review</span>
+          <span class="text-amber-700 font-mono text-sm bg-amber-50 px-2 py-0.5 rounded">REVISE</span>
+        </div>
+        <p class="text-sm text-gray-700 mt-1">7 findings (P1 ×2 + P2 ×5) 모두 fact-based — codebase 의 실제 위치/모듈/구조를 plan 이 잘못 기술. <strong>100% 수락 → plan v2 patch commit <code class="commit-sha">2532a43</code></strong>.</p>
+        <ul class="text-xs text-gray-600 mt-2 ml-4 list-disc space-y-1">
+          <li><strong>F1 P1</strong>: lazy seed 자체에 step=1 hook (signup path 가 create_workspace 통과 안 함)</li>
+          <li><strong>F2 P1</strong>: OnboardingService hook = commit() 직전 위치 (UPDATE rollback 방지)</li>
+          <li><strong>F3 P2</strong>: step=3 trigger = <code>meeting.created_by_id</code> (workspace.owner_id 아님)</li>
+          <li><strong>F4 P2</strong>: <code>backend/src/main.py</code> (backend/main.py 가 아님)</li>
+          <li><strong>F5 P2</strong>: <code>src.common.database.get_async_session</code></li>
+          <li><strong>F6 P2</strong>: drift gate = <code>PR2_MANAGED_COLUMNS</code> tuple</li>
+          <li><strong>F7 P2</strong>: RagService session = <code>self.embedding_repo.session</code> 재사용</li>
+        </ul>
+      </div>
+      <div class="border-l-4 border-emerald-500 pl-4">
+        <div class="flex items-baseline gap-2">
+          <span class="font-bold">1.5차 Schema Review</span>
+          <span class="text-emerald-700 font-mono text-sm bg-emerald-50 px-2 py-0.5 rounded">APPROVE</span>
+        </div>
+        <p class="text-sm text-gray-700 mt-1">Task 1 BE schema 완료 후. "The changes add the onboarding columns consistently across the SQLModel model, Alembic migration, drift-gate allowlist, and documentation. I did not identify any discrete correctness issue in the changed code."</p>
+      </div>
+      <div class="border-l-4 border-indigo-500 pl-4">
+        <div class="flex items-baseline gap-2">
+          <span class="font-bold">2차 Diff Review</span>
+          <span class="text-indigo-700 font-mono text-sm bg-indigo-50 px-2 py-0.5 rounded">진행 중</span>
+        </div>
+        <p class="text-sm text-gray-700 mt-1">전체 30 commits diff vs origin/main. PR #97 머지 직전 verdict 확인.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Sentry observability -->
+  <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+    <h2 class="text-xl font-bold mb-6">5. Sentry Observability</h2>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <h3 class="font-bold text-purple-700">Backend</h3>
+        <ul class="mt-2 text-sm space-y-1">
+          <li>📦 <code>sentry-sdk[fastapi]</code></li>
+          <li>🔐 <code>SENTRY_DSN: SecretStr</code> conditional init</li>
+          <li>🧹 PII scrub <code>before_send</code> — email/transcript/audio_url/password redact</li>
+          <li>📊 sample rate 0.1 (traces) / 1.0 (errors)</li>
+          <li>🔗 ADR-021 Nygard 4-section</li>
+        </ul>
+      </div>
+      <div class="bg-pink-50 border border-pink-200 rounded-lg p-4">
+        <h3 class="font-bold text-pink-700">Frontend (Next.js 16)</h3>
+        <ul class="mt-2 text-sm space-y-1">
+          <li>📦 <code>@sentry/nextjs</code></li>
+          <li>📁 sentry.client/server/edge.config.ts</li>
+          <li>📁 <code>instrumentation.ts</code> 의 <code>onRequestError</code> hook</li>
+          <li>🌐 <code>withSentryConfig</code> wrapper (next.config.ts)</li>
+          <li>🧹 user.email/ip_address redact in beforeSend</li>
+        </ul>
+      </div>
+    </div>
+    <p class="mt-4 text-sm text-gray-600">📌 OpenTelemetry full instrumentation 은 Sprint 23+ CO-1. 본 sprint 의 Sentry baseline 은 "첫 user crash 즉시 알람" 에 최적화.</p>
+  </section>
+
+  <!-- 6. Commits timeline -->
+  <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+    <h2 class="text-xl font-bold mb-6">6. Commits Timeline (30 commits, 9 tasks)</h2>
+    <div class="space-y-3 text-sm">
+      <div class="border-l-2 border-gray-300 pl-3">
+        <div class="font-bold">Stage 1+2 (spec + plan + Codex 1차 patch)</div>
+        <ul class="font-mono text-xs space-y-0.5 mt-1 text-gray-700">
+          <li><span class="text-indigo-600">a699335</span> docs: Sprint 22 spec 작성 (brainstorming 산출물)</li>
+          <li><span class="text-indigo-600">09f0018</span> docs: Sprint 22 plan v1 작성 (writing-plans)</li>
+          <li><span class="text-amber-600">2532a43</span> docs: plan v2 + spec v2 — Codex 1차 7 finding 수락 patch</li>
+        </ul>
+      </div>
+      <div class="border-l-2 border-emerald-400 pl-3">
+        <div class="font-bold">Task 1 — BE Schema (6 commits)</div>
+        <ul class="font-mono text-xs space-y-0.5 mt-1 text-gray-700">
+          <li><span class="text-emerald-600">8d762e9</span> feat(auth): User onboarding_step + onboarded_at column</li>
+          <li><span class="text-emerald-600">6d05053</span> feat(auth): UserResponse onboardingStep + onboardedAt 필드</li>
+          <li><span class="text-emerald-600">59aa479</span> feat(alembic): users.onboarding_step + onboarded_at + backfill step=4</li>
+          <li><span class="text-emerald-600">0f71031</span> fix(alembic): onboarded_at DateTime() timezone naive align</li>
+          <li><span class="text-emerald-600">51cd708</span> test(alembic): drift gate allowlist</li>
+          <li><span class="text-emerald-600">6d94a07</span> docs: User onboarding atomic doc sync</li>
+        </ul>
+      </div>
+      <div class="border-l-2 border-emerald-400 pl-3">
+        <div class="font-bold">Task 2 — BE Event Hooks + Onboarding Module (7 commits + polish)</div>
+        <ul class="font-mono text-xs space-y-0.5 mt-1 text-gray-700">
+          <li><span class="text-emerald-600">a310331</span> feat(onboarding): 도메인 모듈 신설 (service/repo/router/schema/test)</li>
+          <li><span class="text-emerald-600">46f5422</span> feat(onboarding): router include 추가</li>
+          <li><span class="text-emerald-600">f389607</span> feat(onboarding): step=1 hook — lazy seed + create_workspace 양쪽</li>
+          <li><span class="text-emerald-600">b773ad6</span> feat(projects): step=2 hook</li>
+          <li><span class="text-emerald-600">8ecd879</span> feat(meetings): pipeline distillation step=3 hook</li>
+          <li><span class="text-emerald-600">66fdbca</span> feat(rag): ask step=4 + EmbeddingRepository.session 재사용</li>
+          <li><span class="text-emerald-600">dd4498c</span> docs: onboarding 도메인 atomic doc sync</li>
+          <li><span class="text-emerald-600">3c34286</span> polish: OnboardingResponse model_validate + Meeting None guard</li>
+        </ul>
+      </div>
+      <div class="border-l-2 border-emerald-400 pl-3">
+        <div class="font-bold">Task 3 — Race Regression Test (1 commit)</div>
+        <ul class="font-mono text-xs space-y-0.5 mt-1 text-gray-700">
+          <li><span class="text-emerald-600">df26f28</span> test(auth): personal workspace lazy seed idempotency 회귀 test 3 PASS</li>
+        </ul>
+      </div>
+      <div class="border-l-2 border-emerald-400 pl-3">
+        <div class="font-bold">Task 4-6 — FE Onboarding UI + OBN-03 + OBN-04 (7 commits)</div>
+        <ul class="font-mono text-xs space-y-0.5 mt-1 text-gray-700">
+          <li><span class="text-emerald-600">bcbd151</span> feat(fe/onboarding): useOnboarding hook + api + schemas</li>
+          <li><span class="text-emerald-600">4dcf496</span> feat(fe/home): OnboardingBanner server state + progress indicator</li>
+          <li><span class="text-emerald-600">e0386b2</span> feat(fe): React Query invalidate onboarding</li>
+          <li><span class="text-emerald-600">2522b56</span> feat(fe): EmptyState onboarding-aware copy</li>
+          <li><span class="text-emerald-600">fa62aba</span> feat(fe): Export button discoverability — 텍스트 라벨 + tooltip</li>
+          <li><span class="text-emerald-600">c22233d</span> fix(fe/mobile): FAB-bottom-nav collision (BL-017)</li>
+          <li><span class="text-emerald-600">0b3bf82</span> test(e2e): mobile-responsive OnboardingBanner + FAB collision</li>
+        </ul>
+      </div>
+      <div class="border-l-2 border-emerald-400 pl-3">
+        <div class="font-bold">Task 7 — Sentry FE+BE (3 commits)</div>
+        <ul class="font-mono text-xs space-y-0.5 mt-1 text-gray-700">
+          <li><span class="text-emerald-600">60e8266</span> feat(obs): Sentry BE wire + PII scrub before_send</li>
+          <li><span class="text-emerald-600">10fdaf2</span> feat(obs): Sentry FE wire (@sentry/nextjs + instrumentation)</li>
+          <li><span class="text-emerald-600">0428818</span> docs: Sentry env + ADR-021 observability</li>
+        </ul>
+      </div>
+      <div class="border-l-2 border-emerald-400 pl-3">
+        <div class="font-bold">Task 8 — Playwright E2E (2 commits)</div>
+        <ul class="font-mono text-xs space-y-0.5 mt-1 text-gray-700">
+          <li><span class="text-emerald-600">34bc9d9</span> test(e2e): G2/G7/G8 NEW spec + G1 onboarding-banner assertion</li>
+          <li><span class="text-emerald-600">ec71ab3</span> docs: Sprint 22 Playwright E2E 결과 + dogfooding walkthrough</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. Carry-over -->
+  <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+    <h2 class="text-xl font-bold mb-6">7. Carry-over (Sprint 23+)</h2>
+    <div class="grid md:grid-cols-2 gap-3 text-sm">
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div class="font-bold">CO-1 OpenTelemetry</div>
+        <p class="text-gray-700">full instrumentation (Sentry 위 layer, RAG p50/p95)</p>
+      </div>
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div class="font-bold">CO-2 Email reminder</div>
+        <p class="text-gray-700">stuck onboarding (step ≤ 2 + 24h 경과)</p>
+      </div>
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div class="font-bold">CO-3 Onboarding step 5+</div>
+        <p class="text-gray-700">collaboration (첫 댓글 / 첫 share)</p>
+      </div>
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div class="font-bold">CO-4 A/B test framework</div>
+        <p class="text-gray-700">OnboardingBanner copy variation</p>
+      </div>
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div class="font-bold">CO-5 BL-050 잔여 3 entity</div>
+        <p class="text-gray-700">memory_items / memory_ai_calls / promotion_audit</p>
+      </div>
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div class="font-bold">CO-6 ADR-019 Phase B</div>
+        <p class="text-gray-700">Gemini 3.1-flash-lite 코드 swap (2026-05-28)</p>
+      </div>
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div class="font-bold">CO-7 Clerk webhook</div>
+        <p class="text-gray-700">Sprint 19 PR #3 BUG-AUTH-WH</p>
+      </div>
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div class="font-bold">CO-8/9/10 Sentry ops</div>
+        <p class="text-gray-700">quota 모니터링 / 배포 체크리스트 / PII linter</p>
+      </div>
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div class="font-bold">CO-11 G3/G5/G6 보강</div>
+        <p class="text-gray-700">Playwright progress assertion (runtime fixture 후)</p>
+      </div>
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div class="font-bold">CO-12 G4 SSE mock 디버깅</div>
+        <p class="text-gray-700">rag-citation.spec.ts skip 해제</p>
+      </div>
+      <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div class="font-bold">CO-13 test_config.py +3</div>
+        <p class="text-gray-700">본 sprint 무관 baseline pyright</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. References -->
+  <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+    <h2 class="text-xl font-bold mb-4">8. References</h2>
+    <ul class="text-sm space-y-1">
+      <li>📋 PR <a class="text-indigo-600 underline" href="https://github.com/woosung-dev/kairos/pull/97">#97</a> (base=main, head=sprint-22/onboarding-e2e-obs)</li>
+      <li>📑 Spec: <code>docs/superpowers/specs/2026-05-19-sprint22-onboarding-e2e-obs.md</code></li>
+      <li>📑 Plan: <code>docs/superpowers/plans/2026-05-19-sprint22-tasks.md</code> (v2 patch <code>2532a43</code>)</li>
+      <li>📑 ADR-021 Sentry: <code>docs/dev-log/021-sentry-observability.md</code></li>
+      <li>📑 Playwright 결과: <code>docs/dev-log/2026-05-19-sprint22-playwright-e2e.md</code></li>
+      <li>📑 Dogfooding: <code>docs/dev-log/2026-05-19-sprint22-dogfooding.md</code></li>
+      <li>📑 진입 baseline: main HEAD <code>1a83af6</code> (Sprint 21 BL-050 Simple 4)</li>
+    </ul>
+  </section>
+
+</main>
+
+<footer class="bg-gray-900 text-gray-400 text-center py-8 text-sm">
+  <p>Sprint 22 expressive-squirrel · 2026-05-19 · Kairos</p>
+  <p class="mt-1 text-xs opacity-70">"첫 외부 user 가 가입 → 첫 RAG 응답까지 24h 내 도달, production-observable 한 여정."</p>
+</footer>
+
+</body>
+</html>
