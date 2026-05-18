@@ -9,6 +9,11 @@ from sqlmodel import Field, SQLModel
 
 class Project(SQLModel, table=True):
     __tablename__ = "projects"
+    __table_args__ = (
+        # Sprint 19 PR #2 D3a (Codex v2 F-2): alembic 7ebd009f89a4 의 DB UQ 와 model 정합성
+        # composite FK target 선행 조건 (action_items / notes / mpl / project_members 가 모두 참조)
+        UniqueConstraint("id", "workspace_id", name="uq_projects_id_workspace_id"),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     workspace_id: uuid.UUID = Field(foreign_key="workspaces.id")
