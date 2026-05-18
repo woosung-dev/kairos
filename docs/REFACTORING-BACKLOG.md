@@ -1458,17 +1458,53 @@ E1    2482456 refactor(bl-053): E1 entry — AsyncSession SM 양분 import + cla
 
 ---
 
-## BL-054 — session.execute(stmt).scalars().all() → session.exec(stmt).all() migration
+## BL-054 — session.execute(stmt).scalars().all() → session.exec(stmt).all() migration ✅ **완료 (Sprint 20 cleanup PR #93, 2026-05-18)**
 
-**도메인**: backend / repository ergonomics
+Sprint 20 cleanup PR #93 (branch `cleanup/bl-054-session-exec`, PR #92 위 stack PR, 7 commits).
 
-**증상**: 본 codebase 의 모든 repository 가 `session.execute(stmt).scalars().all()` / `scalar_one_or_none()` 패턴 사용. SQLModel 의 `session.exec(stmt).all()` 는 typed result + boilerplate 제거. BL-053 (AsyncSession 통일) 후 진행 권장.
+### 본 PR 완료 결과 (7 commits, 11 파일)
 
-**해결 방향**:
-1. BL-053 완료 (sqlmodel.AsyncSession 으로 전환) 후 진행
-2. 모든 repository 의 `.execute().scalars()` → `.exec()` 변경
-3. type hint 자동 narrowing (SQLModel typed return)
+```
+F6/F5.9a (closeout) docs(bl-054): F6 closeout — execute manifest 갱신 + 헌법 patch + Codex 2차 review 3 finding 수락
+F3 d211d34 refactor(bl-054): F3 auth + inbox + notes — execute → exec (9 변환, 3 파일)
+F2 56474ef refactor(bl-054): F2 actions + meetings + embeddings — execute → exec (14 변환, 3 파일)
+F1 c30d6dc refactor(bl-054): F1 workspaces + projects + memory — execute → exec (34 호출, 4 파일)
+F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
+```
 
-**우선순위**: ★★☆☆☆ (P2 ergonomics, BL-053 의존)
+### Scope (57 변환 + manifest + 헌법 patch)
 
-**근거**: Sprint 19 PR #2 D9 + BL-052 cleanup PR Plan agent verdict.
+| 영역 | 변환 호출 | commit |
+|---|---|---|
+| F1 workspaces (14) + projects (8) + memory_repo (9) + memory_svc (3) | 34 | F1 |
+| F2 actions (4) + meetings (5) + embeddings (5) | 14 | F2 |
+| F3 auth (3) + inbox (3) + notes (3) | 9 | F3 |
+| **총 G1+G3-convert 변환** | **57** | F1~F3 |
+
+### 유지 (manifest 정합, src/ 잔여 19 호출)
+
+- **G3-keep** (1): actions/repository.py:75 cancel_todo_by_project — `.rowcount` 사용
+- **G3-keep-dialect** (1): memory/repository.py:304 — `pg_insert(...).on_conflict_do_nothing()` (SA dialect insert)
+- **G4 raw text** (17): main.py healthcheck (1) + auth/dependencies.py seed (2) + embeddings/repository.py 8 + memory/repository.py 4 + embeddings 320 cache UPDATE
+
+### 헌법 patch (Codex 1차 MAJOR-1 수락)
+
+- `CONTEXT-MAP.md` I-14: `session.exec() 금지` → manifest 기반 allowlist 명시
+- `backend/CONTEXT.md` B-10: 동일 정정 + N+1 방지 selectinload 동일
+
+### 검증
+
+- pytest tests/ → **321 passed + 1 skipped** (BL-053 후와 동일, 회귀 0)
+- pyright → **132 errors** (BL-053 후 131, +1 미세)
+- manifest 정합 검증 통과: G1 변환 누락 0, 잔여 19 = G3-keep 1 + G3-keep-dialect 1 + G4 17
+
+### Codex evaluator review
+
+- 1차 plan review (verdict REVISE): MAJOR-1 (헌법 충돌) + MAJOR-2 (manifest 불완전) 수락 → F0 manifest 신설 + F6 헌법 patch
+- 2차 diff review (verdict REVISE → F5.9a fix 수락):
+  - MAJOR-1 manifest stale → manifest 갱신 (G2 stale 제거 + G4 17 정확 명시 + F5 gate 정확화)
+  - MAJOR-2 pg_insert unclassified → G3-keep-dialect 카테고리 신설 + memory/repository.py:304 docstring 추가
+  - MINOR-3 rowcount rationale → actions/repository.py:75 docstring 정정 + manifest G3-keep rationale 명확화
+  - 2차 scores: 1=2 / 2=5 / 3=4 / 4=5 / 5=3
+
+**근거**: Sprint 19 PR #2 D9 + BL-052 cleanup PR Plan agent verdict + Codex 1차/2차 review.

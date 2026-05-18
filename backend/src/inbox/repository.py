@@ -16,13 +16,12 @@ class InboxRepository:
         self, inbox_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> InboxItem | None:
         """헌법 I-9 (Codex F-1): inbox_id + workspace_id 동시 필터."""
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(InboxItem).where(
                 InboxItem.id == inbox_id,
                 InboxItem.workspace_id == workspace_id,
             )
-        )
-        return result.scalar_one_or_none()
+        )).one_or_none()
 
     async def find_by_workspace(
         self,
@@ -36,8 +35,7 @@ class InboxRepository:
             stmt = stmt.where(InboxItem.is_processed == is_processed)
         stmt = stmt.order_by(InboxItem.created_at.desc())
         stmt = stmt.offset(offset).limit(limit)
-        result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        return list((await self.session.exec(stmt)).all())
 
     async def count_by_workspace(
         self,
@@ -51,8 +49,7 @@ class InboxRepository:
         )
         if is_processed is not None:
             stmt = stmt.where(InboxItem.is_processed == is_processed)
-        result = await self.session.execute(stmt)
-        return result.scalar_one()
+        return (await self.session.exec(stmt)).one()
 
     async def save(self, item: InboxItem) -> InboxItem:
         self.session.add(item)

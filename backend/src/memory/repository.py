@@ -50,8 +50,7 @@ class MemoryRepository:
             MemoryItem.workspace_id == workspace_id,
             MemoryItem.deleted_at.is_(None),
         )
-        result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        return (await self.session.exec(stmt)).one_or_none()
 
     async def update_distilled(
         self,
@@ -59,7 +58,7 @@ class MemoryRepository:
         distilled_json: dict,
         status: str,
     ) -> None:
-        await self.session.execute(
+        await self.session.exec(
             update(MemoryItem)
             .where(MemoryItem.id == memory_id)
             .values(distilled_json=distilled_json, status=status)
@@ -71,7 +70,7 @@ class MemoryRepository:
         embedding_chunk_id: uuid.UUID,
         status: str,
     ) -> None:
-        await self.session.execute(
+        await self.session.exec(
             update(MemoryItem)
             .where(MemoryItem.id == memory_id)
             .values(embedding_chunk_id=embedding_chunk_id, status=status)
@@ -80,7 +79,7 @@ class MemoryRepository:
     async def update_status(
         self, memory_id: uuid.UUID, status: str
     ) -> None:
-        await self.session.execute(
+        await self.session.exec(
             update(MemoryItem)
             .where(MemoryItem.id == memory_id)
             .values(status=status)
@@ -89,7 +88,7 @@ class MemoryRepository:
     async def update_transcript(
         self, memory_id: uuid.UUID, raw_content: str
     ) -> None:
-        await self.session.execute(
+        await self.session.exec(
             update(MemoryItem)
             .where(MemoryItem.id == memory_id)
             .values(raw_content=raw_content)
@@ -135,12 +134,11 @@ class MemoryRepository:
             MemoryItem.r2_audio_key.is_not(None),
             MemoryItem.created_at < cutoff,
         )
-        result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        return list((await self.session.exec(stmt)).all())
 
     async def clear_r2_audio_key(self, memory_id: uuid.UUID) -> None:
         """r2_audio_key NULL 처리 — R2 객체 삭제 후 호출."""
-        await self.session.execute(
+        await self.session.exec(
             update(MemoryItem)
             .where(MemoryItem.id == memory_id)
             .values(r2_audio_key=None)
@@ -244,8 +242,10 @@ class MemoryRepository:
             return []
         ids = [row[0] for row in rows]
         items_q = select(MemoryItem).where(MemoryItem.id.in_(ids))
-        items_result = await self.session.execute(items_q)
-        items_map = {item.id: item for item in items_result.scalars().all()}
+        items_map = {
+            item.id: item
+            for item in (await self.session.exec(items_q)).all()
+        }
         return [
             (items_map[row[0]], int(row[1]))
             for row in rows
@@ -265,8 +265,7 @@ class MemoryRepository:
             MemoryQueryEmbeddingCache.normalized_query == normalized_query,
             MemoryQueryEmbeddingCache.created_at >= cutoff,
         )
-        result = await self.session.execute(stmt)
-        cached = result.scalar_one_or_none()
+        cached = (await self.session.exec(stmt)).one_or_none()
         if cached is None or cached.embedding is None:
             return None
         # pgvector read 시 컬럼 타입별 결과 객체:
@@ -287,7 +286,13 @@ class MemoryRepository:
         normalized_query: str,
         embedding: list[float],
     ) -> None:
-        """C3: cache 저장. composite PK 중복 시 INSERT skip (race condition safe)."""
+        """C3: cache 저장. composite PK 중복 시 INSERT skip (race condition safe).
+
+        BL-054 manifest G3-keep-dialect (Codex 2차 review BL-054 F2 MAJOR 수락):
+        PostgreSQL dialect `pg_insert(...).on_conflict_do_nothing()` 는 SA dialect
+        Insert 이며 SQLModel re-export 미존재 + SM exec() 의 type narrow 가
+        dialect insert 를 받지 못함 → session.execute() 영구 유지.
+        """
         # PostgreSQL ON CONFLICT DO NOTHING — 동시 recall 두 건이 동일 query 미스 시 두 번째 INSERT가 IntegrityError 일으키지 않음
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
