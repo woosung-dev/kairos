@@ -17,9 +17,15 @@ class NoteRepository:
         await self.session.flush()
         return note
 
-    async def find_by_id(self, note_id: uuid.UUID) -> Note | None:
+    async def find_by_id(
+        self, note_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> Note | None:
+        """헌법 I-9 (Codex F-1): note_id + workspace_id 동시 필터."""
         result = await self.session.execute(
-            select(Note).where(Note.id == note_id)
+            select(Note).where(
+                Note.id == note_id,
+                Note.workspace_id == workspace_id,
+            )
         )
         return result.scalar_one_or_none()
 

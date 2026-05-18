@@ -1,5 +1,5 @@
 # backend/src/meetings/repository.py
-"""Meeting Repository — AsyncSession 유일 보유자."""
+"""Meeting Repository — AsyncSession 유일 보유자. 헌법 I-9 workspace_id 필수 (Sprint 19 PR #1)."""
 import uuid
 
 from sqlalchemy import func, select
@@ -18,9 +18,15 @@ class MeetingRepository:
         await self.session.flush()
         return meeting
 
-    async def find_by_id(self, meeting_id: uuid.UUID) -> Meeting | None:
+    async def find_by_id(
+        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> Meeting | None:
+        """헌법 I-9 (Codex F-1): meeting_id + workspace_id 동시 필터."""
         result = await self.session.execute(
-            select(Meeting).where(Meeting.id == meeting_id)
+            select(Meeting).where(
+                Meeting.id == meeting_id,
+                Meeting.workspace_id == workspace_id,
+            )
         )
         return result.scalar_one_or_none()
 
@@ -62,41 +68,61 @@ class MeetingRepository:
     async def update_status(
         self,
         meeting_id: uuid.UUID,
+        workspace_id: uuid.UUID,
         status: str,
         error_message: str | None = None,
     ) -> None:
-        meeting = await self.find_by_id(meeting_id)
+        """헌법 I-9 (Codex F-1): mutating 호출도 workspace_id 검증."""
+        meeting = await self.find_by_id(meeting_id, workspace_id)
         if meeting:
             meeting.status = status
             meeting.error_message = error_message
             self.session.add(meeting)
             await self.session.flush()
 
-    async def set_has_transcript(self, meeting_id: uuid.UUID, value: bool) -> None:
-        meeting = await self.find_by_id(meeting_id)
+    async def set_has_transcript(
+        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID, value: bool
+    ) -> None:
+        meeting = await self.find_by_id(meeting_id, workspace_id)
         if meeting:
             meeting.has_transcript = value
             self.session.add(meeting)
             await self.session.flush()
 
-    async def set_has_summary(self, meeting_id: uuid.UUID, value: bool) -> None:
-        meeting = await self.find_by_id(meeting_id)
+    async def set_has_summary(
+        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID, value: bool
+    ) -> None:
+        meeting = await self.find_by_id(meeting_id, workspace_id)
         if meeting:
             meeting.has_summary = value
             self.session.add(meeting)
             await self.session.flush()
 
     async def save_segments(
-        self, meeting_id: uuid.UUID, segments: list[TranscriptSegment]
+        self,
+        meeting_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        segments: list[TranscriptSegment],
     ) -> None:
+        """헌법 I-9 (Codex F-1): meeting workspace 사전 검증 후 INSERT."""
+        meeting = await self.find_by_id(meeting_id, workspace_id)
+        if meeting is None:
+            return
         for seg in segments:
             seg.meeting_id = meeting_id
             self.session.add(seg)
         await self.session.flush()
 
     async def save_summary(
-        self, meeting_id: uuid.UUID, summary_data: dict
-    ) -> MeetingSummary:
+        self,
+        meeting_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        summary_data: dict,
+    ) -> MeetingSummary | None:
+        """헌법 I-9 (Codex F-1): meeting workspace 사전 검증 후 INSERT."""
+        meeting = await self.find_by_id(meeting_id, workspace_id)
+        if meeting is None:
+            return None
         summary = MeetingSummary(
             meeting_id=meeting_id,
             summary=summary_data.get("summary", ""),
@@ -107,17 +133,32 @@ class MeetingRepository:
         await self.session.flush()
         return summary
 
-    async def get_segments(self, meeting_id: uuid.UUID) -> list[TranscriptSegment]:
+    async def get_segments(
+        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> list[TranscriptSegment]:
+        """헌법 I-9: Meeting join 으로 workspace 격리 검증."""
         result = await self.session.execute(
             select(TranscriptSegment)
-            .where(TranscriptSegment.meeting_id == meeting_id)
+            .join(Meeting, TranscriptSegment.meeting_id == Meeting.id)
+            .where(
+                TranscriptSegment.meeting_id == meeting_id,
+                Meeting.workspace_id == workspace_id,
+            )
             .order_by(TranscriptSegment.start_sec)
         )
         return list(result.scalars().all())
 
-    async def get_summary(self, meeting_id: uuid.UUID) -> MeetingSummary | None:
+    async def get_summary(
+        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> MeetingSummary | None:
+        """헌법 I-9: Meeting join 으로 workspace 격리 검증."""
         result = await self.session.execute(
-            select(MeetingSummary).where(MeetingSummary.meeting_id == meeting_id)
+            select(MeetingSummary)
+            .join(Meeting, MeetingSummary.meeting_id == Meeting.id)
+            .where(
+                MeetingSummary.meeting_id == meeting_id,
+                Meeting.workspace_id == workspace_id,
+            )
         )
         return result.scalar_one_or_none()
 

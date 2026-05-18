@@ -219,3 +219,61 @@ Curious 페르소나 5초/30초/1분 첫인상 + Granola.ai landing/onboarding �
 4. (d) 온보딩 개선 우선순위 — 랜딩 헤드라인 vs TTFV 단축 vs Granola 차별점
 5. 자의 결정 라벨 [확인 필요] 5건 응답
 6. PR 단위 분할 vs 통합 (Sprint 18 rollup 패턴 vs 작은 PR)
+
+---
+
+## 9. v3 Lock-in (2026-05-17, 2차 codex BLOCK 반영 + 사용자 최종 결정 4건)
+
+> 본 §9 추가로 위 §0~§8 초안은 **historical record**로 보존. Sprint 19 실제 진행은 v3 기준.
+>
+> v3 single source of truth: `~/.claude/plans/read-docs-dev-log-sprint-19-plan-md-hazy-catmull.md` (PR #9 closeout 시점에 본 doc으로 통합 patch 예정)
+
+### 9.1 v1/v2/v3 진화 audit trail
+
+- **v1** (위 §0~§8 초안) — Sprint 18 Multi-Agent QA + Codex consult 1차. P0 4건 (BUG-C01-EXT/P1-05/C02/C03), P1 7건. 추정 ~50h.
+- **v2** (1차 codex evaluator REVISE) — BUG-C01-EXT를 "4 도메인 전수 endpoint"로 확장 + BUG-C01-EXT-FK 신규 P0 추가. P0 5건 ~36-49h.
+- **v3** (2차 codex evaluator BLOCK) — 헌법 I-9 (CONTEXT-MAP.md:208 "모든 Repository workspace filter 강제") 위반 발견. BUG-C01-EXT를 "workspace-scoped endpoint 전체 30+"로 재정의 + 새 P0 4건 추가 (AUTH-WH/UPL-OWN/PROJ-DEL/PIPE-LLM). P0 9건 ~72-107h, P1 전부 Sprint 20 carry-over.
+
+### 9.2 사용자 결정 4건 (v3 final)
+
+| # | 결정 | 영향 |
+|---|---|---|
+| 1 | **Scope = tenant/auth boundary만** | P1 (BUG-C04/Mobile/Power/온보딩/pg_prewarm) 전부 Sprint 20 carry-over |
+| 2 | **새 P0 4건 (AUTH-WH/UPL-OWN/PROJ-DEL/PIPE-LLM) 모두 Sprint 19 in** | 헌법 I-9 + 2차 codex BLOCK 해소 |
+| 3 | **BUG-C01-EXT 범위 = workspace-scoped endpoint 전체 30+** | PR #1 commit 도메인별 8 분할 (meetings/notes/inbox/actions/projects/workspaces/upload/auth) |
+| 4 | **기간 = 2주 유지 + P1 전부 Sprint 20 carry-over** | working hours ~80h를 P0 9건 + closeout으로 풀 활용 |
+
+### 9.3 v3 P0 9건 (Sprint 19 in, ~84-122h — matrix 45 lock-in 후 갱신)
+
+1. **BUG-C01-EXT v3** — workspace-scoped endpoint **45** workspace_id 강제 (**42-60h**) — PR #1 진입 직전 ripgrep으로 확정:
+   - projects 11 / meetings 6 / notes 6 / memory 5 / workspaces (member 3 + invite 3 + main 2) 8 / inbox 3 / actions 3 / upload 2 / rag 1
+2. **BUG-C01-EXT-FK** — inbox.classify + actions.create FK 검증 (6-8h)
+3. **BUG-AUTH-WH** — Clerk webhook Svix 서명 검증 (4-6h)
+4. **BUG-UPL-OWN** — upload_assets DB ledger + alembic (6-10h)
+5. **BUG-PROJ-DEL** — project delete cascade 정책 + alembic (8-12h)
+6. **BUG-PIPE-LLM** — LLM 추천 project_id set membership 검증 (2-3h)
+7. **BUG-P1-05 + P1-06** — 보안 헤더 + SlowAPI middleware ordering (12-14h)
+8. **BUG-C02 + BUG-C03** — `/projects` `/meetings` page + FE/BE API contract 통일 (8-13h)
+9. **closeout** — verification + nightly heavy spec + retro (4-6h)
+
+**Sprint 19 총계 (matrix 45 lock-in)**: **~92-132h (Day 1-14)** — working hours ~80h 초과. Day 10 진행률 측정 후 (a) P1 즉시 Sprint 20 이동 (b) 상한 시 1주 연장 결정 사용자 요청.
+
+### 9.4 v3 PR 9개 stack (Sprint 18 #87 9-batch rollup 패턴)
+
+`PR #1` BUG-C01-EXT v3 (**10 도메인 commit**: meetings/notes/inbox/actions/projects/memory/rag/workspaces/upload/closeout-CONTEXT-MAP) → `#2` FK → `#3` AUTH-WH → `#4` UPL-OWN (alembic) → `#5` PROJ-DEL (alembic) → `#6` PIPE-LLM → `#7` P1-05+P1-06 → `#8` C02+C03+API contract → `#9` closeout
+
+### 9.5 PR #1 진입 직전 [확인 필요] 5건
+
+1. ~~endpoint 매트릭스 30+ 자동 생성 후 사용자 확정~~ → **DONE 2026-05-17 (45개 lock-in)**
+2. BUG-PROJ-DEL 정책 (cascade vs archive only) — PR #5 진입 시. **권장: archive only (단순, 시간 절약 + 데이터 손실 회피)**
+3. BUG-UPL-OWN 기존 R2 객체 backfill 정책 — PR #4 진입 시
+4. CSP report endpoint (BE `/api/v1/security/csp-report` vs Sentry) — PR #7 진입 시
+5. BUG-C03 실제 진입점 — Casual 페르소나 보고서 재확인 (PR #8 진입 시)
+
+### 9.6 v3 lock-in 다음 단계
+
+1. 워크트리 `../kairos-sprint-19` + 브랜치 `sprint-19/tenant-boundary-hardening`
+2. PR #1 진입 직전 endpoint 매트릭스 자동 생성 (ripgrep 2건)
+3. 사용자 매트릭스 확정 후 회귀 테스트 골격부터 작성 (TDD failing → fix)
+4. 도메인별 commit 분할 진행
+5. 각 PR 머지 사이클은 Git Safety Protocol (커밋/푸쉬/배포 모니터링 3단계 사용자 승인)

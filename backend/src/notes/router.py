@@ -42,7 +42,7 @@ async def get_note(
     member: WorkspaceMember = Depends(require_viewer),
     service: NoteService = Depends(get_note_service),
 ):
-    return await service.get_note(note_id)
+    return await service.get_note(note_id, workspace_id)
 
 
 @router.get("/{note_id}/export")
@@ -53,7 +53,9 @@ async def export_note(
     member: WorkspaceMember = Depends(require_viewer),
     service: NoteService = Depends(get_note_service),
 ):
-    content, filename, media_type = await service.export_note(note_id, format)
+    content, filename, media_type = await service.export_note(
+        note_id, workspace_id, format
+    )
     encoded = quote(filename)
     return Response(
         content=content,
@@ -79,8 +81,10 @@ async def create_note(
         content=data.content,
         project_id=pid,
     )
-    # embedding은 orchestrator 경유 (ADR-014 옵션 A 정합)
-    background_tasks.add_task(pipeline.embed_note_async, uuid.UUID(result["id"]))
+    # embedding 은 orchestrator 경유 (ADR-014 옵션 A 정합) — Codex F-1: workspace_id 동반
+    background_tasks.add_task(
+        pipeline.embed_note_async, uuid.UUID(result["id"]), workspace_id
+    )
     return result
 
 
@@ -101,12 +105,13 @@ async def update_note(
 
     result = await service.update_note(
         note_id=note_id,
+        workspace_id=workspace_id,
         title=data.title,
         content=data.content,
         project_id=pid,
     )
     if data.content is not None:
-        background_tasks.add_task(pipeline.embed_note_async, note_id)
+        background_tasks.add_task(pipeline.embed_note_async, note_id, workspace_id)
     return result
 
 
@@ -117,5 +122,5 @@ async def delete_note(
     member: WorkspaceMember = Depends(require_member),
     pipeline: NotePipelineService = Depends(get_note_pipeline_service),
 ):
-    # embedding cleanup 포함 orchestrator 경유 (ADR-014 옵션 A 정합)
-    await pipeline.delete_note_with_cleanup(note_id)
+    # embedding cleanup 포함 orchestrator 경유 (ADR-014 옵션 A 정합) — Codex H2/옵션 A: workspace_id 필수
+    await pipeline.delete_note_with_cleanup(note_id, workspace_id)

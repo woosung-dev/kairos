@@ -72,15 +72,15 @@ class MeetingService:
         }
 
     async def get_meeting_detail(
-        self, meeting_id: uuid.UUID
+        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> dict:
-        """회의 상세 (요약 + 트랜스크립트 포함)."""
-        meeting = await self.repo.find_by_id(meeting_id)
+        """회의 상세 (요약 + 트랜스크립트 포함). 헌법 I-9 workspace_id 필수 (Codex F-1)."""
+        meeting = await self.repo.find_by_id(meeting_id, workspace_id)
         if meeting is None:
             raise MeetingNotFoundError()
 
-        segments = await self.repo.get_segments(meeting_id)
-        summary = await self.repo.get_summary(meeting_id)
+        segments = await self.repo.get_segments(meeting_id, workspace_id)
+        summary = await self.repo.get_summary(meeting_id, workspace_id)
 
         result = self._to_list_item(meeting)
         result["transcript"] = [
@@ -117,9 +117,11 @@ class MeetingService:
             result["projects"] = []
         return result
 
-    async def get_meeting_status(self, meeting_id: uuid.UUID) -> dict:
-        """회의 처리 상태."""
-        meeting = await self.repo.find_by_id(meeting_id)
+    async def get_meeting_status(
+        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> dict:
+        """회의 처리 상태. 헌법 I-9 workspace_id 필수 (Codex F-1)."""
+        meeting = await self.repo.find_by_id(meeting_id, workspace_id)
         if meeting is None:
             raise MeetingNotFoundError()
         return {
@@ -127,16 +129,18 @@ class MeetingService:
             "errorMessage": meeting.error_message,
         }
 
-    async def export_meeting(self, meeting_id: uuid.UUID, fmt: str) -> tuple[str, str, str]:
-        """회의 내보내기. (content, filename, media_type) 반환."""
-        meeting = await self.repo.find_by_id(meeting_id)
+    async def export_meeting(
+        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID, fmt: str
+    ) -> tuple[str, str, str]:
+        """회의 내보내기 (content, filename, media_type). 헌법 I-9 workspace_id 필수 (Codex F-1)."""
+        meeting = await self.repo.find_by_id(meeting_id, workspace_id)
         if meeting is None:
             raise MeetingNotFoundError()
 
-        segments = await self.repo.get_segments(meeting_id)
-        summary = await self.repo.get_summary(meeting_id)
+        segments = await self.repo.get_segments(meeting_id, workspace_id)
+        summary = await self.repo.get_summary(meeting_id, workspace_id)
 
-        # 액션 아이템 조회
+        # 액션 아이템 조회 (actions 도메인 workspace 격리는 Phase 5 commit C4 에서 강제)
         actions = []
         if self.action_repo:
             actions = await self.action_repo.find_by_meeting(meeting_id)
@@ -145,7 +149,7 @@ class MeetingService:
             content = self._to_markdown(meeting, summary, segments, actions)
             return content, f"{meeting.title}.md", "text/markdown; charset=utf-8"
         else:
-            detail = await self.get_meeting_detail(meeting_id)
+            detail = await self.get_meeting_detail(meeting_id, workspace_id)
             detail["actionItems"] = [
                 {
                     "title": a.title,

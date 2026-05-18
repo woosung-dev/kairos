@@ -61,8 +61,11 @@ async def update_action_item(
 ):
     return await service.update_action_item(
         action_id=action_id,
+        workspace_id=workspace_id,
         title=data.title,
         description=data.description,
+        # Codex F-2 2차: meeting 재배정 forwarding (C7 추가)
+        meeting_id=uuid.UUID(data.meeting_id) if data.meeting_id else None,
         project_id=uuid.UUID(data.project_id) if data.project_id else None,
         assignee_id=uuid.UUID(data.assignee_id) if data.assignee_id else None,
         due_date=data.due_date,

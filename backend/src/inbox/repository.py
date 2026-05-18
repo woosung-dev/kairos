@@ -12,9 +12,15 @@ class InboxRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def find_by_id(self, inbox_id: uuid.UUID) -> InboxItem | None:
+    async def find_by_id(
+        self, inbox_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> InboxItem | None:
+        """헌법 I-9 (Codex F-1): inbox_id + workspace_id 동시 필터."""
         result = await self.session.execute(
-            select(InboxItem).where(InboxItem.id == inbox_id)
+            select(InboxItem).where(
+                InboxItem.id == inbox_id,
+                InboxItem.workspace_id == workspace_id,
+            )
         )
         return result.scalar_one_or_none()
 

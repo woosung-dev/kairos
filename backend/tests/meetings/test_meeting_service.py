@@ -30,11 +30,14 @@ def _make_meeting(meeting_id: uuid.UUID) -> MagicMock:
 async def test_get_meeting_detail_returns_linked_projects():
     """MeetingProjectLink 로 연결된 프로젝트가 projects 필드에 노출된다."""
     meeting_id = uuid.uuid4()
+    workspace_id = uuid.uuid4()
     proj_a = MagicMock(id=uuid.uuid4(), title="제품 로드맵", status="active", visibility="public")
     proj_b = MagicMock(id=uuid.uuid4(), title="신규 기능 spike", status="active", visibility="draft")
 
     mock_repo = AsyncMock()
-    mock_repo.find_by_id.return_value = _make_meeting(meeting_id)
+    meeting_mock = _make_meeting(meeting_id)
+    meeting_mock.workspace_id = workspace_id
+    mock_repo.find_by_id.return_value = meeting_mock
     mock_repo.get_segments.return_value = []
     mock_repo.get_summary.return_value = None
 
@@ -42,7 +45,7 @@ async def test_get_meeting_detail_returns_linked_projects():
     mock_project_repo.find_projects_by_meeting.return_value = [proj_a, proj_b]
 
     service = MeetingService(repo=mock_repo, project_repo=mock_project_repo)
-    result = await service.get_meeting_detail(meeting_id)
+    result = await service.get_meeting_detail(meeting_id, workspace_id)
 
     assert len(result["projects"]) == 2
     assert {p["title"] for p in result["projects"]} == {"제품 로드맵", "신규 기능 spike"}
@@ -56,9 +59,12 @@ async def test_get_meeting_detail_returns_linked_projects():
 async def test_get_meeting_detail_empty_projects_when_no_links():
     """링크 없으면 projects 는 빈 배열."""
     meeting_id = uuid.uuid4()
+    workspace_id = uuid.uuid4()
 
     mock_repo = AsyncMock()
-    mock_repo.find_by_id.return_value = _make_meeting(meeting_id)
+    meeting_mock = _make_meeting(meeting_id)
+    meeting_mock.workspace_id = workspace_id
+    mock_repo.find_by_id.return_value = meeting_mock
     mock_repo.get_segments.return_value = []
     mock_repo.get_summary.return_value = None
 
@@ -66,7 +72,7 @@ async def test_get_meeting_detail_empty_projects_when_no_links():
     mock_project_repo.find_projects_by_meeting.return_value = []
 
     service = MeetingService(repo=mock_repo, project_repo=mock_project_repo)
-    result = await service.get_meeting_detail(meeting_id)
+    result = await service.get_meeting_detail(meeting_id, workspace_id)
 
     assert result["projects"] == []
 
@@ -75,13 +81,16 @@ async def test_get_meeting_detail_empty_projects_when_no_links():
 async def test_get_meeting_detail_without_project_repo_still_returns_empty():
     """project_repo 주입 안 됐을 때도 안전하게 빈 배열 (테스트/하위호환)."""
     meeting_id = uuid.uuid4()
+    workspace_id = uuid.uuid4()
 
     mock_repo = AsyncMock()
-    mock_repo.find_by_id.return_value = _make_meeting(meeting_id)
+    meeting_mock = _make_meeting(meeting_id)
+    meeting_mock.workspace_id = workspace_id
+    mock_repo.find_by_id.return_value = meeting_mock
     mock_repo.get_segments.return_value = []
     mock_repo.get_summary.return_value = None
 
     service = MeetingService(repo=mock_repo)  # project_repo 없음
-    result = await service.get_meeting_detail(meeting_id)
+    result = await service.get_meeting_detail(meeting_id, workspace_id)
 
     assert result["projects"] == []

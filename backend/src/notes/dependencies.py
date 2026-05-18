@@ -18,7 +18,11 @@ from src.projects.repository import ProjectRepository
 async def get_note_service(
     session: AsyncSession = Depends(get_async_session),
 ) -> NoteService:
-    return NoteService(repo=NoteRepository(session))
+    # Codex F-2: secondary FK (project_id) cross-tenant 검증용 project_repo 주입
+    return NoteService(
+        repo=NoteRepository(session),
+        project_repo=ProjectRepository(session),
+    )
 
 
 async def get_note_pipeline_service(
