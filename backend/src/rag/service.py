@@ -29,12 +29,16 @@ class RagService:
         """Sprint 22 OBN-02: 첫 RAG 성공 응답 시 step=4 + onboarded_at.
 
         self.embedding_repo.session 재사용 (DI 통한 already-injected session).
+        Codex 2차 finding P2: cache-hit / cache-miss 양 path 모두 commit 명시 — 다른 hook 처럼
+        domain commit 이 동반되지 않으므로 본 위치에서 직접 commit 안 하면 rollback 됨.
         실패해도 RAG 응답 자체는 영향 받지 않도록 graceful (비치명적).
         """
         try:
             from src.onboarding.service import OnboardingService
-            onboarding = OnboardingService(self.embedding_repo.session)
+            session = self.embedding_repo.session
+            onboarding = OnboardingService(session)
             await onboarding.increment_step(user_id, 4)
+            await session.commit()
         except Exception as ob_err:
             logger.warning("onboarding step=4 advance 실패 (비치명적): %s", ob_err)
 

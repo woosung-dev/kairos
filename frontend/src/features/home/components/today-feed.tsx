@@ -100,7 +100,7 @@ function OnboardingBanner() {
         <div className="flex flex-wrap items-center gap-2">
           {step < 2 && (
             <Link
-              href="/new"
+              href="/projects"
               className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium transition-colors cursor-pointer"
               style={{
                 background: "var(--accent)",
