@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, UniqueConstraint
+from sqlalchemy import JSON, ForeignKeyConstraint, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -32,9 +32,22 @@ class MeetingProjectLink(SQLModel, table=True):
     __tablename__ = "meeting_project_links"
     __table_args__ = (
         UniqueConstraint("meeting_id", "project_id", name="uq_meeting_project"),
+        # Sprint 19 PR #2 D6 (BUG-C01-EXT-FK / 헌법 I-9 (9)(10)):
+        # workspace_id 컬럼 신설 + 양쪽 composite FK (project + meeting) = cross-workspace 링크 차단.
+        ForeignKeyConstraint(
+            ["workspace_id", "project_id"],
+            ["projects.workspace_id", "projects.id"],
+            name="fk_mpl_project_workspace",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "meeting_id"],
+            ["meetings.workspace_id", "meetings.id"],
+            name="fk_mpl_meeting_workspace",
+        ),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    workspace_id: uuid.UUID = Field(foreign_key="workspaces.id", index=True)
     meeting_id: uuid.UUID = Field(foreign_key="meetings.id")
     project_id: uuid.UUID = Field(foreign_key="projects.id")
 
