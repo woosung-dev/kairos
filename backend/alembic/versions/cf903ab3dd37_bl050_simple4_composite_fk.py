@@ -63,21 +63,21 @@ def upgrade() -> None:
               JOIN projects p ON p.id = i.ai_suggested_project_id
               WHERE i.ai_suggested_project_id IS NOT NULL AND i.workspace_id != p.workspace_id;
             IF cnt_ib > 0 THEN
-                RAISE EXCEPTION 'BL-050 preflight: inbox_items.suggested mismatch=% (composite FK 추가 불가)', cnt_ib;
+                RAISE EXCEPTION 'BL-050 preflight: inbox_items.suggested mismatch=% (composite FK 추가 불가, fix 후 재실행)', cnt_ib;
             END IF;
 
             SELECT COUNT(*) INTO cnt_ec FROM embedding_chunks ec
               JOIN projects p ON p.id = ec.project_id
               WHERE ec.project_id IS NOT NULL AND ec.workspace_id != p.workspace_id;
             IF cnt_ec > 0 THEN
-                RAISE EXCEPTION 'BL-050 preflight: embedding_chunks.project mismatch=% (composite FK 추가 불가)', cnt_ec;
+                RAISE EXCEPTION 'BL-050 preflight: embedding_chunks.project mismatch=% (composite FK 추가 불가, fix 후 재실행)', cnt_ec;
             END IF;
 
             SELECT COUNT(*) INTO cnt_sc FROM semantic_caches sc
               JOIN projects p ON p.id = sc.project_id
               WHERE sc.project_id IS NOT NULL AND sc.workspace_id != p.workspace_id;
             IF cnt_sc > 0 THEN
-                RAISE EXCEPTION 'BL-050 preflight: semantic_caches.project mismatch=% (composite FK 추가 불가)', cnt_sc;
+                RAISE EXCEPTION 'BL-050 preflight: semantic_caches.project mismatch=% (composite FK 추가 불가, fix 후 재실행)', cnt_sc;
             END IF;
         END $$;
         """
