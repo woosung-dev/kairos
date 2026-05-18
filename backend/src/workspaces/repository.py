@@ -24,32 +24,29 @@ class WorkspaceRepository:
         return workspace
 
     async def find_by_id(self, workspace_id: uuid.UUID) -> Workspace | None:
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(Workspace).where(Workspace.id == workspace_id)
-        )
-        return result.scalar_one_or_none()
+        )).one_or_none()
 
     async def find_by_user(self, user_id: uuid.UUID) -> list[Workspace]:
         """사용자가 속한 워크스페이스 목록."""
-        result = await self.session.execute(
+        return list((await self.session.exec(
             select(Workspace)
             .join(WorkspaceMember, WorkspaceMember.workspace_id == Workspace.id)
             .where(WorkspaceMember.user_id == user_id)
-        )
-        return list(result.scalars().all())
+        )).all())
 
     async def get_member_count(self, workspace_id: uuid.UUID) -> int:
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(func.count())
             .select_from(WorkspaceMember)
             .where(WorkspaceMember.workspace_id == workspace_id)
-        )
-        return result.scalar_one()
+        )).one()
 
     async def update_threshold(
         self, workspace_id: uuid.UUID, threshold: float
     ) -> None:
-        await self.session.execute(
+        await self.session.exec(
             update(Workspace)
             .where(Workspace.id == workspace_id)
             .values(inbox_threshold=threshold, updated_at=datetime.utcnow())
@@ -61,35 +58,32 @@ class WorkspaceRepository:
         self, workspace_id: uuid.UUID, user_id: uuid.UUID
     ) -> WorkspaceMember | None:
         """워크스페이스-유저 조합으로 멤버 조회. RBAC 검증 + I-17 cross-workspace 차단에서 사용."""
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(WorkspaceMember).where(
                 WorkspaceMember.workspace_id == workspace_id,
                 WorkspaceMember.user_id == user_id,
             )
-        )
-        return result.scalar_one_or_none()
+        )).one_or_none()
 
     async def find_member_by_id(
         self, member_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> WorkspaceMember | None:
         """헌법 I-9 (Codex F-1): member_id + workspace_id 동시 필터."""
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(WorkspaceMember).where(
                 WorkspaceMember.id == member_id,
                 WorkspaceMember.workspace_id == workspace_id,
             )
-        )
-        return result.scalar_one_or_none()
+        )).one_or_none()
 
     async def list_members(
         self, workspace_id: uuid.UUID
     ) -> list[WorkspaceMember]:
-        result = await self.session.execute(
+        return list((await self.session.exec(
             select(WorkspaceMember).where(
                 WorkspaceMember.workspace_id == workspace_id
             )
-        )
-        return list(result.scalars().all())
+        )).all())
 
     async def add_member(self, member: WorkspaceMember) -> WorkspaceMember:
         self.session.add(member)
@@ -100,7 +94,7 @@ class WorkspaceRepository:
         self, member_id: uuid.UUID, workspace_id: uuid.UUID, role: str
     ) -> None:
         """헌법 I-9 (Codex F-5): mutation 도 workspace_id WHERE 강제."""
-        await self.session.execute(
+        await self.session.exec(
             update(WorkspaceMember)
             .where(
                 WorkspaceMember.id == member_id,
@@ -113,7 +107,7 @@ class WorkspaceRepository:
         self, member_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> None:
         """헌법 I-9 (Codex F-5): mutation 도 workspace_id WHERE 강제."""
-        await self.session.execute(
+        await self.session.exec(
             delete(WorkspaceMember).where(
                 WorkspaceMember.id == member_id,
                 WorkspaceMember.workspace_id == workspace_id,
@@ -129,41 +123,38 @@ class WorkspaceRepository:
 
     async def find_invite_by_code(self, code: str) -> WorkspaceInvite | None:
         """공개 endpoint 진입점 — code 가 unique 라 workspace_id 불필요."""
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(WorkspaceInvite).where(WorkspaceInvite.code == code)
-        )
-        return result.scalar_one_or_none()
+        )).one_or_none()
 
     async def find_invite_by_id(
         self, invite_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> WorkspaceInvite | None:
         """헌법 I-9 (Codex F-1): invite_id + workspace_id 동시 필터."""
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(WorkspaceInvite).where(
                 WorkspaceInvite.id == invite_id,
                 WorkspaceInvite.workspace_id == workspace_id,
             )
-        )
-        return result.scalar_one_or_none()
+        )).one_or_none()
 
     async def list_invites(
         self, workspace_id: uuid.UUID
     ) -> list[WorkspaceInvite]:
-        result = await self.session.execute(
+        return list((await self.session.exec(
             select(WorkspaceInvite)
             .where(
                 WorkspaceInvite.workspace_id == workspace_id,
                 WorkspaceInvite.is_active.is_(True),
             )
             .order_by(WorkspaceInvite.created_at.desc())
-        )
-        return list(result.scalars().all())
+        )).all())
 
     async def increment_invite_use_count(
         self, invite_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> None:
         """헌법 I-9 (Codex F-5): mutation 도 workspace_id WHERE 강제."""
-        await self.session.execute(
+        await self.session.exec(
             update(WorkspaceInvite)
             .where(
                 WorkspaceInvite.id == invite_id,
@@ -176,7 +167,7 @@ class WorkspaceRepository:
         self, invite_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> None:
         """헌법 I-9 (Codex F-5): mutation 도 workspace_id WHERE 강제."""
-        await self.session.execute(
+        await self.session.exec(
             update(WorkspaceInvite)
             .where(
                 WorkspaceInvite.id == invite_id,
