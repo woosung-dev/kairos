@@ -53,6 +53,8 @@
 | A-3 | **assignee는 워크스페이스 멤버만** (외부 사용자 할당 금지). null 허용 |
 | A-4 | **AI 추출 액션도 사용자 수정 가능** — 출처(`meeting_id`)는 보존 |
 | A-5 | **`due_date`는 `date` 타입 (timezone 없음)**. FE에서 사용자 로컬로 해석 — 시각 표시 시 timezone 추론 금지 |
+| A-6 | **헌법 I-9 (Sprint 19 PR #1, Codex F-1)** — service / repository 모든 메서드 workspace_id 필수. find_by_id(action_id, workspace_id), update_action_item(action_id, workspace_id, ...) 시그니처 |
+| A-7 | **Codex F-2 Critical 3 secondary FK** — create / update 시 project_id / meeting_id / assignee_id 모두 같은 workspace 검증. project = ProjectRepository.find_by_id + project.workspace_id, meeting = MeetingRepository.find_by_id(meeting_id, workspace_id), assignee = WorkspaceRepository.find_member(workspace_id, assignee_id). 거부 시 모두 404 |
 
 ---
 
@@ -65,6 +67,21 @@ GET    /                목록 (필터: project / assignee / status)
 POST   /                생성 (201)
 PATCH  /{id}            수정 (status / assignee / due_date / project_id 등)
 ```
+
+### Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영)
+
+- 인증/인가: `require_member` (POST/PATCH) / `require_viewer` (GET) 통과
+- service / repository: 모든 호출에 path `workspace_id` 필수 (헌법 I-9, A-6)
+  - `service.update_action_item(action_id, workspace_id, ...)`
+  - `repository.find_by_id(action_id, workspace_id)`
+- secondary FK 검증 (Codex F-2 Critical, A-7) — `_verify_secondary_fks` helper:
+  - `project_id` → `ProjectRepository.find_by_id` + `project.workspace_id == workspace_id` → `ProjectNotFoundError` (404)
+  - `meeting_id` → `MeetingRepository.find_by_id(meeting_id, workspace_id)` (이미 시그니처 강제) → `MeetingNotFoundError` (404)
+  - `assignee_id` → `WorkspaceRepository.find_member(workspace_id, assignee_id)` → `NotFoundError("워크스페이스 멤버")` (404)
+  - create + update 양쪽 동일 검증
+- cross-tenant 응답: 모두 404
+- dependencies: `get_action_service` 가 `ProjectRepository` / `MeetingRepository` / `WorkspaceRepository` 동반 주입 (동일 session 공유)
+- 회귀 가드: `backend/tests/integration/test_workspace_idor_matrix.py::TestActionsIDORMatrix` 5 케이스 + `tests/actions/test_actions_service.py` 18 케이스
 
 ---
 

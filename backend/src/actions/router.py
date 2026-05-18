@@ -61,6 +61,7 @@ async def update_action_item(
 ):
     return await service.update_action_item(
         action_id=action_id,
+        workspace_id=workspace_id,
         title=data.title,
         description=data.description,
         project_id=uuid.UUID(data.project_id) if data.project_id else None,

@@ -928,6 +928,8 @@ Project
 
 ### Action Items
 
+> **Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영, 3 secondary FK 가장 큰 분량)**: `require_member` (POST/PATCH) / `require_viewer` (GET) 통과. service / repository 호출에 path `workspace_id` 필수 (`update_action_item(action_id, workspace_id, ...)` / `find_by_id(action_id, workspace_id)`). secondary FK 3건 검증 (Codex F-2 Critical): create + update 양쪽 모두 `project_id` (ProjectRepository.find_by_id + workspace_id 일치) + `meeting_id` (MeetingRepository.find_by_id(meeting_id, workspace_id)) + `assignee_id` (WorkspaceRepository.find_member(workspace_id, assignee_id)) 검증 후 거부 시 404. dependencies 에서 3 repo 동반 주입. 회귀 가드: `backend/tests/integration/test_workspace_idor_matrix.py::TestActionsIDORMatrix` 5 케이스.
+
 #### `GET /api/v1/workspaces/{wid}/action-items`
 
 액션 아이템 목록을 반환한다. 상태, 우선순위, 프로젝트으로 필터링할 수 있다.

@@ -596,11 +596,130 @@ class TestInboxIDORMatrix:
 
 
 class TestActionsIDORMatrix:
-    """actions 도메인 3 endpoint — TODO PR #1 actions commit."""
+    """actions 도메인 3 endpoint + 3 secondary FK (Codex F-2 가장 큰 분량).
 
-    @pytest.mark.skip(reason="PR #1 actions commit 진입 시 활성화")
-    def test_placeholder(self):
-        pass
+    실제 fix 필요: update_action_item (workspace_id + project/meeting/assignee F-2).
+    list_action_items / create_action_item 는 이미 workspace_id 받음 — 회귀 확인.
+    """
+
+    @pytest.mark.asyncio
+    async def test_update_action_item_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """actions #1: PATCH /action-items/{id} — workspace_id 정확 값 (Codex F-3)."""
+        from src.actions.dependencies import get_action_service
+        from src.auth.rbac import require_member
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_member] = lambda: member_a
+
+        action_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.update_action_item.return_value = {
+            "id": str(action_id), "workspaceId": str(workspace_a_id),
+        }
+        app.dependency_overrides[get_action_service] = lambda: mock_service
+
+        response = await client.patch(
+            f"/api/v1/workspaces/{workspace_a_id}/action-items/{action_id}",
+            json={"title": "new title"},
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 200
+        call_args = mock_service.update_action_item.call_args
+        kwargs = call_args.kwargs if call_args else {}
+        workspace_id_seen = kwargs.get("workspace_id")
+        assert workspace_id_seen == workspace_a_id, (
+            f"BUG-C01-EXT v3 actions #1 (Codex F-3): update_action_item workspace_id 미전달. "
+            f"kwargs={kwargs}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_update_action_item_rejects_cross_tenant_project_id(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """Codex F-2 Critical: update_action_item 의 project_id cross-workspace 거부 → 404."""
+        from src.actions.dependencies import get_action_service
+        from src.projects.exceptions import ProjectNotFoundError
+        from src.auth.rbac import require_member
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_member] = lambda: member_a
+
+        action_id = uuid.uuid4()
+        foreign_project_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.update_action_item.side_effect = ProjectNotFoundError()
+        app.dependency_overrides[get_action_service] = lambda: mock_service
+
+        response = await client.patch(
+            f"/api/v1/workspaces/{workspace_a_id}/action-items/{action_id}",
+            json={"projectId": str(foreign_project_id)},
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_update_action_item_rejects_cross_tenant_meeting_id(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """Codex F-2 Critical: update_action_item 의 meeting_id cross-workspace 거부 → 404."""
+        from src.actions.dependencies import get_action_service
+        from src.meetings.exceptions import MeetingNotFoundError
+        from src.auth.rbac import require_member
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_member] = lambda: member_a
+
+        action_id = uuid.uuid4()
+        foreign_meeting_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.update_action_item.side_effect = MeetingNotFoundError()
+        app.dependency_overrides[get_action_service] = lambda: mock_service
+
+        response = await client.patch(
+            f"/api/v1/workspaces/{workspace_a_id}/action-items/{action_id}",
+            json={"meetingId": str(foreign_meeting_id)},
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_update_action_item_rejects_cross_tenant_assignee_id(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """Codex F-2 Critical: update_action_item 의 assignee_id (다른 workspace 멤버) 거부 → 404."""
+        from src.actions.dependencies import get_action_service
+        from src.common.exceptions import NotFoundError
+        from src.auth.rbac import require_member
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_member] = lambda: member_a
+
+        action_id = uuid.uuid4()
+        foreign_user_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.update_action_item.side_effect = NotFoundError("워크스페이스 멤버")
+        app.dependency_overrides[get_action_service] = lambda: mock_service
+
+        response = await client.patch(
+            f"/api/v1/workspaces/{workspace_a_id}/action-items/{action_id}",
+            json={"assigneeId": str(foreign_user_id)},
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_action_repository_find_by_id_requires_workspace_id(self):
+        """Codex F-1 anchor: ActionItemRepository.find_by_id 시그니처."""
+        import inspect
+        from src.actions.repository import ActionItemRepository
+
+        sig = inspect.signature(ActionItemRepository.find_by_id)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: ActionItemRepository.find_by_id workspace_id 필수. "
+            f"params={list(sig.parameters)}"
+        )
 
 
 class TestProjectsIDORMatrix:

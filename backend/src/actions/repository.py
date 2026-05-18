@@ -12,9 +12,15 @@ class ActionItemRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def find_by_id(self, action_id: uuid.UUID) -> ActionItem | None:
+    async def find_by_id(
+        self, action_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> ActionItem | None:
+        """헌법 I-9 (Codex F-1): action_id + workspace_id 동시 필터."""
         result = await self.session.execute(
-            select(ActionItem).where(ActionItem.id == action_id)
+            select(ActionItem).where(
+                ActionItem.id == action_id,
+                ActionItem.workspace_id == workspace_id,
+            )
         )
         return result.scalar_one_or_none()
 

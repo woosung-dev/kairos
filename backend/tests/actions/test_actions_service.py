@@ -148,6 +148,7 @@ class TestUpdateActionItem:
     @pytest.mark.asyncio
     async def test_partial_update(self):
         existing = _make_action(title="old", priority="low", status="open")
+        ws_id = existing.workspace_id
         repo = AsyncMock()
         repo.find_by_id = AsyncMock(return_value=existing)
         repo.save = AsyncMock(side_effect=lambda i: i)
@@ -155,7 +156,7 @@ class TestUpdateActionItem:
 
         service = ActionItemService(repo)
         result = await service.update_action_item(
-            existing.id, title="new", status="done"
+            existing.id, ws_id, title="new", status="done"
         )
         assert result["title"] == "new"
         assert result["status"] == "done"
@@ -166,13 +167,16 @@ class TestUpdateActionItem:
     async def test_none_values_dont_overwrite(self):
         """None 인자는 기존 값을 덮어쓰지 않음 (PATCH 의미)."""
         existing = _make_action(title="유지", priority="high")
+        ws_id = existing.workspace_id
         repo = AsyncMock()
         repo.find_by_id = AsyncMock(return_value=existing)
         repo.save = AsyncMock(side_effect=lambda i: i)
         repo.commit = AsyncMock()
 
         service = ActionItemService(repo)
-        result = await service.update_action_item(existing.id, title=None, priority=None)
+        result = await service.update_action_item(
+            existing.id, ws_id, title=None, priority=None
+        )
         assert result["title"] == "유지"
         assert result["priority"] == "high"
 
@@ -180,16 +184,15 @@ class TestUpdateActionItem:
     async def test_updated_at_refreshed(self):
         """update 후 updated_at 이 변경됨을 확인 (정확한 시간이 아닌 변경 자체)."""
         existing = _make_action()
+        ws_id = existing.workspace_id
         original_updated_at = existing.updated_at
-        # 고정 timestamp 와 wall clock 비교 → 변경 자체만 검증
         repo = AsyncMock()
         repo.find_by_id = AsyncMock(return_value=existing)
         repo.save = AsyncMock(side_effect=lambda i: i)
         repo.commit = AsyncMock()
 
         service = ActionItemService(repo)
-        await service.update_action_item(existing.id, title="t")
-        # service 가 datetime.utcnow() 로 갱신하므로 객체 자체는 바뀌어야 함
+        await service.update_action_item(existing.id, ws_id, title="t")
         assert existing.updated_at is not original_updated_at
 
     @pytest.mark.asyncio
@@ -199,7 +202,7 @@ class TestUpdateActionItem:
         service = ActionItemService(repo)
 
         with pytest.raises(ActionItemNotFoundError):
-            await service.update_action_item(uuid.uuid4(), title="x")
+            await service.update_action_item(uuid.uuid4(), uuid.uuid4(), title="x")
 
 
 class TestToDict:
