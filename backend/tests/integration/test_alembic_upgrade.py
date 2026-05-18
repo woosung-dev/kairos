@@ -82,6 +82,9 @@ PR2_MANAGED_CONSTRAINTS = frozenset(
 PR2_MANAGED_COLUMNS = frozenset(
     {
         ("meeting_project_links", "workspace_id"),  # D6: NOT NULL 강제
+        # Sprint 22 OBN-02 (server-side User onboarding tracker)
+        ("users", "onboarding_step"),
+        ("users", "onboarded_at"),
     }
 )
 
