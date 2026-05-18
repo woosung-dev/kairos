@@ -69,8 +69,11 @@ class ActionItemRepository:
     async def cancel_todo_by_project(self, project_id: uuid.UUID) -> int:
         """프로젝트 archive 시 todo 상태 액션을 cancelled로 변경.
 
-        BL-054 manifest G3-keep: rowcount 반환을 위해 session.execute() 유지
-        (SQLModel exec() 의 ScalarResult 에는 .rowcount 미존재).
+        BL-054 manifest G3-keep: rowcount contract preservation 을 위해 session.execute() 유지.
+        SQLModel exec(UpdateBase) 가 반환하는 result 의 type 이 SQLModel 0.0.37 시점
+        dialect/version 에 따라 CursorResult / ScalarResult 모호 — DML result 의
+        rowcount 접근을 SA Result 의 표준 패턴으로 명시적으로 유지한다
+        (Codex 2차 review BL-054 F3 MINOR 수락).
         """
         result = await self.session.execute(
             update(ActionItem)

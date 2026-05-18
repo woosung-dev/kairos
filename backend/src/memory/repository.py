@@ -286,7 +286,13 @@ class MemoryRepository:
         normalized_query: str,
         embedding: list[float],
     ) -> None:
-        """C3: cache 저장. composite PK 중복 시 INSERT skip (race condition safe)."""
+        """C3: cache 저장. composite PK 중복 시 INSERT skip (race condition safe).
+
+        BL-054 manifest G3-keep-dialect (Codex 2차 review BL-054 F2 MAJOR 수락):
+        PostgreSQL dialect `pg_insert(...).on_conflict_do_nothing()` 는 SA dialect
+        Insert 이며 SQLModel re-export 미존재 + SM exec() 의 type narrow 가
+        dialect insert 를 받지 못함 → session.execute() 영구 유지.
+        """
         # PostgreSQL ON CONFLICT DO NOTHING — 동시 recall 두 건이 동일 query 미스 시 두 번째 INSERT가 IntegrityError 일으키지 않음
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
