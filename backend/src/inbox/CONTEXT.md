@@ -78,6 +78,8 @@ POST   /inbox/{id}/dismiss     → 사용자가 무시 (is_processed=true, proje
 | IB-3 | **dismiss는 삭제 아님** — 감사/되돌리기 위해 보존 |
 | IB-4 | **source_type + source_id 유일성** — 같은 콘텐츠 중복 적재 금지 |
 | IB-5 | **classify는 idempotent + N:M** — 같은 InboxItem을 여러 번 classify해도 마지막 입력의 project_ids/tags가 최종 |
+| IB-6 | **헌법 I-9 (Sprint 19 PR #1, Codex F-1)** — service / repository 모든 메서드 workspace_id 필수. find_by_id(inbox_id, workspace_id), classify(inbox_id, workspace_id, project_ids), dismiss(inbox_id, workspace_id) 시그니처 |
+| IB-7 | **Codex F-2 Critical secondary FK** — classify 의 project_ids 모두 같은 workspace 내인지 ProjectRepository.find_by_id + project.workspace_id 검증. cross-workspace 거부 → 404 (ProjectNotFoundError). add_meeting_link 시그니처 자체 변경은 후속 (PR #2 BUG-C01-EXT-FK alembic) |
 
 ---
 
@@ -90,6 +92,22 @@ GET    /                    목록 (미처리 우선)
 POST   /{id}/classify       확정/수정 (project_ids: list, tags: list)
 POST   /{id}/dismiss        무시
 ```
+
+### Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영)
+
+- 인증/인가: `require_member` (POST classify/dismiss) / `require_viewer` (GET list) 통과
+- service / repository: 모든 호출에 path `workspace_id` 필수 전달 (헌법 I-9, IB-6)
+  - `service.classify(inbox_id, workspace_id, project_ids)`
+  - `service.dismiss(inbox_id, workspace_id)`
+  - `repository.find_by_id(inbox_id, workspace_id)`
+- secondary FK (Codex F-2 Critical, IB-7):
+  - classify 의 `project_ids` 모두 `ProjectRepository.find_by_id` + `project.workspace_id == workspace_id` 검증
+  - cross-workspace project_id 거부 → 404 (`ProjectNotFoundError`)
+  - 사전 검증 통과한 verified_projects 만 add_meeting_link 호출 (cross-workspace meeting/project 링크 생성 차단)
+- cross-tenant 응답:
+  - path workspace 안에 없는 `inbox_id` → 404 (`InboxItemNotFoundError`)
+  - cross-workspace `project_id` → 404 (`ProjectNotFoundError`)
+- 회귀 가드: `backend/tests/integration/test_workspace_idor_matrix.py::TestInboxIDORMatrix` 4 케이스 + `tests/inbox/test_inbox_service.py` 13 케이스
 
 ---
 

@@ -564,6 +564,8 @@ Meeting과 Project은 N:M 관계이며 `MeetingProjectLink` 중간 테이블을 
 
 ### Inbox
 
+> **Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영)**: `require_member` (POST classify/dismiss) / `require_viewer` (GET) 통과. service / repository 호출에 path `workspace_id` 필수 (`classify(inbox_id, workspace_id, project_ids)` / `dismiss(inbox_id, workspace_id)` / `find_by_id(inbox_id, workspace_id)`). secondary FK 검증 (Codex F-2 Critical): classify 의 `project_ids` 모두 같은 workspace 내인지 검증 후 거부 시 404 (`ProjectNotFoundError`). cross-tenant `inbox_id` / `project_id` 시도 → 404. 회귀 가드: `backend/tests/integration/test_workspace_idor_matrix.py::TestInboxIDORMatrix` 4 케이스.
+
 #### `GET /api/v1/workspaces/{wid}/inbox`
 
 Inbox 아이템 목록을 반환한다. AI가 자동 생성한 미분류 항목을 확인할 수 있다.

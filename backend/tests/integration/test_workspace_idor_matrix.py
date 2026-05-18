@@ -477,11 +477,122 @@ class TestNotesIDORMatrix:
 
 
 class TestInboxIDORMatrix:
-    """inbox 도메인 3 endpoint — TODO PR #1 inbox commit."""
+    """inbox 도메인 3 endpoint + secondary FK (Codex F-2).
 
-    @pytest.mark.skip(reason="PR #1 inbox commit 진입 시 활성화")
-    def test_placeholder(self):
-        pass
+    실제 fix 필요: classify (workspace_id + project_ids F-2), dismiss (workspace_id).
+    list_inbox 는 이미 workspace_id 전달 중 — 회귀 PASS 확인.
+    """
+
+    @pytest.mark.asyncio
+    async def test_classify_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """inbox #1: POST /inbox/{id}/classify — workspace_id 정확 값 (Codex F-3)."""
+        from src.inbox.dependencies import get_inbox_service
+        from src.auth.rbac import require_member
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_member] = lambda: member_a
+
+        inbox_id = uuid.uuid4()
+        project_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.classify.return_value = {
+            "id": str(inbox_id), "workspaceId": str(workspace_a_id),
+            "linkedProjects": [],
+        }
+        app.dependency_overrides[get_inbox_service] = lambda: mock_service
+
+        response = await client.post(
+            f"/api/v1/workspaces/{workspace_a_id}/inbox/{inbox_id}/classify",
+            json={"projectIds": [str(project_id)]},
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 200
+        call_args = mock_service.classify.call_args
+        kwargs = call_args.kwargs if call_args else {}
+        args = call_args.args if call_args else ()
+        workspace_id_seen = kwargs.get("workspace_id") or (
+            args[1] if len(args) > 1 else None
+        )
+        assert workspace_id_seen == workspace_a_id, (
+            f"BUG-C01-EXT v3 inbox #1 (Codex F-3): classify workspace_id 미전달. "
+            f"call_args={call_args}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_classify_rejects_cross_tenant_project_ids(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """Codex F-2 Critical: classify 가 cross-workspace project_id 거부 → 404."""
+        from src.inbox.dependencies import get_inbox_service
+        from src.projects.exceptions import ProjectNotFoundError
+        from src.auth.rbac import require_member
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_member] = lambda: member_a
+
+        inbox_id = uuid.uuid4()
+        foreign_project_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.classify.side_effect = ProjectNotFoundError()
+        app.dependency_overrides[get_inbox_service] = lambda: mock_service
+
+        response = await client.post(
+            f"/api/v1/workspaces/{workspace_a_id}/inbox/{inbox_id}/classify",
+            json={"projectIds": [str(foreign_project_id)]},
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 404, (
+            f"BUG-C01-EXT v3 inbox F-2 Critical: classify 가 cross-tenant project_id 거부 안 함. "
+            f"응답={response.status_code} body={response.text[:200]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_dismiss_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """inbox #2: POST /inbox/{id}/dismiss — workspace_id 정확 값 (Codex F-3)."""
+        from src.inbox.dependencies import get_inbox_service
+        from src.auth.rbac import require_member
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_member] = lambda: member_a
+
+        inbox_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.dismiss.return_value = {
+            "id": str(inbox_id), "workspaceId": str(workspace_a_id),
+        }
+        app.dependency_overrides[get_inbox_service] = lambda: mock_service
+
+        response = await client.post(
+            f"/api/v1/workspaces/{workspace_a_id}/inbox/{inbox_id}/dismiss",
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 200
+        call_args = mock_service.dismiss.call_args
+        kwargs = call_args.kwargs if call_args else {}
+        args = call_args.args if call_args else ()
+        workspace_id_seen = kwargs.get("workspace_id") or (
+            args[1] if len(args) > 1 else None
+        )
+        assert workspace_id_seen == workspace_a_id, (
+            f"BUG-C01-EXT v3 inbox #2 (Codex F-3): dismiss workspace_id 미전달. "
+            f"call_args={call_args}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_inbox_repository_find_by_id_requires_workspace_id(self):
+        """Codex F-1 anchor: InboxRepository.find_by_id 시그니처."""
+        import inspect
+        from src.inbox.repository import InboxRepository
+
+        sig = inspect.signature(InboxRepository.find_by_id)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: InboxRepository.find_by_id workspace_id 필수. "
+            f"params={list(sig.parameters)}"
+        )
 
 
 class TestActionsIDORMatrix:

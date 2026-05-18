@@ -43,8 +43,15 @@ def _make_inbox_item(
     )
 
 
-def _make_project(project_id: uuid.UUID) -> SimpleNamespace:
-    return SimpleNamespace(id=project_id, title="프로젝트 X")
+def _make_project(
+    project_id: uuid.UUID, workspace_id: uuid.UUID | None = None
+) -> SimpleNamespace:
+    """Codex F-2: workspace_id 명시 — secondary FK 검증에 필요."""
+    return SimpleNamespace(
+        id=project_id,
+        title="프로젝트 X",
+        workspace_id=workspace_id or uuid.uuid4(),
+    )
 
 
 class TestListInbox:
@@ -109,12 +116,13 @@ class TestClassify:
 
         project_repo = AsyncMock()
         project_repo.add_meeting_link = AsyncMock()
+        # F-2 secondary FK: project 가 같은 workspace 내인지 검증 — 검증 + add_meeting_link 호출
         project_repo.find_by_id = AsyncMock(
-            side_effect=[_make_project(pid) for pid in project_ids]
+            side_effect=[_make_project(pid, ws_id) for pid in project_ids]
         )
 
         service = InboxService(inbox_repo, project_repo)
-        result = await service.classify(item_id, project_ids)
+        result = await service.classify(item_id, ws_id, project_ids)
 
         assert project_repo.add_meeting_link.await_count == 2
         assert len(result["linkedProjects"]) == 2
@@ -135,9 +143,11 @@ class TestClassify:
 
         project_repo = AsyncMock()
         project_repo.add_meeting_link = AsyncMock()
+        # F-2 검증: project_id 가 같은 workspace 내인 mock 반환 (검증 통과 후 source_type 분기)
+        project_repo.find_by_id = AsyncMock(return_value=_make_project(uuid.uuid4(), ws_id))
 
         service = InboxService(inbox_repo, project_repo)
-        result = await service.classify(item_id, [uuid.uuid4()])
+        result = await service.classify(item_id, ws_id, [uuid.uuid4()])
 
         project_repo.add_meeting_link.assert_not_called()
         assert result["linkedProjects"] == []
@@ -149,7 +159,7 @@ class TestClassify:
         service = InboxService(inbox_repo, AsyncMock())
 
         with pytest.raises(InboxItemNotFoundError):
-            await service.classify(uuid.uuid4(), [])
+            await service.classify(uuid.uuid4(), uuid.uuid4(), [])
 
     @pytest.mark.asyncio
     async def test_commit_called_once_cross_repo(self):
@@ -164,11 +174,12 @@ class TestClassify:
 
         project_repo = AsyncMock()
         project_repo.add_meeting_link = AsyncMock()
-        project_repo.find_by_id = AsyncMock(return_value=_make_project(uuid.uuid4()))
+        # F-2 검증: 같은 workspace 의 project 반환
+        project_repo.find_by_id = AsyncMock(return_value=_make_project(uuid.uuid4(), ws_id))
         project_repo.commit = AsyncMock()  # 호출되면 안 됨 — service 가 inbox_repo.commit 만
 
         service = InboxService(inbox_repo, project_repo)
-        await service.classify(item.id, [uuid.uuid4()])
+        await service.classify(item.id, ws_id, [uuid.uuid4()])
 
         inbox_repo.commit.assert_awaited_once()
         project_repo.commit.assert_not_called()
@@ -177,14 +188,15 @@ class TestClassify:
 class TestDismiss:
     @pytest.mark.asyncio
     async def test_marks_processed_and_commits(self):
-        item = _make_inbox_item(uuid.uuid4(), uuid.uuid4())
+        ws_id = uuid.uuid4()
+        item = _make_inbox_item(uuid.uuid4(), ws_id)
         inbox_repo = AsyncMock()
         inbox_repo.find_by_id = AsyncMock(return_value=item)
         inbox_repo.save = AsyncMock()
         inbox_repo.commit = AsyncMock()
         service = InboxService(inbox_repo, AsyncMock())
 
-        result = await service.dismiss(item.id)
+        result = await service.dismiss(item.id, ws_id)
         assert result["isProcessed"] is True
         inbox_repo.commit.assert_awaited_once()
 
@@ -195,7 +207,7 @@ class TestDismiss:
         service = InboxService(inbox_repo, AsyncMock())
 
         with pytest.raises(InboxItemNotFoundError):
-            await service.dismiss(uuid.uuid4())
+            await service.dismiss(uuid.uuid4(), uuid.uuid4())
 
 
 class TestToDict:

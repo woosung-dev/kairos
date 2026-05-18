@@ -42,7 +42,7 @@ async def classify_inbox(
     service: InboxService = Depends(get_inbox_service),
 ):
     project_ids = [uuid.UUID(pid) for pid in data.project_ids]
-    return await service.classify(inbox_id, project_ids)
+    return await service.classify(inbox_id, workspace_id, project_ids)
 
 
 @router.post("/{inbox_id}/dismiss")
@@ -52,4 +52,4 @@ async def dismiss_inbox(
     member: WorkspaceMember = Depends(require_member),
     service: InboxService = Depends(get_inbox_service),
 ):
-    return await service.dismiss(inbox_id)
+    return await service.dismiss(inbox_id, workspace_id)
