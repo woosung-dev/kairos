@@ -15,6 +15,7 @@ from sqlmodel import select, text
 from sqlmodel.ext.asyncio.session import AsyncSession as SMAsyncSession
 from testcontainers.postgres import PostgresContainer
 
+from src.common import database as db_module
 from src.common.database import (
     dispose_engine,
     get_session_factory,
@@ -54,4 +55,8 @@ async def test_session_factory_creates_sqlmodel_async_session(
             typed_result = await session.exec(select(literal_column("1")))
             assert typed_result.one() == 1
     finally:
+        # Codex 2차 review MINOR-1: 다른 test 가 stale factory 를 보지 않도록 global reset.
+        # tests/test_database_pool.py 패턴 정합.
         await dispose_engine()
+        db_module._engine = None
+        db_module._async_session_factory = None
