@@ -3,11 +3,21 @@
 import uuid
 from datetime import date, datetime
 
+from sqlalchemy import ForeignKeyConstraint
 from sqlmodel import Field, SQLModel
 
 
 class ActionItem(SQLModel, table=True):
     __tablename__ = "action_items"
+    __table_args__ = (
+        # Sprint 19 PR #2 D4 (BUG-C01-EXT-FK / 헌법 I-9 (9)): cross-workspace project_id insert 차단.
+        # 기존 single-FK (workspace_id → workspaces.id, project_id → projects.id) 유지 — defense-in-depth.
+        ForeignKeyConstraint(
+            ["workspace_id", "project_id"],
+            ["projects.workspace_id", "projects.id"],
+            name="fk_action_items_project_workspace",
+        ),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     workspace_id: uuid.UUID = Field(foreign_key="workspaces.id")
