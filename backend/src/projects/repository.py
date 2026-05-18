@@ -24,13 +24,12 @@ class ProjectRepository:
         self, project_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> Project | None:
         """헌법 I-9 (Codex F-1): project_id + workspace_id 동시 필터."""
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(Project).where(
                 Project.id == project_id,
                 Project.workspace_id == workspace_id,
             )
-        )
-        return result.scalar_one_or_none()
+        )).one_or_none()
 
     async def find_by_workspace(
         self,
@@ -51,8 +50,7 @@ class ProjectRepository:
             stmt = stmt.where(Project.tags.contains([tag]))
         stmt = stmt.order_by(Project.sort_order, Project.created_at.desc())
         stmt = stmt.offset(offset).limit(limit)
-        result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        return list((await self.session.exec(stmt)).all())
 
     async def count_by_workspace(
         self,
@@ -69,8 +67,7 @@ class ProjectRepository:
         stmt = self._apply_visibility_filter(stmt, requester_user_id, requester_role)
         if status:
             stmt = stmt.where(Project.status == status)
-        result = await self.session.execute(stmt)
-        return result.scalar_one()
+        return (await self.session.exec(stmt)).one()
 
     @staticmethod
     def _apply_visibility_filter(
@@ -130,8 +127,7 @@ class ProjectRepository:
             )
             .order_by(ProjectMember.created_at)
         )
-        result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        return list((await self.session.exec(stmt)).all())
 
     async def is_member(
         self,
@@ -145,8 +141,7 @@ class ProjectRepository:
             ProjectMember.user_id == user_id,
             ProjectMember.workspace_id == workspace_id,
         )
-        result = await self.session.execute(stmt)
-        return result.scalar_one_or_none() is not None
+        return (await self.session.exec(stmt)).one_or_none() is not None
 
     async def add_member(
         self,
@@ -169,7 +164,7 @@ class ProjectRepository:
         workspace_id: uuid.UUID,
     ) -> None:
         """헌법 I-9 (Codex F-1/F-5): mutation 도 workspace_id WHERE."""
-        await self.session.execute(
+        await self.session.exec(
             delete(ProjectMember).where(
                 ProjectMember.project_id == project_id,
                 ProjectMember.user_id == user_id,
@@ -223,7 +218,7 @@ class ProjectRepository:
         project = await self.find_by_id(project_id, workspace_id)
         if project is None:
             raise ProjectNotFoundError()
-        await self.session.execute(
+        await self.session.exec(
             delete(MeetingProjectLink).where(
                 MeetingProjectLink.meeting_id == meeting_id,
                 MeetingProjectLink.project_id == project_id,
@@ -251,5 +246,4 @@ class ProjectRepository:
             )
             .order_by(Project.sort_order, Project.created_at.desc())
         )
-        result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        return list((await self.session.exec(stmt)).all())

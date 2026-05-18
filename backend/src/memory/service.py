@@ -758,7 +758,7 @@ async def _bg_promote_embed(
     async with session_factory() as session:
         repo = MemoryRepository(session)
         # processing 마크
-        await session.execute(
+        await session.exec(
             _update(PromotionAudit)
             .where(PromotionAudit.id == audit_id)
             .values(embedding_status="processing")
@@ -767,7 +767,7 @@ async def _bg_promote_embed(
 
         embedding, _tokens, _elapsed, error = await _call_embedding(embed_text)
         if error or not embedding:
-            await session.execute(
+            await session.exec(
                 _update(PromotionAudit)
                 .where(PromotionAudit.id == audit_id)
                 .values(embedding_status="failed")
@@ -790,7 +790,7 @@ async def _bg_promote_embed(
             chunk_level=2,
         )
         await repo.update_embedding(new_memory_id, chunk.id, "active")
-        await session.execute(
+        await session.exec(
             _update(PromotionAudit)
             .where(PromotionAudit.id == audit_id)
             .values(embedding_status="completed")
