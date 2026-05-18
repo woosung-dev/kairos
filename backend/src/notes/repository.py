@@ -21,13 +21,12 @@ class NoteRepository:
         self, note_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> Note | None:
         """헌법 I-9 (Codex F-1): note_id + workspace_id 동시 필터."""
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(Note).where(
                 Note.id == note_id,
                 Note.workspace_id == workspace_id,
             )
-        )
-        return result.scalar_one_or_none()
+        )).one_or_none()
 
     async def find_by_workspace(
         self,
@@ -40,8 +39,7 @@ class NoteRepository:
         if project_id:
             stmt = stmt.where(Note.project_id == project_id)
         stmt = stmt.order_by(Note.updated_at.desc()).offset(offset).limit(limit)
-        result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        return list((await self.session.exec(stmt)).all())
 
     async def count_by_workspace(
         self,
@@ -55,8 +53,7 @@ class NoteRepository:
         )
         if project_id:
             stmt = stmt.where(Note.project_id == project_id)
-        result = await self.session.execute(stmt)
-        return result.scalar_one()
+        return (await self.session.exec(stmt)).one()
 
     async def delete(self, note: Note) -> None:
         await self.session.delete(note)

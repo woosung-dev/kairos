@@ -14,24 +14,21 @@ class UserRepository:
 
     async def find_by_clerk_id(self, clerk_id: str) -> User | None:
         """Clerk ID로 사용자 조회."""
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(User).where(User.clerk_id == clerk_id)
-        )
-        return result.scalar_one_or_none()
+        )).one_or_none()
 
     async def find_by_email(self, email: str) -> User | None:
         """이메일로 사용자 조회."""
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(User).where(User.email == email)
-        )
-        return result.scalar_one_or_none()
+        )).one_or_none()
 
     async def find_by_id(self, user_id: uuid.UUID) -> User | None:
         """ID로 사용자 조회."""
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(User).where(User.id == user_id)
-        )
-        return result.scalar_one_or_none()
+        )).one_or_none()
 
     async def save(self, user: User) -> User:
         """사용자 저장 (insert or update)."""
