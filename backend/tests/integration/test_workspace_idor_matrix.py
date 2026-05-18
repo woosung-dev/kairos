@@ -20,10 +20,14 @@
 - rag           1  (router.py:24)
 - 합계         45
 
-검증 기준 (TDD 실패 → PR #1 도메인별 fix → PASS):
-1. require_viewer 통과 후 service mock 호출 시 workspace_id 인자 전달 (kwargs 검증)
-2. cross-tenant resource_id 시도 → 403 (현재 404 leak 가능성 차단)
-3. status/body 균일성 (404 vs 403 timing side-channel은 nightly로 격하, Codex M3)
+검증 기준 (TDD 실패 → PR #1 도메인별 fix → PASS, Codex F-3/F-4 반영):
+1. require_viewer 통과 후 service mock 호출 시 workspace_id 정확 값 전달
+   (kwargs.get("workspace_id") == workspace_a_id 또는 positional 정확 위치, Codex F-3)
+2. cross-tenant resource_id 시도 → 404
+   (path workspace 안에 없는 resource = NotFound, Codex F-4 lock-in)
+3. cross-tenant secondary FK (project_id / meeting_id / assignee_id) 시도 → 404
+   (notes update / inbox classify / actions update, Codex F-2 Critical)
+4. 응답 시간 timing side-channel 검증은 nightly heavy spec 으로 격하 (Codex F-4)
 
 본 골격은 PR #1 진입점. 도메인별 commit에서 TODO 마커를 채워나간다.
 """
@@ -167,31 +171,117 @@ class TestMeetingsIDORMatrix:
         )
 
         assert response.status_code == 200
-        # 핵심 assertion: service에 workspace_id 인자 전달 검증
+        # 핵심 assertion (Codex F-3 강한 패턴): 값 동치 비교
         call_args = mock_service.get_meeting_detail.call_args
         kwargs = call_args.kwargs if call_args else {}
         args = call_args.args if call_args else ()
-        assert (
-            "workspace_id" in kwargs
-            or workspace_a_id in args
-            or str(workspace_a_id) in [str(a) for a in args]
-        ), (
-            f"BUG-C01-EXT v3 meetings #1 회귀: "
-            f"service.get_meeting_detail 호출 시 workspace_id 미전달. "
-            f"call_args={call_args}"
+        workspace_id_seen = kwargs.get("workspace_id") or (
+            args[1] if len(args) > 1 else None
+        )
+        assert workspace_id_seen == workspace_a_id, (
+            f"BUG-C01-EXT v3 meetings #1 (Codex F-3): "
+            f"service.get_meeting_detail 호출 시 workspace_id 정확 값 미전달. "
+            f"기대={workspace_a_id} 실제={workspace_id_seen} "
+            f"kwargs={kwargs} args={args}"
         )
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="PR #1 meetings commit 진입 시 활성화")
-    async def test_export_meeting_passes_workspace_id_to_service(self):
-        """meetings #2: GET /meetings/{id}/export — meetings/service.py:136."""
-        pass
+    async def test_export_meeting_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """meetings #2: GET /meetings/{id}/export — service.export_meeting workspace_id 정확 값 (Codex F-3)."""
+        from src.meetings.dependencies import get_meeting_service
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_viewer] = lambda: member_a
+
+        meeting_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.export_meeting.return_value = ("data", "f.md", "text/markdown; charset=utf-8")
+        app.dependency_overrides[get_meeting_service] = lambda: mock_service
+
+        response = await client.get(
+            f"/api/v1/workspaces/{workspace_a_id}/meetings/{meeting_id}/export?format=md",
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 200
+        call_args = mock_service.export_meeting.call_args
+        kwargs = call_args.kwargs if call_args else {}
+        args = call_args.args if call_args else ()
+        workspace_id_seen = kwargs.get("workspace_id") or (
+            args[1] if len(args) > 1 else None
+        )
+        assert workspace_id_seen == workspace_a_id, (
+            f"BUG-C01-EXT v3 meetings #2 (Codex F-3): export_meeting workspace_id 정확 값 미전달. "
+            f"기대={workspace_a_id} 실제={workspace_id_seen} kwargs={kwargs} args={args}"
+        )
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="PR #1 meetings commit 진입 시 활성화")
-    async def test_get_meeting_status_passes_workspace_id_to_service(self):
-        """meetings #3: GET /meetings/{id}/status — meetings/service.py:142."""
-        pass
+    async def test_get_meeting_status_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """meetings #3: GET /meetings/{id}/status — service.get_meeting_status workspace_id 정확 값 (Codex F-3)."""
+        from src.meetings.dependencies import get_meeting_service
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_viewer] = lambda: member_a
+
+        meeting_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.get_meeting_status.return_value = {"status": "ready", "errorMessage": None}
+        app.dependency_overrides[get_meeting_service] = lambda: mock_service
+
+        response = await client.get(
+            f"/api/v1/workspaces/{workspace_a_id}/meetings/{meeting_id}/status",
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 200
+        call_args = mock_service.get_meeting_status.call_args
+        kwargs = call_args.kwargs if call_args else {}
+        args = call_args.args if call_args else ()
+        workspace_id_seen = kwargs.get("workspace_id") or (
+            args[1] if len(args) > 1 else None
+        )
+        assert workspace_id_seen == workspace_a_id, (
+            f"BUG-C01-EXT v3 meetings #3 (Codex F-3): get_meeting_status workspace_id 정확 값 미전달. "
+            f"기대={workspace_a_id} 실제={workspace_id_seen} kwargs={kwargs} args={args}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_meeting_repository_find_by_id_requires_workspace_id(self):
+        """Codex F-1 anchor: MeetingRepository.find_by_id 시그니처 workspace_id 필수."""
+        import inspect
+        from src.meetings.repository import MeetingRepository
+
+        sig = inspect.signature(MeetingRepository.find_by_id)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: MeetingRepository.find_by_id 시그니처에 "
+            f"workspace_id 필수. 현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_meeting_pipeline_process_meeting_requires_workspace_id(self):
+        """Codex F-1 Critical anchor: pipeline 진입점 process_meeting workspace_id 필수."""
+        import inspect
+        from src.meetings.pipeline_service import MeetingPipelineService
+
+        sig = inspect.signature(MeetingPipelineService.process_meeting)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1 (Critical): MeetingPipelineService.process_meeting "
+            f"진입점 시그니처에 workspace_id 필수. 현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_meeting_pipeline_capture_text_requires_workspace_id(self):
+        """Codex F-1 anchor: pipeline 진입점 capture_text workspace_id 필수."""
+        import inspect
+        from src.meetings.pipeline_service import MeetingPipelineService
+
+        sig = inspect.signature(MeetingPipelineService.capture_text)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: MeetingPipelineService.capture_text "
+            f"진입점 시그니처에 workspace_id 필수. 현재 params={list(sig.parameters)}"
+        )
 
 
 class TestNotesIDORMatrix:

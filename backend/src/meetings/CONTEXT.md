@@ -82,6 +82,7 @@
 | M-4 | **트랜스크립트는 검색 가능 단위(L2)로 청킹 후 임베딩** |
 | M-5 | **MeetingSummary는 회의당 1개 (덮어쓰기)** — 재처리 시 기존 요약 교체 |
 | M-6 | **임베딩 단계는 비차단** — 임베딩 실패해도 파이프라인은 `completed`로 종료 (트랜스크립트/요약은 보존) |
+| M-7 | **헌법 I-9 (Sprint 19 PR #1, Codex F-1)** — service/repository/pipeline 진입점 + 모든 내부 호출이 `workspace_id` 필수 수신. `find_by_id` / `get_segments` / `get_summary` / `update_status` / `set_has_*` / `save_*` 모두 `(meeting_id, workspace_id, ...)` 시그니처. `BackgroundTasks.add_task` 도 path `workspace_id` 동반 전달. cross-tenant 시도 → 404 (F-4) |
 
 ---
 
@@ -91,11 +92,31 @@
 
 ```
 POST   /                  인제스트 (202)
+POST   /capture           텍스트 캡처 인제스트 (STT 없이 분석 진입, 202)
 GET    /                  목록
 GET    /{id}              디테일 (요약 + 트랜스크립트)
 GET    /{id}/export       내보내기
 GET    /{id}/status       진행상태 polling
 ```
+
+### Tenant boundary (Sprint 19 PR #1, Codex F-1/F-4/F-6 반영)
+
+- 인증/인가: 모든 endpoint 가 `require_member` (POST) 또는 `require_viewer` (GET/PATCH) 의존성 통과 — workspace 비멤버 접근 403
+- service / repository: 모든 호출 시 path `workspace_id` 필수 전달 (헌법 I-9)
+  - `service.get_meeting_detail(meeting_id, workspace_id)`
+  - `service.export_meeting(meeting_id, workspace_id, fmt)`
+  - `service.get_meeting_status(meeting_id, workspace_id)`
+  - `repository.find_by_id(meeting_id, workspace_id)` / `get_segments` / `get_summary` (read)
+  - `repository.update_status(meeting_id, workspace_id, status, error_message=None)` (write)
+  - `repository.set_has_transcript(meeting_id, workspace_id, value)` / `set_has_summary`
+  - `repository.save_segments(meeting_id, workspace_id, segments)` / `save_summary`
+- Pipeline 진입점 (Codex F-1 Critical):
+  - `pipeline.process_meeting(meeting_id, workspace_id)`
+  - `pipeline.capture_text(meeting_id, workspace_id, transcript_text)`
+  - router `BackgroundTasks.add_task` 에서 path `workspace_id` 동반 전달
+- cross-tenant 응답: path workspace 안에 없는 `meeting_id` → 404 (NotFound). `require_*` 거부 → 403. (F-4 lock-in)
+- secondary FK: meeting 자체는 secondary FK 없음 (workspace 직접 FK). 단 `service.export_meeting` 의 `action_repo.find_by_meeting(meeting_id)` 는 actions 도메인 workspace 격리에 의존 (Phase 5 commit C4 에서 강제)
+- 회귀 가드: `backend/tests/integration/test_workspace_idor_matrix.py::TestMeetingsIDORMatrix` 6 케이스 + `tests/meetings/test_pipeline.py` 4 케이스 + `tests/meetings/test_meeting_service.py` 3 케이스
 
 ---
 

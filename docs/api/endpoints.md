@@ -386,6 +386,8 @@ Cloudflare R2 프리사인드 업로드 URL을 발급한다. 클라이언트는 
 
 ### Meetings
 
+> **Tenant boundary (Sprint 19 PR #1, Codex F-1/F-4/F-6 반영)**: 모든 endpoint 는 `require_member` (POST) / `require_viewer` (GET) 통과. service / repository / pipeline 모든 호출이 path `workspace_id` 동반. cross-tenant `meeting_id` 시도 → 404 (NotFound). pipeline 진입점 (`process_meeting`, `capture_text`) + 내부 mutation (`update_status` / `set_has_*` / `save_*`) 시그니처 모두 workspace_id 필수. secondary FK 없음 (meeting 자체는 workspace 직접 FK). 회귀 가드: `backend/tests/integration/test_workspace_idor_matrix.py::TestMeetingsIDORMatrix`.
+
 #### `POST /api/v1/workspaces/{wid}/meetings`
 
 회의를 생성하고 AI 처리 파이프라인을 트리거한다. 비동기 처리이므로 `202 Accepted`를 반환한다.

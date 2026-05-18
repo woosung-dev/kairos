@@ -4,6 +4,7 @@
 도메인 간 직접 import 금지 원칙을 준수:
 - 모든 Repository는 process_meeting / capture_text 실행 시 세션 팩토리로 직접 생성
 - R2Service, TranscriptionService, AIProcessingService는 생성자 주입
+- 헌법 I-9 (CONTEXT-MAP.md:208): pipeline 진입점 + 모든 내부 호출 workspace_id 필수 (Codex F-1 Critical)
 """
 import logging
 import uuid
@@ -47,6 +48,7 @@ class MeetingPipelineService:
         self,
         *,
         meeting: Meeting,
+        workspace_id: uuid.UUID,
         transcript_text: str,
         auto_confirm_threshold: float,
         segments_data: list[dict],
@@ -56,10 +58,13 @@ class MeetingPipelineService:
         inbox_repo: InboxRepository,
         embedding_service: EmbeddingService,
     ) -> None:
-        """요약 → 액션 추출 → Inbox 적재 → 자동 확정 → 임베딩 → 완료 공통 블록."""
+        """요약 → 액션 추출 → Inbox 적재 → 자동 확정 → 임베딩 → 완료 공통 블록.
+
+        헌법 I-9 (Codex F-1): meeting_repo 호출 시 workspace_id 동반 전달.
+        """
         summary_data = await self.ai_service.summarize(transcript_text)
-        await meeting_repo.save_summary(meeting.id, summary_data)
-        await meeting_repo.set_has_summary(meeting.id, True)
+        await meeting_repo.save_summary(meeting.id, workspace_id, summary_data)
+        await meeting_repo.set_has_summary(meeting.id, workspace_id, True)
 
         existing_projects = await project_repo.find_by_workspace(meeting.workspace_id)
         project_list = [
@@ -70,7 +75,7 @@ class MeetingPipelineService:
             transcript_text, summary_data.get("summary", ""), project_list
         )
 
-        # ActionItem 저장
+        # ActionItem 저장 (workspace_id 명시 — cross-domain orchestrator 안전)
         action_count = 0
         for ai_action in actions_data.get("actionItems", []):
             action_item = ActionItem(
@@ -89,7 +94,7 @@ class MeetingPipelineService:
             await action_repo.save(action_item)
             action_count += 1
 
-        refreshed = await meeting_repo.find_by_id(meeting.id)
+        refreshed = await meeting_repo.find_by_id(meeting.id, workspace_id)
         if refreshed:
             refreshed.action_item_count = action_count
         logger.info("액션 아이템 %d개 추출 완료 (meeting=%s)", action_count, meeting.id)
@@ -116,6 +121,7 @@ class MeetingPipelineService:
         await inbox_repo.save(inbox_item)
 
         if confidence >= auto_confirm_threshold and existing_project_id_str:
+            # add_meeting_link workspace 검증은 Phase 4 inbox commit 에서 도입 (F-2 추가)
             await project_repo.add_meeting_link(meeting.id, uuid.UUID(existing_project_id_str))
             logger.info(
                 "자동 확정: meeting=%s → project=%s (confidence=%.2f)",
@@ -141,11 +147,17 @@ class MeetingPipelineService:
         except Exception as emb_err:
             logger.warning("임베딩 생성 실패 (비치명적, meeting=%s): %s", meeting.id, emb_err)
 
-        await meeting_repo.update_status(meeting.id, "completed")
+        await meeting_repo.update_status(meeting.id, workspace_id, "completed")
         await meeting_repo.commit()
 
-    async def process_meeting(self, meeting_id: uuid.UUID) -> None:
-        """회의 처리 전체 파이프라인. 실패 시 status: failed로 롤백."""
+    async def process_meeting(
+        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> None:
+        """회의 처리 전체 파이프라인. 실패 시 status: failed로 롤백.
+
+        헌법 I-9 Critical (Codex F-1): 진입점 시그니처 workspace_id 필수.
+        BackgroundTasks.add_task 시 router 에서 path workspace_id 동반 전달.
+        """
         async with self._session_factory() as session:
             meeting_repo = MeetingRepository(session)
             project_repo = ProjectRepository(session)
@@ -155,7 +167,7 @@ class MeetingPipelineService:
             embedding_service = EmbeddingService(EmbeddingRepository(session))
 
             try:
-                meeting = await meeting_repo.find_by_id(meeting_id)
+                meeting = await meeting_repo.find_by_id(meeting_id, workspace_id)
                 if meeting is None:
                     return
 
@@ -163,7 +175,7 @@ class MeetingPipelineService:
                 threshold = workspace.inbox_threshold if workspace else 0.9
 
                 # [1] STT
-                await meeting_repo.update_status(meeting_id, "transcribing")
+                await meeting_repo.update_status(meeting_id, workspace_id, "transcribing")
                 await meeting_repo.commit()
 
                 audio_url = await self.r2_service.get_download_url(meeting.file_key)
@@ -171,16 +183,16 @@ class MeetingPipelineService:
                 filename = meeting.file_key.split("/")[-1] if "/" in meeting.file_key else meeting.file_key
                 segments, duration = await self.transcription_service.transcribe(audio_bytes, filename)
 
-                await meeting_repo.save_segments(meeting_id, segments)
-                await meeting_repo.set_has_transcript(meeting_id, True)
+                await meeting_repo.save_segments(meeting_id, workspace_id, segments)
+                await meeting_repo.set_has_transcript(meeting_id, workspace_id, True)
 
-                meeting = await meeting_repo.find_by_id(meeting_id)
+                meeting = await meeting_repo.find_by_id(meeting_id, workspace_id)
                 if meeting:
                     meeting.duration_sec = int(duration)
                     await meeting_repo.commit()
 
                 # [2] 분석
-                await meeting_repo.update_status(meeting_id, "analyzing")
+                await meeting_repo.update_status(meeting_id, workspace_id, "analyzing")
                 await meeting_repo.commit()
 
                 transcript_text = "\n".join(seg.text for seg in segments)
@@ -191,6 +203,7 @@ class MeetingPipelineService:
                 ]
                 await self._analyze_and_store(
                     meeting=meeting,
+                    workspace_id=workspace_id,
                     transcript_text=transcript_text,
                     auto_confirm_threshold=threshold,
                     segments_data=segments_data,
@@ -205,13 +218,20 @@ class MeetingPipelineService:
                 logger.exception("파이프라인 실패 (meeting=%s): %s", meeting_id, e)
                 try:
                     await session.rollback()
-                    await meeting_repo.update_status(meeting_id, "failed", error_message=str(e))
+                    await meeting_repo.update_status(
+                        meeting_id, workspace_id, "failed", error_message=str(e)
+                    )
                     await meeting_repo.commit()
                 except Exception as rollback_err:
                     logger.exception("상태 failed 업데이트 실패 (meeting=%s): %s", meeting_id, rollback_err)
 
-    async def capture_text(self, meeting_id: uuid.UUID, transcript_text: str) -> None:
-        """텍스트 캡처 파이프라인 — STT 건너뛰고 분석부터 시작."""
+    async def capture_text(
+        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID, transcript_text: str
+    ) -> None:
+        """텍스트 캡처 파이프라인 — STT 건너뛰고 분석부터 시작.
+
+        헌법 I-9 (Codex F-1): 진입점 시그니처 workspace_id 필수.
+        """
         async with self._session_factory() as session:
             meeting_repo = MeetingRepository(session)
             project_repo = ProjectRepository(session)
@@ -221,25 +241,26 @@ class MeetingPipelineService:
             embedding_service = EmbeddingService(EmbeddingRepository(session))
 
             try:
-                meeting = await meeting_repo.find_by_id(meeting_id)
+                meeting = await meeting_repo.find_by_id(meeting_id, workspace_id)
                 if meeting is None:
                     return
 
                 workspace = await workspace_repo.find_by_id(meeting.workspace_id)
                 threshold = workspace.inbox_threshold if workspace else 0.9
 
-                await meeting_repo.update_status(meeting_id, "analyzing")
+                await meeting_repo.update_status(meeting_id, workspace_id, "analyzing")
                 await meeting_repo.commit()
 
                 segment = TranscriptSegment(
                     meeting_id=meeting_id, speaker="텍스트",
                     start_sec=0.0, end_sec=0.0, text=transcript_text,
                 )
-                await meeting_repo.save_segments(meeting_id, [segment])
-                await meeting_repo.set_has_transcript(meeting_id, True)
+                await meeting_repo.save_segments(meeting_id, workspace_id, [segment])
+                await meeting_repo.set_has_transcript(meeting_id, workspace_id, True)
 
                 await self._analyze_and_store(
                     meeting=meeting,
+                    workspace_id=workspace_id,
                     transcript_text=transcript_text,
                     auto_confirm_threshold=threshold,
                     segments_data=[{"speaker": "텍스트", "text": transcript_text,
@@ -255,7 +276,9 @@ class MeetingPipelineService:
                 logger.exception("capture_text 파이프라인 실패 (meeting=%s): %s", meeting_id, e)
                 try:
                     await session.rollback()
-                    await meeting_repo.update_status(meeting_id, "failed", error_message=str(e))
+                    await meeting_repo.update_status(
+                        meeting_id, workspace_id, "failed", error_message=str(e)
+                    )
                     await meeting_repo.commit()
                 except Exception as rollback_err:
                     logger.exception("상태 failed 업데이트 실패 (meeting=%s): %s", meeting_id, rollback_err)

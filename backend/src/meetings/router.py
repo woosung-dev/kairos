@@ -33,8 +33,10 @@ async def create_meeting(
         created_by_id=member.user_id,
         recorded_at=data.recorded_at,
     )
-    # 백그라운드에서 파이프라인 실행
-    background_tasks.add_task(pipeline.process_meeting, uuid.UUID(result["id"]))
+    # 백그라운드 파이프라인 실행 — Codex F-1: path workspace_id 동반 전달
+    background_tasks.add_task(
+        pipeline.process_meeting, uuid.UUID(result["id"]), workspace_id
+    )
     return result
 
 
@@ -56,7 +58,10 @@ async def capture_text_meeting(
         source="text",
     )
     meeting_id = uuid.UUID(result["id"])
-    background_tasks.add_task(pipeline.capture_text, meeting_id, data.transcript_text)
+    # Codex F-1: path workspace_id 동반 전달
+    background_tasks.add_task(
+        pipeline.capture_text, meeting_id, workspace_id, data.transcript_text
+    )
     return result
 
 
@@ -79,7 +84,7 @@ async def get_meeting(
     member: WorkspaceMember = Depends(require_viewer),
     service: MeetingService = Depends(get_meeting_service),
 ):
-    return await service.get_meeting_detail(meeting_id)
+    return await service.get_meeting_detail(meeting_id, workspace_id)
 
 
 @router.get("/{meeting_id}/export")
@@ -90,7 +95,9 @@ async def export_meeting(
     member: WorkspaceMember = Depends(require_viewer),
     service: MeetingService = Depends(get_meeting_service),
 ):
-    content, filename, media_type = await service.export_meeting(meeting_id, format)
+    content, filename, media_type = await service.export_meeting(
+        meeting_id, workspace_id, format
+    )
     encoded = quote(filename)
     return Response(
         content=content,
@@ -106,4 +113,4 @@ async def get_meeting_status(
     member: WorkspaceMember = Depends(require_viewer),
     service: MeetingService = Depends(get_meeting_service),
 ):
-    return await service.get_meeting_status(meeting_id)
+    return await service.get_meeting_status(meeting_id, workspace_id)

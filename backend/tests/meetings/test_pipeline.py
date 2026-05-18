@@ -91,13 +91,13 @@ async def test_pipeline_success():
             transcription_service=mock_transcription,
             ai_service=mock_ai,
         )
-        await pipeline.process_meeting(meeting_id)
+        await pipeline.process_meeting(meeting_id, workspace_id)
 
     # 임베딩 생성 확인
     mock_embedding_service.embed_meeting.assert_called_once()
 
-    # 상태 전이 확인
-    status_calls = [call.args[1] for call in mock_meeting_repo.update_status.call_args_list]
+    # 상태 전이 확인 (Codex F-1: update_status 시그니처가 (meeting_id, workspace_id, status))
+    status_calls = [call.args[2] for call in mock_meeting_repo.update_status.call_args_list]
     assert "transcribing" in status_calls
     assert "analyzing" in status_calls
     assert "completed" in status_calls
@@ -105,8 +105,8 @@ async def test_pipeline_success():
     # 세그먼트/요약 저장 확인
     mock_meeting_repo.save_segments.assert_called_once()
     mock_meeting_repo.save_summary.assert_called_once()
-    mock_meeting_repo.set_has_transcript.assert_called_once_with(meeting_id, True)
-    mock_meeting_repo.set_has_summary.assert_called_once_with(meeting_id, True)
+    mock_meeting_repo.set_has_transcript.assert_called_once_with(meeting_id, workspace_id, True)
+    mock_meeting_repo.set_has_summary.assert_called_once_with(meeting_id, workspace_id, True)
 
     # 액션 아이템 저장 확인
     mock_action_repo.save.assert_called_once()
@@ -188,9 +188,9 @@ async def test_pipeline_auto_confirm():
             transcription_service=mock_transcription,
             ai_service=mock_ai,
         )
-        await pipeline.process_meeting(meeting_id)
+        await pipeline.process_meeting(meeting_id, workspace_id)
 
-    # 자동 확정 확인
+    # 자동 확정 확인 (add_meeting_link 시그니처는 Phase 4 inbox commit 에서 workspace_id 추가 예정)
     mock_project_repo.add_meeting_link.assert_called_once_with(
         meeting_id, project_id
     )
@@ -206,9 +206,11 @@ async def test_pipeline_failure_sets_failed():
     from src.meetings.pipeline_service import MeetingPipelineService
 
     meeting_id = uuid.uuid4()
+    workspace_id = uuid.uuid4()
 
     mock_meeting_repo = AsyncMock()
     mock_meeting = MagicMock()
+    mock_meeting.workspace_id = workspace_id
     mock_meeting.file_key = "uploads/test/audio.mp3"
     mock_meeting_repo.find_by_id.return_value = mock_meeting
 
@@ -241,15 +243,15 @@ async def test_pipeline_failure_sets_failed():
             transcription_service=mock_transcription,
             ai_service=mock_ai,
         )
-        await pipeline.process_meeting(meeting_id)
+        await pipeline.process_meeting(meeting_id, workspace_id)
 
-    # failed 상태로 업데이트 확인
+    # failed 상태로 업데이트 확인 (Codex F-1: 시그니처 (meeting_id, workspace_id, status, ...))
     last_call = mock_meeting_repo.update_status.call_args_list[-1]
-    assert last_call.args[1] == "failed"
+    assert last_call.args[2] == "failed"
     # error_message 확인 (positional 또는 keyword)
     error_msg = last_call.kwargs.get("error_message", "")
-    if not error_msg and len(last_call.args) > 2:
-        error_msg = last_call.args[2]
+    if not error_msg and len(last_call.args) > 3:
+        error_msg = last_call.args[3]
     assert "네트워크 오류" in error_msg
 
 
@@ -315,14 +317,14 @@ async def test_capture_text_success():
             transcription_service=mock_transcription,
             ai_service=mock_ai,
         )
-        await pipeline.capture_text(meeting_id, transcript_text)
+        await pipeline.capture_text(meeting_id, workspace_id, transcript_text)
 
     # STT 메서드 호출 안 됨
     mock_r2.get_download_url.assert_not_called()
     mock_transcription.transcribe.assert_not_called()
 
-    # 상태 전이 확인 (transcribing 없이 analyzing → completed)
-    status_calls = [call.args[1] for call in mock_meeting_repo.update_status.call_args_list]
+    # 상태 전이 확인 (Codex F-1: update_status 시그니처 (meeting_id, workspace_id, status))
+    status_calls = [call.args[2] for call in mock_meeting_repo.update_status.call_args_list]
     assert "transcribing" not in status_calls
     assert "analyzing" in status_calls
     assert "completed" in status_calls
@@ -330,8 +332,8 @@ async def test_capture_text_success():
     # 트랜스크립트/요약 저장 확인
     mock_meeting_repo.save_segments.assert_called_once()
     mock_meeting_repo.save_summary.assert_called_once()
-    mock_meeting_repo.set_has_transcript.assert_called_once_with(meeting_id, True)
-    mock_meeting_repo.set_has_summary.assert_called_once_with(meeting_id, True)
+    mock_meeting_repo.set_has_transcript.assert_called_once_with(meeting_id, workspace_id, True)
+    mock_meeting_repo.set_has_summary.assert_called_once_with(meeting_id, workspace_id, True)
 
     # 액션 저장 확인
     mock_action_repo.save.assert_called_once()
