@@ -10,6 +10,7 @@ import { useRecall } from "@/features/memory/hooks";
 import { CaptureSheet } from "@/features/memory/components/CaptureSheet";
 import { PromoteModal } from "@/features/memory/components/PromoteModal";
 import { RecallResultCard } from "@/features/memory/components/RecallResultCard";
+import { useBreakpoint } from "@/hooks/use-media-query";
 
 const DEBOUNCE_MS = 300;
 
@@ -29,6 +30,7 @@ function useDebouncedValue<T>(value: T, delay: number): T {
 export default function MemoryPage() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const workspaceId = activeWorkspaceId ?? undefined;
+  const { isMobile } = useBreakpoint();
 
   const [query, setQuery] = useState("");
   const [isCaptureOpen, setIsCaptureOpen] = useState(false);
@@ -112,10 +114,20 @@ export default function MemoryPage() {
         </>
       )}
 
+      {/*
+        Sprint 22 BL-017 + OBN-04: mobile bottom-nav 충돌 회피.
+        - 데스크톱: bottom-8 (32px) — bottom-nav 없음.
+        - 모바일: bottom-nav (56px) 위로 16px 띄움 → 72px (~bottom-18).
+      */}
       <Button
         type="button"
         size="icon"
-        className="fixed bottom-8 right-8 h-14 w-14 animate-pulse rounded-full shadow-xl"
+        className="fixed right-6 md:right-8 h-14 w-14 animate-pulse rounded-full shadow-xl"
+        style={{
+          bottom: isMobile
+            ? "calc(var(--bottom-nav-height) + 16px)"
+            : "2rem",
+        }}
         onClick={() => setIsCaptureOpen(true)}
         aria-label="새 메모 추가"
       >
