@@ -1074,11 +1074,66 @@ class TestMemoryIDORMatrix:
 
 
 class TestRagIDORMatrix:
-    """rag 도메인 1 endpoint (ask) — TODO PR #1 rag commit (matrix lock-in 추가)."""
+    """rag 도메인 1 endpoint (ask) + project_id secondary FK (Sprint 19 PR #1 C11).
 
-    @pytest.mark.skip(reason="PR #1 rag commit 진입 시 활성화")
-    def test_placeholder(self):
-        pass
+    Codex F-2 MAJOR: tenant 검증 role 무관 (admin/owner 도 cross-tenant project_id 차단).
+    visibility 검증 (draft/private) 만 admin/owner 우회 (Sprint 6 ADR-014 옵션 A).
+    """
+
+    @pytest.mark.asyncio
+    async def test_rag_pipeline_service_ask_tenant_check_role_agnostic(self):
+        """Codex F-2 anchor: ask() 안에 role 무관 tenant 검증 (project_repo.find_by_id 호출)."""
+        import inspect
+        from src.rag.pipeline_service import RagPipelineService
+
+        src_text = inspect.getsource(RagPipelineService.ask)
+        # ask 함수 본문에 role-무관 tenant 검증이 visibility 검증 *전에* 있어야 함
+        assert "project_repo.find_by_id(project_id, workspace_id)" in src_text, (
+            f"BUG-C01-EXT v3 Codex F-2: RagPipelineService.ask 안에 role-무관 "
+            f"project_repo.find_by_id(project_id, workspace_id) 호출 필수."
+        )
+
+    @pytest.mark.asyncio
+    async def test_rag_pipeline_admin_cannot_bypass_cross_tenant_project(self):
+        """Codex F-2: admin/owner 도 cross-tenant project_id 차단."""
+        from unittest.mock import AsyncMock, MagicMock
+        from src.rag.pipeline_service import RagPipelineService
+
+        mock_project_repo = AsyncMock()
+        mock_project_repo.find_by_id.return_value = None  # cross-tenant 또는 nonexistent
+        mock_rag_service = AsyncMock()
+
+        async def empty_async_gen():
+            if False:
+                yield {}
+
+        mock_rag_service.ask.return_value = empty_async_gen()
+
+        pipeline = RagPipelineService(
+            rag_service=mock_rag_service,
+            project_repo=mock_project_repo,
+        )
+
+        ws_a = uuid.uuid4()
+        project_b = uuid.uuid4()
+        user = uuid.uuid4()
+
+        events = []
+        async for event in pipeline.ask(
+            question="test",
+            workspace_id=ws_a,
+            requester_user_id=user,
+            requester_role="admin",  # admin 이지만 tenant 우회 금지
+            project_id=project_b,
+        ):
+            events.append(event)
+
+        # admin 도 cross-tenant project_id 시 SSE error event 발생 + done
+        assert any(
+            "프로젝트를 찾을 수 없거나" in str(e.get("data", "")) for e in events
+        ), f"Codex F-2: admin 도 cross-tenant project 차단해야 함. events={events}"
+        # find_by_id workspace_id 호출 확인
+        mock_project_repo.find_by_id.assert_called_with(project_b, ws_a)
 
 
 class TestWorkspacesIDORMatrix:
@@ -1094,11 +1149,51 @@ class TestWorkspacesIDORMatrix:
 
 
 class TestUploadIDORMatrix:
-    """upload 도메인 2 endpoint — TODO PR #1 upload commit.
+    """upload 도메인 2 endpoint (Sprint 19 PR #1 C11).
 
-    file_key path 패턴 (BUG-UPL-OWN)은 PR #4에서 별도. PR #1은 workspace_id 시그니처만.
+    DB lookup 없음 (R2 only), secondary FK 없음. require_member path param 강제 검증.
+    file_key path 패턴 (BUG-UPL-OWN)은 PR #4에서 별도.
     """
 
-    @pytest.mark.skip(reason="PR #1 upload commit 진입 시 활성화")
-    def test_placeholder(self):
-        pass
+    @pytest.mark.asyncio
+    async def test_upload_presigned_url_has_workspace_id_path_param(self):
+        """Upload presigned-url endpoint 가 workspace_id path param 받음 (require_member 차단 기반)."""
+        from src.upload import router as upload_router
+
+        # router 의 endpoint 가 workspace_id path 받는지 inspect
+        routes = [r for r in upload_router.router.routes if hasattr(r, "path")]
+        paths = [r.path for r in routes]
+        assert any("{workspace_id}" in p for p in paths), (
+            f"BUG-C01-EXT v3 upload #1: presigned-url endpoint workspace_id path 필수. paths={paths}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_upload_file_proxy_has_workspace_id_path_param(self):
+        """Upload file endpoint 가 workspace_id path param 받음."""
+        from src.upload import router as upload_router
+
+        routes = [r for r in upload_router.router.routes if hasattr(r, "path")]
+        paths = [r.path for r in routes]
+        # 두 endpoint 모두 workspace_id path
+        ws_routes = [p for p in paths if "{workspace_id}" in p]
+        assert len(ws_routes) >= 2, (
+            f"BUG-C01-EXT v3 upload #2: 2 endpoint 모두 workspace_id path 필수. ws_routes={ws_routes}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_upload_router_requires_member_dependency(self):
+        """require_member dependency 가 두 endpoint 모두 적용 (cross-tenant 차단 게이트).
+
+        RoleChecker(class instance) 형태이므로 __name__ 대신 type 또는 source 검증.
+        """
+        import inspect
+        from src.upload import router as upload_router
+
+        # router 모듈 source 에 require_member 가 import + Depends 로 사용되는지
+        src_text = inspect.getsource(upload_router)
+        assert "require_member" in src_text, (
+            f"BUG-C01-EXT v3 upload: router.py 에 require_member 적용 필수."
+        )
+        assert src_text.count("Depends(require_member)") >= 2, (
+            f"BUG-C01-EXT v3 upload: 2 endpoint 모두 Depends(require_member) 필수."
+        )

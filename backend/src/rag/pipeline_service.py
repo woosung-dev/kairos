@@ -68,8 +68,22 @@ class RagPipelineService:
 
         SSE 시작 *전* 권한 검증 완료 (ADR-010 M1 RAG 품질 시그널 오염 방지).
         권한 위반 시 error 이벤트 + done 이벤트로 종료.
+
+        Sprint 19 PR #1 C11 (Codex F-2 MAJOR): tenant 검증은 role 무관 항상 먼저.
+        admin/owner 도 cross-tenant project_id 는 차단 (tenant boundary 우회 금지).
+        visibility 검증 (draft/private) 만 admin/owner 우회 가능 (Sprint 6 ADR-014 옵션 A).
         """
-        # 권한 검증 (project_id 있을 때만, admin 이상은 우회)
+        # Codex F-2: tenant 검증 (role 무관, 항상 먼저) — admin/owner 도 차단
+        if project_id is not None:
+            project = await self.project_repo.find_by_id(project_id, workspace_id)
+            if project is None:
+                for event in _sse_error_done(
+                    "프로젝트를 찾을 수 없거나 접근 권한이 없습니다."
+                ):
+                    yield event
+                return
+
+        # 권한 검증 (project_id 있을 때만, admin 이상은 visibility 우회)
         if project_id is not None and requester_role not in ("admin", "owner"):
             error_msg = await self._check_project_access(
                 project_id, workspace_id, requester_user_id
