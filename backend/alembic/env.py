@@ -42,9 +42,12 @@ if config.config_file_name is not None:
 
 target_metadata = SQLModel.metadata
 
-# env.py에서 동적으로 DB URL 설정
-settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# env.py에서 동적으로 DB URL 설정.
+# Sprint 19 PR #2 D7.5a (Codex v2 F-3): 외부에서 주입한 sqlalchemy.url 가 있으면 우선 (테스트 환경).
+# 없으면 settings 사용 (운영 / 로컬 alembic 명령 = 기존 동작 유지).
+if not config.get_main_option("sqlalchemy.url"):
+    settings = get_settings()
+    config.set_main_option("sqlalchemy.url", settings.database_url)
 
 
 def run_migrations_offline() -> None:
