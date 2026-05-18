@@ -23,7 +23,8 @@ import uuid
 from datetime import datetime
 
 from fastapi import BackgroundTasks
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.common.prompts import (
     MEMORY_DISTILL_PROMPT,

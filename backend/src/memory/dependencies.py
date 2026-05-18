@@ -7,7 +7,8 @@ session_factory 주입으로 BackgroundTask 내부에서 별도 session 생성 �
 Sprint 19 PR #1 C10 (Codex F-4): WorkspaceRepository 동반 주입 (promote target 검증).
 """
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.common.database import get_async_session, get_session_factory
 from src.common.r2 import R2Service

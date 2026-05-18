@@ -1,7 +1,8 @@
 # backend/src/meetings/dependencies.py
 """Meeting 의존성 — Depends() 조립의 유일한 위치."""
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.actions.repository import ActionItemRepository
 from src.common.database import get_async_session, get_session_factory
