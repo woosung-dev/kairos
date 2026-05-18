@@ -1316,7 +1316,7 @@ production scale (>1만 row 또는 동시 트래픽) 진입 시 다음 패턴 �
 
 ---
 
-## BL-050 — 잔여 cross-workspace single-FK entity audit + composite FK 신설 (BUG-C01-EXT-FK 잔여) 🟡 **PARTIAL (Simple 4 완료, 2026-05-18 Sprint 21 PR #NN)**
+## BL-050 — 잔여 cross-workspace single-FK entity audit + composite FK 신설 (BUG-C01-EXT-FK 잔여) 🟡 **PARTIAL (Simple 4 완료, 2026-05-18 Sprint 21 PR #96)**
 
 **도메인**: backend / multiple (inbox / embeddings / memory / promotion)
 
@@ -1339,7 +1339,7 @@ PR #1 audit 4 case (action_items.project_id / notes.project_id / mpl / project_m
 
 **우선순위**: ★★★☆☆ (P2 defense-in-depth 확장, Sprint 20 carry-over)
 
-### Simple 4 완료 (Sprint 21 PR #NN, 2026-05-18)
+### Simple 4 완료 (Sprint 21 PR #96, 2026-05-18)
 
 - ✅ action_items.meeting_id (composite FK + audit)
 - ✅ inbox_items.ai_suggested_project_id (composite FK + audit)

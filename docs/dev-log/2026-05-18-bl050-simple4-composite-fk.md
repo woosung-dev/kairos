@@ -2,7 +2,7 @@
 
 # BL-050 Simple 4 — Cross-workspace Composite FK Hardening (Sprint 21)
 
-> 일자: 2026-05-18 · PR #NN · 작성자: woo sung
+> 일자: 2026-05-18 · PR #96 · 작성자: woo sung
 
 ## Context
 
