@@ -50,8 +50,7 @@ class MemoryRepository:
             MemoryItem.workspace_id == workspace_id,
             MemoryItem.deleted_at.is_(None),
         )
-        result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        return (await self.session.exec(stmt)).one_or_none()
 
     async def update_distilled(
         self,
@@ -59,7 +58,7 @@ class MemoryRepository:
         distilled_json: dict,
         status: str,
     ) -> None:
-        await self.session.execute(
+        await self.session.exec(
             update(MemoryItem)
             .where(MemoryItem.id == memory_id)
             .values(distilled_json=distilled_json, status=status)
@@ -71,7 +70,7 @@ class MemoryRepository:
         embedding_chunk_id: uuid.UUID,
         status: str,
     ) -> None:
-        await self.session.execute(
+        await self.session.exec(
             update(MemoryItem)
             .where(MemoryItem.id == memory_id)
             .values(embedding_chunk_id=embedding_chunk_id, status=status)
@@ -80,7 +79,7 @@ class MemoryRepository:
     async def update_status(
         self, memory_id: uuid.UUID, status: str
     ) -> None:
-        await self.session.execute(
+        await self.session.exec(
             update(MemoryItem)
             .where(MemoryItem.id == memory_id)
             .values(status=status)
@@ -89,7 +88,7 @@ class MemoryRepository:
     async def update_transcript(
         self, memory_id: uuid.UUID, raw_content: str
     ) -> None:
-        await self.session.execute(
+        await self.session.exec(
             update(MemoryItem)
             .where(MemoryItem.id == memory_id)
             .values(raw_content=raw_content)
@@ -135,12 +134,11 @@ class MemoryRepository:
             MemoryItem.r2_audio_key.is_not(None),
             MemoryItem.created_at < cutoff,
         )
-        result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        return list((await self.session.exec(stmt)).all())
 
     async def clear_r2_audio_key(self, memory_id: uuid.UUID) -> None:
         """r2_audio_key NULL 처리 — R2 객체 삭제 후 호출."""
-        await self.session.execute(
+        await self.session.exec(
             update(MemoryItem)
             .where(MemoryItem.id == memory_id)
             .values(r2_audio_key=None)
@@ -244,8 +242,10 @@ class MemoryRepository:
             return []
         ids = [row[0] for row in rows]
         items_q = select(MemoryItem).where(MemoryItem.id.in_(ids))
-        items_result = await self.session.execute(items_q)
-        items_map = {item.id: item for item in items_result.scalars().all()}
+        items_map = {
+            item.id: item
+            for item in (await self.session.exec(items_q)).all()
+        }
         return [
             (items_map[row[0]], int(row[1]))
             for row in rows
@@ -265,8 +265,7 @@ class MemoryRepository:
             MemoryQueryEmbeddingCache.normalized_query == normalized_query,
             MemoryQueryEmbeddingCache.created_at >= cutoff,
         )
-        result = await self.session.execute(stmt)
-        cached = result.scalar_one_or_none()
+        cached = (await self.session.exec(stmt)).one_or_none()
         if cached is None or cached.embedding is None:
             return None
         # pgvector read 시 컬럼 타입별 결과 객체:
