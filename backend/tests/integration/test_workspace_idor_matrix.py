@@ -452,6 +452,32 @@ class TestNotesIDORMatrix:
         )
 
     @pytest.mark.asyncio
+    async def test_delete_note_cross_tenant_returns_404(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """Codex 2차 Major 1 (C7): cross-tenant note DELETE → 404 (이전 204 success bug)."""
+        from src.notes.dependencies import get_note_pipeline_service
+        from src.notes.exceptions import NoteNotFoundError
+        from src.auth.rbac import require_member
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_member] = lambda: member_a
+
+        note_id = uuid.uuid4()
+        mock_pipeline = AsyncMock()
+        mock_pipeline.delete_note_with_cleanup.side_effect = NoteNotFoundError()
+        app.dependency_overrides[get_note_pipeline_service] = lambda: mock_pipeline
+
+        response = await client.delete(
+            f"/api/v1/workspaces/{workspace_a_id}/notes/{note_id}",
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 404, (
+            f"BUG-C01-EXT v3 Codex 2차 Major 1: notes DELETE cross-tenant 가 204 success 반환. "
+            f"F-4 lock-in 위반. 응답={response.status_code}"
+        )
+
+    @pytest.mark.asyncio
     async def test_note_repository_find_by_id_requires_workspace_id(self):
         """Codex F-1 anchor: NoteRepository.find_by_id 시그니처."""
         import inspect
@@ -663,7 +689,11 @@ class TestActionsIDORMatrix:
     async def test_update_action_item_rejects_cross_tenant_meeting_id(
         self, client, user_a, member_a, workspace_a_id
     ):
-        """Codex F-2 Critical: update_action_item 의 meeting_id cross-workspace 거부 → 404."""
+        """Codex F-2 Critical + 2차 Major 2 (C7): meeting_id forwarding + cross-workspace 거부 → 404.
+
+        강한 검증 (Codex 2차 F-3): side_effect 만 검증하면 mock false positive — meeting_id
+        가 router→service 로 실제 전달되는지 call_args.kwargs 로 확인.
+        """
         from src.actions.dependencies import get_action_service
         from src.meetings.exceptions import MeetingNotFoundError
         from src.auth.rbac import require_member
@@ -683,6 +713,15 @@ class TestActionsIDORMatrix:
             headers={"Authorization": "Bearer t"},
         )
         assert response.status_code == 404
+
+        # Codex 2차 Major 2: meeting_id 가 service 까지 정확 값 전달되는지 검증
+        call_args = mock_service.update_action_item.call_args
+        kwargs = call_args.kwargs if call_args else {}
+        meeting_id_seen = kwargs.get("meeting_id")
+        assert meeting_id_seen == foreign_meeting_id, (
+            f"BUG-C01-EXT v3 Codex 2차 Major 2: actions update meeting_id forwarding 누락. "
+            f"기대={foreign_meeting_id} 실제={meeting_id_seen} kwargs={kwargs}"
+        )
 
     @pytest.mark.asyncio
     async def test_update_action_item_rejects_cross_tenant_assignee_id(

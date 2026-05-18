@@ -57,10 +57,14 @@ class NotePipelineService:
         """노트 삭제 + embedding chunk cleanup + 캐시 무효화 (D-2 부채 해소).
 
         Codex H2 / 옵션 A: pipeline 시그니처 자체에 workspace_id 필수 → pipeline 우회 IDOR 차단.
+        Codex 2차 F-4: cross-tenant 또는 missing note → NoteNotFoundError (404). 이전 silent return
+        은 router 가 204 success 로 응답해 F-4 lock-in 위반 (C7 fix).
         """
+        from src.notes.exceptions import NoteNotFoundError
+
         note = await self.note_repo.find_by_id(note_id, workspace_id)
         if note is None:
-            return
+            raise NoteNotFoundError()
         project_id = note.project_id
         # embedding chunk 삭제 (repository 직접 호출 = 헌법 §4.2 OK, read-only가 아니지만
         # embeddings 도메인은 cross-domain shared service로 분류 — ADR-014 §1)

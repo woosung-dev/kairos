@@ -40,17 +40,27 @@ class ActionItemService:
         meeting_id: uuid.UUID | None,
         assignee_id: uuid.UUID | None,
     ) -> None:
-        """Codex F-2: 3 secondary FK 모두 같은 workspace 인지 검증."""
-        if project_id is not None and self.project_repo is not None:
+        """Codex F-2: 3 secondary FK 모두 같은 workspace 인지 검증.
+
+        Codex 2차 Minor 1 (C7): fail-closed — FK 가 들어왔는데 검증 repo 미주입이면
+        silent skip 대신 RuntimeError 로 차단 (테스트 사고 방지).
+        """
+        if project_id is not None:
+            if self.project_repo is None:
+                raise RuntimeError("project_repo 필수 (F-2 검증)")
             project = await self.project_repo.find_by_id(project_id)
             if project is None or project.workspace_id != workspace_id:
                 raise ProjectNotFoundError()
-        if meeting_id is not None and self.meeting_repo is not None:
+        if meeting_id is not None:
+            if self.meeting_repo is None:
+                raise RuntimeError("meeting_repo 필수 (F-2 검증)")
             # MeetingRepository.find_by_id 가 이미 workspace_id 시그니처 (Sprint 19 PR #1 commit C1)
             meeting = await self.meeting_repo.find_by_id(meeting_id, workspace_id)
             if meeting is None:
                 raise MeetingNotFoundError()
-        if assignee_id is not None and self.workspace_repo is not None:
+        if assignee_id is not None:
+            if self.workspace_repo is None:
+                raise RuntimeError("workspace_repo 필수 (F-2 검증)")
             member = await self.workspace_repo.find_member(workspace_id, assignee_id)
             if member is None:
                 raise NotFoundError("워크스페이스 멤버")

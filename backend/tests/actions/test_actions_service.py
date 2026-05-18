@@ -59,6 +59,7 @@ class TestCreateActionItem:
 
     @pytest.mark.asyncio
     async def test_optional_fields_forwarded(self):
+        from types import SimpleNamespace
         ws_id = uuid.uuid4()
         proj_id = uuid.uuid4()
         assignee = uuid.uuid4()
@@ -74,7 +75,21 @@ class TestCreateActionItem:
         repo.save = AsyncMock(return_value=saved)
         repo.commit = AsyncMock()
 
-        service = ActionItemService(repo)
+        # Codex F-2 + 2차 Minor 1 fail-closed: project_repo / workspace_repo 주입 필수
+        project_repo = AsyncMock()
+        project_repo.find_by_id = AsyncMock(
+            return_value=SimpleNamespace(id=proj_id, workspace_id=ws_id)
+        )
+        workspace_repo = AsyncMock()
+        workspace_repo.find_member = AsyncMock(
+            return_value=SimpleNamespace(user_id=assignee, workspace_id=ws_id)
+        )
+
+        service = ActionItemService(
+            repo=repo,
+            project_repo=project_repo,
+            workspace_repo=workspace_repo,
+        )
         result = await service.create_action_item(
             ws_id,
             "긴급",

@@ -40,11 +40,15 @@ class NoteService:
     async def _verify_project_in_workspace(
         self, project_id: uuid.UUID | None, workspace_id: uuid.UUID
     ) -> None:
-        """Codex F-2: project_id 가 같은 workspace 인지 검증. None 이면 통과."""
+        """Codex F-2: project_id 가 같은 workspace 인지 검증. None 이면 통과.
+
+        Codex 2차 Minor 1 (C7): fail-closed — project_id 가 들어왔는데 project_repo
+        미주입이면 RuntimeError 로 차단 (silent skip 금지).
+        """
         if project_id is None:
             return
         if self.project_repo is None:
-            return
+            raise RuntimeError("project_repo 필수 (F-2 검증)")
         project = await self.project_repo.find_by_id(project_id)
         if project is None or project.workspace_id != workspace_id:
             raise ProjectNotFoundError()
