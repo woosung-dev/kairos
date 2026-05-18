@@ -7,7 +7,7 @@ ADR-016 AD-41 (복제 + tombstone): 원본 MemoryItem.status 변경 없이 targe
 import uuid
 
 import pytest
-from sqlalchemy import select
+from sqlmodel import select
 
 
 @pytest.mark.asyncio
