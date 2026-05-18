@@ -121,7 +121,15 @@ class TestClassify:
             side_effect=[_make_project(pid, ws_id) for pid in project_ids]
         )
 
-        service = InboxService(inbox_repo, project_repo)
+        # Sprint 19 PR #1 C13a (Codex 2차 F-1): meeting_repo 주입 — source_id 검증 통과
+        from unittest.mock import MagicMock
+        mock_meeting = MagicMock()
+        mock_meeting.id = item.source_id
+        mock_meeting.workspace_id = ws_id
+        meeting_repo = AsyncMock()
+        meeting_repo.find_by_id = AsyncMock(return_value=mock_meeting)
+
+        service = InboxService(inbox_repo, project_repo, meeting_repo=meeting_repo)
         result = await service.classify(item_id, ws_id, project_ids)
 
         assert project_repo.add_meeting_link.await_count == 2
@@ -178,7 +186,14 @@ class TestClassify:
         project_repo.find_by_id = AsyncMock(return_value=_make_project(uuid.uuid4(), ws_id))
         project_repo.commit = AsyncMock()  # 호출되면 안 됨 — service 가 inbox_repo.commit 만
 
-        service = InboxService(inbox_repo, project_repo)
+        # Sprint 19 PR #1 C13a (Codex 2차 F-1): meeting_repo 주입 — source_id 검증 통과
+        from unittest.mock import MagicMock
+        mock_meeting = MagicMock()
+        mock_meeting.workspace_id = ws_id
+        meeting_repo = AsyncMock()
+        meeting_repo.find_by_id = AsyncMock(return_value=mock_meeting)
+
+        service = InboxService(inbox_repo, project_repo, meeting_repo=meeting_repo)
         await service.classify(item.id, ws_id, [uuid.uuid4()])
 
         inbox_repo.commit.assert_awaited_once()
