@@ -246,3 +246,90 @@ class TestActionsRealDBIDOR:
                 workspace_id=ws_a.id,
                 assignee_id=user_b,
             )
+
+
+class TestProjectsRealDBIDOR:
+    """Codex F-1/F-3 real DB (Sprint 19 PR #1 C9): projects + meeting-link cross-tenant 격리.
+
+    검증 시나리오:
+    1. ProjectRepository.find_by_id(project_b_id, ws_a.id) → None
+    2. ProjectService.get_project(workspace_id=ws_a, project_id=project_b) → ProjectNotFoundError (F-4 lock-in)
+    3. ProjectRepository.add_meeting_link(meeting_a, project_b, ws_a) → ProjectNotFoundError
+       (F-3 cascade: cross-workspace 링크 생성 차단)
+    """
+
+    @pytest.mark.asyncio
+    async def test_workspace_a_cannot_access_workspace_b_project(
+        self, integration_session: AsyncSession
+    ):
+        """헌법 I-9 직접 검증: ProjectRepository.find_by_id 가 cross-tenant 차단."""
+        from src.projects.repository import ProjectRepository
+
+        user_a = await _create_user(integration_session, "pa")
+        user_b = await _create_user(integration_session, "pb")
+        ws_a = await _create_workspace(integration_session, user_a, "워크스페이스 A proj")
+        ws_b = await _create_workspace(integration_session, user_b, "워크스페이스 B proj")
+        project_b = await _create_project(integration_session, ws_b.id, user_b)
+
+        repo = ProjectRepository(integration_session)
+
+        # A path 로 B project → None
+        result = await repo.find_by_id(project_b.id, ws_a.id)
+        assert result is None, (
+            f"BUG-C01-EXT v3 F-1 real DB: projects cross-tenant 누출. "
+            f"workspace_a({ws_a.id}) 가 workspace_b({ws_b.id}) project({project_b.id}) 조회 성공."
+        )
+
+        # 같은 workspace → 정상 반환 (sanity)
+        own = await repo.find_by_id(project_b.id, ws_b.id)
+        assert own is not None and own.id == project_b.id
+
+    @pytest.mark.asyncio
+    async def test_workspace_a_get_project_rejects_workspace_b_project(
+        self, integration_session: AsyncSession
+    ):
+        """Codex F-4 lock-in: cross-tenant get_project → ProjectNotFoundError (정보 누설 방지)."""
+        from src.projects.exceptions import ProjectNotFoundError
+        from src.projects.repository import ProjectRepository
+        from src.projects.service import ProjectService
+        from src.workspaces.repository import WorkspaceRepository
+
+        user_a = await _create_user(integration_session, "ga")
+        user_b = await _create_user(integration_session, "gb")
+        ws_a = await _create_workspace(integration_session, user_a, "워크스페이스 A get")
+        ws_b = await _create_workspace(integration_session, user_b, "워크스페이스 B get")
+        project_b = await _create_project(integration_session, ws_b.id, user_b)
+
+        service = ProjectService(
+            repo=ProjectRepository(integration_session),
+            ws_repo=WorkspaceRepository(integration_session),
+        )
+
+        with pytest.raises(ProjectNotFoundError):
+            await service.get_project(
+                workspace_id=ws_a.id,
+                project_id=project_b.id,
+                requester_user_id=user_a,
+                requester_role="member",
+            )
+
+    @pytest.mark.asyncio
+    async def test_workspace_a_add_meeting_link_rejects_workspace_b_project(
+        self, integration_session: AsyncSession
+    ):
+        """Codex F-3 cascade real DB: add_meeting_link 가 cross-workspace project 거부."""
+        from src.projects.exceptions import ProjectNotFoundError
+        from src.projects.repository import ProjectRepository
+
+        user_a = await _create_user(integration_session, "la")
+        user_b = await _create_user(integration_session, "lb")
+        ws_a = await _create_workspace(integration_session, user_a, "워크스페이스 A link")
+        ws_b = await _create_workspace(integration_session, user_b, "워크스페이스 B link")
+        meeting_a = await _create_meeting(integration_session, ws_a.id, user_a)
+        project_b = await _create_project(integration_session, ws_b.id, user_b)
+
+        repo = ProjectRepository(integration_session)
+
+        # A meeting + B project + ws_a 시도 → ProjectNotFoundError
+        with pytest.raises(ProjectNotFoundError):
+            await repo.add_meeting_link(meeting_a.id, project_b.id, ws_a.id)

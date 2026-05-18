@@ -49,8 +49,9 @@ class NoteService:
             return
         if self.project_repo is None:
             raise RuntimeError("project_repo 필수 (F-2 검증)")
-        project = await self.project_repo.find_by_id(project_id)
-        if project is None or project.workspace_id != workspace_id:
+        # Sprint 19 PR #1 C9 (Codex F-1 cascade): find_by_id workspace_id 강제
+        project = await self.project_repo.find_by_id(project_id, workspace_id)
+        if project is None:
             raise ProjectNotFoundError()
 
     async def create_note(

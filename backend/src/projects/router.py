@@ -1,5 +1,9 @@
 # backend/src/projects/router.py
-"""Project 라우터 — HTTP 전용."""
+"""Project 라우터 — HTTP 전용.
+
+Sprint 19 PR #1 C9 (Codex F-1/F-3/F-4/F-6):
+모든 service 호출이 workspace_id 명시 전달. cross-tenant → 404 lock-in.
+"""
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -102,6 +106,7 @@ async def update_project(
     if data.visibility is not None and member.role not in ("admin", "owner"):
         raise HTTPException(status_code=403, detail="visibility 변경은 admin 이상만 가능합니다.")
     return await service.update_project(
+        workspace_id=workspace_id,
         project_id=project_id,
         title=data.title,
         description=data.description,
@@ -122,7 +127,7 @@ async def list_project_members(
     service: ProjectService = Depends(get_project_service),
 ):
     """프로젝트 멤버 목록 (viewer 이상)."""
-    return await service.list_members(project_id)
+    return await service.list_members(workspace_id, project_id)
 
 
 @router.post("/{project_id}/members", status_code=201)
@@ -151,7 +156,7 @@ async def remove_project_member(
     service: ProjectService = Depends(get_project_service),
 ):
     """프로젝트 멤버 제거 (admin 이상)."""
-    await service.remove_member(project_id, user_id)
+    await service.remove_member(workspace_id, project_id, user_id)
 
 
 @router.delete("/{project_id}", status_code=204)
@@ -161,7 +166,7 @@ async def delete_project(
     member: WorkspaceMember = Depends(require_admin),
     service: ProjectService = Depends(get_project_service),
 ):
-    await service.delete_project(project_id)
+    await service.delete_project(workspace_id, project_id)
 
 
 @router.post("/{project_id}/archive")
@@ -171,7 +176,7 @@ async def archive_project(
     member: WorkspaceMember = Depends(require_admin),
     service: ProjectService = Depends(get_project_service),
 ):
-    return await service.archive_project(project_id)
+    return await service.archive_project(workspace_id, project_id)
 
 
 # --- Meeting-Project Link ---
@@ -185,7 +190,9 @@ async def add_meeting_project(
     member: WorkspaceMember = Depends(require_member),
     service: ProjectService = Depends(get_project_service),
 ):
-    return await service.add_meeting_project(meeting_id, uuid.UUID(data.project_id))
+    return await service.add_meeting_project(
+        workspace_id, meeting_id, uuid.UUID(data.project_id)
+    )
 
 
 @meeting_project_router.delete("/{project_id}", status_code=204)
@@ -196,4 +203,4 @@ async def remove_meeting_project(
     member: WorkspaceMember = Depends(require_member),
     service: ProjectService = Depends(get_project_service),
 ):
-    await service.remove_meeting_project(meeting_id, project_id)
+    await service.remove_meeting_project(workspace_id, meeting_id, project_id)

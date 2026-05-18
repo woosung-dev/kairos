@@ -1,7 +1,14 @@
 # backend/src/projects/service.py
-"""Project 서비스 — AsyncSession import 금지. 단일 도메인 CRUD만."""
+"""Project 서비스 — AsyncSession import 금지. 단일 도메인 CRUD + cross-workspace 가드.
+
+Sprint 19 PR #1 C9 (Codex F-1/F-2/F-3/F-4/F-6):
+- 모든 mutation/find 메서드가 workspace_id 명시 수령
+- secondary FK (meeting_id) cross-workspace 거부 → fail-closed RuntimeError
+- cross-tenant resource → 404 lock-in (silent return 금지)
+"""
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from src.projects.exceptions import (
     CrossWorkspaceMemberError,
@@ -13,15 +20,39 @@ from src.projects.repository import ProjectRepository
 from src.workspaces.exceptions import PersonalWorkspaceProtected
 from src.workspaces.repository import WorkspaceRepository
 
+if TYPE_CHECKING:
+    from src.meetings.repository import MeetingRepository
+
 
 class ProjectService:
     def __init__(
         self,
         repo: ProjectRepository,
         ws_repo: WorkspaceRepository,
+        meeting_repo: "MeetingRepository | None" = None,
     ) -> None:
         self.repo = repo
         self.ws_repo = ws_repo
+        self.meeting_repo = meeting_repo
+
+    async def _verify_secondary_fks(
+        self,
+        workspace_id: uuid.UUID,
+        meeting_id: uuid.UUID | None = None,
+    ) -> None:
+        """Codex F-2/F-6: secondary FK cross-workspace 거부.
+
+        fail-closed (Codex 2차 Minor 1): repo 미주입 시 RuntimeError (silent skip 금지).
+        """
+        if meeting_id is not None:
+            if self.meeting_repo is None:
+                raise RuntimeError("meeting_repo 필수 (F-2 검증)")
+            meeting = await self.meeting_repo.find_by_id(meeting_id, workspace_id)
+            if meeting is None:
+                # cross-tenant meeting → 404 (F-4 lock-in)
+                from src.meetings.exceptions import MeetingNotFoundError
+
+                raise MeetingNotFoundError()
 
     async def create_project(
         self,
@@ -88,12 +119,12 @@ class ProjectService:
         requester_user_id: uuid.UUID | None = None,
         requester_role: str | None = None,
     ) -> dict:
-        """프로젝트 상세 (visibility 권한 분기)."""
-        project = await self.repo.find_by_id(project_id)
+        """프로젝트 상세 (Codex F-1/F-4: tenant 검증 1차 + visibility 검증 2차)."""
+        # Codex F-1: tenant 검증 (find_by_id가 workspace_id WHERE)
+        project = await self.repo.find_by_id(project_id, workspace_id)
         if project is None:
+            # Codex F-4: cross-tenant resource → 404 (정보 누설 방지)
             raise ProjectNotFoundError()
-        if project.workspace_id != workspace_id:
-            raise WorkspaceMismatchError()
         # visibility 권한 검증 (admin 이상 우회, 그 외 visibility별 분기)
         if requester_role not in ("admin", "owner"):
             if project.visibility == "draft":
@@ -101,16 +132,21 @@ class ProjectService:
                     raise ProjectNotFoundError()
             elif project.visibility == "private":
                 if requester_user_id is None or not await self.repo.is_member(
-                    project_id, requester_user_id
+                    project_id, requester_user_id, workspace_id
                 ):
                     raise ProjectNotFoundError()
         return self._to_dict(project)
 
-    # --- ProjectMember (Sprint 6 L-6) ---
+    # --- ProjectMember (Sprint 6 L-6, Sprint 19 PR #1 C9 workspace_id 강제) ---
 
-    async def list_members(self, project_id: uuid.UUID) -> list[dict]:
-        """프로젝트 멤버 목록."""
-        members = await self.repo.find_members(project_id)
+    async def list_members(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID
+    ) -> list[dict]:
+        """프로젝트 멤버 목록 (Codex F-1: tenant 사전 검증)."""
+        project = await self.repo.find_by_id(project_id, workspace_id)
+        if project is None:
+            raise ProjectNotFoundError()
+        members = await self.repo.find_members(project_id, workspace_id)
         return [
             {
                 "id": str(m.id),
@@ -132,16 +168,14 @@ class ProjectService:
         """프로젝트 멤버 추가. cross-workspace 검증 포함.
 
         검증 순서 (변경 금지):
-          1. project 없음 → ProjectNotFoundError(404)
-          2. project.workspace_id != workspace_id → WorkspaceMismatchError(404)
+          1. project 없음 또는 cross-tenant → ProjectNotFoundError(404, Codex F-4)
+          2. personal workspace → PersonalWorkspaceProtected
           3. WorkspaceMember(workspace_id, user_id) 없음 → CrossWorkspaceMemberError(403)
           4. 중복 → repo.add_member (UniqueConstraint 위반 시 DB 레벨 처리)
         """
-        project = await self.repo.find_by_id(project_id)
+        project = await self.repo.find_by_id(project_id, workspace_id)
         if project is None:
             raise ProjectNotFoundError()
-        if project.workspace_id != workspace_id:
-            raise WorkspaceMismatchError()
         # Sprint 15 ADR-016 AD-43: personal workspace는 ProjectMember 추가 불가
         ws = await self.ws_repo.find_by_id(workspace_id)
         if ws is not None and getattr(ws, "type", "team") == "personal":
@@ -160,17 +194,21 @@ class ProjectService:
         }
 
     async def remove_member(
-        self, project_id: uuid.UUID, user_id: uuid.UUID
+        self,
+        workspace_id: uuid.UUID,
+        project_id: uuid.UUID,
+        user_id: uuid.UUID,
     ) -> None:
-        """프로젝트 멤버 제거."""
-        project = await self.repo.find_by_id(project_id)
+        """프로젝트 멤버 제거 (Codex F-1: tenant 사전 검증)."""
+        project = await self.repo.find_by_id(project_id, workspace_id)
         if project is None:
             raise ProjectNotFoundError()
-        await self.repo.remove_member(project_id, user_id)
+        await self.repo.remove_member(project_id, user_id, workspace_id)
         await self.repo.commit()
 
     async def update_project(
         self,
+        workspace_id: uuid.UUID,
         project_id: uuid.UUID,
         title: str | None = None,
         description: str | None = None,
@@ -178,8 +216,8 @@ class ProjectService:
         visibility: str | None = None,
         tags: list[str] | None = None,
     ) -> dict:
-        """프로젝트 수정."""
-        project = await self.repo.find_by_id(project_id)
+        """프로젝트 수정 (Codex F-1)."""
+        project = await self.repo.find_by_id(project_id, workspace_id)
         if project is None:
             raise ProjectNotFoundError()
 
@@ -199,28 +237,33 @@ class ProjectService:
         await self.repo.commit()
         return self._to_dict(project)
 
-    async def delete_project(self, project_id: uuid.UUID) -> None:
-        """프로젝트 삭제."""
-        project = await self.repo.find_by_id(project_id)
+    async def delete_project(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID
+    ) -> None:
+        """프로젝트 삭제 (Codex F-1/F-4)."""
+        project = await self.repo.find_by_id(project_id, workspace_id)
         if project is None:
             raise ProjectNotFoundError()
         await self.repo.delete(project)
         await self.repo.commit()
 
-    async def archive_project(self, project_id: uuid.UUID) -> dict:
+    async def archive_project(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID
+    ) -> dict:
         """프로젝트 아카이브 (status → archived)."""
-        return await self.update_project(project_id, status="archived")
+        return await self.update_project(workspace_id, project_id, status="archived")
 
     async def add_meeting_project(
-        self, meeting_id: uuid.UUID, project_id: uuid.UUID
+        self,
+        workspace_id: uuid.UUID,
+        meeting_id: uuid.UUID,
+        project_id: uuid.UUID,
     ) -> dict:
-        """회의-프로젝트 연결."""
-        # 프로젝트 존재 확인
-        project = await self.repo.find_by_id(project_id)
-        if project is None:
-            raise ProjectNotFoundError()
-
-        link = await self.repo.add_meeting_link(meeting_id, project_id)
+        """회의-프로젝트 연결 (Codex F-1/F-2/F-3: meeting + project 둘 다 tenant 검증)."""
+        # F-2 secondary FK: meeting tenant 검증 (fail-closed)
+        await self._verify_secondary_fks(workspace_id, meeting_id=meeting_id)
+        # F-1/F-3: project tenant 검증 (repo.add_meeting_link 안에서도 한 번 더)
+        link = await self.repo.add_meeting_link(meeting_id, project_id, workspace_id)
         await self.repo.commit()
         return {
             "id": str(link.id),
@@ -229,17 +272,22 @@ class ProjectService:
         }
 
     async def remove_meeting_project(
-        self, meeting_id: uuid.UUID, project_id: uuid.UUID
+        self,
+        workspace_id: uuid.UUID,
+        meeting_id: uuid.UUID,
+        project_id: uuid.UUID,
     ) -> None:
-        """회의-프로젝트 연결 해제."""
-        await self.repo.remove_meeting_link(meeting_id, project_id)
+        """회의-프로젝트 연결 해제 (Codex F-1/F-2/F-3)."""
+        await self._verify_secondary_fks(workspace_id, meeting_id=meeting_id)
+        await self.repo.remove_meeting_link(meeting_id, project_id, workspace_id)
         await self.repo.commit()
 
     async def get_meeting_projects(
-        self, meeting_id: uuid.UUID
+        self, workspace_id: uuid.UUID, meeting_id: uuid.UUID
     ) -> list[dict]:
-        """회의에 연결된 프로젝트 목록."""
-        projects = await self.repo.find_projects_by_meeting(meeting_id)
+        """회의에 연결된 프로젝트 목록 (Codex F-1/F-2)."""
+        await self._verify_secondary_fks(workspace_id, meeting_id=meeting_id)
+        projects = await self.repo.find_projects_by_meeting(meeting_id, workspace_id)
         return [self._to_dict(p) for p in projects]
 
     @staticmethod

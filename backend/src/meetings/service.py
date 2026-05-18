@@ -102,8 +102,9 @@ class MeetingService:
             else None
         )
         # Sprint 14 T-8: 연결된 프로젝트 (MeetingProjectLink) 동기화 (BUG-H04)
+        # Sprint 19 PR #1 C9 (Codex F-1): workspace_id 명시 전달
         if self.project_repo is not None:
-            linked = await self.project_repo.find_projects_by_meeting(meeting_id)
+            linked = await self.project_repo.find_projects_by_meeting(meeting_id, workspace_id)
             result["projects"] = [
                 {
                     "id": str(p.id),

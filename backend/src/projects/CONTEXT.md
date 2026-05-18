@@ -61,23 +61,24 @@
 | P-6 | **삭제는 hard delete + cascade 또는 soft (status=archived)** — UI는 archive 우선 노출 |
 | P-7 | **권한**: `archive` / `delete`는 `admin` 이상. **`visibility` 변경은 `admin` 이상 (Sprint 6 BE-T15)**. 일반 update(title/description/status/tags)는 require_member 유지 (AD-32). ProjectMember 추가/제거는 `admin` 이상 (BE-T7) |
 | P-8 | **ProjectMember 추가 cross-workspace 차단** (Sprint 7 — AD-33): `add_member`는 `workspace_id`를 필수 인자로 받아 cross-workspace 검증 수행. 검증 순서: project 존재(404) → workspace mismatch(404) → ws_member 존재(403) → 중복(DB UniqueConstraint). is_active 검증 없음 (WorkspaceMember.is_active 컬럼 미존재). |
+| **P-9** | **모든 Repository / Service find / mutation 시그니처에 `workspace_id` 강제** (Sprint 19 PR #1 C9, 헌법 I-9, Codex F-1/F-3): `find_by_id(project_id, workspace_id)` / `find_members(project_id, workspace_id)` / `is_member(project_id, user_id, workspace_id)` / `remove_member(project_id, user_id, workspace_id)` / `add_meeting_link(meeting_id, project_id, workspace_id)` / `remove_meeting_link(meeting_id, project_id, workspace_id)` / `find_projects_by_meeting(meeting_id, workspace_id)` 전부 WHERE workspace_id 절 적용. cross-tenant resource 는 `ProjectNotFoundError(404)` 로 정보 누설 방지 (F-4 lock-in). secondary FK (`meeting_id`) 입력 시 `_verify_secondary_fks` fail-closed (repo None → `RuntimeError`). cross-domain 호출자 (meetings/inbox/actions/notes/rag) 모두 동시 cascade patch. |
 
 ---
 
 ## 6. 엔드포인트
 
-> `/api/v1/workspaces/{workspace_id}/projects` prefix.
+> `/api/v1/workspaces/{workspace_id}/projects` prefix. Sprint 19 PR #1 C9: 11 endpoint 전수 `workspace_id` 시그니처 강제 + cross-tenant → 404 lock-in.
 
 ```
 GET    /                                                    목록 (visibility 필터 적용)
-GET    /{id}                                                디테일 (visibility 검증)
+GET    /{id}                                                디테일 (visibility 검증, find_by_id workspace_id)
 POST   /                                                    생성 (201, visibility 지정 가능)
-PATCH  /{id}                                                수정 (visibility 변경은 admin+)
-DELETE /{id}                                                삭제 (204, admin+)
-POST   /{id}/archive                                        archive 전환 (admin+)
-GET    /{id}/members                                        프로젝트 멤버 목록 (Sprint 6 BE-T7, viewer+)
+PATCH  /{id}                                                수정 (visibility 변경은 admin+, F-1)
+DELETE /{id}                                                삭제 (204, admin+, F-1)
+POST   /{id}/archive                                        archive 전환 (admin+, F-1)
+GET    /{id}/members                                        프로젝트 멤버 목록 (Sprint 6 BE-T7, viewer+, F-1)
 POST   /{id}/members                                        멤버 추가 (Sprint 6, admin+)
-DELETE /{id}/members/{user_id}                              멤버 제거 (Sprint 6, admin+)
+DELETE /{id}/members/{user_id}                              멤버 제거 (Sprint 6, admin+, F-1)
 ```
 
 > 추가 prefix `/api/v1/workspaces/{workspace_id}/meetings/{meeting_id}/projects`:

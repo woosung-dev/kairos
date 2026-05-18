@@ -144,7 +144,12 @@ async def test_add_member_project_not_found_404(integration_session: AsyncSessio
 
 
 async def test_add_member_workspace_mismatch_404(integration_session: AsyncSession):
-    """시나리오 4: ws_a 소속 user + ws_b 프로젝트 → WorkspaceMismatchError(404)."""
+    """시나리오 4: ws_a 소속 user + ws_b 프로젝트 → ProjectNotFoundError(404).
+
+    Sprint 19 PR #1 C9 (Codex F-4 lock-in): cross-tenant resource 는 정보 누설 방지를
+    위해 WorkspaceMismatchError 가 아닌 ProjectNotFoundError (404) 로 통일. 둘 다
+    HTTP 404 응답이지만 detail 이 다르고, '존재하지만 다른 워크스페이스' 단서를 노출하지 않음.
+    """
     owner_id = await _create_user(integration_session)
     user_id = await _create_user(integration_session)
 
@@ -155,7 +160,7 @@ async def test_add_member_workspace_mismatch_404(integration_session: AsyncSessi
     project_b = await _create_project(integration_session, ws_b.id, owner_id)
 
     service = _make_service(integration_session)
-    with pytest.raises(WorkspaceMismatchError):
+    with pytest.raises(ProjectNotFoundError):
         await service.add_member(
             workspace_id=ws_a.id,  # ws_a 로 요청
             project_id=project_b.id,  # 실제 프로젝트는 ws_b 소속
@@ -203,7 +208,12 @@ async def test_add_member_duplicate_409(integration_session: AsyncSession):
 
 
 async def test_get_project_workspace_mismatch_404(integration_session: AsyncSession):
-    """시나리오 6: ws_a 요청 + ws_b 프로젝트 → get_project → WorkspaceMismatchError(404)."""
+    """시나리오 6: ws_a 요청 + ws_b 프로젝트 → get_project → ProjectNotFoundError(404).
+
+    Sprint 19 PR #1 C9 (Codex F-4 lock-in): get_project 도 cross-tenant 정보 누설
+    방지를 위해 ProjectNotFoundError (404) 로 통일. find_by_id(project_id, workspace_id)
+    가 사전 차단하므로 visibility 검증 진입 전에 404.
+    """
     owner_id = await _create_user(integration_session)
 
     ws_a = await _create_workspace(integration_session, owner_id)
@@ -211,7 +221,7 @@ async def test_get_project_workspace_mismatch_404(integration_session: AsyncSess
     project_b = await _create_project(integration_session, ws_b.id, owner_id)
 
     service = _make_service(integration_session)
-    with pytest.raises(WorkspaceMismatchError):
+    with pytest.raises(ProjectNotFoundError):
         await service.get_project(
             workspace_id=ws_a.id,  # ws_a 로 요청
             project_id=project_b.id,  # ws_b 소속 프로젝트

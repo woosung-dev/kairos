@@ -762,11 +762,218 @@ class TestActionsIDORMatrix:
 
 
 class TestProjectsIDORMatrix:
-    """projects 도메인 11 endpoint — TODO PR #1 projects commit (가장 큰 분산)."""
+    """projects 도메인 11 endpoint + cross-domain cascade (Sprint 19 PR #1 C9).
 
-    @pytest.mark.skip(reason="PR #1 projects commit 진입 시 활성화")
-    def test_placeholder(self):
-        pass
+    Codex F-1 BLOCK 해소: ProjectRepository.find_by_id / find_members / is_member
+    + add_meeting_link / remove_meeting_link / find_projects_by_meeting 모두 workspace_id 강제.
+    Codex F-3: add_meeting_link 호출자 inbox.service classify 경로 cascade.
+    Codex F-4: cross-tenant resource → ProjectNotFoundError(404) lock-in (정보 누설 방지).
+    """
+
+    @pytest.mark.asyncio
+    async def test_project_repository_find_by_id_requires_workspace_id(self):
+        """Codex F-1 anchor: ProjectRepository.find_by_id 시그니처 workspace_id 필수."""
+        import inspect
+        from src.projects.repository import ProjectRepository
+
+        sig = inspect.signature(ProjectRepository.find_by_id)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: ProjectRepository.find_by_id 시그니처에 "
+            f"workspace_id 필수. 현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_project_repository_add_meeting_link_requires_workspace_id(self):
+        """Codex F-1/F-3 anchor: add_meeting_link 시그니처 workspace_id 필수."""
+        import inspect
+        from src.projects.repository import ProjectRepository
+
+        sig = inspect.signature(ProjectRepository.add_meeting_link)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1/F-3: ProjectRepository.add_meeting_link 시그니처에 "
+            f"workspace_id 필수. 현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_project_repository_find_projects_by_meeting_requires_workspace_id(self):
+        """Codex F-1 anchor: find_projects_by_meeting 시그니처 workspace_id 필수."""
+        import inspect
+        from src.projects.repository import ProjectRepository
+
+        sig = inspect.signature(ProjectRepository.find_projects_by_meeting)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: find_projects_by_meeting workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_project_service_update_project_requires_workspace_id(self):
+        """Codex F-1 anchor: ProjectService.update_project workspace_id 필수."""
+        import inspect
+        from src.projects.service import ProjectService
+
+        sig = inspect.signature(ProjectService.update_project)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: update_project workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_project_service_delete_project_requires_workspace_id(self):
+        """Codex F-1 anchor: ProjectService.delete_project workspace_id 필수."""
+        import inspect
+        from src.projects.service import ProjectService
+
+        sig = inspect.signature(ProjectService.delete_project)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: delete_project workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_project_service_add_meeting_project_requires_workspace_id(self):
+        """Codex F-1/F-2 anchor: add_meeting_project workspace_id + meeting secondary FK 필수."""
+        import inspect
+        from src.projects.service import ProjectService
+
+        sig = inspect.signature(ProjectService.add_meeting_project)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: add_meeting_project workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_project_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """GET /projects/{id} → service.get_project workspace_id 정확 값 (Codex F-3)."""
+        from src.projects.dependencies import get_project_service
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_viewer] = lambda: member_a
+
+        project_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.get_project.return_value = {
+            "id": str(project_id),
+            "workspaceId": str(workspace_a_id),
+        }
+        app.dependency_overrides[get_project_service] = lambda: mock_service
+
+        response = await client.get(
+            f"/api/v1/workspaces/{workspace_a_id}/projects/{project_id}",
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 200
+        call_args = mock_service.get_project.call_args
+        kwargs = call_args.kwargs if call_args else {}
+        assert kwargs.get("workspace_id") == workspace_a_id, (
+            f"BUG-C01-EXT v3 projects #2 (Codex F-3): get_project workspace_id 정확 값 미전달. "
+            f"기대={workspace_a_id} 실제={kwargs.get('workspace_id')} kwargs={kwargs}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_update_project_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """PATCH /projects/{id} → service.update_project workspace_id 정확 값 (Codex F-3)."""
+        from src.projects.dependencies import get_project_service
+        from src.auth.rbac import require_member
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_member] = lambda: member_a
+
+        project_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.update_project.return_value = {
+            "id": str(project_id),
+            "workspaceId": str(workspace_a_id),
+        }
+        app.dependency_overrides[get_project_service] = lambda: mock_service
+
+        response = await client.patch(
+            f"/api/v1/workspaces/{workspace_a_id}/projects/{project_id}",
+            json={"title": "new"},
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 200
+        call_args = mock_service.update_project.call_args
+        kwargs = call_args.kwargs if call_args else {}
+        assert kwargs.get("workspace_id") == workspace_a_id, (
+            f"BUG-C01-EXT v3 projects #4 (Codex F-3): update_project workspace_id 정확 값. "
+            f"기대={workspace_a_id} 실제={kwargs.get('workspace_id')} kwargs={kwargs}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_delete_project_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """DELETE /projects/{id} → service.delete_project workspace_id 정확 값 (Codex F-3)."""
+        from src.projects.dependencies import get_project_service
+        from src.auth.rbac import require_admin
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        member_a.role = "admin"
+        app.dependency_overrides[require_admin] = lambda: member_a
+
+        project_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.delete_project.return_value = None
+        app.dependency_overrides[get_project_service] = lambda: mock_service
+
+        response = await client.delete(
+            f"/api/v1/workspaces/{workspace_a_id}/projects/{project_id}",
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 204
+        call_args = mock_service.delete_project.call_args
+        args = call_args.args if call_args else ()
+        kwargs = call_args.kwargs if call_args else {}
+        workspace_id_seen = kwargs.get("workspace_id") or (
+            args[0] if len(args) > 0 else None
+        )
+        assert workspace_id_seen == workspace_a_id, (
+            f"BUG-C01-EXT v3 projects #5 (Codex F-3): delete_project workspace_id 정확 값. "
+            f"기대={workspace_a_id} 실제={workspace_id_seen} kwargs={kwargs} args={args}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_add_meeting_project_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """POST /meetings/{mid}/projects → service.add_meeting_project workspace_id 정확 값 (Codex F-3)."""
+        from src.projects.dependencies import get_project_service
+        from src.auth.rbac import require_member
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_member] = lambda: member_a
+
+        meeting_id = uuid.uuid4()
+        project_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.add_meeting_project.return_value = {
+            "id": str(uuid.uuid4()),
+            "meetingId": str(meeting_id),
+            "projectId": str(project_id),
+        }
+        app.dependency_overrides[get_project_service] = lambda: mock_service
+
+        response = await client.post(
+            f"/api/v1/workspaces/{workspace_a_id}/meetings/{meeting_id}/projects",
+            json={"projectId": str(project_id)},
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 201
+        call_args = mock_service.add_meeting_project.call_args
+        args = call_args.args if call_args else ()
+        kwargs = call_args.kwargs if call_args else {}
+        workspace_id_seen = kwargs.get("workspace_id") or (
+            args[0] if len(args) > 0 else None
+        )
+        assert workspace_id_seen == workspace_a_id, (
+            f"BUG-C01-EXT v3 projects #10 (Codex F-3): add_meeting_project workspace_id. "
+            f"기대={workspace_a_id} 실제={workspace_id_seen} kwargs={kwargs} args={args}"
+        )
 
 
 class TestMemoryIDORMatrix:

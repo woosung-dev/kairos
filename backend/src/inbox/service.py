@@ -60,10 +60,11 @@ class InboxService:
 
         # Codex F-2 Critical: project_ids 모두 같은 workspace 인지 사전 검증
         # (add_meeting_link 가 cross-workspace meeting/project 링크 생성하는 것 차단)
+        # Sprint 19 PR #1 C9 (Codex F-1 cascade): find_by_id 시그니처 workspace_id 강제
         verified_projects: list = []
         for project_id in project_ids:
-            project = await self.project_repo.find_by_id(project_id)
-            if project is None or project.workspace_id != workspace_id:
+            project = await self.project_repo.find_by_id(project_id, workspace_id)
+            if project is None:
                 raise ProjectNotFoundError()
             verified_projects.append(project)
 
@@ -72,10 +73,13 @@ class InboxService:
         await self.inbox_repo.save(item)
 
         # source_type 이 "meeting" 이면 → 각 프로젝트에 회의 연결
+        # Sprint 19 PR #1 C9 (Codex F-3): add_meeting_link workspace_id 명시 전달
         linked_projects: list[dict] = []
         if item.source_type == "meeting":
             for project in verified_projects:
-                await self.project_repo.add_meeting_link(item.source_id, project.id)
+                await self.project_repo.add_meeting_link(
+                    item.source_id, project.id, workspace_id
+                )
                 linked_projects.append(
                     {"id": str(project.id), "title": project.title}
                 )

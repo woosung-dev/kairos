@@ -78,6 +78,7 @@ class NotePipelineService:
     async def check_project_access(
         self,
         project_id: uuid.UUID | None,
+        workspace_id: uuid.UUID,
         requester_user_id: uuid.UUID,
         requester_role: str,
     ) -> bool:
@@ -85,12 +86,13 @@ class NotePipelineService:
 
         Returns True if requester has access, False otherwise.
         admin/owner는 우회. project_id=None은 워크스페이스 멤버 누구나 OK.
+        Sprint 19 PR #1 C9 (Codex F-1 cascade): workspace_id 시그니처 강제.
         """
         if requester_role in ("admin", "owner"):
             return True
         if project_id is None:
             return True
-        project = await self.project_repo.find_by_id(project_id)
+        project = await self.project_repo.find_by_id(project_id, workspace_id)
         if project is None:
             return False
         if project.visibility == "public":
@@ -98,5 +100,5 @@ class NotePipelineService:
         if project.visibility == "draft":
             return project.created_by_id == requester_user_id
         if project.visibility == "private":
-            return await self.project_repo.is_member(project_id, requester_user_id)
+            return await self.project_repo.is_member(project_id, requester_user_id, workspace_id)
         return False

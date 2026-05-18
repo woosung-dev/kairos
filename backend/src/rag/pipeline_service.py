@@ -42,13 +42,14 @@ class RagPipelineService:
 
         admin/owner 우회는 caller 책임 (ADR-014 옵션 A).
         """
-        project = await self.project_repo.find_by_id(project_id)
-        if project is None or project.workspace_id != workspace_id:
+        # Sprint 19 PR #1 C9 (Codex F-1 cascade): find_by_id / is_member workspace_id 강제
+        project = await self.project_repo.find_by_id(project_id, workspace_id)
+        if project is None:
             return "프로젝트를 찾을 수 없거나 접근 권한이 없습니다."
         if project.visibility == "draft" and project.created_by_id != requester_user_id:
             return "Draft 프로젝트는 작성자만 접근 가능합니다."
         if project.visibility == "private":
-            is_member = await self.project_repo.is_member(project_id, requester_user_id)
+            is_member = await self.project_repo.is_member(project_id, requester_user_id, workspace_id)
             if not is_member:
                 return "Private 프로젝트는 명시적 멤버만 접근 가능합니다."
         return None
