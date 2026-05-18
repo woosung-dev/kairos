@@ -3,8 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON
-from sqlmodel import Field, SQLModel
+from sqlmodel import JSON, Field, SQLModel
 
 
 class InboxItem(SQLModel, table=True):
