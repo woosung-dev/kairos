@@ -200,13 +200,15 @@ class ProjectRepository:
     ) -> MeetingProjectLink:
         """헌법 I-9 (Codex F-1/F-3): project 가 workspace 소속인지 사전 검증.
 
-        MeetingProjectLink 자체에 workspace_id 컬럼 없음 (PR #2 분리).
-        service 레이어에서 project.workspace_id == workspace_id 보장.
+        Sprint 19 PR #2 D6 (BUG-C01-EXT-FK / 헌법 I-9 (10)): MeetingProjectLink 에 workspace_id 컬럼 신설.
+        composite FK (workspace_id, project_id) + (workspace_id, meeting_id) 가 DB-level 차단.
         """
         project = await self.find_by_id(project_id, workspace_id)
         if project is None:
             raise ProjectNotFoundError()
-        link = MeetingProjectLink(meeting_id=meeting_id, project_id=project_id)
+        link = MeetingProjectLink(
+            meeting_id=meeting_id, project_id=project_id, workspace_id=workspace_id
+        )
         self.session.add(link)
         await self.session.flush()
         return link
@@ -217,7 +219,7 @@ class ProjectRepository:
         project_id: uuid.UUID,
         workspace_id: uuid.UUID,
     ) -> None:
-        """헌법 I-9 (Codex F-1/F-3): 사전 project tenant 검증 후 DELETE."""
+        """헌법 I-9 (Codex F-1/F-3 + v2 F-7): 사전 project tenant 검증 + mutation WHERE workspace_id."""
         project = await self.find_by_id(project_id, workspace_id)
         if project is None:
             raise ProjectNotFoundError()
@@ -225,6 +227,8 @@ class ProjectRepository:
             delete(MeetingProjectLink).where(
                 MeetingProjectLink.meeting_id == meeting_id,
                 MeetingProjectLink.project_id == project_id,
+                # Sprint 19 PR #2 D6 (Codex v2 F-7): mutation 도 workspace_id anchor (헌법 I-9 (2))
+                MeetingProjectLink.workspace_id == workspace_id,
             )
         )
         await self.session.flush()
@@ -232,7 +236,7 @@ class ProjectRepository:
     async def find_projects_by_meeting(
         self, meeting_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> list[Project]:
-        """헌법 I-9 (Codex F-1): JOIN + WHERE Project.workspace_id 강제."""
+        """헌법 I-9 (Codex F-1 + v2 F-7): JOIN + WHERE workspace_id 강제 (mpl + project 양쪽)."""
         stmt = (
             select(Project)
             .join(
@@ -241,6 +245,8 @@ class ProjectRepository:
             )
             .where(
                 MeetingProjectLink.meeting_id == meeting_id,
+                # Sprint 19 PR #2 D6 (Codex v2 F-7): mpl 측도 workspace_id anchor (헌법 I-9 (1))
+                MeetingProjectLink.workspace_id == workspace_id,
                 Project.workspace_id == workspace_id,
             )
             .order_by(Project.sort_order, Project.created_at.desc())

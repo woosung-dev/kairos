@@ -30,7 +30,7 @@
   - `visibility`: `public` / `draft` / `private` (default `public`, indexed) — Sprint 6 BE-T1 (마이그레이션 `c4c5709a4ab4`)
   - `tags`: JSONB (AI 자동 + 사용자)
   - `sort_order`
-- **MeetingProjectLink** — N:M (`(meeting_id, project_id)` 유일). meetings 도메인이 아닌 **projects 도메인 소유**.
+- **MeetingProjectLink** — N:M (`(meeting_id, project_id)` 유일). meetings 도메인이 아닌 **projects 도메인 소유**. **Sprint 19 PR #2 (BUG-C01-EXT-FK, alembic `e5f6g7h8i9ja`)**: `workspace_id` 컬럼 신설 (NOT NULL, indexed) + composite FK 2개 — `(workspace_id, project_id) → projects(workspace_id, id)` + `(workspace_id, meeting_id) → meetings(workspace_id, id)`. cross-workspace 링크 DB-level 차단.
 - **ProjectMember** — N:M (`(project_id, user_id)` 유일). visibility=Private 시 명시적 멤버 매핑 (Sprint 6 BE-T5, 마이그레이션 `754f571d5544`). `role` 컬럼은 향후 sprint 7+ 확장 여지로 두되 1차는 `"member"` 단일 (AD-27).
 
 ---
@@ -62,6 +62,7 @@
 | P-7 | **권한**: `archive` / `delete`는 `admin` 이상. **`visibility` 변경은 `admin` 이상 (Sprint 6 BE-T15)**. 일반 update(title/description/status/tags)는 require_member 유지 (AD-32). ProjectMember 추가/제거는 `admin` 이상 (BE-T7) |
 | P-8 | **ProjectMember 추가 cross-workspace 차단** (Sprint 7 — AD-33): `add_member`는 `workspace_id`를 필수 인자로 받아 cross-workspace 검증 수행. 검증 순서: project 존재(404) → workspace mismatch(404) → ws_member 존재(403) → 중복(DB UniqueConstraint). is_active 검증 없음 (WorkspaceMember.is_active 컬럼 미존재). |
 | **P-9** | **모든 Repository / Service find / mutation 시그니처에 `workspace_id` 강제** (Sprint 19 PR #1 C9, 헌법 I-9, Codex F-1/F-3): `find_by_id(project_id, workspace_id)` / `find_members(project_id, workspace_id)` / `is_member(project_id, user_id, workspace_id)` / `remove_member(project_id, user_id, workspace_id)` / `add_meeting_link(meeting_id, project_id, workspace_id)` / `remove_meeting_link(meeting_id, project_id, workspace_id)` / `find_projects_by_meeting(meeting_id, workspace_id)` 전부 WHERE workspace_id 절 적용. cross-tenant resource 는 `ProjectNotFoundError(404)` 로 정보 누설 방지 (F-4 lock-in). secondary FK (`meeting_id`) 입력 시 `_verify_secondary_fks` fail-closed (repo None → `RuntimeError`). cross-domain 호출자 (meetings/inbox/actions/notes/rag) 모두 동시 cascade patch. |
+| **P-10** | **DB-level composite FK hardening** (Sprint 19 PR #2 BUG-C01-EXT-FK, 헌법 I-9 (9)(10)(11), alembic `e5f6g7h8i9ja`): `Project.__table_args__` 에 `UniqueConstraint("id", "workspace_id")` (D3a) — composite FK target. `ProjectMember.__table_args__` 에 `ForeignKeyConstraint(["project_id", "workspace_id"], ["projects.id", "projects.workspace_id"])` 명시 (D7, alembic 변경 X — 7ebd009f89a4 의 DB constraint 와 model 정합성). `MeetingProjectLink.__table_args__` 에 `workspace_id` 필드 + 2 composite FK (D6). `repository.py` 의 `add_meeting_link` 생성자 + `remove_meeting_link` DELETE WHERE + `find_projects_by_meeting` JOIN WHERE 에 모두 workspace_id (Codex v2 F-7). service-level (P-9) 와 중복 = defense-in-depth (제거 금지). |
 
 ---
 
