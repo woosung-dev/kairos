@@ -112,6 +112,26 @@ async def test_notes_nullable_project_id_allowed(
 
 
 @pytest.mark.asyncio
+async def test_action_items_nullable_project_id_allowed(
+    integration_session: AsyncSession,
+):
+    """action_items.project_id IS NULL = MATCH SIMPLE → composite FK 면제 (Codex v2 F-3).
+
+    PR #2 가 추가한 fk_action_items_project_workspace 가 nullable project_id 에서도
+    PostgreSQL MATCH SIMPLE default 동작으로 면제됨을 검증. notes 와 동일 의도.
+    """
+    s = await _seed_two_workspaces(integration_session)
+    item = ActionItem(
+        workspace_id=s["ws_a"].id,
+        project_id=None,
+        title="Standalone action",
+    )
+    integration_session.add(item)
+    await integration_session.commit()  # 통과 = OK
+    assert item.id is not None
+
+
+@pytest.mark.asyncio
 async def test_mpl_cross_workspace_project_blocked(
     integration_session: AsyncSession,
 ):

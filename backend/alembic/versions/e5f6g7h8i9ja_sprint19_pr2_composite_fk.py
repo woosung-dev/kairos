@@ -39,7 +39,53 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """4 entity composite FK 일괄 추가."""
+    """4 entity composite FK 일괄 추가.
+
+    preflight (Codex v2 F-2): mismatch row 가 있으면 명시적 RAISE EXCEPTION 으로 fail-fast.
+    이렇게 하면 FK 생성 또는 NOT NULL 단계에서 모호한 에러 대신 명확한 메시지.
+    """
+    # 0. preflight — mismatch row 검사. 발견 시 immediate fail.
+    op.execute(
+        """
+        DO $$
+        DECLARE
+            cnt_actions INT;
+            cnt_notes INT;
+            cnt_mpl INT;
+            cnt_pm INT;
+        BEGIN
+            SELECT COUNT(*) INTO cnt_actions FROM action_items a
+              JOIN projects p ON p.id = a.project_id
+              WHERE a.workspace_id != p.workspace_id;
+            IF cnt_actions > 0 THEN
+                RAISE EXCEPTION 'PR #2 preflight: action_items mismatch=% (composite FK 추가 불가, fix 후 재실행)', cnt_actions;
+            END IF;
+
+            SELECT COUNT(*) INTO cnt_notes FROM notes n
+              JOIN projects p ON p.id = n.project_id
+              WHERE n.project_id IS NOT NULL AND n.workspace_id != p.workspace_id;
+            IF cnt_notes > 0 THEN
+                RAISE EXCEPTION 'PR #2 preflight: notes mismatch=% (composite FK 추가 불가)', cnt_notes;
+            END IF;
+
+            SELECT COUNT(*) INTO cnt_mpl FROM meeting_project_links mpl
+              JOIN meetings m ON m.id = mpl.meeting_id
+              JOIN projects p ON p.id = mpl.project_id
+              WHERE m.workspace_id != p.workspace_id;
+            IF cnt_mpl > 0 THEN
+                RAISE EXCEPTION 'PR #2 preflight: meeting_project_links mismatch=% (composite FK 추가 불가)', cnt_mpl;
+            END IF;
+
+            SELECT COUNT(*) INTO cnt_pm FROM project_members pm
+              JOIN projects p ON p.id = pm.project_id
+              WHERE pm.workspace_id != p.workspace_id;
+            IF cnt_pm > 0 THEN
+                RAISE EXCEPTION 'PR #2 preflight: project_members mismatch=% (이미 composite FK 존재해야 함)', cnt_pm;
+            END IF;
+        END $$;
+        """
+    )
+
     # 1. meetings(id, workspace_id) UNIQUE — composite FK target 선행
     op.create_unique_constraint(
         "uq_meetings_id_workspace_id", "meetings", ["id", "workspace_id"]
@@ -80,6 +126,20 @@ def upgrade() -> None:
         SET workspace_id = m.workspace_id
         FROM meetings m
         WHERE m.id = mpl.meeting_id
+        """
+    )
+    # backfill 후 NULL 검사 (Codex v2 F-2): meeting 이 사라진 dangling mpl row 있으면 fail-fast
+    op.execute(
+        """
+        DO $$
+        DECLARE
+            cnt_null INT;
+        BEGIN
+            SELECT COUNT(*) INTO cnt_null FROM meeting_project_links WHERE workspace_id IS NULL;
+            IF cnt_null > 0 THEN
+                RAISE EXCEPTION 'PR #2 backfill: meeting_project_links 의 % rows 가 NULL workspace_id (orphan meeting?). SET NOT NULL 불가.', cnt_null;
+            END IF;
+        END $$;
         """
     )
     op.alter_column("meeting_project_links", "workspace_id", nullable=False)
