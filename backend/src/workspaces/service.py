@@ -50,6 +50,12 @@ class WorkspaceService:
             )
             await self.project_repo.save(project)
 
+        # Sprint 22 OBN-02: team workspace 생성 시 onboarding step=1 (same transaction).
+        # repo.session 으로 호출자의 AsyncSession 재사용 — commit 이전 위치 (UPDATE rollback 방지).
+        from src.onboarding.service import OnboardingService
+        onboarding = OnboardingService(self.repo.session)
+        await onboarding.increment_step(workspace.owner_id, 1)
+
         # 동일 session을 공유하므로 repo 한 곳에서만 commit
         await self.repo.commit()
 

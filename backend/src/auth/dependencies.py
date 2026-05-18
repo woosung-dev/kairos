@@ -126,6 +126,13 @@ async def get_current_user(
         ),
         {"owner_id": str(user.id)},
     )
+    # Sprint 22 OBN-02: personal workspace lazy seed 완료 시 onboarding step=1
+    # is_new_user 여부 무관 — idempotent (step >= 1 이면 UPDATE no-op).
+    # commit 이전 위치 — 같은 transaction 으로 atomicity 보장.
+    from src.onboarding.service import OnboardingService
+    onboarding = OnboardingService(session)
+    await onboarding.increment_step(user.id, 1)
+
     if is_new_user:
         await session.commit()
     else:
