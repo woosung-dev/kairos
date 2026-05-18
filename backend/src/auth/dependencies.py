@@ -129,9 +129,17 @@ async def get_current_user(
     # Sprint 22 OBN-02: personal workspace lazy seed 완료 시 onboarding step=1
     # is_new_user 여부 무관 — idempotent (step >= 1 이면 UPDATE no-op).
     # commit 이전 위치 — 같은 transaction 으로 atomicity 보장.
-    from src.onboarding.service import OnboardingService
-    onboarding = OnboardingService(session)
-    await onboarding.increment_step(user.id, 1)
+    # graceful: hook 실패 시도 lazy seed / auth 전체 흐름은 영향 받지 않음
+    # (CI E2E fail 학습 — entire request fail 차단).
+    try:
+        from src.onboarding.service import OnboardingService
+        onboarding = OnboardingService(session)
+        await onboarding.increment_step(user.id, 1)
+    except Exception as ob_err:
+        import logging
+        logging.getLogger(__name__).warning(
+            "onboarding step=1 advance 실패 (비치명적, lazy seed 보존): %s", ob_err
+        )
 
     if is_new_user:
         await session.commit()
