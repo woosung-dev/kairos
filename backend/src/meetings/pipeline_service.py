@@ -152,6 +152,13 @@ class MeetingPipelineService:
         except Exception as emb_err:
             logger.warning("임베딩 생성 실패 (비치명적, meeting=%s): %s", meeting.id, emb_err)
 
+        # Sprint 22 OBN-02: AI distillation 완료 시 onboarding step=3.
+        # meeting.created_by_id = 실제 회의 업로드한 user (workspace owner 와 다를 수 있음).
+        if meeting.created_by_id is not None:
+            from src.onboarding.service import OnboardingService
+            onboarding = OnboardingService(meeting_repo.session)
+            await onboarding.increment_step(meeting.created_by_id, 3)
+
         await meeting_repo.update_status(meeting.id, workspace_id, "completed")
         await meeting_repo.commit()
 
