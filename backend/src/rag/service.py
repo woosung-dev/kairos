@@ -25,6 +25,19 @@ class RagService:
         self.embedding_service = embedding_service
         self.ai_service = ai_service
 
+    async def _advance_onboarding(self, user_id: uuid.UUID) -> None:
+        """Sprint 22 OBN-02: 첫 RAG 성공 응답 시 step=4 + onboarded_at.
+
+        self.embedding_repo.session 재사용 (DI 통한 already-injected session).
+        실패해도 RAG 응답 자체는 영향 받지 않도록 graceful (비치명적).
+        """
+        try:
+            from src.onboarding.service import OnboardingService
+            onboarding = OnboardingService(self.embedding_repo.session)
+            await onboarding.increment_step(user_id, 4)
+        except Exception as ob_err:
+            logger.warning("onboarding step=4 advance 실패 (비치명적): %s", ob_err)
+
     async def ask(
         self,
         question: str,
@@ -67,6 +80,8 @@ class RagService:
                     {"token": cache_hit["answer"]}, ensure_ascii=False
                 ),
             }
+            # Sprint 22 OBN-02: cache hit 도 첫 RAG 성공 응답 — step=4 advance.
+            await self._advance_onboarding(requester_user_id)
             yield {
                 "event": "done",
                 "data": json.dumps(
@@ -191,6 +206,9 @@ class RagService:
             await self.embedding_repo.commit()
         except Exception as cache_err:
             logger.warning("캐시 저장 실패 (비치명적): %s", cache_err)
+
+        # Sprint 22 OBN-02: 첫 RAG 성공 응답 — step=4 advance + onboarded_at set.
+        await self._advance_onboarding(requester_user_id)
 
         yield {
             "event": "done",
