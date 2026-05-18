@@ -62,11 +62,11 @@ class ProjectMember(SQLModel, table=True):
     __table_args__ = (
         UniqueConstraint("project_id", "user_id", name="uq_project_member"),
         UniqueConstraint("id", "workspace_id", name="uq_project_member_ws"),
-        # Sprint 19 PR #2 D7: alembic 7ebd009f89a4 의 DB constraint 와 model 정합성
-        # (DB-level composite FK 는 이미 존재 — alembic 변경 X, model 만 sync, schema drift 방지)
+        # Sprint 19 PR #2 D7 (column 순서는 alembic 7ebd009f89a4 정의 그대로 — (project_id, workspace_id) → (id, workspace_id))
+        # DB-level composite FK 는 이미 존재 — alembic 변경 X, model 만 sync, schema drift 방지
         ForeignKeyConstraint(
-            ["workspace_id", "project_id"],
-            ["projects.workspace_id", "projects.id"],
+            ["project_id", "workspace_id"],
+            ["projects.id", "projects.workspace_id"],
             name="fk_project_members_project_workspace",
         ),
     )
