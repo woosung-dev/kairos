@@ -106,3 +106,79 @@ async def test_project_members_project_workspace_match(
         f"cross-workspace project 참조. sample={mismatched[:3]}. "
         f"composite FK 는 Sprint 19 PR #2 분리."
     )
+
+
+@pytest.mark.asyncio
+async def test_action_items_meeting_workspace_match(
+    integration_session: AsyncSession,
+):
+    """action_items.meeting_id 가 다른 workspace 의 meeting 을 가리키지 않는다."""
+    result = await integration_session.execute(text("""
+        SELECT a.id, a.workspace_id AS a_ws, m.workspace_id AS m_ws
+        FROM action_items a
+        JOIN meetings m ON m.id = a.meeting_id
+        WHERE a.meeting_id IS NOT NULL AND a.workspace_id != m.workspace_id
+        LIMIT 10
+    """))
+    mismatched = result.fetchall()
+    assert len(mismatched) == 0, (
+        f"BL-050 audit: action_items 의 {len(mismatched)} 행이 cross-workspace meeting 참조. "
+        f"sample={mismatched[:3]}. composite FK 신설 + backfill 은 본 PR 의 D3 alembic."
+    )
+
+
+@pytest.mark.asyncio
+async def test_inbox_suggested_project_workspace_match(
+    integration_session: AsyncSession,
+):
+    """inbox.ai_suggested_project_id 가 다른 workspace 의 project 를 가리키지 않는다."""
+    result = await integration_session.execute(text("""
+        SELECT i.id, i.workspace_id AS i_ws, p.workspace_id AS p_ws
+        FROM inbox_items i
+        JOIN projects p ON p.id = i.ai_suggested_project_id
+        WHERE i.ai_suggested_project_id IS NOT NULL AND i.workspace_id != p.workspace_id
+        LIMIT 10
+    """))
+    mismatched = result.fetchall()
+    assert len(mismatched) == 0, (
+        f"BL-050 audit: inbox_items 의 {len(mismatched)} 행이 cross-workspace project 추천. "
+        f"sample={mismatched[:3]}. composite FK 신설 + backfill 은 본 PR 의 D3 alembic."
+    )
+
+
+@pytest.mark.asyncio
+async def test_embedding_chunks_project_workspace_match(
+    integration_session: AsyncSession,
+):
+    """embedding_chunks.project_id 가 다른 workspace 의 project 를 가리키지 않는다."""
+    result = await integration_session.execute(text("""
+        SELECT ec.id, ec.workspace_id AS ec_ws, p.workspace_id AS p_ws
+        FROM embedding_chunks ec
+        JOIN projects p ON p.id = ec.project_id
+        WHERE ec.project_id IS NOT NULL AND ec.workspace_id != p.workspace_id
+        LIMIT 10
+    """))
+    mismatched = result.fetchall()
+    assert len(mismatched) == 0, (
+        f"BL-050 audit: embedding_chunks 의 {len(mismatched)} 행이 cross-workspace project 참조. "
+        f"sample={mismatched[:3]}. composite FK 신설 + backfill 은 본 PR 의 D3 alembic."
+    )
+
+
+@pytest.mark.asyncio
+async def test_semantic_caches_project_workspace_match(
+    integration_session: AsyncSession,
+):
+    """semantic_caches.project_id 가 다른 workspace 의 project 를 가리키지 않는다."""
+    result = await integration_session.execute(text("""
+        SELECT sc.id, sc.workspace_id AS sc_ws, p.workspace_id AS p_ws
+        FROM semantic_caches sc
+        JOIN projects p ON p.id = sc.project_id
+        WHERE sc.project_id IS NOT NULL AND sc.workspace_id != p.workspace_id
+        LIMIT 10
+    """))
+    mismatched = result.fetchall()
+    assert len(mismatched) == 0, (
+        f"BL-050 audit: semantic_caches 의 {len(mismatched)} 행이 cross-workspace project 참조. "
+        f"sample={mismatched[:3]}. composite FK 신설 + backfill 은 본 PR 의 D3 alembic."
+    )

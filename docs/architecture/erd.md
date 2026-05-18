@@ -338,3 +338,24 @@ erDiagram
 - `expiresAt`: TTL 7일 자동 만료
 - 데이터 변경 시 해당 `projectId`의 캐시 무효화
 - 상세 설계: [RAG 파이프라인 설계](rag-pipeline.md) 참조
+
+---
+
+## BL-050 Simple 4 composite FK (Sprint 21, 2026-05-18)
+
+Sprint 19 PR #2 (BUG-C01-EXT-FK) 의 후속 hardening — 4 entity 의 cross-workspace single-FK 를 composite FK 로 강화.
+
+| 출발 entity | 컬럼 | 도착 entity | composite FK 명 |
+|---|---|---|---|
+| action_items | (workspace_id, meeting_id) | meetings | fk_action_items_meeting_workspace |
+| inbox_items | (workspace_id, ai_suggested_project_id) | projects | fk_inbox_suggested_project_workspace |
+| embedding_chunks | (workspace_id, project_id) | projects | fk_embedding_chunks_project_workspace |
+| semantic_caches | (workspace_id, project_id) | projects | fk_semantic_caches_project_workspace |
+
+모두 nullable FK → MATCH SIMPLE NULL row 자동 면제. alembic revision `cf903ab3dd37` (down_revision: `e5f6g7h8i9ja`).
+
+### BL-050 Carry-over (Sprint 22+)
+
+- memory_items.embedding_chunk_id — embedding_chunks UNIQUE 선행 작업 필요
+- memory_ai_calls.memory_id — memory_items UNIQUE 선행 + NOT NULL FK 패턴
+- promotion_audit (source/target workspace_id) — intentional cross-workspace, 별도 분석

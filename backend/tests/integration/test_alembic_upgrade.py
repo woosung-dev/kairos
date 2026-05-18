@@ -56,18 +56,25 @@ def _include_object(obj, name, type_, reflected, compare_to):
 # 본 set 에 포함된 constraint 의 drift 는 절대 필터링 안 됨 (반드시 검출).
 PR2_MANAGED_CONSTRAINTS = frozenset(
     {
-        # composite FK 4 entity (D2 alembic + D4/D5/D6/D7 model)
+        # PR #2 (BUG-C01-EXT-FK) composite FK 4 entity (D2 alembic + D4~D7 model)
         "fk_action_items_project_workspace",
         "fk_notes_project_workspace",
         "fk_mpl_project_workspace",
         "fk_mpl_meeting_workspace",
         "fk_mpl_workspace",
         "fk_project_members_project_workspace",
-        # UQ target (D3 meetings + D3a projects)
+        # PR #2 UQ target (D3 meetings + D3a projects)
         "uq_meetings_id_workspace_id",
         "uq_projects_id_workspace_id",
-        # meeting_project_links workspace_id 컬럼 + 인덱스
+        # PR #2 meeting_project_links workspace_id 컬럼 + 인덱스
         "ix_meeting_project_links_workspace_id",
+        # Sprint 21 BL-050 Simple 4 composite FK (Codex 1차 MAJOR-1 수락)
+        # 이름은 PR2_MANAGED_CONSTRAINTS 유지 (rename = surgical change 위반);
+        # 본 set 의 의도는 "drift gate 의 catch allowlist" — generic.
+        "fk_action_items_meeting_workspace",
+        "fk_inbox_suggested_project_workspace",
+        "fk_embedding_chunks_project_workspace",
+        "fk_semantic_caches_project_workspace",
     }
 )
 

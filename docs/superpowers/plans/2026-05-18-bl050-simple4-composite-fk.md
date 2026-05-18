@@ -247,14 +247,58 @@ verdict = APPROVE / REVISE / BLOCK 중 하나. REVISE 시 finding 100% 수락 �
 
 ---
 
-## Task 2: D2 model `__table_args__` 4 patch (~2h)
+## Task 2: D2 model `__table_args__` 4 patch (~2.5h, drift gate allowlist 갱신 포함)
 
-**Goal:** 4 model 에 composite ForeignKeyConstraint 선언. import 추가 + table_args 신설/확장.
+**Goal:** 4 model 에 composite ForeignKeyConstraint 선언. import 추가 + table_args 신설/확장. **drift gate allowlist 선행 갱신** (Codex 1차 MAJOR-1 수락).
 
 **Files:**
+- Modify: `backend/tests/integration/test_alembic_upgrade.py:57-72` (PR2_MANAGED_CONSTRAINTS 에 BL-050 4 FK 명 추가) — **Step 2.0 선행**
 - Modify: `backend/src/actions/models.py:11-19` (기존 `__table_args__` 확장)
 - Modify: `backend/src/inbox/models.py` (import + `__table_args__` 신설)
 - Modify: `backend/src/embeddings/models.py` (import + 2 model 의 `__table_args__` 신설)
+
+### Step 2.0: drift gate allowlist 갱신 (Codex 1차 MAJOR-1 수락, ~10min)
+
+**근거**: `_is_pr2_scope_drift()` 함수가 `PR2_MANAGED_CONSTRAINTS` allowlist 기반 catch — BL-050 4 새 FK 가 allowlist 미등록 시 D2 후 drift test 가 **false-green** (실제로 drift 있지만 PASS). D3 누락 case 도 catch 안 됨.
+
+- [ ] **Edit `backend/tests/integration/test_alembic_upgrade.py:57-72` — allowlist 확장**
+
+기존 `PR2_MANAGED_CONSTRAINTS` (line 57-72) 의 frozenset 에 BL-050 4 FK 추가:
+
+```python
+PR2_MANAGED_CONSTRAINTS = frozenset(
+    {
+        # PR #2 (BUG-C01-EXT-FK) composite FK 4 entity
+        "fk_action_items_project_workspace",
+        "fk_notes_project_workspace",
+        "fk_mpl_project_workspace",
+        "fk_mpl_meeting_workspace",
+        "fk_mpl_workspace",
+        "fk_project_members_project_workspace",
+        # PR #2 UQ target
+        "uq_meetings_id_workspace_id",
+        "uq_projects_id_workspace_id",
+        # PR #2 meeting_project_links workspace_id 컬럼 + 인덱스
+        "ix_meeting_project_links_workspace_id",
+        # Sprint 21 BL-050 Simple 4 composite FK (D2 model + D3 alembic)
+        "fk_action_items_meeting_workspace",
+        "fk_inbox_suggested_project_workspace",
+        "fk_embedding_chunks_project_workspace",
+        "fk_semantic_caches_project_workspace",
+    }
+)
+```
+
+> 함수명 `_is_pr2_scope_drift` 와 변수명 `PR2_MANAGED_CONSTRAINTS` 는 그대로 유지 (rename = surgical change 위반). 실제 의도는 "drift gate 의 catch allowlist" 로 generic — BL-050 항목도 자연 합류.
+
+- [ ] **회귀: D2 model 변경 전이라 drift 0 유지**
+
+```bash
+cd /Users/woosung/project/agy-project/kairos-sprint-21/backend
+uv run pytest tests/integration/test_alembic_upgrade.py -v 2>&1 | tail -10
+```
+
+Expected: 1 passed (drift 0, allowlist 만 확장).
 
 ### Step 2.1: actions/models.py 확장
 
@@ -390,26 +434,39 @@ uv run pyright 2>&1 | tail -3
 
 Expected: 132 errors (baseline 유지, ForeignKeyConstraint 는 type-safe).
 
-- [ ] **alembic drift 의도 확인**
+- [ ] **alembic drift 의도 확인** (Codex 1차 MAJOR-1 fix 후 정확한 RED catch)
 
 ```bash
 cd backend
-uv run pytest tests/integration/test_alembic_upgrade.py -v 2>&1 | tail -10
+uv run pytest tests/integration/test_alembic_upgrade.py -v 2>&1 | tail -20
 ```
 
-Expected: **FAIL** with drift "fk constraint pending in revision" (D2 model 과 alembic head `e5f6g7h8i9ja` 불일치 — 의도된 상태, D3 가 해소).
+Expected: **FAIL** with assertion message containing 4 BL-050 constraint name (`fk_action_items_meeting_workspace`, `fk_inbox_suggested_project_workspace`, `fk_embedding_chunks_project_workspace`, `fk_semantic_caches_project_workspace`) — Step 2.0 의 allowlist 갱신 덕분에 정확히 catch.
 
-> drift FAIL 이 의도된 RED. D3 에서 GREEN 으로 전환.
+> drift FAIL 이 의도된 RED. D3 에서 GREEN 으로 전환. (Step 2.0 갱신 전이라면 false-green — Codex 1차 finding.)
 
-- [ ] **Commit D2**
+- [ ] **Commit D2** (Step 2.0 + Step 2.1~2.3 한 commit)
 
 ```bash
 cd /Users/woosung/project/agy-project/kairos-sprint-21
-git add backend/src/actions/models.py backend/src/inbox/models.py backend/src/embeddings/models.py
+git add backend/tests/integration/test_alembic_upgrade.py backend/src/actions/models.py backend/src/inbox/models.py backend/src/embeddings/models.py
 git commit -m "$(cat <<'EOF'
-refactor(bl-050): D2 4 model __table_args__ — composite FK 선언
+refactor(bl-050): D2 4 model __table_args__ + drift gate allowlist 갱신
 
-Sprint 21 BL-050 Simple 4 — model layer composite FK 선언:
+Sprint 21 BL-050 Simple 4 — model layer composite FK 선언 + Codex 1차
+MAJOR-1 수락 (drift gate allowlist 갱신):
+
+PR2_MANAGED_CONSTRAINTS 에 BL-050 4 FK 추가:
+- fk_action_items_meeting_workspace
+- fk_inbox_suggested_project_workspace
+- fk_embedding_chunks_project_workspace
+- fk_semantic_caches_project_workspace
+
+이유: _is_pr2_scope_drift() 가 allowlist 기반 catch — BL-050 4 FK 미등록 시
+D2 후 drift test 가 false-green (실제 drift 있는데 PASS, D3 누락도 catch X).
+함수/변수명 PR2 그대로 유지 (rename = surgical change 위반, 의도는 generic catch).
+
+model __table_args__:
 - action_items.meeting_id ↔ meetings(workspace_id, id) (기존 project FK 옆 추가)
 - inbox_items.ai_suggested_project_id ↔ projects(workspace_id, id) (__table_args__ 신설)
 - embedding_chunks.project_id ↔ projects(workspace_id, id) (__table_args__ 신설)
@@ -418,7 +475,7 @@ Sprint 21 BL-050 Simple 4 — model layer composite FK 선언:
 nullable FK → MATCH SIMPLE NULL row 자동 면제 (Sprint 19 PR #2 notes 패턴).
 ForeignKeyConstraint import = sqlmodel re-export (BL-052 cleanup 후).
 
-alembic drift = 의도된 RED (D3 alembic 으로 해소).
+alembic drift = 의도된 RED (정확히 4 FK pending in revision catch).
 회귀: pytest 325 PASS / pyright 132 baseline 유지.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>

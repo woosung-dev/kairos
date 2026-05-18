@@ -1316,7 +1316,7 @@ production scale (>1만 row 또는 동시 트래픽) 진입 시 다음 패턴 �
 
 ---
 
-## BL-050 — 잔여 cross-workspace single-FK entity audit + composite FK 신설 (BUG-C01-EXT-FK 잔여)
+## BL-050 — 잔여 cross-workspace single-FK entity audit + composite FK 신설 (BUG-C01-EXT-FK 잔여) 🟡 **PARTIAL (Simple 4 완료, 2026-05-18 Sprint 21 PR #96)**
 
 **도메인**: backend / multiple (inbox / embeddings / memory / promotion)
 
@@ -1338,6 +1338,19 @@ PR #1 audit 4 case (action_items.project_id / notes.project_id / mpl / project_m
 4. alembic 단일 revision 으로 묶음
 
 **우선순위**: ★★★☆☆ (P2 defense-in-depth 확장, Sprint 20 carry-over)
+
+### Simple 4 완료 (Sprint 21 PR #96, 2026-05-18)
+
+- ✅ action_items.meeting_id (composite FK + audit)
+- ✅ inbox_items.ai_suggested_project_id (composite FK + audit)
+- ✅ embedding_chunks.project_id (composite FK + audit)
+- ✅ semantic_caches.project_id (composite FK + audit)
+
+### Carry-over (Sprint 22+)
+
+- memory_items.embedding_chunk_id — embedding_chunks(id, workspace_id) UNIQUE 선행 작업 필요
+- memory_ai_calls.memory_id — memory_items(id, workspace_id) UNIQUE 선행 + NOT NULL FK 패턴 다름
+- promotion_audit (source/target workspace_id) — intentional cross-workspace, 별도 분석
 
 **근거**: Sprint 19 PR #2 plan agent §D scope omission, Codex 1차 F-8.
 

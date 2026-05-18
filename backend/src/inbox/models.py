@@ -3,11 +3,20 @@
 import uuid
 from datetime import datetime
 
-from sqlmodel import JSON, Field, SQLModel
+from sqlmodel import JSON, Field, ForeignKeyConstraint, SQLModel
 
 
 class InboxItem(SQLModel, table=True):
     __tablename__ = "inbox_items"
+    __table_args__ = (
+        # Sprint 21 BL-050 Simple 4: cross-workspace ai_suggested_project_id 차단.
+        # nullable FK → MATCH SIMPLE NULL row 면제 (AI 추천 없는 inbox 정상).
+        ForeignKeyConstraint(
+            ["workspace_id", "ai_suggested_project_id"],
+            ["projects.workspace_id", "projects.id"],
+            name="fk_inbox_suggested_project_workspace",
+        ),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     workspace_id: uuid.UUID = Field(foreign_key="workspaces.id")

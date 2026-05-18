@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timedelta
 
-from sqlmodel import JSON, Column, Field, SQLModel, Text
+from sqlmodel import JSON, Column, Field, ForeignKeyConstraint, SQLModel, Text
 
 try:
     # Sprint 16 ADR-020: Vector(fp32, 4B) → Halfvec(fp16, 2B) — 저장 50% 절감 (I-20)
@@ -16,6 +16,15 @@ class EmbeddingChunk(SQLModel, table=True):
     """계층적 임베딩 청크. Level 2(문단)가 검색 대상."""
 
     __tablename__ = "embedding_chunks"
+    __table_args__ = (
+        # Sprint 21 BL-050 Simple 4: cross-workspace project_id 차단.
+        # nullable FK → MATCH SIMPLE NULL row 면제 (workspace-level 임베딩 정상).
+        ForeignKeyConstraint(
+            ["workspace_id", "project_id"],
+            ["projects.workspace_id", "projects.id"],
+            name="fk_embedding_chunks_project_workspace",
+        ),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     workspace_id: uuid.UUID = Field(foreign_key="workspaces.id", index=True)
@@ -46,6 +55,15 @@ class SemanticCache(SQLModel, table=True):
     """시맨틱 캐시. 유사 질문 → 캐시 답변 반환."""
 
     __tablename__ = "semantic_caches"
+    __table_args__ = (
+        # Sprint 21 BL-050 Simple 4: cross-workspace project_id 차단.
+        # nullable FK → MATCH SIMPLE NULL row 면제 (workspace-level 캐시 정상).
+        ForeignKeyConstraint(
+            ["workspace_id", "project_id"],
+            ["projects.workspace_id", "projects.id"],
+            name="fk_semantic_caches_project_workspace",
+        ),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     workspace_id: uuid.UUID = Field(foreign_key="workspaces.id", index=True)

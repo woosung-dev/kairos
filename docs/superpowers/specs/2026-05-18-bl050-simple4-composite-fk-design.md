@@ -101,7 +101,7 @@ def upgrade():
     # 2. 4 composite FK
     op.create_foreign_key("fk_action_items_meeting_workspace", "action_items", "meetings",
                           ["workspace_id", "meeting_id"], ["workspace_id", "id"])
-    op.create_foreign_key("fk_inbox_suggested_project_workspace", "inbox", "projects",
+    op.create_foreign_key("fk_inbox_suggested_project_workspace", "inbox_items", "projects",
                           ["workspace_id", "ai_suggested_project_id"], ["workspace_id", "id"])
     op.create_foreign_key("fk_embedding_chunks_project_workspace", "embedding_chunks", "projects",
                           ["workspace_id", "project_id"], ["workspace_id", "id"])
