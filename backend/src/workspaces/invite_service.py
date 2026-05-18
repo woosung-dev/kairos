@@ -116,12 +116,14 @@ class InviteService:
             for inv in invites
         ]
 
-    async def deactivate_invite(self, invite_id: uuid.UUID) -> None:
-        """초대 링크 비활성화."""
-        invite = await self.repo.find_invite_by_id(invite_id)
+    async def deactivate_invite(
+        self, workspace_id: uuid.UUID, invite_id: uuid.UUID
+    ) -> None:
+        """초대 링크 비활성화 (Sprint 19 PR #1 C12 Codex F-1/F-5: workspace_id WHERE 강제)."""
+        invite = await self.repo.find_invite_by_id(invite_id, workspace_id)
         if invite is None:
             raise InviteNotFoundError()
-        await self.repo.deactivate_invite(invite_id)
+        await self.repo.deactivate_invite(invite_id, workspace_id)
         await self.repo.commit()
 
     async def get_invite_info(self, code: str) -> dict:
@@ -186,12 +188,12 @@ class InviteService:
         )
         member = await self.repo.add_member(member)
 
-        # 사용 횟수 증가
-        await self.repo.increment_invite_use_count(invite.id)
+        # 사용 횟수 증가 (Sprint 19 PR #1 C12: invite.workspace_id 명시 전달)
+        await self.repo.increment_invite_use_count(invite.id, invite.workspace_id)
 
         # max_uses 도달 시 자동 비활성화
         if invite.max_uses is not None and invite.use_count + 1 >= invite.max_uses:
-            await self.repo.deactivate_invite(invite.id)
+            await self.repo.deactivate_invite(invite.id, invite.workspace_id)
 
         await self.repo.commit()
 
@@ -221,17 +223,21 @@ class InviteService:
 
     async def update_member_role(
         self,
+        workspace_id: uuid.UUID,
         member_id: uuid.UUID,
         new_role: str,
     ) -> dict:
-        """멤버 역할 변경. Owner는 변경 불가."""
-        member = await self.repo.find_member_by_id(member_id)
+        """멤버 역할 변경. Owner는 변경 불가.
+
+        Sprint 19 PR #1 C12 (Codex F-1/F-5): workspace_id WHERE 강제.
+        """
+        member = await self.repo.find_member_by_id(member_id, workspace_id)
         if member is None:
             raise MemberNotFoundError()
         if member.role == "owner":
             raise CannotModifyOwnerError()
 
-        await self.repo.update_member_role(member_id, new_role)
+        await self.repo.update_member_role(member_id, workspace_id, new_role)
         await self.repo.commit()
 
         return {
@@ -240,15 +246,20 @@ class InviteService:
             "role": new_role,
         }
 
-    async def remove_member(self, member_id: uuid.UUID) -> None:
-        """멤버 제거. Owner는 제거 불가."""
-        member = await self.repo.find_member_by_id(member_id)
+    async def remove_member(
+        self, workspace_id: uuid.UUID, member_id: uuid.UUID
+    ) -> None:
+        """멤버 제거. Owner는 제거 불가.
+
+        Sprint 19 PR #1 C12 (Codex F-1/F-5): workspace_id WHERE 강제.
+        """
+        member = await self.repo.find_member_by_id(member_id, workspace_id)
         if member is None:
             raise MemberNotFoundError()
         if member.role == "owner":
             raise CannotModifyOwnerError()
 
-        await self.repo.remove_member(member_id)
+        await self.repo.remove_member(member_id, workspace_id)
         await self.repo.commit()
 
     # --- 내부 헬퍼 ---

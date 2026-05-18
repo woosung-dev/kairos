@@ -37,7 +37,7 @@ async def update_member_role(
 ):
     """멤버 역할 변경. Owner만."""
     try:
-        return await service.update_member_role(member_id, data.role)
+        return await service.update_member_role(workspace_id, member_id, data.role)
     except MemberNotFoundError:
         raise HTTPException(404, "멤버를 찾을 수 없습니다")
     except CannotModifyOwnerError:
@@ -53,7 +53,7 @@ async def remove_member(
 ):
     """멤버 제거. Admin 이상."""
     try:
-        await service.remove_member(member_id)
+        await service.remove_member(workspace_id, member_id)
     except MemberNotFoundError:
         raise HTTPException(404, "멤버를 찾을 수 없습니다")
     except CannotModifyOwnerError:

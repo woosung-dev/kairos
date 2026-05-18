@@ -66,7 +66,7 @@ async def deactivate_invite(
     service: InviteService = Depends(get_invite_service),
 ):
     """초대 링크 비활성화. Admin 이상만."""
-    await service.deactivate_invite(invite_id)
+    await service.deactivate_invite(workspace_id, invite_id)
 
 
 # --- 공개 엔드포인트 ---

@@ -1137,15 +1137,106 @@ class TestRagIDORMatrix:
 
 
 class TestWorkspacesIDORMatrix:
-    """workspaces main 2 + member 3 + invite 3 = 8 endpoint — TODO PR #1 workspaces commit.
+    """workspaces main 2 + member 3 + invite 3 = 8 endpoint (Sprint 19 PR #1 C12).
 
-    `member_router.py:23,35,51` + `invite_router.py:37,54,65` + `invite_service.py:222,243,119`
-    `find_member_by_id(member_id, workspace_id)` / `find_invite_by_id(invite_id, workspace_id)` 변경.
+    Codex F-1/F-5: find_member_by_id / find_invite_by_id 시그니처 + mutation WHERE workspace_id.
     """
 
-    @pytest.mark.skip(reason="PR #1 workspaces commit 진입 시 활성화")
-    def test_placeholder(self):
-        pass
+    @pytest.mark.asyncio
+    async def test_workspace_repository_find_member_by_id_requires_workspace_id(self):
+        """Codex F-1 anchor: find_member_by_id workspace_id 필수."""
+        import inspect
+        from src.workspaces.repository import WorkspaceRepository
+
+        sig = inspect.signature(WorkspaceRepository.find_member_by_id)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: find_member_by_id workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_workspace_repository_find_invite_by_id_requires_workspace_id(self):
+        """Codex F-1 anchor: find_invite_by_id workspace_id 필수."""
+        import inspect
+        from src.workspaces.repository import WorkspaceRepository
+
+        sig = inspect.signature(WorkspaceRepository.find_invite_by_id)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: find_invite_by_id workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_workspace_repository_update_member_role_mutation_workspace_id(self):
+        """Codex F-5 anchor: update_member_role mutation 도 workspace_id WHERE."""
+        import inspect
+        from src.workspaces.repository import WorkspaceRepository
+
+        sig = inspect.signature(WorkspaceRepository.update_member_role)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-5: update_member_role mutation workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_workspace_repository_remove_member_mutation_workspace_id(self):
+        """Codex F-5 anchor: remove_member mutation 도 workspace_id WHERE."""
+        import inspect
+        from src.workspaces.repository import WorkspaceRepository
+
+        sig = inspect.signature(WorkspaceRepository.remove_member)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-5: remove_member mutation workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_workspace_repository_deactivate_invite_mutation_workspace_id(self):
+        """Codex F-5 anchor: deactivate_invite mutation 도 workspace_id WHERE."""
+        import inspect
+        from src.workspaces.repository import WorkspaceRepository
+
+        sig = inspect.signature(WorkspaceRepository.deactivate_invite)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-5: deactivate_invite mutation workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_workspace_repository_increment_invite_use_count_mutation_workspace_id(self):
+        """Codex F-5 anchor: increment_invite_use_count mutation 도 workspace_id WHERE."""
+        import inspect
+        from src.workspaces.repository import WorkspaceRepository
+
+        sig = inspect.signature(WorkspaceRepository.increment_invite_use_count)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-5: increment_invite_use_count mutation workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_invite_service_update_member_role_requires_workspace_id(self):
+        """Codex F-1 anchor: InviteService.update_member_role 첫 인자 workspace_id."""
+        import inspect
+        from src.workspaces.invite_service import InviteService
+
+        sig = inspect.signature(InviteService.update_member_role)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: InviteService.update_member_role workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_invite_service_remove_member_requires_workspace_id(self):
+        """Codex F-1 anchor: InviteService.remove_member 첫 인자 workspace_id."""
+        import inspect
+        from src.workspaces.invite_service import InviteService
+
+        sig = inspect.signature(InviteService.remove_member)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: InviteService.remove_member workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
 
 
 class TestUploadIDORMatrix:
