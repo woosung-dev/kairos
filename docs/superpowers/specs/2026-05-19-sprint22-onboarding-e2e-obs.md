@@ -117,10 +117,11 @@ rag ────────┘
 |---|---|
 | `backend/src/auth/models.py` | User column 2개 추가: `onboarding_step: int = 0`, `onboarded_at: datetime \| None = None` |
 | `backend/src/auth/schemas.py` | `UserResponse` 에 `onboardingStep`, `onboardedAt` alias 필드 추가 |
-| `backend/src/workspaces/service.py:create_workspace()` | endpoint 끝부분에 `OnboardingService.increment_step(user_id, 1)` 호출 (same session) |
+| `backend/src/auth/dependencies.py:get_current_user()` | lazy seed 직후 `OnboardingService.increment_step(user.id, 1)` 호출 — **signup path 의 primary step=1 hook** (Codex 1차 finding 1) |
+| `backend/src/workspaces/service.py:create_workspace()` | `commit()` 직전 `OnboardingService.increment_step(owner_id, 1)` 호출 — team workspace path 보조 hook. **commit 직전** 위치 필수 (Codex 1차 finding 2 — commit 후 placement 는 UPDATE rollback 됨) |
 | `backend/src/projects/service.py:create_project()` | endpoint 끝부분에 `OnboardingService.increment_step(user_id, 2)` 호출 |
-| `backend/src/meetings/pipeline_service.py:process_meeting()` | **AI Distillation 완료 시점** — line 67 `save_summary` + line 79+ ActionItem 저장 후 method end 직전에 `OnboardingService.increment_step(user_id, 3)` 호출 (D8 lock-in). meeting 의 `owner_id` 또는 workspace owner 로 user_id 추출 |
-| `backend/src/rag/service.py:ask()` | 첫 성공 응답 후 `OnboardingService.increment_step(user_id, 4)` 호출 (idempotent — 2회 이상 RAG ask 시 no-op) |
+| `backend/src/meetings/pipeline_service.py:process_meeting()` | **AI Distillation 완료 시점** — line 67 `save_summary` + line 79+ ActionItem 저장 후 method end 직전에 `OnboardingService.increment_step(meeting.created_by_id, 3)` 호출. **`meeting.created_by_id` 사용** (workspace.owner_id 아님 — Codex 1차 finding 3, non-owner 멤버 회의 시 owner 의 funnel 잘못 advance 방지) |
+| `backend/src/rag/service.py:ask()` | 첫 성공 응답 후 `OnboardingService.increment_step(user_id, 4)` 호출. **session = `self.embedding_repo.session` 재사용** (RagService 에 `_session` 없음 — Codex 1차 finding 7). `ask()` 시그니처에 `user_id` 파라미터 추가 (router update 동반) |
 | `backend/main.py` | router include + `sentry_sdk.init()` conditional |
 | `backend/src/core/config.py` | `SENTRY_DSN: SecretStr \| None = None` env |
 
@@ -194,13 +195,17 @@ frontend/instrumentation.ts            # Next.js 16 Sentry hook
 
 ```
 [가입] Clerk sign-up
-  ↓ FE: useUser() 후 POST /api/v1/auth/sync
-  ↓ BE: auth/dependencies.py:require_user lazy seed
+  ↓ FE: useUser() 후 protected endpoint 첫 호출
+  ↓ BE: auth/dependencies.py:get_current_user() lazy seed
   ↓       → ON CONFLICT DO NOTHING personal workspace 시드
   ↓       → WorkspaceMember(owner) seed
-  ↓ BE: workspaces/service.py:create_workspace() (lazy seed flow)
-  ↓       → OnboardingService.increment_step(user_id, 1)
+  ↓       → OnboardingService.increment_step(user.id, 1)   ← signup path primary hook (D8/Codex finding 1)
   → User.onboarding_step = 1
+
+[team workspace 생성 — 별도 path] FE: POST /api/v1/workspaces
+  ↓ BE: workspaces/service.py:create_workspace() — commit() 직전 (Codex finding 2)
+  ↓       → OnboardingService.increment_step(workspace.owner_id, 1)
+  → User.onboarding_step = max(current, 1)   ← idempotent
 
 [첫 project] FE: POST /api/v1/projects (사용자 입력)
   ↓ BE: projects/service.py:create_project()

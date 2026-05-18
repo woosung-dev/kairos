@@ -35,7 +35,7 @@
 | `backend/tests/onboarding/test_service.py` | create | Task 2.1 |
 | `backend/tests/onboarding/test_repository.py` | create | Task 2.1 |
 | `backend/tests/onboarding/test_router.py` | create | Task 2.1 |
-| `backend/main.py` | modify (router include + Sentry init) | Task 2.2 + Task 7.1 |
+| `backend/src/main.py` | modify (router include + Sentry init) | Task 2.2 + Task 7.1 |
 | `backend/src/workspaces/service.py` | modify (step=1 hook) | Task 2.3 |
 | `backend/src/projects/service.py` | modify (step=2 hook) | Task 2.4 |
 | `backend/src/meetings/pipeline_service.py` | modify (step=3 hook, line ~115 method end) | Task 2.5 |
@@ -59,7 +59,7 @@
 | `frontend/e2e/tests/mobile-responsive.spec.ts` | modify (OBN-04 case) | Task 6.3 |
 | `backend/pyproject.toml` | modify (sentry-sdk dep) | Task 7.1 |
 | `backend/src/core/config.py` | modify (SENTRY_DSN env) | Task 7.1 |
-| `backend/main.py` | modify (sentry init + PII scrub) | Task 7.1 |
+| `backend/src/main.py` | modify (sentry init + PII scrub) | Task 7.1 |
 | `frontend/package.json` | modify (@sentry/nextjs dep) | Task 7.2 |
 | `frontend/sentry.client.config.ts` | create | Task 7.2 |
 | `frontend/sentry.server.config.ts` | create | Task 7.2 |
@@ -300,31 +300,33 @@ git add backend/alembic/versions/*.py
 git commit -m "feat(alembic): users.onboarding_step + onboarded_at column + backfill step=4 (Sprint 22)"
 ```
 
-### Task 1.4: Drift gate allowlist 갱신
+### Task 1.4: Drift gate allowlist 갱신 (column drift = `PR2_MANAGED_COLUMNS`)
+
+**Fact (Codex 1차 finding 6)**: `PR2_MANAGED_CONSTRAINTS` 는 constraint/index 이름 매칭용. column nullable/type/default drift 는 `PR2_MANAGED_COLUMNS` tuple `(table, column)` 으로 매칭. 본 sprint 의 신규 column 2개는 `PR2_MANAGED_COLUMNS` 에 등재.
 
 **Files:**
 - Modify: `backend/tests/integration/test_alembic_upgrade.py`
 
-- [ ] **Step 1.4.1: PR2_MANAGED_CONSTRAINTS 위치 확인**
+- [ ] **Step 1.4.1: PR2_MANAGED_COLUMNS 위치 확인**
 
 ```bash
-grep -n "PR2_MANAGED_CONSTRAINTS\|onboarding\|users\." backend/tests/integration/test_alembic_upgrade.py | head -10
+grep -n "PR2_MANAGED_COLUMNS\|PR2_MANAGED_CONSTRAINTS\|users.*onboarding\|('users'," backend/tests/integration/test_alembic_upgrade.py | head -10
 ```
 
-- [ ] **Step 1.4.2: allowlist 에 신규 column 등재**
+- [ ] **Step 1.4.2: allowlist 에 신규 column tuple 등재**
 
-`PR2_MANAGED_CONSTRAINTS` set 안에 추가 (set literal 형식):
+`PR2_MANAGED_COLUMNS` set 안에 tuple 추가:
 
 ```python
-PR2_MANAGED_CONSTRAINTS = {
-    # ... 기존 entries ...
-    # Sprint 22 BL-OBN-02 (server-side User column)
-    "users.onboarding_step",
-    "users.onboarded_at",
+PR2_MANAGED_COLUMNS = {
+    # ... 기존 ('table', 'column') tuples ...
+    # Sprint 22 OBN-02 (server-side User onboarding tracker)
+    ("users", "onboarding_step"),
+    ("users", "onboarded_at"),
 }
 ```
 
-정확한 형식은 기존 entry 패턴 따름 (drift gate 의 set 명명 규칙 확인).
+정확한 set 명칭 (`PR2_MANAGED_COLUMNS`) + tuple 형식 `(table_name, column_name)` 은 기존 entry 패턴 따름.
 
 - [ ] **Step 1.4.3: drift gate test 실행**
 
@@ -524,6 +526,8 @@ class OnboardingService:
 
 - [ ] **Step 2.1.5: dependencies.py 작성**
 
+**Fact (Codex 1차 finding 5)**: 본 프로젝트의 session DI 는 `src.common.database.get_async_session`. `src.core.database.get_session` 은 존재하지 않음.
+
 `backend/src/onboarding/dependencies.py`:
 
 ```python
@@ -531,12 +535,12 @@ class OnboardingService:
 from fastapi import Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.core.database import get_session
+from src.common.database import get_async_session
 from src.onboarding.service import OnboardingService
 
 
 def get_onboarding_service(
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_async_session),
 ) -> OnboardingService:
     return OnboardingService(session)
 ```
@@ -713,20 +717,22 @@ git add backend/src/onboarding/ backend/tests/onboarding/
 git commit -m "feat(onboarding): 도메인 모듈 신설 (service / repo / router / schema / test 4건)"
 ```
 
-### Task 2.2: backend/main.py — router include
+### Task 2.2: backend/src/main.py — router include
+
+**Fact (Codex 1차 finding 4)**: FastAPI app entry = `backend/src/main.py` (NOT `backend/src/main.py`). smoke command 도 `from src.main import app`.
 
 **Files:**
-- Modify: `backend/main.py`
+- Modify: `backend/src/main.py`
 
 - [ ] **Step 2.2.1: 기존 router include 위치 확인**
 
 ```bash
-grep -n "include_router\|onboarding" backend/main.py
+grep -n "include_router\|onboarding" backend/src/main.py
 ```
 
 - [ ] **Step 2.2.2: onboarding router include 추가**
 
-`backend/main.py` 의 router include 블록에 (기존 패턴 따라):
+`backend/src/main.py` 의 router include 블록에 (기존 패턴 따라):
 
 ```python
 from src.onboarding.router import router as onboarding_router
@@ -737,7 +743,7 @@ app.include_router(onboarding_router, prefix="/api/v1")
 - [ ] **Step 2.2.3: smoke**
 
 ```bash
-cd backend && uv run python -c "from main import app; print([r.path for r in app.routes if 'onboarding' in r.path])"
+cd backend && uv run python -c "from src.main import app; print([r.path for r in app.routes if 'onboarding' in r.path])"
 ```
 
 Expected: `['/api/v1/users/me/onboarding']`
@@ -745,22 +751,50 @@ Expected: `['/api/v1/users/me/onboarding']`
 - [ ] **Step 2.2.4: commit (E7)**
 
 ```bash
-git add backend/main.py
+git add backend/src/main.py
 git commit -m "feat(onboarding): router include 추가 (Sprint 22)"
 ```
 
-### Task 2.3: Hook wire — workspace 생성 시 step=1
+### Task 2.3: Hook wire — workspace 생성 시 step=1 (lazy seed + create_workspace 둘 다)
+
+**Fact (Codex 1차 finding 1 P1)**: signup flow 의 personal workspace 는 `WorkspaceService.create_workspace()` 호출 안 함. `auth/dependencies.py:get_current_user()` 의 inline SQL 이 personal workspace 생성. 따라서 step=1 hook 은 **두 위치 모두** 필요:
+- (a) `auth/dependencies.py:get_current_user()` 의 lazy seed 직후 (signup path)
+- (b) `WorkspaceService.create_workspace()` 의 commit 직전 (team workspace 생성 path)
+
+**Fact (Codex 1차 finding 2 P1)**: `WorkspaceService.create_workspace()` 는 `self.repo.commit()` 으로 transaction 닫음. `OnboardingService.increment_step()` 의 UPDATE 는 commit/flush 안 하므로 commit **이전** 위치해야 함.
 
 **Files:**
-- Modify: `backend/src/workspaces/service.py`
+- Modify: `backend/src/auth/dependencies.py` (lazy seed 후 step=1)
+- Modify: `backend/src/workspaces/service.py` (commit 전 step=1)
 
-- [ ] **Step 2.3.1: create_workspace 메소드 끝부분 확인**
+- [ ] **Step 2.3.1: create_workspace + dependencies.py 구조 확인**
 
 ```bash
-grep -n "create_workspace\|return workspace" backend/src/workspaces/service.py | head -10
+grep -n "create_workspace\|repo.commit\|self.repo\|session.commit\|return workspace" backend/src/workspaces/service.py | head -10
+grep -n "session.commit\|return user\|is_new_user" backend/src/auth/dependencies.py | head -10
 ```
 
 - [ ] **Step 2.3.2: TDD — failing test 작성**
+
+`backend/tests/auth/test_onboarding_step1_lazy_seed.py`:
+
+```python
+import pytest
+
+@pytest.mark.asyncio
+async def test_lazy_seed_signup_advances_onboarding_step_to_1(
+    integration_session, fresh_clerk_claims, mock_async_session
+):
+    """signup flow: get_current_user → personal workspace 시드 → step=1."""
+    from src.auth.dependencies import get_current_user
+    from src.onboarding.service import OnboardingService
+
+    user = await get_current_user(claims=fresh_clerk_claims, session=integration_session)
+
+    onboarding = OnboardingService(integration_session)
+    status = await onboarding.get_status(user.id)
+    assert status.step == 1
+```
 
 `backend/tests/workspaces/test_onboarding_hook.py`:
 
@@ -768,9 +802,10 @@ grep -n "create_workspace\|return workspace" backend/src/workspaces/service.py |
 import pytest
 
 @pytest.mark.asyncio
-async def test_create_workspace_sets_onboarding_step_1(
+async def test_create_team_workspace_sets_onboarding_step_1(
     integration_session, test_user_id
 ):
+    """team workspace 생성 path 도 step=1 advance."""
     from src.workspaces.service import WorkspaceService
     from src.onboarding.service import OnboardingService
 
@@ -781,9 +816,8 @@ async def test_create_workspace_sets_onboarding_step_1(
     assert initial.step == 0
 
     await ws_service.create_workspace(
-        owner_id=test_user_id, name="Test WS", workspace_type="team"
+        owner_id=test_user_id, name="Test Team WS", workspace_type="team"
     )
-    await integration_session.commit()
 
     after = await onboarding.get_status(test_user_id)
     assert after.step == 1
@@ -792,37 +826,49 @@ async def test_create_workspace_sets_onboarding_step_1(
 - [ ] **Step 2.3.3: 실패 확인**
 
 ```bash
-cd backend && uv run pytest tests/workspaces/test_onboarding_hook.py -v 2>&1 | tail -5
+cd backend && uv run pytest tests/auth/test_onboarding_step1_lazy_seed.py tests/workspaces/test_onboarding_hook.py -v 2>&1 | tail -10
 ```
 
-Expected: FAIL (hook 미구현)
+Expected: 2 FAIL (hook 미구현)
 
-- [ ] **Step 2.3.4: hook 추가**
+- [ ] **Step 2.3.4: hook 추가 (lazy seed path)**
 
-`backend/src/workspaces/service.py` 의 `create_workspace()` 메소드 끝부분 (return 직전) 에:
+`backend/src/auth/dependencies.py:get_current_user()` 의 `await session.commit()` 직전 (line ~129 영역) 에:
 
 ```python
-# Sprint 22 OBN-02: 첫 workspace 생성 시 step=1
+# Sprint 22 OBN-02: personal workspace lazy seed 완료 시 step=1
+# is_new_user 여부 무관 — idempotent (step >= 1 이면 no-op)
 from src.onboarding.service import OnboardingService
-onboarding = OnboardingService(self._session)
+onboarding = OnboardingService(session)
+await onboarding.increment_step(user.id, 1)
+```
+
+- [ ] **Step 2.3.5: hook 추가 (create_workspace path)**
+
+`backend/src/workspaces/service.py:create_workspace()` 의 `self.repo.commit()` (또는 `session.commit()`) **호출 직전** 에:
+
+```python
+# Sprint 22 OBN-02: team workspace 생성 시 step=1 (same transaction)
+from src.onboarding.service import OnboardingService
+onboarding = OnboardingService(self.repo.session if hasattr(self.repo, "session") else self._session)
 await onboarding.increment_step(workspace.owner_id, 1)
 ```
 
-(import 는 file top 으로 옮기는 게 권장. service signature 에 `_session` 또는 등가 attribute 가 있어야 함 — 미존재 시 인자로 받음.)
+(정확한 session 접근 — `self.repo.session` 또는 `self._session` 또는 인자 — 은 `WorkspaceService` 의 actual constructor 시그니처 확인 후 align)
 
-- [ ] **Step 2.3.5: PASS 확인**
+- [ ] **Step 2.3.6: PASS 확인**
 
 ```bash
-cd backend && uv run pytest tests/workspaces/test_onboarding_hook.py -v 2>&1 | tail -5
+cd backend && uv run pytest tests/auth/test_onboarding_step1_lazy_seed.py tests/workspaces/test_onboarding_hook.py -v 2>&1 | tail -10
 ```
 
-Expected: PASS
+Expected: 2 PASS
 
-- [ ] **Step 2.3.6: commit (E8)**
+- [ ] **Step 2.3.7: commit (E8)**
 
 ```bash
-git add backend/src/workspaces/service.py backend/tests/workspaces/test_onboarding_hook.py
-git commit -m "feat(workspaces): create_workspace 시 onboarding step=1 hook (Sprint 22)"
+git add backend/src/auth/dependencies.py backend/src/workspaces/service.py backend/tests/auth/test_onboarding_step1_lazy_seed.py backend/tests/workspaces/test_onboarding_hook.py
+git commit -m "feat(onboarding): step=1 hook — lazy seed + create_workspace 양쪽 (Sprint 22 OBN-02)"
 ```
 
 ### Task 2.4: Hook wire — project 생성 시 step=2
@@ -913,23 +959,27 @@ async def test_process_meeting_sets_onboarding_step_3_after_distillation(
 
 (완전한 fixture 셋업은 기존 meetings 테스트 패턴 따름)
 
-- [ ] **Step 2.5.4: hook 추가 — pipeline_service.process_meeting end**
+- [ ] **Step 2.5.4: hook 추가 — pipeline_service.process_meeting end (creator credit)**
 
-`backend/src/meetings/pipeline_service.py` 의 `process_meeting()` method 끝부분 (line ~115 + ActionItem 저장 후):
+**Fact (Codex 1차 finding 3 P2)**: `Meeting` 모델 에 `created_by_id` field 가 있음 (router 에서 populate). non-owner workspace member 가 회의 업로드한 경우 owner 가 아닌 actual creator 의 funnel 을 advance 해야 정확. **`meeting.created_by_id` 사용**, `workspace.owner_id` 아님.
+
+`backend/src/meetings/pipeline_service.py:process_meeting()` method 끝부분 (`save_summary` + ActionItem 저장 완료 후, session.commit 직전):
 
 ```python
 # Sprint 22 OBN-02: AI Distillation 완료 시 step=3
-# meeting → workspace.owner_id 로 user_id 추출
-from src.workspaces.repository import WorkspaceRepository
-ws_repo = WorkspaceRepository(session)
-ws = await ws_repo.find_by_id(workspace_id)
-if ws is not None:
-    from src.onboarding.service import OnboardingService
+# meeting.created_by_id = 실제 회의 업로드한 user. workspace owner 가 아닐 수 있음.
+from src.meetings.repository import MeetingRepository
+from src.onboarding.service import OnboardingService
+
+meeting_repo = MeetingRepository(session)
+meeting = await meeting_repo.find_by_id(meeting_id, workspace_id)
+if meeting is not None and meeting.created_by_id is not None:
     onboarding = OnboardingService(session)
-    await onboarding.increment_step(ws.owner_id, 3)
+    await onboarding.increment_step(meeting.created_by_id, 3)
+    # session.commit() 은 호출 안 함 — process_meeting 의 외부 session_factory 가 commit
 ```
 
-session 인자가 process_meeting 안에서 어떻게 다뤄지는지 확인 (`session_factory` 패턴인 경우 새 session 생성, 또는 인자 전달).
+**Note**: `process_meeting` 안의 session 은 `session_factory` 패턴으로 wrapped — 본 hook 도 동일 session 사용 (`onboarding.service` 의 `OnboardingRepository.increment` 는 commit/flush 0건 보장됨). `Meeting.created_by_id` 필드 확인: `grep -n "created_by_id" backend/src/meetings/models.py` 으로 verify.
 
 - [ ] **Step 2.5.5: PASS → commit (E10)**
 
@@ -938,16 +988,26 @@ git add backend/src/meetings/pipeline_service.py backend/tests/meetings/test_onb
 git commit -m "feat(meetings): pipeline distillation 완료 시 onboarding step=3 hook (Sprint 22)"
 ```
 
-### Task 2.6: Hook wire — RAG ask 첫 성공 시 step=4
+### Task 2.6: Hook wire — RAG ask 첫 성공 시 step=4 (session DI 통한 injection)
+
+**Fact (Codex 1차 finding 7 P2)**: `RagService` 는 `EmbeddingRepository` + `EmbeddingService` + `AIProcessingService` 로 구성. `self._session` 속성 **없음**. 따라서 onboarding hook 은 다음 중 하나:
+- (a) `RagService` 의 `ask()` 메소드에 `session: AsyncSession` 파라미터 추가 (router 가 inject)
+- (b) `RagService` 의 `EmbeddingRepository.session` 재사용 (already-injected session)
+- (c) router 가 RagService 호출 후 onboarding 별도 호출 (boundary 분리)
+
+**권장 = (b)** — 기존 session 재사용, RagService signature 변경 0건, atomic transaction.
 
 **Files:**
 - Modify: `backend/src/rag/service.py`
 
-- [ ] **Step 2.6.1: rag/service.py:ask() 끝부분 확인**
+- [ ] **Step 2.6.1: rag/service.py:ask() + EmbeddingRepository session 접근 확인**
 
 ```bash
-grep -n "def ask\|return\|yield" backend/src/rag/service.py | head -20
+grep -n "def ask\|self.embedding_repo\|return\|yield" backend/src/rag/service.py | head -20
+grep -n "self.session\|self._session\|EmbeddingRepository" backend/src/embeddings/repository.py | head -5
 ```
+
+(line 59 `self.session = session` 으로 `EmbeddingRepository.session` 직접 접근 가능 확인됨.)
 
 - [ ] **Step 2.6.2: TDD — failing test**
 
@@ -958,19 +1018,21 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_rag_ask_first_success_sets_onboarding_step_4(
-    integration_session, test_user_id
+    integration_session, test_user_id, test_workspace_id, rag_service_factory
 ):
-    from src.rag.service import RagService
+    """첫 RAG ask 성공 시 step=4 + onboarded_at set."""
     from src.onboarding.service import OnboardingService
 
     onboarding = OnboardingService(integration_session)
     await onboarding.increment_step(test_user_id, 3)
     await integration_session.commit()
 
-    rag_service = RagService(integration_session)
-    # ask 호출 (Gemini mock 또는 cache 적중 path)
-    await rag_service.ask(query="test", user_id=test_user_id, ...)
-    await integration_session.commit()
+    rag_service = rag_service_factory(integration_session)
+    await rag_service.ask(
+        query="test query",
+        workspace_id=test_workspace_id,
+        user_id=test_user_id,
+    )
 
     status = await onboarding.get_status(test_user_id)
     assert status.step == 4
@@ -978,24 +1040,28 @@ async def test_rag_ask_first_success_sets_onboarding_step_4(
     assert status.onboarded_at is not None
 ```
 
-- [ ] **Step 2.6.3: hook 추가**
+- [ ] **Step 2.6.3: hook 추가 — EmbeddingRepository.session 재사용**
 
-`backend/src/rag/service.py:ask()` 첫 성공 응답 후:
+`backend/src/rag/service.py:ask()` 첫 성공 응답 후 (return 직전):
 
 ```python
 # Sprint 22 OBN-02: 첫 RAG ask 성공 시 step=4 + onboarded_at
-from src.onboarding.service import OnboardingService
-onboarding = OnboardingService(self._session)
-await onboarding.increment_step(user_id, 4)
+# self.embedding_repo.session 재사용 (DI 통한 already-injected session)
+if user_id is not None:
+    from src.onboarding.service import OnboardingService
+    onboarding = OnboardingService(self.embedding_repo.session)
+    await onboarding.increment_step(user_id, 4)
 ```
 
-SSE streaming endpoint 인 경우 첫 token 송신 직후 또는 final accumulated response 직후. RAG service 의 `ask()` (non-streaming) 와 `ask_stream()` (SSE) 둘 다 hook 필요시 양쪽.
+`ask()` 시그니처에 `user_id: uuid.UUID | None = None` 파라미터 추가 (router 도 update).
+
+SSE streaming endpoint (`ask_stream` 또는 등가) 인 경우 final SSE complete event 직후 동일 hook.
 
 - [ ] **Step 2.6.4: PASS → commit (E11)**
 
 ```bash
-git add backend/src/rag/service.py backend/tests/rag/test_onboarding_hook.py
-git commit -m "feat(rag): ask 첫 성공 시 onboarding step=4 + onboarded_at hook (Sprint 22)"
+git add backend/src/rag/service.py backend/src/rag/router.py backend/tests/rag/test_onboarding_hook.py
+git commit -m "feat(rag): ask 첫 성공 시 onboarding step=4 + user_id param + EmbeddingRepository.session 재사용 (Sprint 22)"
 ```
 
 ### Task 2.7: Atomic Update §4 — domain docs sync
@@ -1039,13 +1105,18 @@ git commit -m "docs: onboarding 도메인 atomic doc sync (Sprint 22)"
 **Files:**
 - Create: `backend/tests/auth/test_personal_workspace_race.py`
 
-- [ ] **Step 3.1.1: test 작성**
+- [ ] **Step 3.1.1: test 작성 (Sprint 15 inline SQL 패턴 복제)**
+
+**Fact**: lazy seed 는 `backend/src/auth/dependencies.py:get_current_user()` 함수의 line 99-128 inline SQL 로 구현됨. 별도 헬퍼 함수 (`_seed_personal_workspace_if_missing` 등) **존재하지 않음**. 따라서 race test 는 inline SQL 패턴을 복제하여 검증.
 
 ```python
 """Sprint 22 OBN-01 — personal workspace lazy seed race safety 회귀 test.
 
-Sprint 15 의 dependencies.py:79-120 lazy seed + uq_workspaces_owner_personal partial unique index
-가 동시 sync 호출 시 personal workspace 1개만 생성됨을 검증.
+Sprint 15 의 dependencies.py:get_current_user() inline lazy seed (line 99-128) +
+uq_workspaces_owner_personal partial unique index 가 동시 sync 호출 시
+personal workspace 1개만 생성됨을 검증.
+
+본 test 는 신규 코드 0건, lazy seed SQL 의 race-safety 만 확인.
 """
 import asyncio
 import uuid
@@ -1055,76 +1126,107 @@ from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 
+# dependencies.py line 99-128 의 inline SQL 복제 (헬퍼 부재로 직접 sql)
+LAZY_SEED_WORKSPACE_SQL = """
+    INSERT INTO workspaces (id, owner_id, name, type, inbox_threshold, created_at, updated_at)
+    VALUES (gen_random_uuid(), :owner_id, :name, 'personal', 0.9, now(), now())
+    ON CONFLICT (owner_id) WHERE type = 'personal' DO NOTHING
+"""
+
+LAZY_SEED_MEMBER_SQL = """
+    INSERT INTO workspace_members (id, workspace_id, user_id, role)
+    SELECT gen_random_uuid(), w.id, w.owner_id, 'owner'
+    FROM workspaces w
+    WHERE w.owner_id = :owner_id AND w.type = 'personal'
+      AND NOT EXISTS (
+        SELECT 1 FROM workspace_members m
+        WHERE m.workspace_id = w.id AND m.user_id = w.owner_id
+      )
+"""
+
+
+async def _lazy_seed(session: AsyncSession, user_id: uuid.UUID, display_name: str) -> None:
+    """dependencies.py:get_current_user() 의 line 99-128 inline SQL 패턴 복제."""
+    await session.execute(
+        text(LAZY_SEED_WORKSPACE_SQL),
+        {"owner_id": str(user_id), "name": f"{display_name}의 개인 Kairos"},
+    )
+    await session.execute(
+        text(LAZY_SEED_MEMBER_SQL),
+        {"owner_id": str(user_id)},
+    )
+
+
 @pytest.mark.asyncio
-async def test_concurrent_sync_creates_single_personal_workspace(
+async def test_concurrent_lazy_seed_creates_single_personal_workspace(
     integration_session: AsyncSession, async_session_factory
 ):
-    """동일 user_id 로 require_user 가 2회 동시 호출되어도 personal workspace 1개만 생성."""
+    """동일 user_id 로 lazy seed 가 2회 동시 호출되어도 personal workspace 1개만 생성."""
     user_id = uuid.uuid4()
 
-    # Pre-seed user row (Clerk 동기화 가정)
-    await integration_session.exec(
+    # Pre-seed user row
+    await integration_session.execute(
         text(
-            "INSERT INTO users (id, clerk_id, email, created_at, updated_at) "
-            "VALUES (:id, :clerk, :email, now(), now())"
-        ).bindparams(id=user_id, clerk=f"clerk_{user_id}", email=f"{user_id}@test.com")
+            "INSERT INTO users (id, clerk_id, display_name, email, created_at, updated_at) "
+            "VALUES (:id, :clerk, :name, :email, now(), now())"
+        ),
+        {"id": str(user_id), "clerk": f"clerk_{user_id}", "name": "Alice", "email": f"{user_id}@test.com"},
     )
     await integration_session.commit()
 
-    # 동시 2회 require_user → lazy seed 동시 trigger
-    async def seed_in_new_session():
+    # 동시 2회 lazy seed
+    async def seed_in_new_session() -> None:
         async with async_session_factory() as session:
-            from src.auth.dependencies import _seed_personal_workspace_if_missing
-            await _seed_personal_workspace_if_missing(session, user_id)
+            await _lazy_seed(session, user_id, "Alice")
             await session.commit()
 
     await asyncio.gather(seed_in_new_session(), seed_in_new_session())
 
     # 검증: personal workspace 정확히 1개
-    result = await integration_session.exec(
+    result = await integration_session.execute(
         text(
             "SELECT COUNT(*) FROM workspaces "
             "WHERE owner_id = :owner AND type = 'personal'"
-        ).bindparams(owner=user_id)
+        ),
+        {"owner": str(user_id)},
     )
-    count = result.first()[0]
+    count = result.scalar_one()
     assert count == 1, f"Expected 1 personal workspace, got {count}"
 
 
 @pytest.mark.asyncio
-async def test_workspace_member_owner_seeded_after_personal_workspace(
+async def test_lazy_seed_creates_workspace_member_owner(
     integration_session: AsyncSession,
 ):
-    """Sprint 15 dependencies.py:113-120 의 WorkspaceMember(owner) seed 검증."""
+    """dependencies.py line 113-128 의 WorkspaceMember(owner) seed 검증."""
     user_id = uuid.uuid4()
-    # Pre-seed user
-    await integration_session.exec(
+    await integration_session.execute(
         text(
-            "INSERT INTO users (id, clerk_id, email, created_at, updated_at) "
-            "VALUES (:id, :clerk, :email, now(), now())"
-        ).bindparams(id=user_id, clerk=f"clerk_{user_id}", email=f"{user_id}@test.com")
+            "INSERT INTO users (id, clerk_id, display_name, email, created_at, updated_at) "
+            "VALUES (:id, :clerk, :name, :email, now(), now())"
+        ),
+        {"id": str(user_id), "clerk": f"clerk_{user_id}", "name": "Alice", "email": f"{user_id}@test.com"},
     )
     await integration_session.commit()
 
-    # lazy seed 직접 호출
-    from src.auth.dependencies import _seed_personal_workspace_if_missing
-    await _seed_personal_workspace_if_missing(integration_session, user_id)
+    await _lazy_seed(integration_session, user_id, "Alice")
     await integration_session.commit()
 
     # WorkspaceMember(owner) row 존재 확인
-    result = await integration_session.exec(
+    result = await integration_session.execute(
         text(
             "SELECT COUNT(*) FROM workspace_members wm "
             "JOIN workspaces w ON w.id = wm.workspace_id "
             "WHERE w.owner_id = :owner AND w.type = 'personal' "
             "AND wm.user_id = :owner AND wm.role = 'owner'"
-        ).bindparams(owner=user_id)
+        ),
+        {"owner": str(user_id)},
     )
-    count = result.first()[0]
+    count = result.scalar_one()
     assert count == 1
 ```
 
-`_seed_personal_workspace_if_missing` 함수명은 `backend/src/auth/dependencies.py` 의 실제 함수명 확인 후 정확히 import. 미일치 시 inline lazy seed call 코드를 그대로 옮겨오기.
+**Note**: User table 의 `display_name` column 은 `backend/src/auth/models.py` 의 User schema 에 명시되어 있음 (line 91-95 confirm). pytest fixture `async_session_factory` 는 `backend/tests/conftest.py` 에 정의됨 — 미존재 시 추가.
 
 - [ ] **Step 3.1.2: test 실행 + PASS 확인**
 
@@ -1604,7 +1706,7 @@ git commit -m "test(e2e): mobile-responsive OnboardingBanner case (Sprint 22 OBN
 **Files:**
 - Modify: `backend/pyproject.toml`
 - Modify: `backend/src/core/config.py`
-- Modify: `backend/main.py`
+- Modify: `backend/src/main.py`
 
 - [ ] **Step 7.1.1: dep 추가**
 
@@ -1629,7 +1731,7 @@ class Settings(BaseSettings):
 - [ ] **Step 7.1.3: main.py — init + PII scrub**
 
 ```python
-# backend/main.py top-level
+# backend/src/main.py top-level
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
@@ -1663,7 +1765,7 @@ if settings.SENTRY_DSN:
 
 ```bash
 cd backend && uv run pytest tests/ -q 2>&1 | tail -3
-git add backend/pyproject.toml backend/uv.lock backend/src/core/config.py backend/main.py
+git add backend/pyproject.toml backend/uv.lock backend/src/core/config.py backend/src/main.py
 git commit -m "feat(obs): Sentry BE wire + PII scrub before_send (Sprint 22)"
 ```
 
