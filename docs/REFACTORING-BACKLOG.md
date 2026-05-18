@@ -1366,22 +1366,69 @@ PR #1 audit 4 case (action_items.project_id / notes.project_id / mpl / project_m
 
 ---
 
-## BL-052 — 잔여 model 파일의 sqlalchemy → SQLModel import 통일 (codebase consistency)
+## BL-052 — 잔여 model 파일의 sqlalchemy → SQLModel import 통일 (codebase consistency) ✅ **완료 (cleanup PR, 2026-05-18)**
 
-**도메인**: backend / SQLModel models
+Sprint 19 PR #2 D9 commit (43a0eb4) 가 4 model 파일 (projects/notes/actions/meetings) 통일. 본 cleanup PR 가 잔여 17+ 파일 (3 model + 12 repo/service/main + 6 test) 완료.
 
-**증상**: SQLModel 공식 문서는 `ForeignKeyConstraint`, `UniqueConstraint`, `Column`, `Text`, `JSON`, `Index`, `CheckConstraint`, `ForeignKey` 등 SQLAlchemy 객체를 직접 re-export 하여 `from sqlmodel import ...` 만으로 import 권장. 그러나 본 codebase 의 기존 model 파일들은 `from sqlalchemy import JSON, Column, Text` 패턴 사용.
+### D9 commit msg 정정
 
-Sprint 19 PR #2 (D9 commit) 가 본 PR scope 4 model (projects/notes/actions/meetings) 의 import 를 SQLModel 로 통일. **잔여 3 model 파일은 carry-over**:
-- `backend/src/embeddings/models.py` — `from sqlalchemy import JSON, Column, Text`
-- `backend/src/inbox/models.py` — `from sqlalchemy import JSON`
-- `backend/src/memory/models.py` — `from sqlalchemy import Column, Text` (+ `from sqlalchemy.dialects.postgresql import JSONB` — dialect-specific, sqlmodel 미 re-export → 그대로 유지)
+D9 message 는 "select/delete/update/text/func/and_/or_/AsyncSession/JSONB 모두 SQLModel 미 re-export" 라고 명시했으나, 실제 empirical 검증 결과:
+- **Re-export 가능 (Category A)**: `select, delete, update, text, func, and_, or_, exists, bindparam, distinct, JSON, Column, Text, ForeignKeyConstraint, UniqueConstraint, Index` 등 모두 sqlmodel 가 직접 re-export
+- **Re-export 불가 (Category B)**: `async_sessionmaker, create_async_engine, JSONB, IntegrityError, pg_insert, HALFVEC` + alembic versions/*.py 의 `import sqlalchemy as sa` 한정
+
+### 본 cleanup PR 진행 결과 (7 commit, 21 파일)
+
+- **C1**: embeddings/inbox/memory model — JSON/Column/Text → sqlmodel
+- **C2~C4**: auth/workspaces/projects/notes/actions/meetings/embeddings/inbox/memory/rag repository — query builder 통일 (inline import 3건 포함)
+- **C5**: main.py text → sqlmodel
+- **C6~C7**: tests/conftest.py + 5 test 파일 — text/select 통일
+
+**검증**:
+- 317 PASS 회귀 (변경 전과 동일)
+- D7.5b drift detection 0 (re-export 는 동일 객체)
+- pyright errors 172 (origin/main) → 100 (본 PR, 72 감소) — SQLModel typed result 가 더 좋음
+- Codex 1차 plan review REVISE → 5 finding (plan 결함만, 모두 수락 후 patch)
+- Codex 2차 diff review APPROVE (finding 0)
+
+### 잔여 BL carry-over
+
+- **BL-053**: AsyncSession 통일 (Level 3) — sqlmodel.ext.asyncio.session.AsyncSession 으로 전환 + common/database.py:class_= 변경 + 19+ 파일 type cascade. SQLAlchemy AsyncSession 의 subclass 라 안전하지만 별도 PR.
+- **BL-054**: session.execute(stmt).scalars().all() → session.exec(stmt).all() migration (SQLModel typed result + boilerplate 제거).
+
+**근거**: Sprint 19 PR #2 D9 commit + 사용자 피드백 (2026-05-18, 전수 조사 + 수정 요청).
+
+---
+
+## BL-053 — AsyncSession 통일 (Level 3, sqlmodel.ext.asyncio.session.AsyncSession 전환)
+
+**도메인**: backend / SQLAlchemy ext.asyncio + SQLModel
+
+**증상**: BL-052 cleanup 후 잔여 sqlalchemy import 의 대부분이 `from sqlalchemy.ext.asyncio import AsyncSession` (19+ 파일). `sqlmodel.ext.asyncio.session.AsyncSession` 가 SQLAlchemy AsyncSession 의 **subclass** + `exec()` 메서드 추가 (SQLModel typed result). 즉 전환 가능하지만 type cascade 광범위.
 
 **해결 방향**:
-1. 위 3 파일의 `from sqlalchemy import {JSON,Column,Text}` 를 `from sqlmodel import ...` 로 통일
-2. `JSONB` (PostgreSQL-specific) 와 `select / delete / update / text / func / and_ / or_ / exists / bindparam / AsyncSession / async_sessionmaker / create_async_engine` 등은 SQLModel 미 re-export → sqlalchemy 그대로 유지
-3. 단순 cleanup — runtime 영향 0, import path 일관성만
+1. `backend/src/common/database.py:create_async_engine + async_sessionmaker(class_=SMAsyncSession)` 변경
+2. 19+ 파일의 `from sqlalchemy.ext.asyncio import AsyncSession` → `from sqlmodel.ext.asyncio.session import AsyncSession`
+3. type annotation cascade (모든 repository/service/dependency)
+4. fixture (conftest.py) type 정합
+5. 검증: drift 0 / 317 PASS / pyright 0 error / runtime 정상
 
-**우선순위**: ★☆☆☆☆ (P3 cleanup, runtime 영향 0)
+**우선순위**: ★★☆☆☆ (P2 cleanup, exec() 활용 여지 + BL-054 선행 조건)
 
-**근거**: Sprint 19 PR #2 사용자 피드백 (2026-05-18) — "SQLModel 공식 문서 권장 패턴 우선".
+**근거**: Sprint 19 PR #2 D9 + BL-052 cleanup PR Plan agent verdict (Level 3 분리).
+
+---
+
+## BL-054 — session.execute(stmt).scalars().all() → session.exec(stmt).all() migration
+
+**도메인**: backend / repository ergonomics
+
+**증상**: 본 codebase 의 모든 repository 가 `session.execute(stmt).scalars().all()` / `scalar_one_or_none()` 패턴 사용. SQLModel 의 `session.exec(stmt).all()` 는 typed result + boilerplate 제거. BL-053 (AsyncSession 통일) 후 진행 권장.
+
+**해결 방향**:
+1. BL-053 완료 (sqlmodel.AsyncSession 으로 전환) 후 진행
+2. 모든 repository 의 `.execute().scalars()` → `.exec()` 변경
+3. type hint 자동 narrowing (SQLModel typed return)
+
+**우선순위**: ★★☆☆☆ (P2 ergonomics, BL-053 의존)
+
+**근거**: Sprint 19 PR #2 D9 + BL-052 cleanup PR Plan agent verdict.
