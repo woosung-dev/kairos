@@ -2,7 +2,7 @@
 """ActionItem Repository — AsyncSession 유일 보유자."""
 import uuid
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import func, select, update
 
 from src.actions.models import ActionItem

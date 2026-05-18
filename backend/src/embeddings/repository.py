@@ -2,7 +2,7 @@
 """임베딩 청크 + 시맨틱 캐시 DB 접근."""
 import uuid
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import delete, select, text
 
 from src.embeddings.models import EmbeddingChunk, SemanticCache
