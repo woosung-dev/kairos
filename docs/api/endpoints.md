@@ -1087,3 +1087,9 @@ Response: SSE stream (event: thinking → search_results → answer → done)
 | 32 | `PATCH` | `/api/v1/workspaces/{id}/members/{uid}/role` | 역할 변경 |
 | 33 | `DELETE` | `/api/v1/workspaces/{id}/members/{uid}` | 멤버 제거 |
 | 34 | `POST` | `/api/v1/workspaces/{id}/invite` | 초대 링크 생성 |
+
+## Sprint 22 — Onboarding funnel (OBN-02)
+
+| # | Method | Path | 설명 |
+|:-:|--------|------|------|
+| 35 | `GET` | `/api/v1/users/me/onboarding` | 현재 user 의 onboarding 진행도 (`{ step, totalSteps: 4, onboardedAt, isCompleted }`). step lifecycle: 가입(1) → 첫 project(2) → 첫 meeting distillation(3) → 첫 RAG ask(4). |

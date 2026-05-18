@@ -38,7 +38,7 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 
 ---
 
-## 4. 도메인 모듈 12개
+## 4. 도메인 모듈 13개
 
 | 모듈 | CONTEXT.md | 책임 요약 |
 |---|---|---|
@@ -52,6 +52,7 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 | upload | 전역 규칙만 (전용 CONTEXT.md 없음) | R2 업로드 (presigned URL, aioboto3) |
 | embeddings | 전역 규칙만 (전용 CONTEXT.md 없음) | EmbeddingChunk + SemanticCache 저장/검색 (pgvector) |
 | rag | `src/rag/CONTEXT.md` | RAG 6-Layer + Gemini 답변 (SSE 스트리밍) |
+| onboarding | `src/onboarding/CONTEXT.md` | User.onboarding_step (0~4) lifecycle — workspaces/projects/meetings/rag 가 hook 호출 (Sprint 22 OBN-02) |
 | common | — | database / r2 / pagination / exceptions / prompts |
 | core | — | config (pydantic-settings) |
 
