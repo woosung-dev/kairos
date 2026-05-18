@@ -3,12 +3,16 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON
+from sqlalchemy import JSON, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
 class Meeting(SQLModel, table=True):
     __tablename__ = "meetings"
+    __table_args__ = (
+        # Sprint 19 PR #2 D3: composite FK target 선행 조건 (meeting_project_links 의 (workspace_id, meeting_id))
+        UniqueConstraint("id", "workspace_id", name="uq_meetings_id_workspace_id"),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     workspace_id: uuid.UUID = Field(foreign_key="workspaces.id")
