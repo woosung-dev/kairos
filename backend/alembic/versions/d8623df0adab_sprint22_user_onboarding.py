@@ -27,7 +27,7 @@ def upgrade() -> None:
     )
     op.add_column(
         "users",
-        sa.Column("onboarded_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("onboarded_at", sa.DateTime(), nullable=True),
     )
     # D7 lock-in: 기존 user 는 이미 active → step=4 + onboarded_at=created_at
     op.execute(
