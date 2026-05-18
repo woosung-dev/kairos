@@ -5,7 +5,7 @@ Sprint 19 PR #1 C9 (Codex F-2): MeetingRepository 동반 주입 (동일 session)
 backend.md §3 크로스 레포지토리 트랜잭션 패턴.
 """
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.common.database import get_async_session
 from src.meetings.repository import MeetingRepository

@@ -11,7 +11,8 @@ personal_ws / team_ws / seed_memory 는 R2 이후 (Workspace.type 컬럼 + memor
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import SQLModel, text
 from testcontainers.postgres import PostgresContainer
 

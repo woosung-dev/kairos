@@ -2,7 +2,7 @@
 """노트 DB 접근."""
 import uuid
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import func, select
 
 from src.notes.models import Note

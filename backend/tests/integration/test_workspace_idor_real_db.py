@@ -17,7 +17,7 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 pytestmark = pytest.mark.integration
 

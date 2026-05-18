@@ -13,7 +13,7 @@ import uuid
 
 import pytest
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.actions.models import ActionItem
 from src.auth.models import User

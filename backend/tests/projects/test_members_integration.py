@@ -2,7 +2,7 @@
 import uuid
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.projects.exceptions import (
     CrossWorkspaceMemberError,

@@ -1399,22 +1399,62 @@ D9 message 는 "select/delete/update/text/func/and_/or_/AsyncSession/JSONB 모�
 
 ---
 
-## BL-053 — AsyncSession 통일 (Level 3, sqlmodel.ext.asyncio.session.AsyncSession 전환)
+## BL-053 — AsyncSession 통일 (Level 3, sqlmodel.ext.asyncio.session.AsyncSession 전환) ✅ **완료 (Sprint 20 cleanup PR #92, 2026-05-18)**
 
-**도메인**: backend / SQLAlchemy ext.asyncio + SQLModel
+Sprint 20 cleanup PR #92 (branch `cleanup/bl-053-async-session`, origin/main@195b8e3 기반 5 commits).
 
-**증상**: BL-052 cleanup 후 잔여 sqlalchemy import 의 대부분이 `from sqlalchemy.ext.asyncio import AsyncSession` (19+ 파일). `sqlmodel.ext.asyncio.session.AsyncSession` 가 SQLAlchemy AsyncSession 의 **subclass** + `exec()` 메서드 추가 (SQLModel typed result). 즉 전환 가능하지만 type cascade 광범위.
+### 본 PR 완료 결과 (5 commits, 29 파일)
 
-**해결 방향**:
-1. `backend/src/common/database.py:create_async_engine + async_sessionmaker(class_=SMAsyncSession)` 변경
-2. 19+ 파일의 `from sqlalchemy.ext.asyncio import AsyncSession` → `from sqlmodel.ext.asyncio.session import AsyncSession`
-3. type annotation cascade (모든 repository/service/dependency)
-4. fixture (conftest.py) type 정합
-5. 검증: drift 0 / 317 PASS / pyright 0 error / runtime 정상
+```
+E7.9a 10d8752 refactor(bl-053): E7.9a Codex 2차 review MINOR 2건 수락 fix (2 파일)
+E4    84a9841 refactor(bl-053): E4 tests — AsyncSession SM cascade + fixture smoke (5 + 1 신규)
+E3    21dab73 refactor(bl-053): E3 repository — AsyncSession SM cascade (9 파일)
+E2    fa52d7a refactor(bl-053): E2 dependencies + rbac + main — AsyncSession SM cascade (10 파일)
+E1    2482456 refactor(bl-053): E1 entry — AsyncSession SM 양분 import + class_= 통일 + smoke test
+```
 
-**우선순위**: ★★☆☆☆ (P2 cleanup, exec() 활용 여지 + BL-054 선행 조건)
+### Scope (29 파일, Level 3)
 
-**근거**: Sprint 19 PR #2 D9 + BL-052 cleanup PR Plan agent verdict (Level 3 분리).
+| 영역 | 객체 | 파일 수 | commit |
+|---|---|---|---|
+| Entry (양분 import) | `class_=AsyncSession` + `async_sessionmaker` 동반 | 5 (common/database, memory/{service,dependencies}, meetings/{pipeline_service,dependencies}) | E1 |
+| Dependencies + rbac + main | `from sqlmodel.ext.asyncio.session import AsyncSession` (single import) | 10 (8 deps + auth/rbac + main) | E2 |
+| Repository | type annotation cascade | 9 (actions/auth/embeddings/inbox/meetings/memory/notes/projects/workspaces) | E3 |
+| Tests | conftest 양분 + 4 integration | 5 | E4 |
+| Fixture smoke (신규) | `test_integration_session_is_smodel_async_session` + 의존 fixture cascade | 1 신규 (Codex MINOR-4) | E4 |
+| Codex MINOR fix | smoke global reset + memory/service docstring 정정 | 2 (Codex 2차 MINOR-1+2) | E7.9a |
+
+### Category B 영구 유지 (sqlalchemy.ext.asyncio)
+
+- `async_sessionmaker` (5 파일): common/database.py, meetings/dependencies.py, meetings/pipeline_service.py, memory/dependencies.py, memory/service.py
+- `create_async_engine` (3 파일): common/database.py, tests/conftest.py, tests/integration/test_alembic_upgrade.py
+- alembic/env.py 의 `async_engine_from_config` (1 파일, autogenerate 표준)
+
+모두 SQLModel 미 re-export → SA 영구 유지 ✅
+
+### 검증 결과
+
+- backend pytest tests/ → **321 passed + 1 skipped** (baseline 317 + 4 신규 smoke: 1 E1 + 3 E4)
+- backend pytest tests/integration/test_alembic_upgrade.py → 1 PASS (drift 0 유지)
+- pyright: **132 errors (origin/main) → 131 errors (본 PR, -1 개선)**
+- grep `from sqlalchemy.ext.asyncio import AsyncSession`: **29 → 0** (100% 제거, alembic env.py 제외)
+
+### Codex evaluator review
+
+- 1차 plan review (verdict REVISE): 5 finding (MAJOR 2 + MINOR 3) 모두 수락 → plan v2 patch
+  - MAJOR-1: 헌법 I-14 + B-10 충돌 (BL-054 F6 closeout 으로 carry-over)
+  - MAJOR-2: BL-054 execute allowlist 불완전 (manifest G1~G5 — BL-054 F1 진입 전)
+  - MINOR-3/4/5: E1 import 양분 + E6 fixture smoke + E7 grep gate (모두 적용)
+- 2차 diff review (verdict **APPROVE**, 4.6/5 평균): 2 MINOR 모두 수락 → E7.9a fix
+  - 1_pure_refactor=5, 2_sm_subclass_compat=5, 3_cat_b_allowlist=5, 4_smoke_test_coverage=4, 5_silent_failure_modes=4
+
+### BL-054 carry-over (PR #93)
+
+- 모든 repository 의 `session.execute(stmt).scalars().all()` / `.scalar_one_or_none()` / `.scalar_one()` 패턴을 SQLModel typed `session.exec(stmt).all()` / `.one_or_none()` / `.one()` 으로 migration
+- 헌법 patch 동반 (CONTEXT-MAP I-14 + backend/CONTEXT.md B-10 + .ai/rules/backend.md)
+- execute allowlist manifest (G1~G5) 작성 후 진행
+
+**근거**: Sprint 19 PR #2 D9 + BL-052 cleanup PR (#91) Plan agent verdict + Codex 1차/2차 review.
 
 ---
 

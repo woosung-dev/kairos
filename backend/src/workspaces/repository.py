@@ -8,7 +8,7 @@ deactivate_invite / increment_invite_use_count 모두 workspace_id 명시 + WHER
 import uuid
 from datetime import datetime
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import delete, func, select, update
 
 from src.workspaces.models import Workspace, WorkspaceInvite, WorkspaceMember

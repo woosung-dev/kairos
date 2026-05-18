@@ -9,7 +9,9 @@ patch §4 P-R1 architecture:
 - ffmpeg normalize_audio (A2) — webm/mp4/aac → wav 16kHz mono
 - capture 후 embedding 경로 항상 (A6)
 
-backend rules §3 — AsyncSession import 금지. session_factory만 보유.
+backend rules §3 — Service는 AsyncSession 인스턴스를 직접 보유하지 않고
+session_factory(async_sessionmaker) 만 보유. BackgroundTask 내부에서 별도 session 생성.
+(BL-053 Sprint 20 — AsyncSession 자체는 SQLModel 타입으로 import 가능, 단 인스턴스 보유 금지.)
 """
 import asyncio
 import io
@@ -23,7 +25,8 @@ import uuid
 from datetime import datetime
 
 from fastapi import BackgroundTasks
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.common.prompts import (
     MEMORY_DISTILL_PROMPT,

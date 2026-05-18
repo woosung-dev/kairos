@@ -1,7 +1,7 @@
 # backend/src/embeddings/dependencies.py
 """임베딩 서비스 의존성 주입."""
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.common.database import get_async_session
 from src.embeddings.repository import EmbeddingRepository

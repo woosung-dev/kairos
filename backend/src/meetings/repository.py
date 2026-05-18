@@ -2,7 +2,7 @@
 """Meeting Repository — AsyncSession 유일 보유자. 헌법 I-9 workspace_id 필수 (Sprint 19 PR #1)."""
 import uuid
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import func, select
 
 from src.meetings.models import Meeting, MeetingSummary, TranscriptSegment
