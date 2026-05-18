@@ -3,7 +3,7 @@
 import jwt
 import httpx
 from fastapi import Depends, Header, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.auth.models import User
 from src.auth.repository import UserRepository

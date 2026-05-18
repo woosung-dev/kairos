@@ -4,7 +4,7 @@
 NoteService = 순수 CRUD. NotePipelineService = embedding orchestrator + 권한 검증.
 """
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.common.database import get_async_session
 from src.embeddings.repository import EmbeddingRepository

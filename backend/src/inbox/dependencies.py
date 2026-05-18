@@ -5,7 +5,7 @@ Sprint 19 PR #1 C13a (Codex 2차 F-1): MeetingRepository 동반 주입 — class
 source_type='meeting' 시 item.source_id cross-tenant 검증 (fail-closed).
 """
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.common.database import get_async_session
 from src.inbox.repository import InboxRepository

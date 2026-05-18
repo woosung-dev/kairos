@@ -1,7 +1,7 @@
 # backend/src/workspaces/dependencies.py
 """Workspace 의존성 — Depends() 조립의 유일한 위치."""
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.auth.repository import UserRepository
 from src.common.database import get_async_session

@@ -4,7 +4,7 @@
 RagService = 6-Layer 비즈니스 로직. RagPipelineService = visibility 검증 + 위임.
 """
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.common.database import get_async_session
 from src.embeddings.repository import EmbeddingRepository

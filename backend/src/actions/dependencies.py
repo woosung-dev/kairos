@@ -5,7 +5,7 @@ Codex F-2 Critical: secondary FK (project / meeting / assignee) cross-tenant 검
 ProjectRepository / MeetingRepository / WorkspaceRepository 동반 주입.
 """
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.common.database import get_async_session
 from src.actions.repository import ActionItemRepository
