@@ -4,7 +4,9 @@ import { z } from "zod/v4";
 export const onboardingResponseSchema = z.object({
   step: z.number().int().min(0).max(4),
   totalSteps: z.literal(4),
-  onboardedAt: z.string().datetime().nullable(),
+  // Codex 2차 finding P2: FastAPI naive DateTime 은 Z suffix 없이 serialize 되어
+  // .datetime() validator 가 ZodError → 검증 relax 로 회피. BE timezone-aware 전환 시 복원 CO.
+  onboardedAt: z.string().nullable(),
   isCompleted: z.boolean(),
 });
 
