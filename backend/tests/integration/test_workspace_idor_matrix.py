@@ -285,14 +285,195 @@ class TestMeetingsIDORMatrix:
 
 
 class TestNotesIDORMatrix:
-    """notes 도메인 6 endpoint — TODO PR #1 notes commit.
+    """notes 도메인 6 endpoint + secondary FK (Codex F-2) + pipeline 옵션 A (Codex H2).
 
-    pipeline_service.py:51,53 `delete_note_with_cleanup(note_id, workspace_id)` 변경 포함 (Codex H2).
+    실제 fix 필요 endpoint:
+    - GET /{id} (get_note), GET /{id}/export, PATCH /{id} (update_note), DELETE /{id}
+    - list_notes / create_note 는 이미 workspace_id 전달 중 (회귀 PASS 확인)
+    - F-2 anchor: update_note 가 cross-tenant project_id 거부 → 404
     """
 
-    @pytest.mark.skip(reason="PR #1 notes commit 진입 시 활성화")
-    def test_placeholder(self):
-        pass
+    @pytest.mark.asyncio
+    async def test_get_note_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """notes #1: GET /notes/{id} — service.get_note workspace_id 정확 값 (Codex F-3)."""
+        from src.notes.dependencies import get_note_service
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_viewer] = lambda: member_a
+
+        note_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.get_note.return_value = {
+            "id": str(note_id), "workspaceId": str(workspace_a_id),
+        }
+        app.dependency_overrides[get_note_service] = lambda: mock_service
+
+        response = await client.get(
+            f"/api/v1/workspaces/{workspace_a_id}/notes/{note_id}",
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 200
+        call_args = mock_service.get_note.call_args
+        kwargs = call_args.kwargs if call_args else {}
+        args = call_args.args if call_args else ()
+        workspace_id_seen = kwargs.get("workspace_id") or (
+            args[1] if len(args) > 1 else None
+        )
+        assert workspace_id_seen == workspace_a_id, (
+            f"BUG-C01-EXT v3 notes #1 (Codex F-3): get_note workspace_id 정확 값 미전달. "
+            f"기대={workspace_a_id} 실제={workspace_id_seen} kwargs={kwargs} args={args}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_export_note_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """notes #2: GET /notes/{id}/export — workspace_id 정확 값 (Codex F-3)."""
+        from src.notes.dependencies import get_note_service
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_viewer] = lambda: member_a
+
+        note_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.export_note.return_value = ("data", "f.md", "text/markdown; charset=utf-8")
+        app.dependency_overrides[get_note_service] = lambda: mock_service
+
+        response = await client.get(
+            f"/api/v1/workspaces/{workspace_a_id}/notes/{note_id}/export?format=md",
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 200
+        call_args = mock_service.export_note.call_args
+        kwargs = call_args.kwargs if call_args else {}
+        args = call_args.args if call_args else ()
+        workspace_id_seen = kwargs.get("workspace_id") or (
+            args[1] if len(args) > 1 else None
+        )
+        assert workspace_id_seen == workspace_a_id
+
+    @pytest.mark.asyncio
+    async def test_update_note_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """notes #3: PATCH /notes/{id} — workspace_id 정확 값 (Codex F-3)."""
+        from src.notes.dependencies import get_note_service, get_note_pipeline_service
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        # update_note 는 require_member 통과 — member_a 그대로 활용
+        from src.auth.rbac import require_member
+        app.dependency_overrides[require_member] = lambda: member_a
+
+        note_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.update_note.return_value = {
+            "id": str(note_id), "workspaceId": str(workspace_a_id),
+        }
+        mock_pipeline = AsyncMock()
+        app.dependency_overrides[get_note_service] = lambda: mock_service
+        app.dependency_overrides[get_note_pipeline_service] = lambda: mock_pipeline
+
+        response = await client.patch(
+            f"/api/v1/workspaces/{workspace_a_id}/notes/{note_id}",
+            json={"title": "new title"},
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 200
+        call_args = mock_service.update_note.call_args
+        kwargs = call_args.kwargs if call_args else {}
+        workspace_id_seen = kwargs.get("workspace_id")
+        assert workspace_id_seen == workspace_a_id, (
+            f"BUG-C01-EXT v3 notes #3 (Codex F-3): update_note workspace_id 미전달. "
+            f"kwargs={kwargs}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_update_note_rejects_cross_tenant_project_id(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """Codex F-2 Critical: update_note 가 cross-workspace project_id 거부 → 404."""
+        from src.notes.dependencies import get_note_service, get_note_pipeline_service
+        from src.projects.exceptions import ProjectNotFoundError
+        from src.auth.rbac import require_member
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_member] = lambda: member_a
+
+        note_id = uuid.uuid4()
+        foreign_project_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.update_note.side_effect = ProjectNotFoundError()
+        mock_pipeline = AsyncMock()
+        app.dependency_overrides[get_note_service] = lambda: mock_service
+        app.dependency_overrides[get_note_pipeline_service] = lambda: mock_pipeline
+
+        response = await client.patch(
+            f"/api/v1/workspaces/{workspace_a_id}/notes/{note_id}",
+            json={"projectId": str(foreign_project_id)},
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 404, (
+            f"BUG-C01-EXT v3 notes F-2 Critical: update_note 가 cross-tenant project_id 거부 안 함. "
+            f"응답={response.status_code} body={response.text[:200]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_delete_note_passes_workspace_id_to_pipeline(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """notes #4: DELETE /notes/{id} — pipeline.delete_note_with_cleanup workspace_id (Codex F-2 옵션 A)."""
+        from src.notes.dependencies import get_note_pipeline_service
+        from src.auth.rbac import require_member
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_member] = lambda: member_a
+
+        note_id = uuid.uuid4()
+        mock_pipeline = AsyncMock()
+        mock_pipeline.delete_note_with_cleanup.return_value = None
+        app.dependency_overrides[get_note_pipeline_service] = lambda: mock_pipeline
+
+        response = await client.delete(
+            f"/api/v1/workspaces/{workspace_a_id}/notes/{note_id}",
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 204
+        call_args = mock_pipeline.delete_note_with_cleanup.call_args
+        kwargs = call_args.kwargs if call_args else {}
+        args = call_args.args if call_args else ()
+        workspace_id_seen = kwargs.get("workspace_id") or (
+            args[1] if len(args) > 1 else None
+        )
+        assert workspace_id_seen == workspace_a_id, (
+            f"BUG-C01-EXT v3 notes #4 옵션 A: delete_note_with_cleanup workspace_id 미전달. "
+            f"call_args={call_args}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_note_repository_find_by_id_requires_workspace_id(self):
+        """Codex F-1 anchor: NoteRepository.find_by_id 시그니처."""
+        import inspect
+        from src.notes.repository import NoteRepository
+
+        sig = inspect.signature(NoteRepository.find_by_id)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: NoteRepository.find_by_id workspace_id 필수. "
+            f"params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_pipeline_delete_note_with_cleanup_requires_workspace_id(self):
+        """Codex H2 / 옵션 A anchor: pipeline 시그니처 자체 변경."""
+        import inspect
+        from src.notes.pipeline_service import NotePipelineService
+
+        sig = inspect.signature(NotePipelineService.delete_note_with_cleanup)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 옵션 A: delete_note_with_cleanup workspace_id 필수. "
+            f"params={list(sig.parameters)}"
+        )
 
 
 class TestInboxIDORMatrix:

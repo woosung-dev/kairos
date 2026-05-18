@@ -1070,6 +1070,8 @@ Response: SSE stream (event: thinking → search_results → answer → done)
 - 생성/수정 시 BackgroundTasks로 비동기 임베딩
 - Tiptap JSON content + plain_text (임베딩용)
 
+> **Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영)**: 모든 endpoint 가 `require_member` (POST/PATCH/DELETE) / `require_viewer` (GET) 통과. service / repository / pipeline 모든 호출이 path `workspace_id` 동반. secondary FK 검증: `create_note` / `update_note` 의 `project_id` 가 같은 workspace 내인지 `ProjectRepository.find_by_id` 검증 후 거부 시 404 (Codex F-2 Critical). pipeline 옵션 A (Codex H2): `embed_note_async(note_id, workspace_id)` / `delete_note_with_cleanup(note_id, workspace_id)` — pipeline 우회 IDOR 차단. cross-tenant `note_id` 또는 `project_id` 시도 → 404. 회귀 가드: `backend/tests/integration/test_workspace_idor_matrix.py::TestNotesIDORMatrix` 7 케이스. notes 도메인 CONTEXT 신설: `backend/src/notes/CONTEXT.md`.
+
 ---
 
 ## Sprint 4: RBAC (목록 수준)

@@ -29,12 +29,15 @@ class NotePipelineService:
         self.embedding_service = embedding_service
         self.project_repo = project_repo
 
-    async def embed_note_async(self, note_id: uuid.UUID) -> None:
+    async def embed_note_async(
+        self, note_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> None:
         """BackgroundTasks용 임베딩 생성 + 캐시 무효화 (D-2 부채 해소).
 
         embedding 호출은 본 orchestrator 내부에서만 — 헌법 §4.2 정합.
+        헌법 I-9 (Codex F-1): workspace_id 필수.
         """
-        note = await self.note_repo.find_by_id(note_id)
+        note = await self.note_repo.find_by_id(note_id, workspace_id)
         if not note or not note.plain_text:
             return
         await self.embedding_service.embed_note(
@@ -48,12 +51,16 @@ class NotePipelineService:
             note.workspace_id, note.project_id
         )
 
-    async def delete_note_with_cleanup(self, note_id: uuid.UUID) -> None:
-        """노트 삭제 + embedding chunk cleanup + 캐시 무효화 (D-2 부채 해소)."""
-        note = await self.note_repo.find_by_id(note_id)
+    async def delete_note_with_cleanup(
+        self, note_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> None:
+        """노트 삭제 + embedding chunk cleanup + 캐시 무효화 (D-2 부채 해소).
+
+        Codex H2 / 옵션 A: pipeline 시그니처 자체에 workspace_id 필수 → pipeline 우회 IDOR 차단.
+        """
+        note = await self.note_repo.find_by_id(note_id, workspace_id)
         if note is None:
             return
-        workspace_id = note.workspace_id
         project_id = note.project_id
         # embedding chunk 삭제 (repository 직접 호출 = 헌법 §4.2 OK, read-only가 아니지만
         # embeddings 도메인은 cross-domain shared service로 분류 — ADR-014 §1)
