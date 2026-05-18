@@ -47,6 +47,7 @@ from src.memory.models import (
     PromotionAudit,
 )
 from src.memory.repository import MemoryRepository
+from src.workspaces.repository import WorkspaceRepository
 from src.memory.schemas import (
     MemoryCreateOut,
     MemoryDetailOut,
@@ -78,10 +79,14 @@ class MemoryService:
         repo: MemoryRepository,
         session_factory: async_sessionmaker[AsyncSession],
         r2_service: R2Service,
+        workspace_repo: WorkspaceRepository | None = None,
     ) -> None:
         self.repo = repo
         self._session_factory = session_factory
         self.r2_service = r2_service
+        # Sprint 19 PR #1 C10 (Codex F-4): promote 의 cross-workspace 검증을 repo API 로 이동
+        # (backend rule §3 회복 — service 가 session 직접 사용 금지)
+        self.workspace_repo = workspace_repo
 
     # ── 요청 핸들러 ──
 
@@ -402,34 +407,29 @@ class MemoryService:
 
         ADR-016 AD-41 (복제 + tombstone) — source MemoryItem.status 변경 없음.
         검증: source != target / target type='team' / user가 target ws 멤버.
+        Sprint 19 PR #1 C10 (Codex F-4): WorkspaceRepository 통한 검증 (backend rule §3 회복).
         """
-        from sqlalchemy import select
-        from src.workspaces.models import Workspace, WorkspaceMember
-
         if source_workspace_id == target_workspace_id:
             raise CannotPromoteToSameWorkspaceError()
+
+        # Sprint 19 PR #1 C10 (Codex F-4): fail-closed — workspace_repo 미주입 시 RuntimeError
+        if self.workspace_repo is None:
+            raise RuntimeError("workspace_repo 필수 (F-4 promote target 검증)")
 
         # 1. 원본 fetch (workspace_id 강제 필터로 I-9 격리)
         source = await self.repo.get_by_id(memory_id, source_workspace_id)
         if source is None:
             raise MemoryNotFoundError()
 
-        # 2. target workspace 검증 — type='team' + user가 멤버
-        target_q = select(Workspace).where(Workspace.id == target_workspace_id)
-        target = (
-            await self.repo.session.execute(target_q)
-        ).scalar_one_or_none()
+        # 2. target workspace 검증 — WorkspaceRepository API 사용 (Codex F-4)
+        target = await self.workspace_repo.find_by_id(target_workspace_id)
         if target is None:
             raise TargetWorkspaceInvalidError()
         if getattr(target, "type", "team") == "personal":
             raise CannotPromoteToPersonalError()
-        member_q = select(WorkspaceMember).where(
-            WorkspaceMember.workspace_id == target_workspace_id,
-            WorkspaceMember.user_id == promoted_by_user_id,
+        member = await self.workspace_repo.find_member(
+            target_workspace_id, promoted_by_user_id
         )
-        member = (
-            await self.repo.session.execute(member_q)
-        ).scalar_one_or_none()
         if member is None:
             raise TargetWorkspaceInvalidError()
 

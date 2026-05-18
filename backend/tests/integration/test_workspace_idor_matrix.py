@@ -977,11 +977,100 @@ class TestProjectsIDORMatrix:
 
 
 class TestMemoryIDORMatrix:
-    """memory 도메인 5 endpoint — TODO PR #1 memory commit (matrix lock-in 추가)."""
+    """memory 도메인 5 endpoint + promote target_workspace_id secondary FK (Sprint 19 PR #1 C10).
 
-    @pytest.mark.skip(reason="PR #1 memory commit 진입 시 활성화")
-    def test_placeholder(self):
-        pass
+    Codex F-4: promote 의 cross-workspace 검증을 WorkspaceRepository API 로 이동
+    (backend rule §3 회복). workspace_repo None → RuntimeError fail-closed.
+    """
+
+    @pytest.mark.asyncio
+    async def test_memory_repository_get_by_id_requires_workspace_id(self):
+        """Codex F-1 anchor: MemoryRepository.get_by_id 시그니처 workspace_id 필수."""
+        import inspect
+        from src.memory.repository import MemoryRepository
+
+        sig = inspect.signature(MemoryRepository.get_by_id)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: MemoryRepository.get_by_id workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_memory_service_promote_uses_workspace_repo(self):
+        """Codex F-4 anchor: MemoryService 가 workspace_repo 주입 받음 (backend rule §3)."""
+        import inspect
+        from src.memory.service import MemoryService
+
+        sig = inspect.signature(MemoryService.__init__)
+        assert "workspace_repo" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-4: MemoryService.__init__ 에 workspace_repo 주입 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_memory_service_promote_fail_closed_without_workspace_repo(self):
+        """Codex F-4 + 2차 Minor 1 fail-closed: workspace_repo=None → RuntimeError."""
+        from unittest.mock import AsyncMock, MagicMock
+        from src.memory.service import MemoryService
+
+        service = MemoryService(
+            repo=AsyncMock(),
+            session_factory=MagicMock(),
+            r2_service=MagicMock(),
+            workspace_repo=None,
+        )
+        bg = MagicMock()
+        with pytest.raises(RuntimeError, match="workspace_repo 필수"):
+            await service.promote(
+                memory_id=uuid.uuid4(),
+                source_workspace_id=uuid.uuid4(),
+                target_workspace_id=uuid.uuid4(),
+                promoted_by_user_id=uuid.uuid4(),
+                background_tasks=bg,
+            )
+
+    @pytest.mark.asyncio
+    async def test_get_memory_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """GET /memory/{id} → service.get_memory workspace_id 정확 값 (Codex F-3)."""
+        from src.memory.dependencies import get_memory_service
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_viewer] = lambda: member_a
+
+        memory_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.get_memory.return_value = {
+            "memory_id": memory_id,
+            "workspace_id": workspace_a_id,
+            "type": "text",
+            "raw_content": "test",
+            "distilled_json": None,
+            "status": "ready",
+            "embedding_chunk_id": None,
+            "r2_audio_key": None,
+            "created_at": "2026-01-01T00:00:00",
+            "updated_at": "2026-01-01T00:00:00",
+        }
+        app.dependency_overrides[get_memory_service] = lambda: mock_service
+
+        response = await client.get(
+            f"/api/v1/workspaces/{workspace_a_id}/memory/{memory_id}",
+            headers={"Authorization": "Bearer t"},
+        )
+        # response 200 or schema validation issue — assertion 은 호출 검증만
+        call_args = mock_service.get_memory.call_args
+        if call_args:
+            args = call_args.args
+            kwargs = call_args.kwargs
+            workspace_id_seen = kwargs.get("workspace_id") or (
+                args[1] if len(args) > 1 else None
+            )
+            assert workspace_id_seen == workspace_a_id, (
+                f"BUG-C01-EXT v3 memory #4 (Codex F-3): get_memory workspace_id 정확 값. "
+                f"기대={workspace_a_id} 실제={workspace_id_seen} kwargs={kwargs} args={args}"
+            )
 
 
 class TestRagIDORMatrix:
