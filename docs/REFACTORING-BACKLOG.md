@@ -1262,4 +1262,32 @@ Cloud Run + Neon Postgres 환경에서 BE 인스턴스 cold start 시:
 
 **우선순위**: ★☆☆☆☆ (P3 cosmetic, fallback 으로 사용자 체감 영향 작음)
 
+---
+
+## BL-047 — projects.repository find_projects_by_meeting / add_meeting_link cross-domain cascade 모니터링
+
+**도메인**: backend / projects + cross-domain (meetings/inbox/notes/rag)
+
+**증상**: Sprint 19 PR #1 C9 (commit 6f646e7) 에서 ProjectRepository 의 `find_by_id` / `find_members` / `is_member` / `add_meeting_link` / `remove_meeting_link` / `find_projects_by_meeting` 시그니처 변경 후 cross-domain 호출자 (actions/inbox/notes/rag/meetings) 모두 전수 patch. 단 향후 새 도메인이 ProjectRepository 호출 시 시그니처 누락 잠재.
+
+**현 상태**: handoff v2 의 Codex 2차 Minor 3 명시 finding. 본 C9 commit 으로 일부 해소 (cross-domain 호출자 cascade). 단 모니터링 필요.
+
+**해결 방향**: lint rule 또는 grep CI 작업으로 1-인자 `find_by_id(project_id)` 호출 패턴 차단. 또는 Repository protocol 강제.
+
+**우선순위**: ★★☆☆☆ (P2 monitoring, immediate risk 0 but 잠재 regression 방지)
+
+---
+
+## BL-048 — Sprint 19 PR #1 matrix endpoint 전수 forward coverage 강화
+
+**도메인**: backend / tests
+
+**증상**: Sprint 19 PR #1 C9~C12 의 `test_workspace_idor_matrix.py` 가 도메인별 signature anchor 6~8건 + representative endpoint forward 1~4건 으로 활성화. Codex 2차 review F-2 finding = "memory/rag/workspaces/upload 의 모든 endpoint 별 mock service kwargs 정확 비교 강화 필요".
+
+**현 상태**: 45 endpoint 중 anchor + forward = ~40 test pass. positional fallback 허용 패턴 일부 남음 — generator 누락 catch 강도 약함.
+
+**해결 방향**: (1) router 호출 모두 keyword 인자로 정리 (`service.method(workspace_id=workspace_id, ...)`) → matrix mock `call_args.kwargs.get("workspace_id") == workspace_a_id` 정확 비교 가능. (2) 도메인별 endpoint 전수 forward test 추가 — memory 4 / workspaces 8 / projects 11 (현재 4 만 forward).
+
+**우선순위**: ★★★☆☆ (P2 hardening, 본 PR scope 외 — generator regression 방지)
+
 **근거**: Sprint 17 QA, PR #44 close.

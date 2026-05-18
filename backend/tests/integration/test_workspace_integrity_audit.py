@@ -82,3 +82,27 @@ async def test_meeting_project_links_workspace_match(
         f"sample={mismatched[:3]}. MeetingProjectLink workspace 컬럼 + composite FK + backfill 은 "
         f"Sprint 19 PR #2 (BUG-C01-EXT-FK + alembic) 로 별도."
     )
+
+
+@pytest.mark.asyncio
+async def test_project_members_project_workspace_match(
+    integration_session: AsyncSession,
+):
+    """project_members.workspace_id 가 project.workspace_id 와 일치 (Sprint 19 PR #1 C9).
+
+    Codex F-5 cascade: project_members 가 추가된 (Sprint 6 L-6) 도메인 audit.
+    composite FK 없으므로 잠재 mismatch 가능. 0 row 보장.
+    """
+    result = await integration_session.execute(text("""
+        SELECT pm.id, pm.workspace_id AS pm_ws, p.workspace_id AS p_ws
+        FROM project_members pm
+        JOIN projects p ON p.id = pm.project_id
+        WHERE pm.workspace_id != p.workspace_id
+        LIMIT 10
+    """))
+    mismatched = result.fetchall()
+    assert len(mismatched) == 0, (
+        f"Codex F-5 audit (C9 cascade): project_members 의 {len(mismatched)} 행이 "
+        f"cross-workspace project 참조. sample={mismatched[:3]}. "
+        f"composite FK 는 Sprint 19 PR #2 분리."
+    )

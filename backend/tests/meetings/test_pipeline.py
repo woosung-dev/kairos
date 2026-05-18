@@ -190,9 +190,9 @@ async def test_pipeline_auto_confirm():
         )
         await pipeline.process_meeting(meeting_id, workspace_id)
 
-    # 자동 확정 확인 (add_meeting_link 시그니처는 Phase 4 inbox commit 에서 workspace_id 추가 예정)
+    # Sprint 19 PR #1 C9 (Codex F-1/F-3): add_meeting_link workspace_id 명시 전달
     mock_project_repo.add_meeting_link.assert_called_once_with(
-        meeting_id, project_id
+        meeting_id, project_id, workspace_id
     )
 
     # InboxItem의 is_processed=True 확인

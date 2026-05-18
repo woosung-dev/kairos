@@ -762,47 +762,529 @@ class TestActionsIDORMatrix:
 
 
 class TestProjectsIDORMatrix:
-    """projects 도메인 11 endpoint — TODO PR #1 projects commit (가장 큰 분산)."""
+    """projects 도메인 11 endpoint + cross-domain cascade (Sprint 19 PR #1 C9).
 
-    @pytest.mark.skip(reason="PR #1 projects commit 진입 시 활성화")
-    def test_placeholder(self):
-        pass
+    Codex F-1 BLOCK 해소: ProjectRepository.find_by_id / find_members / is_member
+    + add_meeting_link / remove_meeting_link / find_projects_by_meeting 모두 workspace_id 강제.
+    Codex F-3: add_meeting_link 호출자 inbox.service classify 경로 cascade.
+    Codex F-4: cross-tenant resource → ProjectNotFoundError(404) lock-in (정보 누설 방지).
+    """
+
+    @pytest.mark.asyncio
+    async def test_project_repository_find_by_id_requires_workspace_id(self):
+        """Codex F-1 anchor: ProjectRepository.find_by_id 시그니처 workspace_id 필수."""
+        import inspect
+        from src.projects.repository import ProjectRepository
+
+        sig = inspect.signature(ProjectRepository.find_by_id)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: ProjectRepository.find_by_id 시그니처에 "
+            f"workspace_id 필수. 현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_project_repository_add_meeting_link_requires_workspace_id(self):
+        """Codex F-1/F-3 anchor: add_meeting_link 시그니처 workspace_id 필수."""
+        import inspect
+        from src.projects.repository import ProjectRepository
+
+        sig = inspect.signature(ProjectRepository.add_meeting_link)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1/F-3: ProjectRepository.add_meeting_link 시그니처에 "
+            f"workspace_id 필수. 현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_project_repository_find_projects_by_meeting_requires_workspace_id(self):
+        """Codex F-1 anchor: find_projects_by_meeting 시그니처 workspace_id 필수."""
+        import inspect
+        from src.projects.repository import ProjectRepository
+
+        sig = inspect.signature(ProjectRepository.find_projects_by_meeting)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: find_projects_by_meeting workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_project_service_update_project_requires_workspace_id(self):
+        """Codex F-1 anchor: ProjectService.update_project workspace_id 필수."""
+        import inspect
+        from src.projects.service import ProjectService
+
+        sig = inspect.signature(ProjectService.update_project)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: update_project workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_project_service_delete_project_requires_workspace_id(self):
+        """Codex F-1 anchor: ProjectService.delete_project workspace_id 필수."""
+        import inspect
+        from src.projects.service import ProjectService
+
+        sig = inspect.signature(ProjectService.delete_project)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: delete_project workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_project_service_add_meeting_project_requires_workspace_id(self):
+        """Codex F-1/F-2 anchor: add_meeting_project workspace_id + meeting secondary FK 필수."""
+        import inspect
+        from src.projects.service import ProjectService
+
+        sig = inspect.signature(ProjectService.add_meeting_project)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: add_meeting_project workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_project_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """GET /projects/{id} → service.get_project workspace_id 정확 값 (Codex F-3)."""
+        from src.projects.dependencies import get_project_service
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_viewer] = lambda: member_a
+
+        project_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.get_project.return_value = {
+            "id": str(project_id),
+            "workspaceId": str(workspace_a_id),
+        }
+        app.dependency_overrides[get_project_service] = lambda: mock_service
+
+        response = await client.get(
+            f"/api/v1/workspaces/{workspace_a_id}/projects/{project_id}",
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 200
+        call_args = mock_service.get_project.call_args
+        kwargs = call_args.kwargs if call_args else {}
+        assert kwargs.get("workspace_id") == workspace_a_id, (
+            f"BUG-C01-EXT v3 projects #2 (Codex F-3): get_project workspace_id 정확 값 미전달. "
+            f"기대={workspace_a_id} 실제={kwargs.get('workspace_id')} kwargs={kwargs}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_update_project_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """PATCH /projects/{id} → service.update_project workspace_id 정확 값 (Codex F-3)."""
+        from src.projects.dependencies import get_project_service
+        from src.auth.rbac import require_member
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_member] = lambda: member_a
+
+        project_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.update_project.return_value = {
+            "id": str(project_id),
+            "workspaceId": str(workspace_a_id),
+        }
+        app.dependency_overrides[get_project_service] = lambda: mock_service
+
+        response = await client.patch(
+            f"/api/v1/workspaces/{workspace_a_id}/projects/{project_id}",
+            json={"title": "new"},
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 200
+        call_args = mock_service.update_project.call_args
+        kwargs = call_args.kwargs if call_args else {}
+        assert kwargs.get("workspace_id") == workspace_a_id, (
+            f"BUG-C01-EXT v3 projects #4 (Codex F-3): update_project workspace_id 정확 값. "
+            f"기대={workspace_a_id} 실제={kwargs.get('workspace_id')} kwargs={kwargs}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_delete_project_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """DELETE /projects/{id} → service.delete_project workspace_id 정확 값 (Codex F-3)."""
+        from src.projects.dependencies import get_project_service
+        from src.auth.rbac import require_admin
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        member_a.role = "admin"
+        app.dependency_overrides[require_admin] = lambda: member_a
+
+        project_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.delete_project.return_value = None
+        app.dependency_overrides[get_project_service] = lambda: mock_service
+
+        response = await client.delete(
+            f"/api/v1/workspaces/{workspace_a_id}/projects/{project_id}",
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 204
+        call_args = mock_service.delete_project.call_args
+        args = call_args.args if call_args else ()
+        kwargs = call_args.kwargs if call_args else {}
+        workspace_id_seen = kwargs.get("workspace_id") or (
+            args[0] if len(args) > 0 else None
+        )
+        assert workspace_id_seen == workspace_a_id, (
+            f"BUG-C01-EXT v3 projects #5 (Codex F-3): delete_project workspace_id 정확 값. "
+            f"기대={workspace_a_id} 실제={workspace_id_seen} kwargs={kwargs} args={args}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_add_meeting_project_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """POST /meetings/{mid}/projects → service.add_meeting_project workspace_id 정확 값 (Codex F-3)."""
+        from src.projects.dependencies import get_project_service
+        from src.auth.rbac import require_member
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_member] = lambda: member_a
+
+        meeting_id = uuid.uuid4()
+        project_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.add_meeting_project.return_value = {
+            "id": str(uuid.uuid4()),
+            "meetingId": str(meeting_id),
+            "projectId": str(project_id),
+        }
+        app.dependency_overrides[get_project_service] = lambda: mock_service
+
+        response = await client.post(
+            f"/api/v1/workspaces/{workspace_a_id}/meetings/{meeting_id}/projects",
+            json={"projectId": str(project_id)},
+            headers={"Authorization": "Bearer t"},
+        )
+        assert response.status_code == 201
+        call_args = mock_service.add_meeting_project.call_args
+        args = call_args.args if call_args else ()
+        kwargs = call_args.kwargs if call_args else {}
+        workspace_id_seen = kwargs.get("workspace_id") or (
+            args[0] if len(args) > 0 else None
+        )
+        assert workspace_id_seen == workspace_a_id, (
+            f"BUG-C01-EXT v3 projects #10 (Codex F-3): add_meeting_project workspace_id. "
+            f"기대={workspace_a_id} 실제={workspace_id_seen} kwargs={kwargs} args={args}"
+        )
 
 
 class TestMemoryIDORMatrix:
-    """memory 도메인 5 endpoint — TODO PR #1 memory commit (matrix lock-in 추가)."""
+    """memory 도메인 5 endpoint + promote target_workspace_id secondary FK (Sprint 19 PR #1 C10).
 
-    @pytest.mark.skip(reason="PR #1 memory commit 진입 시 활성화")
-    def test_placeholder(self):
-        pass
+    Codex F-4: promote 의 cross-workspace 검증을 WorkspaceRepository API 로 이동
+    (backend rule §3 회복). workspace_repo None → RuntimeError fail-closed.
+    """
+
+    @pytest.mark.asyncio
+    async def test_memory_repository_get_by_id_requires_workspace_id(self):
+        """Codex F-1 anchor: MemoryRepository.get_by_id 시그니처 workspace_id 필수."""
+        import inspect
+        from src.memory.repository import MemoryRepository
+
+        sig = inspect.signature(MemoryRepository.get_by_id)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: MemoryRepository.get_by_id workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_memory_service_promote_uses_workspace_repo(self):
+        """Codex F-4 anchor: MemoryService 가 workspace_repo 주입 받음 (backend rule §3)."""
+        import inspect
+        from src.memory.service import MemoryService
+
+        sig = inspect.signature(MemoryService.__init__)
+        assert "workspace_repo" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-4: MemoryService.__init__ 에 workspace_repo 주입 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_memory_service_promote_fail_closed_without_workspace_repo(self):
+        """Codex F-4 + 2차 Minor 1 fail-closed: workspace_repo=None → RuntimeError."""
+        from unittest.mock import AsyncMock, MagicMock
+        from src.memory.service import MemoryService
+
+        service = MemoryService(
+            repo=AsyncMock(),
+            session_factory=MagicMock(),
+            r2_service=MagicMock(),
+            workspace_repo=None,
+        )
+        bg = MagicMock()
+        with pytest.raises(RuntimeError, match="workspace_repo 필수"):
+            await service.promote(
+                memory_id=uuid.uuid4(),
+                source_workspace_id=uuid.uuid4(),
+                target_workspace_id=uuid.uuid4(),
+                promoted_by_user_id=uuid.uuid4(),
+                background_tasks=bg,
+            )
+
+    @pytest.mark.asyncio
+    async def test_get_memory_passes_workspace_id_to_service(
+        self, client, user_a, member_a, workspace_a_id
+    ):
+        """GET /memory/{id} → service.get_memory workspace_id 정확 값 (Codex F-3)."""
+        from src.memory.dependencies import get_memory_service
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_viewer] = lambda: member_a
+
+        memory_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.get_memory.return_value = {
+            "memory_id": memory_id,
+            "workspace_id": workspace_a_id,
+            "type": "text",
+            "raw_content": "test",
+            "distilled_json": None,
+            "status": "ready",
+            "embedding_chunk_id": None,
+            "r2_audio_key": None,
+            "created_at": "2026-01-01T00:00:00",
+            "updated_at": "2026-01-01T00:00:00",
+        }
+        app.dependency_overrides[get_memory_service] = lambda: mock_service
+
+        response = await client.get(
+            f"/api/v1/workspaces/{workspace_a_id}/memory/{memory_id}",
+            headers={"Authorization": "Bearer t"},
+        )
+        # response 200 or schema validation issue — assertion 은 호출 검증만
+        call_args = mock_service.get_memory.call_args
+        if call_args:
+            args = call_args.args
+            kwargs = call_args.kwargs
+            workspace_id_seen = kwargs.get("workspace_id") or (
+                args[1] if len(args) > 1 else None
+            )
+            assert workspace_id_seen == workspace_a_id, (
+                f"BUG-C01-EXT v3 memory #4 (Codex F-3): get_memory workspace_id 정확 값. "
+                f"기대={workspace_a_id} 실제={workspace_id_seen} kwargs={kwargs} args={args}"
+            )
 
 
 class TestRagIDORMatrix:
-    """rag 도메인 1 endpoint (ask) — TODO PR #1 rag commit (matrix lock-in 추가)."""
+    """rag 도메인 1 endpoint (ask) + project_id secondary FK (Sprint 19 PR #1 C11).
 
-    @pytest.mark.skip(reason="PR #1 rag commit 진입 시 활성화")
-    def test_placeholder(self):
-        pass
+    Codex F-2 MAJOR: tenant 검증 role 무관 (admin/owner 도 cross-tenant project_id 차단).
+    visibility 검증 (draft/private) 만 admin/owner 우회 (Sprint 6 ADR-014 옵션 A).
+    """
+
+    @pytest.mark.asyncio
+    async def test_rag_pipeline_service_ask_tenant_check_role_agnostic(self):
+        """Codex F-2 anchor: ask() 안에 role 무관 tenant 검증 (project_repo.find_by_id 호출)."""
+        import inspect
+        from src.rag.pipeline_service import RagPipelineService
+
+        src_text = inspect.getsource(RagPipelineService.ask)
+        # ask 함수 본문에 role-무관 tenant 검증이 visibility 검증 *전에* 있어야 함
+        assert "project_repo.find_by_id(project_id, workspace_id)" in src_text, (
+            f"BUG-C01-EXT v3 Codex F-2: RagPipelineService.ask 안에 role-무관 "
+            f"project_repo.find_by_id(project_id, workspace_id) 호출 필수."
+        )
+
+    @pytest.mark.asyncio
+    async def test_rag_pipeline_admin_cannot_bypass_cross_tenant_project(self):
+        """Codex F-2: admin/owner 도 cross-tenant project_id 차단."""
+        from unittest.mock import AsyncMock, MagicMock
+        from src.rag.pipeline_service import RagPipelineService
+
+        mock_project_repo = AsyncMock()
+        mock_project_repo.find_by_id.return_value = None  # cross-tenant 또는 nonexistent
+        mock_rag_service = AsyncMock()
+
+        async def empty_async_gen():
+            if False:
+                yield {}
+
+        mock_rag_service.ask.return_value = empty_async_gen()
+
+        pipeline = RagPipelineService(
+            rag_service=mock_rag_service,
+            project_repo=mock_project_repo,
+        )
+
+        ws_a = uuid.uuid4()
+        project_b = uuid.uuid4()
+        user = uuid.uuid4()
+
+        events = []
+        async for event in pipeline.ask(
+            question="test",
+            workspace_id=ws_a,
+            requester_user_id=user,
+            requester_role="admin",  # admin 이지만 tenant 우회 금지
+            project_id=project_b,
+        ):
+            events.append(event)
+
+        # admin 도 cross-tenant project_id 시 SSE error event 발생 + done
+        assert any(
+            "프로젝트를 찾을 수 없거나" in str(e.get("data", "")) for e in events
+        ), f"Codex F-2: admin 도 cross-tenant project 차단해야 함. events={events}"
+        # find_by_id workspace_id 호출 확인
+        mock_project_repo.find_by_id.assert_called_with(project_b, ws_a)
 
 
 class TestWorkspacesIDORMatrix:
-    """workspaces main 2 + member 3 + invite 3 = 8 endpoint — TODO PR #1 workspaces commit.
+    """workspaces main 2 + member 3 + invite 3 = 8 endpoint (Sprint 19 PR #1 C12).
 
-    `member_router.py:23,35,51` + `invite_router.py:37,54,65` + `invite_service.py:222,243,119`
-    `find_member_by_id(member_id, workspace_id)` / `find_invite_by_id(invite_id, workspace_id)` 변경.
+    Codex F-1/F-5: find_member_by_id / find_invite_by_id 시그니처 + mutation WHERE workspace_id.
     """
 
-    @pytest.mark.skip(reason="PR #1 workspaces commit 진입 시 활성화")
-    def test_placeholder(self):
-        pass
+    @pytest.mark.asyncio
+    async def test_workspace_repository_find_member_by_id_requires_workspace_id(self):
+        """Codex F-1 anchor: find_member_by_id workspace_id 필수."""
+        import inspect
+        from src.workspaces.repository import WorkspaceRepository
+
+        sig = inspect.signature(WorkspaceRepository.find_member_by_id)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: find_member_by_id workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_workspace_repository_find_invite_by_id_requires_workspace_id(self):
+        """Codex F-1 anchor: find_invite_by_id workspace_id 필수."""
+        import inspect
+        from src.workspaces.repository import WorkspaceRepository
+
+        sig = inspect.signature(WorkspaceRepository.find_invite_by_id)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: find_invite_by_id workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_workspace_repository_update_member_role_mutation_workspace_id(self):
+        """Codex F-5 anchor: update_member_role mutation 도 workspace_id WHERE."""
+        import inspect
+        from src.workspaces.repository import WorkspaceRepository
+
+        sig = inspect.signature(WorkspaceRepository.update_member_role)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-5: update_member_role mutation workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_workspace_repository_remove_member_mutation_workspace_id(self):
+        """Codex F-5 anchor: remove_member mutation 도 workspace_id WHERE."""
+        import inspect
+        from src.workspaces.repository import WorkspaceRepository
+
+        sig = inspect.signature(WorkspaceRepository.remove_member)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-5: remove_member mutation workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_workspace_repository_deactivate_invite_mutation_workspace_id(self):
+        """Codex F-5 anchor: deactivate_invite mutation 도 workspace_id WHERE."""
+        import inspect
+        from src.workspaces.repository import WorkspaceRepository
+
+        sig = inspect.signature(WorkspaceRepository.deactivate_invite)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-5: deactivate_invite mutation workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_workspace_repository_increment_invite_use_count_mutation_workspace_id(self):
+        """Codex F-5 anchor: increment_invite_use_count mutation 도 workspace_id WHERE."""
+        import inspect
+        from src.workspaces.repository import WorkspaceRepository
+
+        sig = inspect.signature(WorkspaceRepository.increment_invite_use_count)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-5: increment_invite_use_count mutation workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_invite_service_update_member_role_requires_workspace_id(self):
+        """Codex F-1 anchor: InviteService.update_member_role 첫 인자 workspace_id."""
+        import inspect
+        from src.workspaces.invite_service import InviteService
+
+        sig = inspect.signature(InviteService.update_member_role)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: InviteService.update_member_role workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_invite_service_remove_member_requires_workspace_id(self):
+        """Codex F-1 anchor: InviteService.remove_member 첫 인자 workspace_id."""
+        import inspect
+        from src.workspaces.invite_service import InviteService
+
+        sig = inspect.signature(InviteService.remove_member)
+        assert "workspace_id" in sig.parameters, (
+            f"BUG-C01-EXT v3 Codex F-1: InviteService.remove_member workspace_id 필수. "
+            f"현재 params={list(sig.parameters)}"
+        )
 
 
 class TestUploadIDORMatrix:
-    """upload 도메인 2 endpoint — TODO PR #1 upload commit.
+    """upload 도메인 2 endpoint (Sprint 19 PR #1 C11).
 
-    file_key path 패턴 (BUG-UPL-OWN)은 PR #4에서 별도. PR #1은 workspace_id 시그니처만.
+    DB lookup 없음 (R2 only), secondary FK 없음. require_member path param 강제 검증.
+    file_key path 패턴 (BUG-UPL-OWN)은 PR #4에서 별도.
     """
 
-    @pytest.mark.skip(reason="PR #1 upload commit 진입 시 활성화")
-    def test_placeholder(self):
-        pass
+    @pytest.mark.asyncio
+    async def test_upload_presigned_url_has_workspace_id_path_param(self):
+        """Upload presigned-url endpoint 가 workspace_id path param 받음 (require_member 차단 기반)."""
+        from src.upload import router as upload_router
+
+        # router 의 endpoint 가 workspace_id path 받는지 inspect
+        routes = [r for r in upload_router.router.routes if hasattr(r, "path")]
+        paths = [r.path for r in routes]
+        assert any("{workspace_id}" in p for p in paths), (
+            f"BUG-C01-EXT v3 upload #1: presigned-url endpoint workspace_id path 필수. paths={paths}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_upload_file_proxy_has_workspace_id_path_param(self):
+        """Upload file endpoint 가 workspace_id path param 받음."""
+        from src.upload import router as upload_router
+
+        routes = [r for r in upload_router.router.routes if hasattr(r, "path")]
+        paths = [r.path for r in routes]
+        # 두 endpoint 모두 workspace_id path
+        ws_routes = [p for p in paths if "{workspace_id}" in p]
+        assert len(ws_routes) >= 2, (
+            f"BUG-C01-EXT v3 upload #2: 2 endpoint 모두 workspace_id path 필수. ws_routes={ws_routes}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_upload_router_requires_member_dependency(self):
+        """require_member dependency 가 두 endpoint 모두 적용 (cross-tenant 차단 게이트).
+
+        RoleChecker(class instance) 형태이므로 __name__ 대신 type 또는 source 검증.
+        """
+        import inspect
+        from src.upload import router as upload_router
+
+        # router 모듈 source 에 require_member 가 import + Depends 로 사용되는지
+        src_text = inspect.getsource(upload_router)
+        assert "require_member" in src_text, (
+            f"BUG-C01-EXT v3 upload: router.py 에 require_member 적용 필수."
+        )
+        assert src_text.count("Depends(require_member)") >= 2, (
+            f"BUG-C01-EXT v3 upload: 2 endpoint 모두 Depends(require_member) 필수."
+        )

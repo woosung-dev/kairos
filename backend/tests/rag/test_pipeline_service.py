@@ -7,7 +7,7 @@ ADR-014 옵션 A.
 import json
 import uuid
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -83,9 +83,17 @@ class TestRagPipelineServiceAsk:
     async def test_admin_bypasses_visibility_check(
         self, workspace_id, project_id, non_member_id
     ):
-        """admin 역할은 visibility 무관 통과."""
+        """admin 역할은 visibility (draft/private) 우회. 단 tenant 검증은 받음.
+
+        Sprint 19 PR #1 C11 (Codex F-2): tenant boundary 는 role 무관 항상 검증.
+        visibility 검증 (draft creator / private ProjectMember) 만 admin/owner 우회.
+        """
         project_repo = AsyncMock()
-        project_repo.find_by_id = AsyncMock()  # 호출되면 안 됨
+        # tenant check 통과 (project 가 본 workspace 소속이라 반환)
+        mock_project = MagicMock()
+        mock_project.visibility = "private"
+        project_repo.find_by_id = AsyncMock(return_value=mock_project)
+        project_repo.is_member = AsyncMock(return_value=False)  # 호출되면 안 됨 (visibility 우회)
         rag_service = _make_rag_service()
         pipeline = RagPipelineService(rag_service, project_repo)
 
@@ -99,9 +107,12 @@ class TestRagPipelineServiceAsk:
         ):
             events.append(event)
 
-        # admin은 검증 skip → RagService 위임 결과 그대로
+        # admin은 visibility 검증 skip → RagService 위임 결과 그대로
         assert events[0]["event"] == "answer"
-        project_repo.find_by_id.assert_not_called()
+        # Codex F-2: tenant 검증은 받음 (project_id, workspace_id)
+        project_repo.find_by_id.assert_called_with(project_id, workspace_id)
+        # visibility 검증 (_check_project_access 의 is_member) 는 우회
+        project_repo.is_member.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_project_not_found_yields_error(

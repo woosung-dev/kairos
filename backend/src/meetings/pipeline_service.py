@@ -121,8 +121,12 @@ class MeetingPipelineService:
         await inbox_repo.save(inbox_item)
 
         if confidence >= auto_confirm_threshold and existing_project_id_str:
-            # add_meeting_link workspace 검증은 Phase 4 inbox commit 에서 도입 (F-2 추가)
-            await project_repo.add_meeting_link(meeting.id, uuid.UUID(existing_project_id_str))
+            # Sprint 19 PR #1 C9 (Codex F-1/F-3): workspace_id 명시 전달
+            await project_repo.add_meeting_link(
+                meeting.id,
+                uuid.UUID(existing_project_id_str),
+                meeting.workspace_id,
+            )
             logger.info(
                 "자동 확정: meeting=%s → project=%s (confidence=%.2f)",
                 meeting.id, existing_project_id_str, confidence,

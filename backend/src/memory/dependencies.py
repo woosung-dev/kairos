@@ -3,6 +3,8 @@
 
 backend rules §3 — Depends 조립은 dependencies.py에서만.
 session_factory 주입으로 BackgroundTask 내부에서 별도 session 생성 가능.
+
+Sprint 19 PR #1 C10 (Codex F-4): WorkspaceRepository 동반 주입 (promote target 검증).
 """
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -11,6 +13,7 @@ from src.common.database import get_async_session, get_session_factory
 from src.common.r2 import R2Service
 from src.memory.repository import MemoryRepository
 from src.memory.service import MemoryService
+from src.workspaces.repository import WorkspaceRepository
 
 
 async def get_memory_repository(
@@ -20,13 +23,19 @@ async def get_memory_repository(
 
 
 def get_memory_service(
-    repo: MemoryRepository = Depends(get_memory_repository),
+    session: AsyncSession = Depends(get_async_session),
     session_factory: async_sessionmaker[AsyncSession] = Depends(
         get_session_factory
     ),
 ) -> MemoryService:
+    """동일 session으로 MemoryRepository + WorkspaceRepository 조립.
+
+    Sprint 19 PR #1 C10 (Codex F-4): backend rule §3 회복 — promote target 검증을
+    workspace_repo API 로 위임 (service 가 직접 session.execute 사용 금지).
+    """
     return MemoryService(
-        repo=repo,
+        repo=MemoryRepository(session),
+        workspace_repo=WorkspaceRepository(session),
         session_factory=session_factory,
         r2_service=R2Service(),
     )

@@ -1,10 +1,18 @@
 # backend/src/projects/repository.py
-"""Project Repository — AsyncSession 유일 보유자."""
+"""Project Repository — AsyncSession 유일 보유자.
+
+Sprint 19 PR #1 C9 (Codex F-1/F-3): 헌법 I-9 강제.
+모든 find/mutation 메서드가 workspace_id 명시 파라미터 + WHERE 절 적용.
+add_meeting_link / remove_meeting_link / find_projects_by_meeting 는
+MeetingProjectLink 에 workspace_id 컬럼이 없으므로 (PR #2 분리) Project
+join + WHERE Project.workspace_id 로 사전 tenant 검증.
+"""
 import uuid
 
 from sqlalchemy import and_, delete, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.projects.exceptions import ProjectNotFoundError
 from src.projects.models import MeetingProjectLink, Project, ProjectMember
 
 
@@ -12,9 +20,15 @@ class ProjectRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def find_by_id(self, project_id: uuid.UUID) -> Project | None:
+    async def find_by_id(
+        self, project_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> Project | None:
+        """헌법 I-9 (Codex F-1): project_id + workspace_id 동시 필터."""
         result = await self.session.execute(
-            select(Project).where(Project.id == project_id)
+            select(Project).where(
+                Project.id == project_id,
+                Project.workspace_id == workspace_id,
+            )
         )
         return result.scalar_one_or_none()
 
@@ -102,25 +116,34 @@ class ProjectRepository:
             )
         )
 
-    # --- ProjectMember (Sprint 6 L-6) ---
+    # --- ProjectMember (Sprint 6 L-6, Sprint 19 PR #1 C9 workspace_id 강제) ---
 
     async def find_members(
-        self, project_id: uuid.UUID
+        self, project_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> list[ProjectMember]:
+        """헌법 I-9 (Codex F-1): project_members 도 workspace_id 필터."""
         stmt = (
             select(ProjectMember)
-            .where(ProjectMember.project_id == project_id)
+            .where(
+                ProjectMember.project_id == project_id,
+                ProjectMember.workspace_id == workspace_id,
+            )
             .order_by(ProjectMember.created_at)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
     async def is_member(
-        self, project_id: uuid.UUID, user_id: uuid.UUID
+        self,
+        project_id: uuid.UUID,
+        user_id: uuid.UUID,
+        workspace_id: uuid.UUID,
     ) -> bool:
+        """헌법 I-9 (Codex F-1): is_member 도 workspace_id 필터."""
         stmt = select(ProjectMember.id).where(
             ProjectMember.project_id == project_id,
             ProjectMember.user_id == user_id,
+            ProjectMember.workspace_id == workspace_id,
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none() is not None
@@ -140,12 +163,17 @@ class ProjectRepository:
         return member
 
     async def remove_member(
-        self, project_id: uuid.UUID, user_id: uuid.UUID
+        self,
+        project_id: uuid.UUID,
+        user_id: uuid.UUID,
+        workspace_id: uuid.UUID,
     ) -> None:
+        """헌법 I-9 (Codex F-1/F-5): mutation 도 workspace_id WHERE."""
         await self.session.execute(
             delete(ProjectMember).where(
                 ProjectMember.project_id == project_id,
                 ProjectMember.user_id == user_id,
+                ProjectMember.workspace_id == workspace_id,
             )
         )
         await self.session.flush()
@@ -162,19 +190,37 @@ class ProjectRepository:
     async def commit(self) -> None:
         await self.session.commit()
 
-    # --- Meeting-Project Link ---
+    # --- Meeting-Project Link (PR #1 C9: project tenant 사전 검증) ---
 
     async def add_meeting_link(
-        self, meeting_id: uuid.UUID, project_id: uuid.UUID
+        self,
+        meeting_id: uuid.UUID,
+        project_id: uuid.UUID,
+        workspace_id: uuid.UUID,
     ) -> MeetingProjectLink:
+        """헌법 I-9 (Codex F-1/F-3): project 가 workspace 소속인지 사전 검증.
+
+        MeetingProjectLink 자체에 workspace_id 컬럼 없음 (PR #2 분리).
+        service 레이어에서 project.workspace_id == workspace_id 보장.
+        """
+        project = await self.find_by_id(project_id, workspace_id)
+        if project is None:
+            raise ProjectNotFoundError()
         link = MeetingProjectLink(meeting_id=meeting_id, project_id=project_id)
         self.session.add(link)
         await self.session.flush()
         return link
 
     async def remove_meeting_link(
-        self, meeting_id: uuid.UUID, project_id: uuid.UUID
+        self,
+        meeting_id: uuid.UUID,
+        project_id: uuid.UUID,
+        workspace_id: uuid.UUID,
     ) -> None:
+        """헌법 I-9 (Codex F-1/F-3): 사전 project tenant 검증 후 DELETE."""
+        project = await self.find_by_id(project_id, workspace_id)
+        if project is None:
+            raise ProjectNotFoundError()
         await self.session.execute(
             delete(MeetingProjectLink).where(
                 MeetingProjectLink.meeting_id == meeting_id,
@@ -184,15 +230,19 @@ class ProjectRepository:
         await self.session.flush()
 
     async def find_projects_by_meeting(
-        self, meeting_id: uuid.UUID
+        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> list[Project]:
+        """헌법 I-9 (Codex F-1): JOIN + WHERE Project.workspace_id 강제."""
         stmt = (
             select(Project)
             .join(
                 MeetingProjectLink,
                 MeetingProjectLink.project_id == Project.id,
             )
-            .where(MeetingProjectLink.meeting_id == meeting_id)
+            .where(
+                MeetingProjectLink.meeting_id == meeting_id,
+                Project.workspace_id == workspace_id,
+            )
             .order_by(Project.sort_order, Project.created_at.desc())
         )
         result = await self.session.execute(stmt)
