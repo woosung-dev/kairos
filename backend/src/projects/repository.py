@@ -9,8 +9,8 @@ join + WHERE Project.workspace_id 로 사전 tenant 검증.
 """
 import uuid
 
-from sqlalchemy import and_, delete, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import and_, delete, exists, func, or_, select
 
 from src.projects.exceptions import ProjectNotFoundError
 from src.projects.models import MeetingProjectLink, Project, ProjectMember
