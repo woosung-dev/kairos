@@ -16,13 +16,12 @@ class ActionItemRepository:
         self, action_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> ActionItem | None:
         """헌법 I-9 (Codex F-1): action_id + workspace_id 동시 필터."""
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(ActionItem).where(
                 ActionItem.id == action_id,
                 ActionItem.workspace_id == workspace_id,
             )
-        )
-        return result.scalar_one_or_none()
+        )).one_or_none()
 
     async def find_by_workspace(
         self,
@@ -42,8 +41,7 @@ class ActionItemRepository:
             stmt = stmt.where(ActionItem.project_id == project_id)
         stmt = stmt.order_by(ActionItem.created_at.desc())
         stmt = stmt.offset(offset).limit(limit)
-        result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        return list((await self.session.exec(stmt)).all())
 
     async def count_by_workspace(
         self,
@@ -57,8 +55,7 @@ class ActionItemRepository:
         )
         if status:
             stmt = stmt.where(ActionItem.status == status)
-        result = await self.session.execute(stmt)
-        return result.scalar_one()
+        return (await self.session.exec(stmt)).one()
 
     async def find_by_meeting(self, meeting_id: uuid.UUID) -> list[ActionItem]:
         """회의에서 추출된 액션 아이템 조회."""
@@ -67,11 +64,14 @@ class ActionItemRepository:
             .where(ActionItem.meeting_id == meeting_id)
             .order_by(ActionItem.created_at.desc())
         )
-        result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        return list((await self.session.exec(stmt)).all())
 
     async def cancel_todo_by_project(self, project_id: uuid.UUID) -> int:
-        """프로젝트 archive 시 todo 상태 액션을 cancelled로 변경."""
+        """프로젝트 archive 시 todo 상태 액션을 cancelled로 변경.
+
+        BL-054 manifest G3-keep: rowcount 반환을 위해 session.execute() 유지
+        (SQLModel exec() 의 ScalarResult 에는 .rowcount 미존재).
+        """
         result = await self.session.execute(
             update(ActionItem)
             .where(

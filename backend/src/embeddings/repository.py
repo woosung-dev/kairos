@@ -88,14 +88,14 @@ class EmbeddingRepository:
     ) -> None:
         """특정 소스의 모든 청크 삭제 (재생성 전)."""
         # 자식 먼저 삭제 (FK 제약)
-        await self.session.execute(
+        await self.session.exec(
             delete(EmbeddingChunk).where(
                 EmbeddingChunk.source_type == source_type,
                 EmbeddingChunk.source_id == source_id,
                 EmbeddingChunk.parent_chunk_id.isnot(None),
             )
         )
-        await self.session.execute(
+        await self.session.exec(
             delete(EmbeddingChunk).where(
                 EmbeddingChunk.source_type == source_type,
                 EmbeddingChunk.source_id == source_id,
@@ -244,10 +244,9 @@ class EmbeddingRepository:
 
     async def find_chunk_by_id(self, chunk_id: uuid.UUID) -> EmbeddingChunk | None:
         """ID로 청크 조회 (parent context 조회용)."""
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(EmbeddingChunk).where(EmbeddingChunk.id == chunk_id)
-        )
-        return result.scalar_one_or_none()
+        )).one_or_none()
 
     async def find_chunks_by_ids(
         self, ids: list[uuid.UUID]
@@ -255,10 +254,12 @@ class EmbeddingRepository:
         """여러 청크를 한 번의 쿼리로 조회한다."""
         if not ids:
             return {}
-        result = await self.session.execute(
-            select(EmbeddingChunk).where(EmbeddingChunk.id.in_(ids))
-        )
-        return {c.id: c for c in result.scalars().all()}
+        return {
+            c.id: c
+            for c in (await self.session.exec(
+                select(EmbeddingChunk).where(EmbeddingChunk.id.in_(ids))
+            )).all()
+        }
 
     # --- 캐시 ---
 
@@ -419,7 +420,7 @@ class EmbeddingRepository:
         )
         if project_id:
             stmt = stmt.where(SemanticCache.project_id == project_id)
-        await self.session.execute(stmt)
+        await self.session.exec(stmt)
         await self.session.flush()
 
     async def commit(self) -> None:

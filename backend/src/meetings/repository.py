@@ -22,13 +22,12 @@ class MeetingRepository:
         self, meeting_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> Meeting | None:
         """헌법 I-9 (Codex F-1): meeting_id + workspace_id 동시 필터."""
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(Meeting).where(
                 Meeting.id == meeting_id,
                 Meeting.workspace_id == workspace_id,
             )
-        )
-        return result.scalar_one_or_none()
+        )).one_or_none()
 
     async def find_by_workspace(
         self,
@@ -44,8 +43,7 @@ class MeetingRepository:
                 MeetingProjectLink.meeting_id == Meeting.id,
             ).where(MeetingProjectLink.project_id == project_id)
         stmt = stmt.order_by(Meeting.created_at.desc()).offset(offset).limit(limit)
-        result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        return list((await self.session.exec(stmt)).all())
 
     async def count_by_workspace(
         self,
@@ -62,8 +60,7 @@ class MeetingRepository:
                 MeetingProjectLink,
                 MeetingProjectLink.meeting_id == Meeting.id,
             ).where(MeetingProjectLink.project_id == project_id)
-        result = await self.session.execute(stmt)
-        return result.scalar_one()
+        return (await self.session.exec(stmt)).one()
 
     async def update_status(
         self,
@@ -137,7 +134,7 @@ class MeetingRepository:
         self, meeting_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> list[TranscriptSegment]:
         """헌법 I-9: Meeting join 으로 workspace 격리 검증."""
-        result = await self.session.execute(
+        return list((await self.session.exec(
             select(TranscriptSegment)
             .join(Meeting, TranscriptSegment.meeting_id == Meeting.id)
             .where(
@@ -145,22 +142,20 @@ class MeetingRepository:
                 Meeting.workspace_id == workspace_id,
             )
             .order_by(TranscriptSegment.start_sec)
-        )
-        return list(result.scalars().all())
+        )).all())
 
     async def get_summary(
         self, meeting_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> MeetingSummary | None:
         """헌법 I-9: Meeting join 으로 workspace 격리 검증."""
-        result = await self.session.execute(
+        return (await self.session.exec(
             select(MeetingSummary)
             .join(Meeting, MeetingSummary.meeting_id == Meeting.id)
             .where(
                 MeetingSummary.meeting_id == meeting_id,
                 Meeting.workspace_id == workspace_id,
             )
-        )
-        return result.scalar_one_or_none()
+        )).one_or_none()
 
     async def commit(self) -> None:
         await self.session.commit()
