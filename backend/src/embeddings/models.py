@@ -3,8 +3,7 @@
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import JSON, Column, Text
-from sqlmodel import Field, SQLModel
+from sqlmodel import JSON, Column, Field, SQLModel, Text
 
 try:
     # Sprint 16 ADR-020: Vector(fp32, 4B) → Halfvec(fp16, 2B) — 저장 50% 절감 (I-20)

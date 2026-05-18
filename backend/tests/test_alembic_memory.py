@@ -5,7 +5,7 @@ conftest.SQLModel.metadata.create_all 로 테이블이 생성되므로
 information_schema 조회로 컬럼/테이블 존재 여부를 확인한다.
 """
 import pytest
-from sqlalchemy import text
+from sqlmodel import text
 
 
 @pytest.mark.asyncio

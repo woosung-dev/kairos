@@ -12,9 +12,8 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, Text
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlmodel import Field, SQLModel
+from sqlalchemy.dialects.postgresql import JSONB  # PostgreSQL dialect 전용 (SQLModel 미 re-export)
+from sqlmodel import Column, Field, SQLModel, Text
 
 try:
     # Sprint 16 ADR-020: Vector → HALFVEC (fp16, 4B→2B). MemoryQueryEmbeddingCache 정합.

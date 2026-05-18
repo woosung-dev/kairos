@@ -16,7 +16,7 @@ conftest.integration_session은 SQLModel.metadata.create_all 기반. alembic upg
 import uuid
 
 import pytest
-from sqlalchemy import text
+from sqlmodel import text
 
 from src.embeddings.models import EmbeddingChunk, SemanticCache
 from src.embeddings.repository import (

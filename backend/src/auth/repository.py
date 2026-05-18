@@ -2,8 +2,8 @@
 """User Repository — AsyncSession 유일 보유자."""
 import uuid
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
 from src.auth.models import User
 

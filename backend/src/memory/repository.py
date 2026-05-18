@@ -9,8 +9,8 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import bindparam, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import bindparam, select, text, update
 
 from src.memory.models import (
     MemoryAICall,
@@ -97,7 +97,7 @@ class MemoryRepository:
 
     async def get_metrics_counts(self, workspace_id: uuid.UUID) -> dict[str, int]:
         """C7 — memory_events 기반 capture/recall/promote count."""
-        from sqlalchemy import func
+        from sqlmodel import func
         stmt = (
             select(MemoryEvent.event_type, func.count(MemoryEvent.id))
             .where(MemoryEvent.workspace_id == workspace_id)

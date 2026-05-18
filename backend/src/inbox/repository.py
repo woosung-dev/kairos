@@ -2,8 +2,8 @@
 """Inbox Repository — AsyncSession 유일 보유자."""
 import uuid
 
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import func, select
 
 from src.inbox.models import InboxItem
 

@@ -19,9 +19,8 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, text
 from testcontainers.postgres import PostgresContainer
 
 # 모든 model 을 metadata 에 등록

@@ -11,9 +11,8 @@ personal_ws / team_ws / seed_memory 는 R2 이후 (Workspace.type 컬럼 + memor
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, text
 from testcontainers.postgres import PostgresContainer
 
 # SQLModel.metadata.create_all 이전에 모든 테이블 모델을 임포트해야 등록됨.

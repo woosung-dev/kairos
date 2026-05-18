@@ -81,7 +81,7 @@ async def get_current_user(
     UNIQUE partial index `uq_workspaces_owner_personal` (postgresql_where=`type='personal'`)는
     R2 migration에서 사전 생성됨.
     """
-    from sqlalchemy import text as _text
+    from sqlmodel import text as _text
 
     repo = UserRepository(session)
     user = await repo.find_by_clerk_id(claims["sub"])

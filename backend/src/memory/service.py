@@ -750,7 +750,7 @@ async def _bg_promote_embed(
 
     pending → processing → completed/failed 흐름. session_factory로 별도 session.
     """
-    from sqlalchemy import update as _update
+    from sqlmodel import update as _update
 
     async with session_factory() as session:
         repo = MemoryRepository(session)
