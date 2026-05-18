@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     # Cron (Sprint 15 R-CRON — R2 30일 cleanup endpoint 인증)
     cron_secret_token: SecretStr = SecretStr("dev-cron-secret-CHANGE-ME-IN-PROD")
 
+    # Sentry (Sprint 22 Task 7 — Observability)
+    sentry_dsn: SecretStr | None = None
+    sentry_traces_sample_rate: float = 0.1
+    environment: str = "development"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

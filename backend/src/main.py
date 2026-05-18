@@ -1,9 +1,11 @@
 import logging
 
+import sentry_sdk
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import text
 
@@ -34,6 +36,30 @@ logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
+
+
+def _scrub_pii_hook(event, hint):
+    """Sentry before_send PII 스크럽 — transcript / email / password / audio_url 제거."""
+    request = event.get("request")
+    if request and isinstance(request.get("data"), dict):
+        for field in ("transcript", "email", "password", "audio_url"):
+            request["data"].pop(field, None)
+    if event.get("user"):
+        event["user"].pop("email", None)
+        event["user"].pop("ip_address", None)
+    return event
+
+
+# Sentry 초기화 (DSN 설정 시에만 활성. dev 환경 기본 비활성)
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn.get_secret_value(),
+        integrations=[FastApiIntegration()],
+        send_default_pii=False,
+        before_send=_scrub_pii_hook,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        environment=settings.environment,
+    )
 
 # 허용 Origin 목록 (쉼표 구분 문자열에서 파싱)
 ALLOWED_ORIGINS = [o.strip() for o in settings.cors_origins.split(",")]
