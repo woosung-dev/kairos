@@ -16,6 +16,14 @@ class ActionItem(SQLModel, table=True):
             ["projects.workspace_id", "projects.id"],
             name="fk_action_items_project_workspace",
         ),
+        # Sprint 21 BL-050 Simple 4: cross-workspace meeting_id insert 차단.
+        # meetings(id, workspace_id) UNIQUE 는 PR #2 e5f6g7h8i9ja 에서 신설됨.
+        # nullable FK → MATCH SIMPLE NULL row 면제.
+        ForeignKeyConstraint(
+            ["workspace_id", "meeting_id"],
+            ["meetings.workspace_id", "meetings.id"],
+            name="fk_action_items_meeting_workspace",
+        ),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
