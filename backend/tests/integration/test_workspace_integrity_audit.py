@@ -112,10 +112,7 @@ async def test_project_members_project_workspace_match(
 async def test_action_items_meeting_workspace_match(
     integration_session: AsyncSession,
 ):
-    """action_items.meeting_id 가 다른 workspace 의 meeting 을 가리키지 않는다.
-
-    BL-050 Simple 4 — composite FK 신설 직전 mismatch 0 확인용 baseline audit.
-    """
+    """action_items.meeting_id 가 다른 workspace 의 meeting 을 가리키지 않는다."""
     result = await integration_session.execute(text("""
         SELECT a.id, a.workspace_id AS a_ws, m.workspace_id AS m_ws
         FROM action_items a
