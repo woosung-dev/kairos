@@ -4,10 +4,12 @@ import { useProjects } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { ProjectCard } from "./project-card";
 import { EmptyState } from "@/components/empty-state";
+import { useOnboarding } from "@/features/onboarding/hooks";
 
 export function ProjectList() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const { data, isLoading, error } = useProjects(activeWorkspaceId ?? undefined);
+  const { data: onboarding } = useOnboarding();
 
   if (isLoading) {
     return (
@@ -38,6 +40,8 @@ export function ProjectList() {
         title="프로젝트가 없습니다"
         description="첫 번째 프로젝트를 만들어 콘텐츠를 정리하세요"
         action={{ label: "프로젝트 만들기", href: "/new" }}
+        onboardingStep={onboarding?.step}
+        context="projects"
       />
     );
   }
