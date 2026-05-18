@@ -34,10 +34,15 @@ class OnboardingService:
         )
         row = result.first()
         if row is None:
-            return OnboardingResponse(step=0, onboarded_at=None, is_completed=False)
+            return OnboardingResponse.model_validate(
+                {"step": 0, "totalSteps": 4, "onboardedAt": None, "isCompleted": False}
+            )
         step = int(row[0])
-        return OnboardingResponse(
-            step=step,
-            onboarded_at=row[1],
-            is_completed=(step >= 4),
+        return OnboardingResponse.model_validate(
+            {
+                "step": step,
+                "totalSteps": 4,
+                "onboardedAt": row[1],
+                "isCompleted": step >= 4,
+            }
         )

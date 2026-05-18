@@ -213,6 +213,9 @@ class MeetingPipelineService:
                      "start_sec": seg.start_sec, "end_sec": seg.end_sec}
                     for seg in segments
                 ]
+                if meeting is None:
+                    logger.error("Meeting %s not found after transcription, skipping analyze", meeting_id)
+                    return
                 await self._analyze_and_store(
                     meeting=meeting,
                     workspace_id=workspace_id,
