@@ -3,8 +3,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import ForeignKeyConstraint
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, ForeignKeyConstraint, SQLModel
 
 
 class ActionItem(SQLModel, table=True):

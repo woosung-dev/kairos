@@ -3,8 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, ForeignKeyConstraint, UniqueConstraint
-from sqlmodel import Field, SQLModel
+from sqlmodel import JSON, Field, ForeignKeyConstraint, SQLModel, UniqueConstraint
 
 
 class Project(SQLModel, table=True):

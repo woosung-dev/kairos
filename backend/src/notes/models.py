@@ -3,8 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Column, ForeignKeyConstraint, Text
-from sqlmodel import Field, SQLModel
+from sqlmodel import JSON, Column, Field, ForeignKeyConstraint, SQLModel, Text
 
 
 class Note(SQLModel, table=True):

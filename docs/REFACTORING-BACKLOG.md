@@ -1363,3 +1363,25 @@ PR #1 audit 4 case (action_items.project_id / notes.project_id / mpl / project_m
 **우선순위**: ★☆☆☆☆ (P3 cleanup, runtime 영향 0 — 단 향후 신규 model 추가 시 alembic 누락 catch 약화)
 
 **근거**: Sprint 19 PR #2 D7.5b drift detection 도입 후 catch 한 기존 부채.
+
+---
+
+## BL-052 — 잔여 model 파일의 sqlalchemy → SQLModel import 통일 (codebase consistency)
+
+**도메인**: backend / SQLModel models
+
+**증상**: SQLModel 공식 문서는 `ForeignKeyConstraint`, `UniqueConstraint`, `Column`, `Text`, `JSON`, `Index`, `CheckConstraint`, `ForeignKey` 등 SQLAlchemy 객체를 직접 re-export 하여 `from sqlmodel import ...` 만으로 import 권장. 그러나 본 codebase 의 기존 model 파일들은 `from sqlalchemy import JSON, Column, Text` 패턴 사용.
+
+Sprint 19 PR #2 (D9 commit) 가 본 PR scope 4 model (projects/notes/actions/meetings) 의 import 를 SQLModel 로 통일. **잔여 3 model 파일은 carry-over**:
+- `backend/src/embeddings/models.py` — `from sqlalchemy import JSON, Column, Text`
+- `backend/src/inbox/models.py` — `from sqlalchemy import JSON`
+- `backend/src/memory/models.py` — `from sqlalchemy import Column, Text` (+ `from sqlalchemy.dialects.postgresql import JSONB` — dialect-specific, sqlmodel 미 re-export → 그대로 유지)
+
+**해결 방향**:
+1. 위 3 파일의 `from sqlalchemy import {JSON,Column,Text}` 를 `from sqlmodel import ...` 로 통일
+2. `JSONB` (PostgreSQL-specific) 와 `select / delete / update / text / func / and_ / or_ / exists / bindparam / AsyncSession / async_sessionmaker / create_async_engine` 등은 SQLModel 미 re-export → sqlalchemy 그대로 유지
+3. 단순 cleanup — runtime 영향 0, import path 일관성만
+
+**우선순위**: ★☆☆☆☆ (P3 cleanup, runtime 영향 0)
+
+**근거**: Sprint 19 PR #2 사용자 피드백 (2026-05-18) — "SQLModel 공식 문서 권장 패턴 우선".
