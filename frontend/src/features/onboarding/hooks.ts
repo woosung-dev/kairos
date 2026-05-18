@@ -30,5 +30,12 @@ export function useOnboarding() {
     },
     enabled: !!workspaceId,
     staleTime: 30_000,
+    // Sprint 22 (CI fragility fix): retry/refetch 비활성화 — error 시 banner 만 hidden,
+    // page render 영향 0. CI 의 networkidle wait 못 도달 시 home/mobile-responsive heading
+    // 검증 timeout fix.
+    retry: false,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
