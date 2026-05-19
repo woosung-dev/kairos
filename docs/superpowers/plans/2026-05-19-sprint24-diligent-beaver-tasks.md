@@ -377,8 +377,8 @@ async def clone_action_items_for_promote(
     Returns: 실 복제 row count (audit.action_item_count 로 set).
     """
     # 1. source ActionItem rows fetch (workspace + meeting 격리)
-    from backend.src.actions.models import ActionItem  # 순환 import 회피, 함수 내 import
-    from backend.src.workspaces.models import WorkspaceMember
+    from src.actions.models import ActionItem  # 순환 import 회피, 함수 내 import
+    from src.workspaces.models import WorkspaceMember
 
     source_result = await session.exec(
         select(ActionItem).where(ActionItem.meeting_id == source_meeting_id)
@@ -459,7 +459,7 @@ await self.repo.session.flush()
 
 ```python
 # 파일 상단
-from backend.src.common.promote_helpers import (
+from src.common.promote_helpers import (
     build_item_promotion_audit,
     clone_action_items_for_promote,  # NEW Sprint 24
     validate_promote_target,
@@ -558,12 +558,12 @@ async def test_promote_note_chunk_zero_plain_text_schedules_embed(
     async def fake_embed(self, note_id, ws_id):  # instance method signature (self 첫번째)
         bg_calls.append((note_id, ws_id))
     monkeypatch.setattr(
-        "backend.src.notes.pipeline_service.NotePipelineService.embed_note_async",
+        "src.notes.pipeline_service.NotePipelineService.embed_note_async",
         fake_embed,
     )
 
     bg_tasks = BackgroundTasks()
-    response = await notes_service.promote_note(
+    response = await notes_service.promote(
         note_id=sample_note_chunk_zero_with_plain_text.id,
         source_workspace_id=sample_note_chunk_zero_with_plain_text.workspace_id,
         target_workspace_id=target_workspace.id,
@@ -595,7 +595,7 @@ async def test_promote_note_chunk_n_lifecycle_pending(
     promoter_user,
 ):
     """BL-064: chunk N>0 일 때도 audit.embedding_status="pending" 초기값 정합."""
-    response = await notes_service.promote_note(
+    response = await notes_service.promote(
         note_id=sample_note_chunk_3_with_plain_text.id,
         source_workspace_id=sample_note_chunk_3_with_plain_text.workspace_id,
         target_workspace_id=target_workspace.id,
@@ -614,7 +614,7 @@ async def test_promote_note_no_plain_text_no_chunk_rejected(
 ):
     """BL-064: plain_text 부재 + chunk 0 → 400 회귀 가드 (Sprint 23 6차 P2)."""
     with pytest.raises(NotePromoteNotEmbeddedError):
-        await notes_service.promote_note(
+        await notes_service.promote(
             note_id=sample_note_empty.id,
             source_workspace_id=sample_note_empty.workspace_id,
             target_workspace_id=target_workspace.id,
@@ -630,9 +630,14 @@ uv run pytest tests/notes/test_note_promote.py -k "chunk_zero_plain_text or chun
 # expected: 3 FAIL
 ```
 
-### Step 3.3: `promote_note` chunk 0 + plain_text 분기 보강
+### Step 3.3: `NoteService.promote` chunk 0 + plain_text 분기 보강
 
-- [ ] `backend/src/notes/service.py` 의 line 270 영역 수정
+> **Codex 2차 정정**:
+> - service method = `NoteService.promote()` (line 221, NOT `promote_note`). router function 이름만 `promote_note`.
+> - **P1 audit lifecycle wrapper 필수**: `pipeline.embed_note_async` 만 호출 시 audit `embedding_status` 가 `pending → completed/failed` 전환 안 됨. Sprint 23 D4 `_replicate_chunks_async` 패턴 정합으로 `_regenerate_embed_with_audit_async(audit_id, note_id, workspace_id)` wrapper BG task 신설.
+> - `PromoteNoteResponse` schema = snake_case 보존 (`new_note_id` / `audit_id`) — 기존 modal 의 `NEW_ID_KEY` + `response.audit_id` 직접 read 호환성 유지.
+
+- [ ] `backend/src/notes/service.py` 의 line 270 영역 수정 — `NotePromoteNotEmbeddedError` 분기
 
 ```python
 # Sprint 24 Task 3 (BL-064): chunk 0 + plain_text 분기 보강.
@@ -650,10 +655,10 @@ needs_embed_regenerate = not existing_chunks  # True: chunk 0 + plain_text 존�
 - [ ] **service signature 변경** — `pipeline: NotePipelineService` DI 추가 (Codex 1차 P2-3 fix)
 
 ```python
-# Sprint 24 Task 3 (BL-064): promote_note signature 에 pipeline 추가.
+# Sprint 24 Task 3 (BL-064): promote() signature 에 pipeline 추가.
 # Codex 1차 P2-3 fix: embed_note_async = NotePipelineService instance method
 # (module-level function 부재). pipeline DI 로 호출.
-async def promote_note(
+async def promote(
     self,
     note_id: uuid.UUID,
     source_workspace_id: uuid.UUID,
@@ -661,22 +666,84 @@ async def promote_note(
     promoted_by_user_id: uuid.UUID,
     background_tasks: BackgroundTasks,
     pipeline: "NotePipelineService",  # NEW Sprint 24 (TYPE_CHECKING import 회피 quote)
-) -> PromoteNoteResponse:
+) -> PromoteNoteOut:
     ...
 ```
 
-- [ ] BG task schedule 분기 추가 (line 305 영역 — 기존 source chunk 복제 BG 옆)
+- [ ] **`_regenerate_embed_with_audit_async` wrapper BG task 신설 (Codex 2차 P1 fix)**
+
+`NotePipelineService.embed_note_async` 만 호출 시 audit row 의 `embedding_status` 가 `pending` 그대로 stuck. polling endpoint 가 영원히 pending 반환 — BL-064 핵심 기능 무력. wrapper BG task 가 audit lifecycle 책임.
 
 ```python
-# Sprint 24 Task 3 (BL-064): chunk 0 분기에서 pipeline.embed_note_async 신규 schedule.
-# 기존 chunk 복제 BG (Sprint 23 D4): source EmbeddingChunk → target 복제 + audit completed.
-# 신규 chunk 0 분기: pipeline.embed_note_async 가 plain_text 로부터 신규 embedding 생성.
-# Codex 1차 P2-3 fix: NotePipelineService instance method 활용 (모듈 함수 X).
+# Sprint 24 Task 3 (BL-064): chunk 0 분기 audit lifecycle wrapper.
+# Codex 2차 P1 fix: pipeline.embed_note_async 만 호출 시 audit pending stuck.
+# Sprint 23 D4 _replicate_chunks_async 패턴 정합.
+async def _regenerate_embed_with_audit_async(
+    self,
+    audit_id: uuid.UUID,
+    note_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+) -> None:
+    """chunk 0 + plain_text note 의 BG embedding 생성 + audit lifecycle 갱신.
+
+    동작:
+    1. audit.embedding_status = "processing" mark
+    2. pipeline.embed_note_async(note_id, workspace_id) 호출
+    3. 성공: audit.embedding_status = "completed"
+    4. 예외: rollback + audit.embedding_status = "failed"
+
+    parent SAVEPOINT 외부 (별도 BG session_factory) — Sprint 23 D4 같은 패턴.
+    """
+    from src.common.promote_models import ItemPromotionAudit  # 순환 import 회피
+    from sqlmodel import update as _update
+
+    async with self.session_factory() as session:
+        try:
+            # 1. processing mark
+            await session.exec(
+                _update(ItemPromotionAudit)
+                .where(ItemPromotionAudit.id == audit_id)
+                .values(embedding_status="processing")
+            )
+            await session.commit()
+
+            # 2. 신규 embedding 생성 (NotePipelineService instance method)
+            await self.pipeline.embed_note_async(note_id, workspace_id)
+
+            # 3. completed mark
+            await session.exec(
+                _update(ItemPromotionAudit)
+                .where(ItemPromotionAudit.id == audit_id)
+                .values(embedding_status="completed")
+            )
+            await session.commit()
+        except Exception as exc:  # noqa: BLE001
+            # 4. failed mark (Sprint 23 D4 Codex 4차 P2-2 패턴 — rollback 먼저)
+            await session.rollback()
+            await session.exec(
+                _update(ItemPromotionAudit)
+                .where(ItemPromotionAudit.id == audit_id)
+                .values(embedding_status="failed")
+            )
+            await session.commit()
+            raise
+```
+
+> wrapper 가 `self.pipeline` 을 사용하려면 `NoteService.__init__` 의 `pipeline` 의존성 추가 필요. 또는 wrapper signature 에 `pipeline` 인자 추가. **선택**: signature 에 인자로 받음 (NoteService init 변경 최소화).
+
+> 다만 `NoteService.session_factory` 는 Sprint 23 D4 에서 이미 의존성 추가됨 → 그대로 활용.
+
+- [ ] BG task schedule 분기 추가 — chunk 0 vs chunk N 차이
+
+```python
+# Sprint 24 Task 3 (BL-064): chunk 0 분기는 wrapper BG task,
+# chunk N 분기는 기존 _replicate_chunks_async (Sprint 23 D4) 그대로.
 if needs_embed_regenerate:
     background_tasks.add_task(
-        pipeline.embed_note_async, new_note.id, target_workspace_id
+        self._regenerate_embed_with_audit_async,
+        audit.id, new_note.id, target_workspace_id,
     )
-    # audit row 의 embedding_status="pending" 그대로 (기존 lifecycle 활용)
+    # audit.embedding_status 가 wrapper 안에서 pending → processing → completed/failed 전환
 else:
     background_tasks.add_task(
         self._replicate_chunks_async, source.id, source_workspace_id,
@@ -684,7 +751,9 @@ else:
     )
 ```
 
-- [ ] router.py 에서 pipeline DI 주입 (이미 다른 endpoint 가 동일 패턴 사용 중인지 verify)
+또는 `_regenerate_embed_with_audit_async` 가 pipeline 을 인자로 받는 free function 형태도 가능. 다만 instance method 가 self.session_factory 활용에 더 자연스러움. 결정: instance method + `_regenerate_embed_with_audit_async(self, audit_id, note_id, workspace_id, pipeline)` signature (pipeline 인자 외부 주입).
+
+- [ ] router.py 에서 pipeline DI 주입
 
 ```python
 # backend/src/notes/router.py 의 promote_note endpoint
@@ -698,7 +767,7 @@ async def promote_note(
     service: NoteService = Depends(get_note_service),
     pipeline: NotePipelineService = Depends(get_note_pipeline_service),  # NEW
 ):
-    return await service.promote_note(
+    return await service.promote(  # NOTE: service method = promote (NOT promote_note)
         note_id=note_id,
         source_workspace_id=workspace_id,
         target_workspace_id=body.target_workspace_id,
@@ -708,9 +777,11 @@ async def promote_note(
     )
 ```
 
-### Step 3.4: `PromoteNoteResponse.embedding_status` 필드 + `EmbeddingStatusOut` 추가
+### Step 3.4: `PromoteNoteOut.embedding_status` 필드 + `EmbeddingStatusOut` 추가
 
-- [ ] `backend/src/notes/schemas.py`
+> **Codex 2차 P2-3 정정**: 기존 ItemPromoteModal 이 `response.new_note_id` / `response.audit_id` 를 **snake_case 직접 read** (`NEW_ID_KEY[itemType] = "new_note_id"` + `response.audit_id`). alias_generator / Field alias 추가 시 `newNoteId` / `auditId` 응답으로 modal 가 ID 못 찾음. **snake_case 보존 + alias 추가 안 함**.
+
+- [ ] `backend/src/notes/schemas.py` 의 기존 `PromoteNoteOut` (또는 `MeetingPromoteOut` 와 동급) 에 필드 추가
 
 ```python
 from typing import Literal
@@ -718,33 +789,31 @@ from typing import Literal
 EmbeddingStatusValue = Literal["pending", "processing", "completed", "failed", "n/a"]
 
 
-class PromoteNoteResponse(BaseModel):
+# 기존 schema 명칭 확인 후 정합 (memory/meeting/note 도메인 *PromoteOut 동급 명칭)
+# Sprint 23 D4 의 PromoteNoteOut snake_case 응답 유지 — modal 호환성.
+class PromoteNoteOut(BaseModel):
     """POST /notes/{id}/promote 응답 — 복제본 + audit 식별자.
 
     Sprint 24 BL-064: embedding_status 필드 추가 — audit raw value 그대로 노출.
+    snake_case 보존 (Sprint 23 D4 D-1 정합) — frontend ItemPromoteModal 의
+    NEW_ID_KEY[itemType] = "new_note_id" + response.audit_id 직접 read 호환성.
     """
-    new_note_id: uuid.UUID = Field(alias="newNoteId")
-    audit_id: uuid.UUID = Field(alias="auditId")
-    embedding_status: EmbeddingStatusValue = Field(
-        alias="embeddingStatus",
-        description=(
-            "ItemPromotionAudit.embedding_status raw value. "
-            "pending → BG schedule 직후. processing → BG task 진행 중. "
-            "completed → 임베딩 완료. failed → BG 실패. n/a → ledger 부재 도메인."
-        ),
-    )
+    new_note_id: uuid.UUID  # snake_case 보존 (alias 추가 X)
+    audit_id: uuid.UUID
+    embedding_status: EmbeddingStatusValue  # snake_case 보존, modal 가 read
 
-    class Config:
-        populate_by_name = True
+    # Codex 2차 P2-3: alias 추가 안 함, populate_by_name 도 추가 안 함 (기본값 유지).
 
 
 class EmbeddingStatusOut(BaseModel):
-    """GET /notes/{id}/embedding-status 응답 (Sprint 24 BL-064)."""
+    """GET /notes/{id}/embedding-status 응답 (Sprint 24 BL-064 NEW endpoint).
+
+    NEW endpoint 이므로 camelCase alias OK (FE 가 신규로 read 하는 schema).
+    """
     status: EmbeddingStatusValue
     chunk_count: int = Field(alias="chunkCount")
 
-    class Config:
-        populate_by_name = True
+    model_config = {"populate_by_name": True}
 ```
 
 ### Step 3.5: `GET embedding-status` endpoint 추가
@@ -806,7 +875,7 @@ async def test_embed_note_async_idempotent_when_already_embedded(
     sample_note_chunk_5,  # fixture: chunk count 5 (이미 임베딩 완료)
 ):
     """BL-064: target note 가 이미 embed 되어 있으면 early return (멱등)."""
-    from backend.src.embeddings.service import embed_note_async
+    from src.embeddings.service import embed_note_async
     # before count
     before_count = await count_chunks(sample_note_chunk_5.id, integration_session)
     await embed_note_async(sample_note_chunk_5.id, sample_note_chunk_5.workspace_id)
@@ -856,12 +925,13 @@ uv run pytest tests/ -q
 # 정확히는: 379 baseline + 3 (BL-063) + 3 (BL-064 note_promote) + 2 (embedding_regenerate) - 2 (note_promote_no_plain_text 의 새 case 가 기존 case 통합) = 385
 ```
 
-### Step 3.9: FE client `getEmbeddingStatus` 추가
+### Step 3.9: FE client `getEmbeddingStatus` 추가 (Codex 2차 P2-4 정정)
 
-- [ ] `frontend/src/features/notes/api.ts`
+- [ ] `frontend/src/features/notes/api.ts` — 기존 `fetchNote` 등의 패턴 정합 (`apiClient<T>(path, {token})` + Clerk token)
 
 ```typescript
 // Sprint 24 BL-064 — promoted note 의 embedding 상태 polling client.
+// Codex 2차 P2-4 fix: api.get 부재. 기존 fetchNote 등의 apiClient<T>(path, {token}) 패턴 정합.
 export type EmbeddingStatus = "pending" | "processing" | "completed" | "failed" | "n/a";
 
 export interface EmbeddingStatusOut {
@@ -870,30 +940,50 @@ export interface EmbeddingStatusOut {
 }
 
 export async function getEmbeddingStatus(
+  token: string,
   workspaceId: string,
   noteId: string,
 ): Promise<EmbeddingStatusOut> {
-  const res = await api.get<EmbeddingStatusOut>(
+  return apiClient<EmbeddingStatusOut>(
     `/workspaces/${workspaceId}/notes/${noteId}/embedding-status`,
+    { token },
   );
-  return res.data;
 }
 ```
 
-### Step 3.10: FE `ItemPromoteModal` polling 분기
+### Step 3.10: FE `ItemPromoteModal` polling 분기 (Codex 2차 P2-3 정정)
 
-- [ ] `frontend/src/components/shared/ItemPromoteModal.tsx` 의 success callback 보강
+> **snake_case 보존**: 기존 modal 가 `NEW_ID_KEY[itemType] = "new_note_id"` + `response.audit_id` snake_case 직접 read. BE 응답도 alias 없이 snake_case 그대로. 본 patch 도 동일하게 `response.embedding_status` snake_case read.
+
+- [ ] `frontend/src/components/shared/ItemPromoteModal.tsx` 의 mutation success 콜백 보강
+
+기존 modal 의 mutation onSuccess 흐름에 itemType==="note" 분기 추가. 기존 props (`open` / `onOpenChange` / `itemType` / `itemId` / `sourceWorkspaceId` / `onSuccess`) 보존.
 
 ```typescript
-// Sprint 24 BL-064 — note promote success 시 embeddingStatus pending/processing → polling
-const handlePromoteSuccess = async (response: PromoteResponse) => {
-  if (response.embeddingStatus === "completed" || response.embeddingStatus === "n/a") {
+// Sprint 24 BL-064 — note promote 응답 의 embedding_status pending/processing 시 polling 추가.
+// snake_case 보존 — BE 응답 alias 없음 (Codex 2차 P2-3).
+// 기존 modal 의 onSuccess(newId, auditId) 흐름은 유지. note 한정 polling 흐름만 추가.
+
+import { useAuth } from "@clerk/nextjs";
+import { getEmbeddingStatus, type EmbeddingStatus } from "@/features/notes/api";
+
+// mutation 의 onSuccess 콜백 안에서:
+const { getToken } = useAuth();
+
+const handleNotePromoteSuccess = async (
+  response: { new_note_id: string; audit_id: string; embedding_status: EmbeddingStatus },
+  targetWorkspaceId: string,
+) => {
+  // ready / n/a: 즉시 완료 toast
+  if (response.embedding_status === "completed" || response.embedding_status === "n/a") {
     toast.success("Promote 완료");
-    onClose();
+    onOpenChange(false);
+    onSuccess?.(response.new_note_id, response.audit_id);
     return;
   }
 
-  if (response.embeddingStatus === "pending" || response.embeddingStatus === "processing") {
+  // pending / processing: polling 시작 (5s × 3회 maxAttempts)
+  if (response.embedding_status === "pending" || response.embedding_status === "processing") {
     const toastId = toast.loading("Promote 완료 (임베딩 재생성 중)");
     let attempts = 0;
     const maxAttempts = 3;
@@ -901,19 +991,22 @@ const handlePromoteSuccess = async (response: PromoteResponse) => {
     const intervalId = setInterval(async () => {
       attempts += 1;
       try {
-        const status = await getEmbeddingStatus(response.workspaceId, response.newNoteId);
+        const token = (await getToken()) ?? "";
+        const status = await getEmbeddingStatus(token, targetWorkspaceId, response.new_note_id);
         if (status.status === "completed") {
           clearInterval(intervalId);
           toast.success("임베딩 재생성 완료", { id: toastId });
-          onClose();
+          onOpenChange(false);
+          onSuccess?.(response.new_note_id, response.audit_id);
         } else if (status.status === "failed") {
           clearInterval(intervalId);
           toast.error("임베딩 재생성 실패", { id: toastId });
-          onClose();
+          onOpenChange(false);
         } else if (attempts >= maxAttempts) {
           clearInterval(intervalId);
           toast("재생성 진행 중, 잠시 후 확인", { id: toastId });
-          onClose();
+          onOpenChange(false);
+          onSuccess?.(response.new_note_id, response.audit_id);
         }
       } catch (e) {
         clearInterval(intervalId);
@@ -923,11 +1016,13 @@ const handlePromoteSuccess = async (response: PromoteResponse) => {
     return;
   }
 
-  // failed/n/a 즉시
+  // failed: 즉시 (BG 호출 직후 부정 status — 본 sprint 범위에서는 발생 안 함)
   toast.error("Promote 후 임베딩 상태 이상");
-  onClose();
+  onOpenChange(false);
 };
 ```
+
+기존 mutation 의 onSuccess 콜백 in itemType === "note" 분기에서 위 helper 호출. 다른 itemType (memory/meeting/inbox/action) 은 기존 동작 유지.
 
 ### Step 3.11: FE vitest 1 신규
 
@@ -946,35 +1041,56 @@ describe("ItemPromoteModal — Sprint 24 BL-064 polling", () => {
     vi.useFakeTimers();
   });
 
-  it("pending status triggers polling and updates on completed", async () => {
+  // Codex 2차 P2-5 정정: 기존 dispatch test harness 패턴 + mocked fetch + 정확한 props.
+  // ItemPromoteModal 실 props: itemType / itemId / sourceWorkspaceId / open / onOpenChange / onSuccess.
+  // promote 응답은 mocked fetch 로 endpoint 가 반환 — modal 내부에서 fetch.
+  it("note promote pending status triggers polling endpoint", async () => {
+    // 1. promote POST 응답 mock (snake_case 보존)
+    const fetchMock = vi.spyOn(global, "fetch").mockImplementation(async (url) => {
+      const u = String(url);
+      if (u.includes("/notes/") && u.endsWith("/promote")) {
+        return new Response(JSON.stringify({
+          new_note_id: "note-uuid",
+          audit_id: "audit-uuid",
+          embedding_status: "pending",
+        }), { status: 200 });
+      }
+      // workspaces fetch (modal 내부 useWorkspaces)
+      return new Response(JSON.stringify([
+        { id: "ws-target", name: "Target", type: "team" }
+      ]), { status: 200 });
+    });
+
+    // 2. getEmbeddingStatus polling mock — processing → completed transition
     const getStatusMock = vi.spyOn(notesApi, "getEmbeddingStatus")
       .mockResolvedValueOnce({ status: "processing", chunkCount: 0 })
       .mockResolvedValueOnce({ status: "completed", chunkCount: 4 });
 
-    // promote API 가 pending 응답 시뮬레이션
-    const promoteResponse = {
-      newNoteId: "note-uuid",
-      auditId: "audit-uuid",
-      embeddingStatus: "pending" as const,
-      workspaceId: "ws-uuid",
-    };
-
-    const { getByText } = render(
+    const handleOpenChange = vi.fn();
+    render(
       <ItemPromoteModal
-        isOpen
         itemType="note"
-        promoteResponse={promoteResponse}
-        onClose={vi.fn()}
+        itemId="note-source-uuid"
+        sourceWorkspaceId="ws-source"
+        open
+        onOpenChange={handleOpenChange}
       />
     );
 
-    // 5s tick → polling 1st call
+    // 3. target workspace 선택 + Submit 클릭 → promote fetch trigger
+    // (기존 dispatch test harness 의 selectWorkspace + clickSubmit 흐름 활용)
+    // ... [기존 test harness 의 helper 함수 호출 — 자세한 건 기존 *.test.tsx 패턴 참조] ...
+
+    // 4. polling 호출 verify
     vi.advanceTimersByTime(5000);
     await waitFor(() => expect(getStatusMock).toHaveBeenCalledTimes(1));
 
-    // 10s tick → polling 2nd call → completed
+    // 5. 2번째 polling → completed → modal close
     vi.advanceTimersByTime(5000);
     await waitFor(() => expect(getStatusMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(handleOpenChange).toHaveBeenCalledWith(false));
+
+    fetchMock.mockRestore();
   });
 });
 ```

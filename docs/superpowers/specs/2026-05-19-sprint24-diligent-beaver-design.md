@@ -79,10 +79,14 @@ Sprint 23 D4 promote sprint (`d659c03`) 가 4 도메인 (meetings/notes/inbox/ac
    ├─ source.plain_text 존재 + chunk N>0 → promote OK + embedding_status="ready"
    └─ source.plain_text 존재 + chunk 0   → promote OK
           ↓ target note 생성 (chunk 미복제, source EmbeddingChunk 복제 분기 skip)
-          ↓ BackgroundTasks.add_task(embed_note_async, target_note_id, target_ws_id)  ← chunk 0 분기 신규
           ↓ ItemPromotionAudit row 저장 (기존 `embedding_status` column, 초기값 "pending")
-          ↓ BG task lifecycle: "pending" → "processing" → "completed" / "failed"
-          ↓ response.embedding_status = audit raw value 그대로 (초기 "pending")
+          ↓ BackgroundTasks.add_task(self._regenerate_embed_with_audit_async,
+                                     audit.id, target_note_id, target_ws_id, pipeline)
+                                     ← Codex 2차 P1 fix: wrapper BG task (audit_id 받음).
+                                       기존 pipeline.embed_note_async 만 호출 시 audit
+                                       lifecycle 갱신 안 됨 — wrapper 가 책임.
+          ↓ wrapper 내부 lifecycle: "pending" → "processing" → "completed" / "failed"
+          ↓ response.embedding_status = audit raw value 그대로 (초기 "pending", snake_case 보존)
 
 [FE ItemPromoteModal success callback]
        ↓ response.embeddingStatus 분기 (camelCase, BE alias 정합)
@@ -140,14 +144,15 @@ Sprint 23 D4 promote sprint (`d659c03`) 가 4 도메인 (meetings/notes/inbox/ac
 
 | 파일 | 역할 | 변경 |
 |---|---|---|
-| `backend/src/notes/service.py` | `promote_note` 의 chunk 0 + plain_text 분기 → `embed_note_async` BG schedule (audit `embedding_status` 는 기존 "pending" 초기값 그대로) | MOD |
+| `backend/src/notes/service.py` | `NoteService.promote()` (snake_case, NOT promote_note — Codex 2차 P2-2 정정) 의 chunk 0 + plain_text 분기 → `_regenerate_embed_with_audit_async` wrapper BG task schedule (audit lifecycle 책임). + signature 에 `pipeline: NotePipelineService` DI 추가. | MOD |
+| `backend/src/notes/service.py` | `_regenerate_embed_with_audit_async(audit_id, note_id, workspace_id, pipeline)` wrapper BG task 신설 — Sprint 23 D4 `_replicate_chunks_async` 패턴 정합. audit `pending → processing → completed/failed` lifecycle (Codex 2차 P1 fix). | NEW method |
 | `backend/src/notes/router.py` | `GET /workspaces/{wid}/notes/{id}/embedding-status` (`require_viewer`) | NEW endpoint |
-| `backend/src/notes/schemas.py` | `PromoteNoteResponse.embedding_status: Literal["pending","processing","completed","failed","n/a"]` (audit raw values) + `EmbeddingStatusOut` | MOD |
+| `backend/src/notes/schemas.py` | `PromoteNoteOut.embedding_status: Literal["pending","processing","completed","failed","n/a"]` (snake_case 보존, alias 없음 — Codex 2차 P2-3: 기존 ItemPromoteModal 의 NEW_ID_KEY snake_case read 호환성) + `EmbeddingStatusOut` (NEW endpoint, chunkCount camelCase OK) | MOD |
 | `backend/src/common/promote_models.py` | 변경 없음 (기존 `embedding_status` column 활용) | — |
 | alembic | 변경 없음 (head `9dd1a3b80431` 유지) | — |
 | `backend/tests/notes/test_note_promote.py` | 4 → 7 case (3 신규: chunk 0+plain_text → embed_note_async schedule + audit pending / chunk N → 기존 흐름 정합 / plain_text 부재 → 400 회귀) | EXT |
 | `backend/tests/notes/test_embedding_regenerate.py` | embed_note_async idempotency + polling endpoint RBAC | NEW |
-| `frontend/src/features/notes/api.ts` | `getEmbeddingStatus(workspaceId, noteId)` client | NEW function |
+| `frontend/src/features/notes/api.ts` | `getEmbeddingStatus(token, workspaceId, noteId)` client — 기존 `apiClient<T>(path, {token})` 패턴 정합 (Codex 2차 P2-4 정정, Clerk token Authorization) | NEW function |
 | `frontend/src/components/shared/ItemPromoteModal.tsx` | embeddingStatus pending/processing 분기 + polling (Codex 1차 P2-4 정정) | MOD |
 | `frontend/src/components/shared/__tests__/ItemPromoteModal.test.tsx` | pending → polling → completed transition (기존 file 에 신규 case 추가) | MOD |
 | `backend/src/notes/CONTEXT.md` | §엔드포인트 patch (chunk 0 + plain_text 분기 추가 명시) | MOD |
