@@ -18,7 +18,8 @@ export function useInbox(wid: string | undefined, params?: FetchInboxParams) {
   const { getToken } = useAuth();
 
   return useQuery({
-    queryKey: inboxKeys.list(wid ?? ""),
+    // Sprint 23 D3 fix: queryKey 에 params 포함 → 각 callsite 의 의도 분리.
+    queryKey: inboxKeys.list(wid ?? "", params),
     queryFn: async () => {
       const token = await getToken();
       if (!token) throw new Error("인증이 필요합니다");
@@ -49,7 +50,8 @@ export function useClassifyInbox(wid: string | undefined) {
     },
     onSuccess: () => {
       if (wid) {
-        queryClient.invalidateQueries({ queryKey: inboxKeys.list(wid) });
+        // Sprint 23 D3 fix: byWorkspace prefix 로 모든 params 의 cache 일괄 무효화.
+        queryClient.invalidateQueries({ queryKey: inboxKeys.byWorkspace(wid) });
       }
       toast.success("프로젝트에 연결되었습니다");
     },
@@ -74,7 +76,8 @@ export function useDismissInbox(wid: string | undefined) {
     },
     onSuccess: () => {
       if (wid) {
-        queryClient.invalidateQueries({ queryKey: inboxKeys.list(wid) });
+        // Sprint 23 D3 fix: byWorkspace prefix 로 모든 params 의 cache 일괄 무효화.
+        queryClient.invalidateQueries({ queryKey: inboxKeys.byWorkspace(wid) });
       }
       toast("항목을 무시했습니다");
     },

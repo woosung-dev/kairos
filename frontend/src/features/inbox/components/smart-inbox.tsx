@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+// Sprint 23 D3 fix: 미처리 항목만 BE 에서 fetch (explicit params) + autoProcessed 그룹 제거.
+// 이전: useInbox(wid) 전체 fetch → autoProcessed (collapsed) 그룹에 dismissed 항목 표시 → 사용자 인지 혼란.
+// 이후: useInbox(wid, { isProcessed: false }) BE filter → 미처리만 list → 사용자 결정 명확.
 import { SmartInboxItemCard } from "./inbox-item-card";
 import { useInbox } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
@@ -38,11 +40,12 @@ function InboxSkeleton() {
 /* ── 컴포넌트 ── */
 
 export function SmartInbox() {
-  const [isAutoExpanded, setIsAutoExpanded] = useState(false);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
-  /* isProcessed 미지정 → 전체 목록 fetch 후 클라이언트 분기 */
-  const { data, isLoading, error } = useInbox(activeWorkspaceId ?? undefined);
+  /* Sprint 23 D3 fix: BE filter 위임 — 미처리 항목만 fetch. */
+  const { data, isLoading, error } = useInbox(activeWorkspaceId ?? undefined, {
+    isProcessed: false,
+  });
 
   /* 로딩 상태 */
   if (isLoading) {
@@ -88,14 +91,9 @@ export function SmartInbox() {
     );
   }
 
-  const items: InboxItem[] = data?.items ?? [];
-
-  /* isProcessed === false → 확인 필요, isProcessed === true → AI 자동 처리 */
-  const needsReview = items.filter((item) => !item.isProcessed);
-  const autoProcessed = items.filter((item) => item.isProcessed);
-
+  // Sprint 23 D3 fix: BE 가 미처리만 반환 → client filter 단순화.
+  const needsReview: InboxItem[] = data?.items ?? [];
   const needsReviewCount = needsReview.length;
-  const autoProcessedCount = autoProcessed.length;
 
   return (
     <div className="p-6">
@@ -141,53 +139,10 @@ export function SmartInbox() {
         </section>
       )}
 
-      {/* AI 자동 처리 그룹 */}
-      {autoProcessedCount > 0 && (
-        <section>
-          <button
-            onClick={() => setIsAutoExpanded(!isAutoExpanded)}
-            className="flex items-center gap-2 mb-3 w-full text-left"
-            style={{ cursor: "pointer", minHeight: "44px" }}
-          >
-            <span className="text-base">✅</span>
-            <h2
-              className="text-sm font-semibold"
-              style={{ color: "var(--success)", fontFamily: "var(--font-display)" }}
-            >
-              AI가 자동 처리한 항목
-            </h2>
-            <span
-              className="px-1.5 py-0.5 rounded-full text-[10px] font-medium"
-              style={{
-                background: "rgba(52,211,153,0.1)",
-                color: "var(--success)",
-              }}
-            >
-              {autoProcessedCount}건
-            </span>
-            <span
-              className="ml-auto text-xs transition-transform"
-              style={{
-                color: "var(--text-muted)",
-                transform: isAutoExpanded ? "rotate(180deg)" : "rotate(0deg)",
-              }}
-            >
-              ▼
-            </span>
-          </button>
+      {/* Sprint 23 D3 fix: autoProcessed 그룹 제거 (BE 가 미처리만 반환). */}
 
-          {isAutoExpanded && (
-            <div className="grid gap-3">
-              {autoProcessed.map((item) => (
-                <SmartInboxItemCard key={item.id} item={item} />
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* 모두 비어있을 때 */}
-      {needsReviewCount === 0 && autoProcessedCount === 0 && (
+      {/* 비어있을 때 (미처리 0건) */}
+      {needsReviewCount === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <span className="text-4xl mb-4">📥</span>
           <h3
