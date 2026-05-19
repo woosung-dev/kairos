@@ -123,6 +123,9 @@ export function ItemPromoteModal({
   );
 
   const [targetId, setTargetId] = useState<string>("");
+  // Sprint 24 Codex 3차 P2 fix: note polling 중 confirm button 재클릭 → duplicate
+  // promote API 호출 방지. polling 동안 isDisabled 에 합산.
+  const [isPolling, setIsPolling] = useState<boolean>(false);
   const selectedTarget = targetId || teamOptions[0]?.id || "";
 
   const promote = useMutation({
@@ -166,6 +169,9 @@ export function ItemPromoteModal({
         (response.embedding_status === "pending" ||
           response.embedding_status === "processing")
       ) {
+        // Sprint 24 Codex 3차 P2 fix: polling 동안 confirm button disable
+        // (mutation.isPending 이 false 로 되돌아가는 시점에도 isPolling 으로 차단).
+        setIsPolling(true);
         const toastId = toast.loading("노트 복사 완료 (임베딩 재생성 중)");
         let attempts = 0;
         const intervalId = window.setInterval(async () => {
@@ -174,6 +180,7 @@ export function ItemPromoteModal({
             const token = await getToken();
             if (!token) {
               window.clearInterval(intervalId);
+              setIsPolling(false);
               toast.error("상태 확인 실패", { id: toastId });
               onOpenChange(false);
               return;
@@ -185,15 +192,18 @@ export function ItemPromoteModal({
             );
             if (status.status === "completed") {
               window.clearInterval(intervalId);
+              setIsPolling(false);
               toast.success("임베딩 재생성 완료", { id: toastId });
               onSuccess?.(newId, auditId);
               onOpenChange(false);
             } else if (status.status === "failed") {
               window.clearInterval(intervalId);
+              setIsPolling(false);
               toast.error("임베딩 재생성 실패", { id: toastId });
               onOpenChange(false);
             } else if (attempts >= NOTE_POLL_MAX_ATTEMPTS) {
               window.clearInterval(intervalId);
+              setIsPolling(false);
               toast("재생성이 계속 진행 중이에요. 잠시 후 새로고침하세요", {
                 id: toastId,
               });
@@ -202,6 +212,7 @@ export function ItemPromoteModal({
             }
           } catch {
             window.clearInterval(intervalId);
+            setIsPolling(false);
             toast.error("상태 확인 실패", { id: toastId });
             onOpenChange(false);
           }
@@ -220,7 +231,10 @@ export function ItemPromoteModal({
   });
 
   const isDisabled =
-    !selectedTarget || promote.isPending || teamOptions.length === 0;
+    !selectedTarget ||
+    promote.isPending ||
+    isPolling ||
+    teamOptions.length === 0;
 
   async function handleConfirm() {
     if (!selectedTarget) return;
