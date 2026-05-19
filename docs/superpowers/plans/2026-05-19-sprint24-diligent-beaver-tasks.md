@@ -265,8 +265,12 @@ async def test_promote_meeting_with_3_action_items(
     target_workspace,
     promoter_user,
 ):
-    """BL-063: Meeting promote 시 source ActionItem 3 rows 자동 복제."""
-    response = await meetings_service.promote_meeting(
+    """BL-063: Meeting promote 시 source ActionItem 3 rows 자동 복제.
+
+    Codex 1차 P2-1 fix: MeetingService.promote() + MeetingPromoteOut.new_meeting_id (snake_case).
+    action_item_count 은 Meeting 엔티티의 column — target meeting fetch 로 검증.
+    """
+    response = await meetings_service.promote(
         meeting_id=sample_source_meeting_with_actions.id,
         source_workspace_id=sample_source_meeting_with_actions.workspace_id,
         target_workspace_id=target_workspace.id,
@@ -274,11 +278,12 @@ async def test_promote_meeting_with_3_action_items(
         background_tasks=BackgroundTasks(),
     )
     # target meeting 의 action 탭에 3 rows
-    target_actions = await actions_repo.find_by_meeting(response.new_meeting.id)
+    target_actions = await actions_repo.find_by_meeting(response.new_meeting_id)
     assert len(target_actions) == 3
     assert {a.status for a in target_actions} == {"todo", "done", "in_progress"}
-    # audit.action_item_count 가 실제 row count 와 정합
-    assert response.audit.action_item_count == 3
+    # target Meeting.action_item_count column 도 실 row count 와 정합 (Sprint 23 의 0 reset 제거)
+    target_meeting = await meetings_repo.find_by_id(response.new_meeting_id, target_workspace.id)
+    assert target_meeting.action_item_count == 3
 ```
 
 ### Step 2.3: test fail verify
@@ -296,22 +301,24 @@ cd backend && uv run pytest tests/meetings/test_meeting_promote.py::test_promote
 async def test_promote_meeting_with_zero_action_items(
     integration_session,
     actions_repo,
+    meetings_repo,
     meetings_service,
     sample_source_meeting_no_actions,
     target_workspace,
     promoter_user,
 ):
-    """BL-063: ActionItem 0 건일 때 promote OK + count 0."""
-    response = await meetings_service.promote_meeting(
+    """BL-063: ActionItem 0 건일 때 promote OK + count 0. Codex 1차 P2-1 정정."""
+    response = await meetings_service.promote(
         meeting_id=sample_source_meeting_no_actions.id,
         source_workspace_id=sample_source_meeting_no_actions.workspace_id,
         target_workspace_id=target_workspace.id,
         promoted_by_user_id=promoter_user.id,
         background_tasks=BackgroundTasks(),
     )
-    target_actions = await actions_repo.find_by_meeting(response.new_meeting.id)
+    target_actions = await actions_repo.find_by_meeting(response.new_meeting_id)
     assert len(target_actions) == 0
-    assert response.audit.action_item_count == 0
+    target_meeting = await meetings_repo.find_by_id(response.new_meeting_id, target_workspace.id)
+    assert target_meeting.action_item_count == 0
 
 
 async def test_promote_meeting_assignee_non_member_resets_to_none(
@@ -322,15 +329,15 @@ async def test_promote_meeting_assignee_non_member_resets_to_none(
     target_workspace,
     promoter_user,
 ):
-    """BL-063: assignee 가 target ws member 아니면 assignee_id = None reset."""
-    response = await meetings_service.promote_meeting(
+    """BL-063: assignee 가 target ws member 아니면 assignee_id = None reset. Codex 1차 P2-1 정정."""
+    response = await meetings_service.promote(
         meeting_id=sample_meeting_with_external_assignee.id,
         source_workspace_id=sample_meeting_with_external_assignee.workspace_id,
         target_workspace_id=target_workspace.id,
         promoted_by_user_id=promoter_user.id,
         background_tasks=BackgroundTasks(),
     )
-    target_actions = await actions_repo.find_by_meeting(response.new_meeting.id)
+    target_actions = await actions_repo.find_by_meeting(response.new_meeting_id)
     assert len(target_actions) == 1
     assert target_actions[0].assignee_id is None  # silent reset
 ```
@@ -388,6 +395,11 @@ async def clone_action_items_for_promote(
     target_member_ids: set[uuid.UUID] = set(member_result.all())
 
     # 3. remap (composite FK: workspace_id + project_id + meeting_id, assignee None reset)
+    # Codex 1차 P2-2 fix: ActionItem 모델에 created_by_id 부재 — 제거.
+    #                     priority 필드 (default "medium") 명시 복제.
+    # ActionItem 실 fields: id(default) / workspace_id / meeting_id / project_id /
+    #                      title / description / assignee_id / due_date / priority /
+    #                      status / created_at(default) / updated_at(default)
     cloned: list[ActionItem] = []
     for src in source_items:
         cloned.append(ActionItem(
@@ -398,8 +410,8 @@ async def clone_action_items_for_promote(
             title=src.title,
             description=src.description,
             status=src.status,
+            priority=src.priority,
             due_date=src.due_date,
-            created_by_id=src.created_by_id,
         ))
 
     # 4. bulk save (transactional, parent SAVEPOINT 활용)
@@ -408,7 +420,7 @@ async def clone_action_items_for_promote(
     return len(cloned)
 ```
 
-### Step 2.6: meetings/service.py 의 `promote_meeting` 보강
+### Step 2.6: meetings/service.py 의 `promote` 보강 (Codex 1차 P2-1)
 
 - [ ] `backend/src/meetings/service.py:347` 영역 수정
 
@@ -517,8 +529,8 @@ git commit -m "feat(meetings): BL-063 — ActionItem rows 자동 복제 on Meeti
 - Modify: `backend/tests/notes/test_note_promote.py` (3 신규 case)
 - Create: `backend/tests/notes/test_embedding_regenerate.py`
 - Modify: `frontend/src/features/notes/api.ts` (client function)
-- Modify: `frontend/src/features/inbox/components/ItemPromoteModal.tsx` (polling)
-- Create: `frontend/tests/features/notes/note-promote-modal.test.tsx`
+- Modify: `frontend/src/components/shared/ItemPromoteModal.tsx` (polling)
+- Create: `frontend/src/components/shared/__tests__/ItemPromoteModal.test.tsx`
 - Modify: `backend/src/notes/CONTEXT.md`
 - Modify: `docs/api/endpoints.md`
 - Modify: `docs/architecture/cross-domain-pipeline.md`
@@ -531,16 +543,24 @@ git commit -m "feat(meetings): BL-063 — ActionItem rows 자동 복제 on Meeti
 async def test_promote_note_chunk_zero_plain_text_schedules_embed(
     integration_session,
     notes_service,
+    note_pipeline_service,  # fixture: NotePipelineService instance (DI 패턴)
     sample_note_chunk_zero_with_plain_text,  # fixture: plain_text="content text" + EmbeddingChunk 0
     target_workspace,
     promoter_user,
     monkeypatch,
 ):
-    """BL-064: chunk 0 + plain_text 존재 시 → embed_note_async BG schedule + audit pending."""
+    """BL-064: chunk 0 + plain_text 존재 시 → pipeline.embed_note_async BG schedule + audit pending.
+
+    Codex 1차 P2-3 fix: embed_note_async = NotePipelineService instance method (모듈 함수 아님).
+    monkeypatch 대상 = NotePipelineService.embed_note_async (instance method).
+    """
     bg_calls = []
-    async def fake_embed(note_id, ws_id):
+    async def fake_embed(self, note_id, ws_id):  # instance method signature (self 첫번째)
         bg_calls.append((note_id, ws_id))
-    monkeypatch.setattr("backend.src.notes.service.embed_note_async", fake_embed)
+    monkeypatch.setattr(
+        "backend.src.notes.pipeline_service.NotePipelineService.embed_note_async",
+        fake_embed,
+    )
 
     bg_tasks = BackgroundTasks()
     response = await notes_service.promote_note(
@@ -549,6 +569,7 @@ async def test_promote_note_chunk_zero_plain_text_schedules_embed(
         target_workspace_id=target_workspace.id,
         promoted_by_user_id=promoter_user.id,
         background_tasks=bg_tasks,
+        pipeline=note_pipeline_service,  # DI 추가 (service signature 변경)
     )
     # promote 자체 성공 (400 X)
     assert response.new_note_id is not None
@@ -626,15 +647,34 @@ existing_chunks = await self.repo.find_note_chunks(source.id, source_workspace_i
 needs_embed_regenerate = not existing_chunks  # True: chunk 0 + plain_text 존재 → BG schedule
 ```
 
+- [ ] **service signature 변경** — `pipeline: NotePipelineService` DI 추가 (Codex 1차 P2-3 fix)
+
+```python
+# Sprint 24 Task 3 (BL-064): promote_note signature 에 pipeline 추가.
+# Codex 1차 P2-3 fix: embed_note_async = NotePipelineService instance method
+# (module-level function 부재). pipeline DI 로 호출.
+async def promote_note(
+    self,
+    note_id: uuid.UUID,
+    source_workspace_id: uuid.UUID,
+    target_workspace_id: uuid.UUID,
+    promoted_by_user_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    pipeline: "NotePipelineService",  # NEW Sprint 24 (TYPE_CHECKING import 회피 quote)
+) -> PromoteNoteResponse:
+    ...
+```
+
 - [ ] BG task schedule 분기 추가 (line 305 영역 — 기존 source chunk 복제 BG 옆)
 
 ```python
-# Sprint 24 Task 3 (BL-064): chunk 0 분기에서 embed_note_async 신규 schedule.
+# Sprint 24 Task 3 (BL-064): chunk 0 분기에서 pipeline.embed_note_async 신규 schedule.
 # 기존 chunk 복제 BG (Sprint 23 D4): source EmbeddingChunk → target 복제 + audit completed.
-# 신규 chunk 0 분기: embed_note_async 가 plain_text 로부터 신규 embedding 생성.
+# 신규 chunk 0 분기: pipeline.embed_note_async 가 plain_text 로부터 신규 embedding 생성.
+# Codex 1차 P2-3 fix: NotePipelineService instance method 활용 (모듈 함수 X).
 if needs_embed_regenerate:
     background_tasks.add_task(
-        embed_note_async, new_note.id, target_workspace_id
+        pipeline.embed_note_async, new_note.id, target_workspace_id
     )
     # audit row 의 embedding_status="pending" 그대로 (기존 lifecycle 활용)
 else:
@@ -644,11 +684,28 @@ else:
     )
 ```
 
-- [ ] `embed_note_async` import 확인
+- [ ] router.py 에서 pipeline DI 주입 (이미 다른 endpoint 가 동일 패턴 사용 중인지 verify)
 
-```bash
-grep -n "embed_note_async\|from .*embed" backend/src/notes/service.py | head
-# expected: 이미 import 되어 있거나, embeddings 도메인에서 import
+```python
+# backend/src/notes/router.py 의 promote_note endpoint
+@router.post("/{note_id}/promote", ...)
+async def promote_note(
+    workspace_id: uuid.UUID,
+    note_id: uuid.UUID,
+    body: NotePromoteIn,
+    background_tasks: BackgroundTasks,
+    member: WorkspaceMember = Depends(require_member),
+    service: NoteService = Depends(get_note_service),
+    pipeline: NotePipelineService = Depends(get_note_pipeline_service),  # NEW
+):
+    return await service.promote_note(
+        note_id=note_id,
+        source_workspace_id=workspace_id,
+        target_workspace_id=body.target_workspace_id,
+        promoted_by_user_id=member.user_id,
+        background_tasks=background_tasks,
+        pipeline=pipeline,  # NEW
+    )
 ```
 
 ### Step 3.4: `PromoteNoteResponse.embedding_status` 필드 + `EmbeddingStatusOut` 추가
@@ -825,7 +882,7 @@ export async function getEmbeddingStatus(
 
 ### Step 3.10: FE `ItemPromoteModal` polling 분기
 
-- [ ] `frontend/src/features/inbox/components/ItemPromoteModal.tsx` 의 success callback 보강
+- [ ] `frontend/src/components/shared/ItemPromoteModal.tsx` 의 success callback 보강
 
 ```typescript
 // Sprint 24 BL-064 — note promote success 시 embeddingStatus pending/processing → polling
@@ -874,12 +931,12 @@ const handlePromoteSuccess = async (response: PromoteResponse) => {
 
 ### Step 3.11: FE vitest 1 신규
 
-- [ ] `frontend/tests/features/notes/note-promote-modal.test.tsx`
+- [ ] `frontend/src/components/shared/__tests__/ItemPromoteModal.test.tsx`
 
 ```typescript
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/react";
-import { ItemPromoteModal } from "@/features/inbox/components/ItemPromoteModal";
+import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
 import * as notesApi from "@/features/notes/api";
 
 vi.mock("@/features/notes/api");
@@ -957,8 +1014,8 @@ git add backend/src/notes/service.py \
         backend/tests/notes/test_note_promote.py \
         backend/tests/notes/test_embedding_regenerate.py \
         frontend/src/features/notes/api.ts \
-        frontend/src/features/inbox/components/ItemPromoteModal.tsx \
-        frontend/tests/features/notes/note-promote-modal.test.tsx \
+        frontend/src/components/shared/ItemPromoteModal.tsx \
+        frontend/src/components/shared/__tests__/ItemPromoteModal.test.tsx \
         backend/src/notes/CONTEXT.md \
         docs/api/endpoints.md \
         docs/architecture/cross-domain-pipeline.md

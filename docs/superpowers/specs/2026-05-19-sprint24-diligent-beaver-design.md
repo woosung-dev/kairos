@@ -53,7 +53,7 @@ Sprint 23 D4 promote sprint (`d659c03`) 가 4 도메인 (meetings/notes/inbox/ac
 [Meeting promote endpoint]
   POST /workspaces/{wid}/meetings/{id}/promote
        ↓
-  MeetingService.promote_meeting(...)
+  MeetingService.promote(...)  # Codex 1차 P2-1: 실 메서드명 promote() (snake_case 헌법 정합)
        ↓ (parent SAVEPOINT)
    ├─ source meeting → target ws 복제 (Sprint 23 dc20757 패턴)
    ├─ promote_helpers.clone_action_items_for_promote(    ← NEW
@@ -126,7 +126,7 @@ Sprint 23 D4 promote sprint (`d659c03`) 가 4 도메인 (meetings/notes/inbox/ac
 |---|---|---|
 | `backend/src/common/promote_helpers.py` | `clone_action_items_for_promote(...)` helper 추가 | NEW function |
 | `backend/src/common/promote_models.py` | `ItemPromotionAudit` 기존 컬럼 (변경 없음) | — |
-| `backend/src/meetings/service.py` | `promote_meeting` 의 `action_item_count=0` reset 제거 + helper 호출 | MOD |
+| `backend/src/meetings/service.py` | `promote` 의 `action_item_count=0` reset 제거 + helper 호출 (실 메서드명, Codex 1차 P2-1 정정) | MOD |
 | `backend/src/actions/repository.py` | `bulk_save_promoted_action_items(items: list[ActionItem]) -> int` | NEW method |
 | `backend/src/actions/models.py` | 변경 없음 (composite FK 이미 Sprint 21 적용) | — |
 | `backend/tests/meetings/test_meeting_promote.py` | 4 → 7 case (3 신규: rows 3건 / rows 0건 / assignee None reset) | EXT |
@@ -148,8 +148,8 @@ Sprint 23 D4 promote sprint (`d659c03`) 가 4 도메인 (meetings/notes/inbox/ac
 | `backend/tests/notes/test_note_promote.py` | 4 → 7 case (3 신규: chunk 0+plain_text → embed_note_async schedule + audit pending / chunk N → 기존 흐름 정합 / plain_text 부재 → 400 회귀) | EXT |
 | `backend/tests/notes/test_embedding_regenerate.py` | embed_note_async idempotency + polling endpoint RBAC | NEW |
 | `frontend/src/features/notes/api.ts` | `getEmbeddingStatus(workspaceId, noteId)` client | NEW function |
-| `frontend/src/features/inbox/components/ItemPromoteModal.tsx` | embeddingStatus pending/processing 분기 + polling | MOD |
-| `frontend/tests/features/notes/note-promote-modal.test.tsx` | pending → polling → completed transition | NEW |
+| `frontend/src/components/shared/ItemPromoteModal.tsx` | embeddingStatus pending/processing 분기 + polling (Codex 1차 P2-4 정정) | MOD |
+| `frontend/src/components/shared/__tests__/ItemPromoteModal.test.tsx` | pending → polling → completed transition (기존 file 에 신규 case 추가) | MOD |
 | `backend/src/notes/CONTEXT.md` | §엔드포인트 patch (chunk 0 + plain_text 분기 추가 명시) | MOD |
 | `backend/src/common/CONTEXT.md` | 변경 없음 (column 추가 X) | — |
 | `docs/api/endpoints.md` | `/notes/{id}/promote` 응답 enum 명시 + `/notes/{id}/embedding-status` 신설 | MOD |
@@ -276,7 +276,7 @@ Playwright MCP browser_navigate/click/snapshot 결과로 D1/D3 실 효과 확인
 | `test_embed_note_async_idempotent` | target note 이미 chunk count > 0 일 때 embed_note_async 재호출 | skip (early return 멱등 verify) |
 | `test_embedding_status_endpoint_rbac_viewer` | non-member 가 GET /notes/{id}/embedding-status | 403 + viewer/member/admin/owner = 200 |
 
-### BL-064 vitest 1 신규 (`frontend/tests/features/notes/note-promote-modal.test.tsx`)
+### BL-064 vitest 1 신규 case (`frontend/src/components/shared/__tests__/ItemPromoteModal.test.tsx` 기존 file 에 case 추가, Codex 1차 P2-4 정정)
 
 | Case | 검증 |
 |---|---|
