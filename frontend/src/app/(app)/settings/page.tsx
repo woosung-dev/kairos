@@ -58,7 +58,12 @@ function SettingsContent() {
     activeWorkspaceId ?? undefined,
   );
   const { data: members } = useMembers(activeWorkspaceId ?? undefined);
-  const { data: invites } = useInvites(activeWorkspaceId ?? undefined);
+  // Sprint 23 Codex 7차 P2 fix: useInvites 는 admin/owner 만 호출 (BE 가 admin+ 강제 → 403 회피).
+  // member/viewer 에게는 enabled=false 로 차단. tab count badge 는 0 또는 미표시.
+  const isAdminOrOwner = hasRole("admin");
+  const { data: invites } = useInvites(activeWorkspaceId ?? undefined, {
+    enabled: isAdminOrOwner,
+  });
   const router = useRouter();
   const searchParams = useSearchParams();
 
