@@ -28,6 +28,7 @@ from src.notes.exceptions import (
     CannotPromoteToPersonalError,
     CannotPromoteToSameWorkspaceError,
     NoteNotFoundError,
+    NotePromoteNotEmbeddedError,
     TargetWorkspaceInvalidError,
 )
 from src.notes.models import Note
@@ -262,6 +263,19 @@ class NoteService:
         source = await self.repo.find_by_id(note_id, source_workspace_id)
         if source is None:
             raise NoteNotFoundError()
+
+        # Sprint 23 Codex 6차 P2 fix: source note 의 chunk 0 이면 promote 거부.
+        # 사유: 임베딩 미완료 (embed_note_async race) note 를 promote 하면 target chunk 0 →
+        # 영원히 RAG/search 에서 사라짐. 사용자에게 잠시 후 재시도 안내.
+        # plain_text 가 빈 경우는 chunk 자체가 안 생기는 정상 (단, 사용자가 의도적 promote 면
+        # 의미 모호 — content 없는 note 는 RAG/search 대상 아님). 둘 다 거부 (조건 통일).
+        if not source.plain_text or not source.plain_text.strip():
+            raise NotePromoteNotEmbeddedError()
+        existing_chunks = await self.repo.find_note_chunks(
+            source.id, source_workspace_id
+        )
+        if not existing_chunks:
+            raise NotePromoteNotEmbeddedError()
 
         # 3. 복제 Note (id 새로 발급, workspace_id=target, project_id=None).
         # I-18: 원본 보존 — source 미변경.

@@ -51,7 +51,12 @@ async def notes_client(integration_session, auth_user, monkeypatch):
 
 @pytest_asyncio.fixture
 async def seed_note(integration_session, auth_user, personal_ws):
-    """personal ws 의 Note seed (project_id=None — cross-workspace promote 단순화)."""
+    """personal ws 의 Note seed + EmbeddingChunk 1 seed.
+
+    Sprint 23 Codex 6차 P2 fix: promote 가 source.plain_text + chunk 0 거부 (race 회피).
+    fixture 가 임베딩 ready 상태를 시뮬레이트 — EmbeddingChunk 1건 seed (vector 더미).
+    """
+    from src.embeddings.models import EmbeddingChunk
     from src.notes.models import Note
 
     note = Note(
@@ -63,6 +68,22 @@ async def seed_note(integration_session, auth_user, personal_ws):
         created_by_id=auth_user.id,
     )
     integration_session.add(note)
+    await integration_session.flush()
+
+    # Sprint 23 Codex 6차 P2: 임베딩 완료 상태 시뮬레이트 (chunk 1건).
+    # vector 는 1536d halfvec — 더미 0.0 list (실제 검색은 본 test 에서 미사용).
+    chunk = EmbeddingChunk(
+        workspace_id=personal_ws.id,
+        project_id=None,
+        source_id=note.id,
+        source_type="note",
+        chunk_text="첫 번째 문장",
+        chunk_index=0,
+        chunk_level=1,
+        embedding=[0.0] * 1536,
+        metadata_json={},
+    )
+    integration_session.add(chunk)
     await integration_session.flush()
     await integration_session.commit()
     return note

@@ -35,3 +35,19 @@ class CannotPromoteToSameWorkspaceError(HTTPException):
         super().__init__(
             status_code=400, detail="같은 워크스페이스로는 promote 할 수 없습니다"
         )
+
+
+class NotePromoteNotEmbeddedError(HTTPException):
+    """Sprint 23 Codex 6차 P2 fix: 임베딩 미완료 note promote 시도.
+
+    사유: source note 가 embed_note_async 비동기 임베딩 끝나기 전 promote 되면 chunk 0 →
+    target ws 에 chunk 미복제 → 영원히 RAG/search 에서 사라짐. 거부 + 사용자가 잠시 후 재시도.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=400,
+            detail=(
+                "노트 임베딩이 아직 완료되지 않았습니다. 잠시 후 다시 시도해주세요."
+            ),
+        )
