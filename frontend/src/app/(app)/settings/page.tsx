@@ -197,7 +197,9 @@ function SettingsContent() {
           </div>
         </TabsContent>
 
-        {/* 초대 탭 */}
+        {/* 초대 탭 — Sprint 23 Codex 9차 P2 fix: admin+ 만 InviteManager mount.
+            member/viewer 가 ?tab=invites URL 직접 접근 시 InviteManager 가 useInvites 무조건
+            호출 → 403. admin 분기로 mount 자체 차단. */}
         <TabsContent value="invites">
           <div className="space-y-4">
             <h2
@@ -206,10 +208,19 @@ function SettingsContent() {
             >
               초대 링크
             </h2>
-            <InviteManager
-              workspaceId={activeWorkspaceId}
-              currentUserRole={workspaceRole}
-            />
+            {isAdminOrOwner ? (
+              <InviteManager
+                workspaceId={activeWorkspaceId}
+                currentUserRole={workspaceRole}
+              />
+            ) : (
+              <p
+                className="text-sm"
+                style={{ color: "var(--text-muted)" }}
+              >
+                초대 링크 관리는 관리자(Admin) 이상 권한에서만 가능합니다.
+              </p>
+            )}
           </div>
         </TabsContent>
 
