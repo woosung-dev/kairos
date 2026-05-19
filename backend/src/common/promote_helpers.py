@@ -71,11 +71,9 @@ async def validate_promote_target(
             "target_invalid",
             f"target workspace {target_workspace_id} not found",
         )
-    if getattr(target, "type", "team") == "personal":
-        raise PromoteValidationError(
-            "target_personal", "personal workspace 로 promote 불가"
-        )
 
+    # Sprint 23 Codex 8차 P2 fix: membership 확인을 personal/type 검증 보다 먼저 수행 →
+    # cross-tenant workspace 존재/type 정보 leak 차단. target_personal 은 멤버 확인 후에만 노출.
     member = await workspace_repo.find_member(
         target_workspace_id, promoted_by_user_id
     )
@@ -83,6 +81,7 @@ async def validate_promote_target(
         raise PromoteValidationError(
             "not_member", "promoter 가 target workspace 멤버 아님"
         )
+
     # Sprint 23 Codex 3차 P1 fix: target ws viewer role 거부 (RBAC bypass 차단).
     # 사유: route 의 require_member 는 source workspace_id 만 적용 → target 의 viewer 도
     # 통과 가능했으나, promote 는 target ws insert 작업이라 member 이상 write 권한 필요.
@@ -90,6 +89,12 @@ async def validate_promote_target(
         raise PromoteValidationError(
             "not_member",
             "target workspace viewer role 은 promote 불가 (write 권한 필요)",
+        )
+
+    # 멤버 확인 후에만 type 검증 (personal info leak 차단, Codex 8차 P2)
+    if getattr(target, "type", "team") == "personal":
+        raise PromoteValidationError(
+            "target_personal", "personal workspace 로 promote 불가"
         )
 
 

@@ -25,6 +25,7 @@ from src.meetings.exceptions import (
     CannotPromoteToSameWorkspaceError,
     MeetingNotFoundError,
     MeetingPromoteNonTerminalError,
+    MeetingPromoteNotEmbeddedError,
     TargetWorkspaceInvalidError,
 )
 from src.meetings.models import Meeting, MeetingSummary, TranscriptSegment
@@ -299,6 +300,17 @@ class MeetingService:
         # (pipeline 미실행, 동기화 없음) → 거부 + 사용자 안내.
         if source.status not in ("completed", "failed"):
             raise MeetingPromoteNonTerminalError()
+
+        # Sprint 23 Codex 8차 P2 fix: status='completed' 라도 embedding step 실패 → chunk 0 인
+        # 경우 BG task 가 audit 'n/a' silent success → target 영원히 unsearchable. notes 의
+        # NotePromoteNotEmbeddedError 패턴 (Codex 6차 P2) 와 동일. preflight 거부.
+        # failed status 는 임베딩 자체 의미 없음 (예외 — chunk 검증 skip).
+        if source.status == "completed":
+            existing_chunks = await self.repo.find_meeting_chunks(
+                source.id, source_workspace_id
+            )
+            if not existing_chunks:
+                raise MeetingPromoteNotEmbeddedError()
 
         source_summary = await self.repo.get_summary(
             meeting_id, source_workspace_id

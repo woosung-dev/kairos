@@ -50,3 +50,20 @@ class MeetingPromoteNonTerminalError(HTTPException):
             status_code=400,
             detail="진행 중인 회의는 promote 할 수 없습니다 (완료 또는 실패 상태만 가능)",
         )
+
+
+class MeetingPromoteNotEmbeddedError(HTTPException):
+    """Sprint 23 Codex 8차 P2 fix: 임베딩 미완료 meeting promote 시도.
+
+    사유: status='completed' 인 meeting 이지만 embedding step 실패로 chunk 0 → BG task 가
+    audit 'n/a' silent success 반환 → target meeting 영원히 RAG/search 에서 사라짐. notes 의
+    NotePromoteNotEmbeddedError 와 동일 패턴 (Codex 6차 P2). 거부 + 사용자 안내.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=400,
+            detail=(
+                "회의 임베딩이 아직 완료되지 않았습니다. 잠시 후 다시 시도해주세요."
+            ),
+        )

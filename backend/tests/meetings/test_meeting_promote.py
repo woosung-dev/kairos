@@ -51,7 +51,12 @@ async def meetings_client(integration_session, auth_user, monkeypatch):
 
 @pytest_asyncio.fixture
 async def seed_meeting(integration_session, auth_user, personal_ws):
-    """personal ws 의 Meeting + MeetingSummary + 2 TranscriptSegment seed."""
+    """personal ws 의 Meeting + MeetingSummary + 2 TranscriptSegment + EmbeddingChunk seed.
+
+    Sprint 23 Codex 8차 P2 fix: promote preflight 이 source status='completed' + chunk 0
+    case 를 거부 (notes 6차 P2 패턴). fixture 가 임베딩 완료 상태 시뮬레이트.
+    """
+    from src.embeddings.models import EmbeddingChunk
     from src.meetings.models import Meeting, MeetingSummary, TranscriptSegment
 
     meeting = Meeting(
@@ -94,6 +99,20 @@ async def seed_meeting(integration_session, auth_user, personal_ws):
     ]
     for seg in segments:
         integration_session.add(seg)
+
+    # Sprint 23 Codex 8차 P2: 임베딩 완료 상태 시뮬레이트 (chunk 1건, vector 더미 1536d).
+    chunk = EmbeddingChunk(
+        workspace_id=personal_ws.id,
+        project_id=None,
+        source_id=meeting.id,
+        source_type="meeting",
+        chunk_text="첫 번째 문장",
+        chunk_index=0,
+        chunk_level=1,
+        embedding=[0.0] * 1536,
+        metadata_json={},
+    )
+    integration_session.add(chunk)
     await integration_session.flush()
     await integration_session.commit()
     return meeting
