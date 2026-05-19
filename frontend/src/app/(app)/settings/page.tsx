@@ -2,6 +2,7 @@
 
 // Sprint 23 D2 Variant C — 워크스페이스 설정 페이지 (Compact Header + Geist Mono + ?tab=*)
 
+import { Suspense } from "react";
 import { Settings, Users, Link2, Building2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,7 +32,26 @@ const MONO_STYLE = {
   fontVariantNumeric: "tabular-nums" as const,
 };
 
+// Sprint 23 Codex 2.5차 P1 fix: useSearchParams() 가 Next.js production build 에서 Suspense
+// boundary 필요. SettingsContent 로 분리 + Suspense wrap → `next build` Missing Suspense 회피.
 export default function SettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          className="flex items-center justify-center h-full"
+          style={{ color: "var(--text-muted)" }}
+        >
+          로딩 중...
+        </div>
+      }
+    >
+      <SettingsContent />
+    </Suspense>
+  );
+}
+
+function SettingsContent() {
   const { activeWorkspaceId, workspaceRole, hasRole } = useWorkspaceStore();
   const { data: workspace } = useWorkspace(activeWorkspaceId ?? undefined);
   const updateSettings = useUpdateWorkspaceSettings(
