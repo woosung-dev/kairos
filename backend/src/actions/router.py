@@ -2,12 +2,17 @@
 """ActionItem 라우터 — HTTP 전용."""
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 
 from src.auth.rbac import require_member, require_viewer
 from src.workspaces.models import WorkspaceMember
 from src.actions.dependencies import get_action_service
-from src.actions.schemas import CreateActionItemRequest, UpdateActionItemRequest
+from src.actions.schemas import (
+    ActionPromoteIn,
+    ActionPromoteOut,
+    CreateActionItemRequest,
+    UpdateActionItemRequest,
+)
 from src.actions.service import ActionItemService
 
 router = APIRouter(
@@ -71,4 +76,33 @@ async def update_action_item(
         due_date=data.due_date,
         priority=data.priority,
         status=data.status,
+    )
+
+
+# Sprint 23 D4 Task 2 Step 2.5: action promote — I-18 복제 + audit (BG embedding 없음).
+@router.post(
+    "/{action_id}/promote",
+    response_model=ActionPromoteOut,
+    status_code=202,
+)
+async def promote_action(
+    workspace_id: uuid.UUID,
+    action_id: uuid.UUID,
+    body: ActionPromoteIn,
+    background_tasks: BackgroundTasks,
+    member: WorkspaceMember = Depends(require_member),
+    service: ActionItemService = Depends(get_action_service),
+) -> ActionPromoteOut:
+    """ActionItem → team workspace 복제 + audit row.
+
+    202 Accepted — ActionItem 은 임베딩 ledger 부재 → BG embedding 복제 없음.
+    ItemPromotionAudit.embedding_status='n/a'. meeting_id / project_id / assignee_id
+    모두 복제본에서 None reset (composite FK 제약 + 단순화).
+    """
+    return await service.promote(
+        action_id=action_id,
+        source_workspace_id=workspace_id,
+        target_workspace_id=body.target_workspace_id,
+        promoted_by_user_id=member.user_id,
+        background_tasks=background_tasks,
     )
