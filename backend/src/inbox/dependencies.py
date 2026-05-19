@@ -3,6 +3,9 @@
 
 Sprint 19 PR #1 C13a (Codex 2차 F-1): MeetingRepository 동반 주입 — classify 의
 source_type='meeting' 시 item.source_id cross-tenant 검증 (fail-closed).
+
+Sprint 23 D4 (Task 2 Step 2.4): WorkspaceRepository 동반 주입 — promote 흐름
+(cross-workspace target 검증) 필수. 일반 CRUD 흐름은 미사용.
 """
 from fastapi import Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -12,14 +15,16 @@ from src.inbox.repository import InboxRepository
 from src.inbox.service import InboxService
 from src.meetings.repository import MeetingRepository
 from src.projects.repository import ProjectRepository
+from src.workspaces.repository import WorkspaceRepository
 
 
 async def get_inbox_service(
     session: AsyncSession = Depends(get_async_session),
 ) -> InboxService:
-    """동일 session으로 InboxRepo + ProjectRepo + MeetingRepo 주입."""
+    """동일 session으로 InboxRepo + ProjectRepo + MeetingRepo + WorkspaceRepo 주입."""
     return InboxService(
         inbox_repo=InboxRepository(session),
         project_repo=ProjectRepository(session),
         meeting_repo=MeetingRepository(session),
+        workspace_repo=WorkspaceRepository(session),
     )

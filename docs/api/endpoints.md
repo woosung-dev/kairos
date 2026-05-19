@@ -123,6 +123,7 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 | 43 | 15 | `POST` | `/api/v1/admin/memory/r2-cleanup` | 30일 경과 voice R2 객체 cleanup (X-Cron-Token header, GCP Cloud Scheduler 호출) |
 | 44 | 23 | `POST` | `/api/v1/workspaces/{wid}/meetings/{mid}/promote` | 회의 → team workspace 복제 (Meeting/Summary/Segments + EmbeddingChunk BG 복제, I-18, 202) — require_member |
 | 45 | 23 | `POST` | `/api/v1/workspaces/{wid}/notes/{nid}/promote` | 노트 → team workspace 복제 (Note + EmbeddingChunk BG 복제, project_id=None 복제본, I-18, 202) — require_member |
+| 46 | 23 | `POST` | `/api/v1/workspaces/{wid}/inbox/{iid}/promote` | Inbox 아이템 → team workspace 복제 (InboxItem 복제, ai_suggested_project_id=None + is_processed=False reset, BG embedding 없음 — audit.embedding_status='n/a', I-18, 202) — require_member |
 
 > **Sprint 15 변경 (Memory 모듈 신설)** — ADR-016 Personal↔Team IA + Recall-first wedge:
 > - 38~43: 신규 6 endpoint (memory 도메인). 38/39/40/41/42는 `/api/v1/workspaces/{ws_id}/memory*` 패턴 (I-13 정합). 43은 admin 예외.
@@ -674,6 +675,54 @@ Inbox 아이템을 무시(dismiss) 처리한다.
   "isProcessed": true
 }
 ```
+
+---
+
+#### `POST /api/v1/workspaces/{wid}/inbox/{id}/promote`
+
+> **Sprint 23 D4 (Task 2 Step 2.4)** — 헌법 I-18 (Promotion = 복제 + tombstone, 이동 금지) 강제.
+
+Inbox 아이템을 team workspace 로 복제한다. 원본 InboxItem 은 source workspace 에 보존되고, target workspace 에 새 InboxItem 복제본 + `ItemPromotionAudit(item_type='inbox')` row 가 생성된다.
+
+**Request:**
+
+| 항목 | 값 |
+|------|-----|
+| Headers | `Authorization: Bearer <clerk_jwt>` |
+| Path | `wid` — source 워크스페이스 UUID, `id` — Inbox 아이템 UUID |
+| Body | `{ "targetWorkspaceId": "uuid" }` |
+| RBAC | `require_member` (source ws) + promoter 가 target ws 멤버 |
+
+**Response:**
+
+```
+202 Accepted
+```
+
+```json
+{
+  "new_inbox_id": "uuid",
+  "audit_id": "uuid",
+  "status": "completed"
+}
+```
+
+**복제 정책:**
+
+- `title`, `summary`, `source_type`, `source_id`, `ai_suggested_project_title`, `ai_suggested_tags`, `ai_confidence` 는 그대로 복제.
+- `ai_suggested_project_id`=None reset (composite FK `fk_inbox_suggested_project_workspace` 가 (workspace_id, ai_suggested_project_id) 정합 강제 — target ws 와 무관).
+- `is_processed`=False reset (복제본은 target ws 사용자 재분류 대기).
+- `source_id` 는 soft reference (FK 미강제) — cross-workspace transitive 참조 그대로 보존.
+- BG embedding 복제 없음 (InboxItem 은 source_type='inbox' EmbeddingChunk 가 실제 인서트되지 않음 — `_ALLOWED_SOURCE_TYPES` whitelist 만 존재). audit.embedding_status='n/a' + 응답 status='completed' (notes/meetings 의 'embedding_pending' 과 차이).
+
+**에러:**
+
+| 상태 | 사유 | 응답 |
+|:----:|------|------|
+| 400 | source == target | `같은 워크스페이스로는 promote 할 수 없습니다` |
+| 400 | target.type='personal' | `개인 워크스페이스로는 promote 할 수 없습니다` |
+| 403 | target ws 미존재 또는 promoter 가 target ws 멤버 아님 | `대상 워크스페이스가 유효하지 않습니다` |
+| 404 | source inbox_id 미존재 | `Inbox 아이템을 찾을 수 없습니다` |
 
 ---
 
