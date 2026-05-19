@@ -11,7 +11,12 @@ from src.auth.rbac import require_member, require_viewer
 from src.workspaces.models import WorkspaceMember
 from src.notes.dependencies import get_note_pipeline_service, get_note_service
 from src.notes.pipeline_service import NotePipelineService
-from src.notes.schemas import CreateNoteRequest, UpdateNoteRequest
+from src.notes.schemas import (
+    CreateNoteRequest,
+    NotePromoteIn,
+    NotePromoteOut,
+    UpdateNoteRequest,
+)
 from src.notes.service import NoteService
 
 router = APIRouter(
@@ -124,3 +129,31 @@ async def delete_note(
 ):
     # embedding cleanup 포함 orchestrator 경유 (ADR-014 옵션 A 정합) — Codex H2/옵션 A: workspace_id 필수
     await pipeline.delete_note_with_cleanup(note_id, workspace_id)
+
+
+# Sprint 23 D4 Task 2 Step 2.3: notes promote — I-18 복제 + audit + BG embedding.
+@router.post(
+    "/{note_id}/promote",
+    response_model=NotePromoteOut,
+    status_code=202,
+)
+async def promote_note(
+    workspace_id: uuid.UUID,
+    note_id: uuid.UUID,
+    body: NotePromoteIn,
+    background_tasks: BackgroundTasks,
+    member: WorkspaceMember = Depends(require_member),
+    service: NoteService = Depends(get_note_service),
+) -> NotePromoteOut:
+    """노트 → team workspace 복제 + audit row + 백그라운드 embedding 복제.
+
+    202 Accepted — BG 흐름에서 EmbeddingChunk 복제 후 ItemPromotionAudit.embedding_status 갱신.
+    project_id 는 복제본에서 None (cross-workspace 제약, 사용자가 별도 연결).
+    """
+    return await service.promote(
+        note_id=note_id,
+        source_workspace_id=workspace_id,
+        target_workspace_id=body.target_workspace_id,
+        promoted_by_user_id=member.user_id,
+        background_tasks=background_tasks,
+    )

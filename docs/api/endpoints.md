@@ -122,6 +122,7 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 | 42 | 15 | `POST` | `/api/v1/workspaces/{wid}/memory/{memory_id}/promote` | 메모 → team workspace 복제 (I-18 복제+tombstone, 202 + BG) — require_member |
 | 43 | 15 | `POST` | `/api/v1/admin/memory/r2-cleanup` | 30일 경과 voice R2 객체 cleanup (X-Cron-Token header, GCP Cloud Scheduler 호출) |
 | 44 | 23 | `POST` | `/api/v1/workspaces/{wid}/meetings/{mid}/promote` | 회의 → team workspace 복제 (Meeting/Summary/Segments + EmbeddingChunk BG 복제, I-18, 202) — require_member |
+| 45 | 23 | `POST` | `/api/v1/workspaces/{wid}/notes/{nid}/promote` | 노트 → team workspace 복제 (Note + EmbeddingChunk BG 복제, project_id=None 복제본, I-18, 202) — require_member |
 
 > **Sprint 15 변경 (Memory 모듈 신설)** — ADR-016 Personal↔Team IA + Recall-first wedge:
 > - 38~43: 신규 6 endpoint (memory 도메인). 38/39/40/41/42는 `/api/v1/workspaces/{ws_id}/memory*` 패턴 (I-13 정합). 43은 admin 예외.
@@ -1061,6 +1062,7 @@ ActionItem
 | 30 | `POST` | `/api/v1/workspaces/{wid}/notes` | 노트 생성 (`projectId` 선택적) |
 | 31 | `PATCH` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 수정 (debounce 자동저장) |
 | 32 | `DELETE` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 삭제 (204) |
+| 45 | `POST` | `/api/v1/workspaces/{wid}/notes/{id}/promote` | Sprint 23 D4: 노트 → team workspace 복제 (I-18, 202 + BG embedding). target=personal/존재X/non-member 시 400 / 403. ItemPromotionAudit(item_type='note') row 생성. |
 
 ### RAG Ask (`POST /rag/ask`)
 

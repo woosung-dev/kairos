@@ -34,6 +34,10 @@
 | out | `embeddings/service` | via pipeline | 임베딩 생성 + 캐시 무효화 |
 | out | `projects/repository` | Repository (read) | project visibility 검증 + Codex F-2 secondary FK 검증 |
 | out | `embeddings/repository` | direct (orchestrator) | chunk delete (ADR-014 §1 cross-domain shared service) |
+| out | `workspaces/repository` | Repository (read) | Sprint 23 D4: promote target 검증 (find_by_id / find_member) |
+| out | `common/promote_helpers` | Utility | Sprint 23 D4: validate_promote_target + build_item_promotion_audit (4 도메인 공통) |
+| out | `common/promote_models` | Model (write) | Sprint 23 D4: ItemPromotionAudit row 적재 (item_type='note') |
+| out | `embeddings/models` (EmbeddingChunk) | direct (BG copy) | Sprint 23 D4: promote BG embedding 복제 (source_type='note' 한정) |
 
 ---
 
@@ -60,10 +64,13 @@
 | N-3 | **Note.project_id 변경 시 같은 workspace 내 project 만 허용** (Codex F-2 Critical secondary FK) |
 | N-4 | **헌법 I-9 (Sprint 19 PR #1, Codex F-1)** — service / repository / pipeline 모든 메서드 workspace_id 필수. find_by_id(note_id, workspace_id), get_note(note_id, workspace_id), update_note / delete_note / export_note 동일, pipeline embed_note_async / delete_note_with_cleanup 도 동일 |
 | N-5 | **cross-tenant 시도 응답: 404** (path workspace 안에 없는 note_id = NotFound, Codex F-4 lock-in) |
+| N-6 | **Sprint 23 D4 promote = 복제 + tombstone (헌법 I-18)** — 원본 Note 변경 없음. target ws 에 새 Note + EmbeddingChunk 복제 (BG) + ItemPromotionAudit (item_type='note') |
+| N-7 | **promote 복제본 project_id = None** — source.project_id 는 source ws 의 project 라 cross-workspace 제약 (secondary FK ck). target ws 에서 PATCH 로 별도 연결 |
+| N-8 | **promote 검증 — same_workspace/target_personal → 400, target_invalid/not_member → 403** (CannotPromoteToSameWorkspaceError / CannotPromoteToPersonalError / TargetWorkspaceInvalidError) |
 
 ---
 
-## 7. 엔드포인트 (6)
+## 7. 엔드포인트 (7)
 
 > 모두 `/api/v1/workspaces/{workspace_id}/notes` prefix.
 
@@ -74,6 +81,7 @@ GET    /{id}/export        내보내기 (md / json)
 POST   /                   create
 PATCH  /{id}               update (title / content / project_id)
 DELETE /{id}               delete (pipeline cleanup 동반)
+POST   /{id}/promote       Sprint 23 D4: team workspace 복제 (I-18, 202 + BG embedding 복제)
 ```
 
 ### Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영)
