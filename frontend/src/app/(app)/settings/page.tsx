@@ -1,9 +1,13 @@
 "use client";
 
+// Sprint 23 D2 Variant C — 워크스페이스 설정 페이지 (Compact Header + Geist Mono + ?tab=*)
+
 import { Settings, Users, Link2, Building2 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MemberList } from "@/features/members/components/member-list";
 import { InviteManager } from "@/features/members/components/invite-manager";
+import { useMembers, useInvites } from "@/features/members/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import {
   useWorkspace,
@@ -11,16 +15,51 @@ import {
 } from "@/features/workspaces/hooks";
 
 const THRESHOLD_PRESETS = [0.7, 0.8, 0.9, 0.95] as const;
+const VALID_TABS = ["members", "invites", "general"] as const;
+type TabValue = (typeof VALID_TABS)[number];
+
+const ROLE_LABEL: Record<string, string> = {
+  owner: "owner",
+  admin: "admin",
+  member: "member",
+  viewer: "viewer",
+};
+
+const MONO_STYLE = {
+  fontFamily:
+    '"Geist Mono", ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Code", monospace',
+  fontVariantNumeric: "tabular-nums" as const,
+};
 
 export default function SettingsPage() {
   const { activeWorkspaceId, workspaceRole, hasRole } = useWorkspaceStore();
   const { data: workspace } = useWorkspace(activeWorkspaceId ?? undefined);
   const updateSettings = useUpdateWorkspaceSettings(
-    activeWorkspaceId ?? undefined
+    activeWorkspaceId ?? undefined,
   );
+  const { data: members } = useMembers(activeWorkspaceId ?? undefined);
+  const { data: invites } = useInvites(activeWorkspaceId ?? undefined);
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
+  const memberCount = members?.length ?? 0;
+  const activeInviteCount =
+    invites?.filter((invite) => invite.isActive).length ?? 0;
   const isOwner = hasRole("owner");
   const currentThreshold = workspace?.inboxThreshold ?? 0.9;
+
+  const tabParam = searchParams.get("tab");
+  const activeTab: TabValue = (VALID_TABS as readonly string[]).includes(
+    tabParam ?? "",
+  )
+    ? (tabParam as TabValue)
+    : "members";
+
+  const handleTabChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", value);
+    router.replace(`/settings?${params.toString()}`, { scroll: false });
+  };
 
   if (!activeWorkspaceId) {
     return (
@@ -35,19 +74,37 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-8">
-      {/* 페이지 헤더 */}
-      <div className="flex items-center gap-3 mb-6">
-        <Settings className="w-5 h-5" style={{ color: "var(--text-secondary)" }} />
+      {/* Compact 헤더 — Satoshi 32px h1 + Geist Mono 11px subtitle */}
+      <header className="mb-8">
         <h1
-          className="text-lg font-semibold"
-          style={{ color: "var(--text-primary)" }}
+          className="flex items-center gap-2.5 tracking-tight"
+          style={{
+            fontFamily:
+              '"Satoshi", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            fontSize: 32,
+            fontWeight: 700,
+            lineHeight: 1.1,
+            color: "var(--text-primary)",
+          }}
         >
+          <Settings className="w-7 h-7" aria-hidden />
           설정
         </h1>
-      </div>
+        <p
+          className="mt-2 truncate"
+          style={{
+            ...MONO_STYLE,
+            fontSize: 11,
+            color: "var(--text-muted)",
+          }}
+        >
+          {workspace?.name ?? "—"} ·{" "}
+          {workspaceRole ? ROLE_LABEL[workspaceRole] : "—"} · 멤버 {memberCount}
+        </p>
+      </header>
 
-      {/* 탭 구조 */}
-      <Tabs defaultValue="members">
+      {/* 탭 구조 — ?tab=* deep-link 동기화 + count badge */}
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList
           className="w-full justify-start gap-1 rounded-lg p-1 mb-6"
           style={{ background: "var(--surface)" }}
@@ -56,21 +113,43 @@ export default function SettingsPage() {
             value="members"
             className="gap-1.5 cursor-pointer text-sm"
           >
-            <Users className="w-4 h-4" />
+            <Users className="w-4 h-4" aria-hidden />
             멤버
+            <span
+              aria-label={`멤버 수 ${memberCount}`}
+              style={{
+                ...MONO_STYLE,
+                fontSize: 11,
+                color: "var(--text-muted)",
+                marginLeft: 2,
+              }}
+            >
+              {memberCount}
+            </span>
           </TabsTrigger>
           <TabsTrigger
             value="invites"
             className="gap-1.5 cursor-pointer text-sm"
           >
-            <Link2 className="w-4 h-4" />
+            <Link2 className="w-4 h-4" aria-hidden />
             초대
+            <span
+              aria-label={`활성 초대 ${activeInviteCount}`}
+              style={{
+                ...MONO_STYLE,
+                fontSize: 11,
+                color: "var(--text-muted)",
+                marginLeft: 2,
+              }}
+            >
+              {activeInviteCount}
+            </span>
           </TabsTrigger>
           <TabsTrigger
             value="general"
             className="gap-1.5 cursor-pointer text-sm"
           >
-            <Building2 className="w-4 h-4" />
+            <Building2 className="w-4 h-4" aria-hidden />
             일반
           </TabsTrigger>
         </TabsList>
@@ -112,7 +191,6 @@ export default function SettingsPage() {
         {/* 일반 탭 */}
         <TabsContent value="general">
           <div className="space-y-6">
-            {/* AI 자동 확정 임계값 */}
             {isOwner && (
               <div className="space-y-4">
                 <h2
@@ -143,6 +221,7 @@ export default function SettingsPage() {
                         }
                         className="px-4 py-2 rounded-md text-sm font-medium cursor-pointer transition-colors duration-150"
                         style={{
+                          ...MONO_STYLE,
                           background: isActive
                             ? "var(--accent)"
                             : "var(--surface-active)",
