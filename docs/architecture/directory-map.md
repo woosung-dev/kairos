@@ -22,7 +22,9 @@ frontend/
     │
     ├── components/                    # 도메인 무관 공통 UI
     │   ├── ui/                        # shadcn/ui v4 (수정 금지)
-    │   └── layout/                    # Sidebar, Header, PanelLayout, RAGPanel
+    │   ├── layout/                    # Sidebar, Header, PanelLayout, RAGPanel
+    │   └── shared/                    # 도메인 횡단 공통 컴포넌트 (Sprint 23 D4)
+    │       └── ItemPromoteModal.tsx   # 5 도메인 generic promote modal (memory/meeting/note/inbox/action)
     │
     ├── features/                      # 도메인별 비즈니스 레이어
     │   ├── inbox/

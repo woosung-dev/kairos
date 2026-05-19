@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { ArrowUpRight } from "lucide-react";
+import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
+import { useWorkspaceStore } from "@/features/workspaces/store";
 import type { InboxItem } from "../types";
 
 /* ── 라벨/아이콘 맵 ── */
@@ -27,6 +30,8 @@ interface SmartInboxItemCardProps {
 
 export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
   const [status, setStatus] = useState<"idle" | "confirmed" | "dismissed" | "editing">("idle");
+  const [isPromoteOpen, setIsPromoteOpen] = useState(false);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
   /* aiConfidence가 null일 때 0으로 폴백 */
   const confidencePercent = item.aiConfidence !== null
@@ -146,6 +151,27 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
             >
               {SOURCE_LABELS[item.sourceType] ?? item.sourceType}
             </span>
+            {/* Sprint 23 D4: 워크스페이스 이동 — 우상단 ghost icon button */}
+            {activeWorkspaceId && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsPromoteOpen(true);
+                }}
+                className="ml-auto shrink-0 px-1.5 py-1 rounded transition-colors"
+                style={{
+                  color: "var(--text-muted)",
+                  borderRadius: "var(--radius-sm)",
+                  cursor: "pointer",
+                  minHeight: "32px",
+                }}
+                aria-label="워크스페이스 이동"
+                title="워크스페이스 이동"
+              >
+                <ArrowUpRight className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
           {item.summary && (
             <p className="text-xs line-clamp-2" style={{ color: "var(--text-secondary)" }}>
@@ -299,6 +325,17 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
             취소
           </button>
         </div>
+      )}
+
+      {/* Sprint 23 D4: 워크스페이스 이동 modal */}
+      {activeWorkspaceId && (
+        <ItemPromoteModal
+          itemType="inbox"
+          itemId={item.id}
+          sourceWorkspaceId={activeWorkspaceId}
+          open={isPromoteOpen}
+          onOpenChange={setIsPromoteOpen}
+        />
       )}
     </div>
   );
