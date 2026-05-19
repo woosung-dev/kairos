@@ -13,6 +13,7 @@ from src.notes.dependencies import get_note_pipeline_service, get_note_service
 from src.notes.pipeline_service import NotePipelineService
 from src.notes.schemas import (
     CreateNoteRequest,
+    EmbeddingStatusOut,
     NotePromoteIn,
     NotePromoteOut,
     UpdateNoteRequest,
@@ -132,6 +133,7 @@ async def delete_note(
 
 
 # Sprint 23 D4 Task 2 Step 2.3: notes promote — I-18 복제 + audit + BG embedding.
+# Sprint 24 BL-064: pipeline DI 주입 + chunk 0 + plain_text BG re-embedding 분기 + status endpoint.
 @router.post(
     "/{note_id}/promote",
     response_model=NotePromoteOut,
@@ -144,11 +146,14 @@ async def promote_note(
     background_tasks: BackgroundTasks,
     member: WorkspaceMember = Depends(require_member),
     service: NoteService = Depends(get_note_service),
+    pipeline: NotePipelineService = Depends(get_note_pipeline_service),
 ) -> NotePromoteOut:
     """노트 → team workspace 복제 + audit row + 백그라운드 embedding 복제.
 
     202 Accepted — BG 흐름에서 EmbeddingChunk 복제 후 ItemPromotionAudit.embedding_status 갱신.
     project_id 는 복제본에서 None (cross-workspace 제약, 사용자가 별도 연결).
+
+    Sprint 24 BL-064: chunk 0 + plain_text 분기 BG embedding 재생성 — pipeline DI 주입.
     """
     return await service.promote(
         note_id=note_id,
@@ -156,4 +161,21 @@ async def promote_note(
         target_workspace_id=body.target_workspace_id,
         promoted_by_user_id=member.user_id,
         background_tasks=background_tasks,
+        pipeline=pipeline,
     )
+
+
+# Sprint 24 BL-064: embedding-status polling endpoint (NEW).
+@router.get("/{note_id}/embedding-status", response_model=EmbeddingStatusOut)
+async def get_embedding_status(
+    workspace_id: uuid.UUID,
+    note_id: uuid.UUID,
+    member: WorkspaceMember = Depends(require_viewer),
+    service: NoteService = Depends(get_note_service),
+) -> EmbeddingStatusOut:
+    """target note 의 embedding 진행 상태 polling.
+
+    RBAC: viewer 이상 (read-only).
+    응답: audit raw embedding_status (pending/processing/completed/failed/n/a) + 실 chunk count.
+    """
+    return await service.get_embedding_status(workspace_id, note_id)

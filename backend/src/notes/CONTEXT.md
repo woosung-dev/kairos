@@ -67,21 +67,30 @@
 | N-6 | **Sprint 23 D4 promote = 복제 + tombstone (헌법 I-18)** — 원본 Note 변경 없음. target ws 에 새 Note + EmbeddingChunk 복제 (BG) + ItemPromotionAudit (item_type='note') |
 | N-7 | **promote 복제본 project_id = None** — source.project_id 는 source ws 의 project 라 cross-workspace 제약 (secondary FK ck). target ws 에서 PATCH 로 별도 연결 |
 | N-8 | **promote 검증 — same_workspace/target_personal → 400, target_invalid/not_member → 403** (CannotPromoteToSameWorkspaceError / CannotPromoteToPersonalError / TargetWorkspaceInvalidError) |
+| N-9 | **Sprint 24 BL-064: chunk 0 + plain_text 분기는 BG re-embedding schedule** — 400 거부 대신 `_bg_regenerate_embed_with_audit` wrapper BG task 가 `pipeline.embed_note_async` 호출 + audit `pending → processing → completed/failed` lifecycle 갱신. plain_text 부재 case 만 400 회귀 가드 유지 |
+| N-10 | **Sprint 24 BL-064: PromoteNoteOut snake_case 보존** — `new_note_id` / `audit_id` / `embedding_status` 모두 snake_case (alias 추가 X). FE ItemPromoteModal 의 NEW_ID_KEY snake_case read 호환성 (Codex 2차 P2-3) |
 
 ---
 
-## 7. 엔드포인트 (7)
+## 7. 엔드포인트 (8)
 
 > 모두 `/api/v1/workspaces/{workspace_id}/notes` prefix.
 
 ```
-GET    /                   목록 (project_id 필터 옵션)
-GET    /{id}               디테일
-GET    /{id}/export        내보내기 (md / json)
-POST   /                   create
-PATCH  /{id}               update (title / content / project_id)
-DELETE /{id}               delete (pipeline cleanup 동반)
-POST   /{id}/promote       Sprint 23 D4: team workspace 복제 (I-18, 202 + BG embedding 복제)
+GET    /                          목록 (project_id 필터 옵션)
+GET    /{id}                      디테일
+GET    /{id}/export               내보내기 (md / json)
+POST   /                          create
+PATCH  /{id}                      update (title / content / project_id)
+DELETE /{id}                      delete (pipeline cleanup 동반)
+POST   /{id}/promote              Sprint 23 D4 + Sprint 24 BL-064: team workspace 복제 (I-18, 202)
+                                  - 응답: new_note_id / audit_id / status / embedding_status (snake_case 보존)
+                                  - chunk N>0 → 기존 BG EmbeddingChunk 복제 (Sprint 23)
+                                  - chunk 0 + plain_text → BG embed_note_async 재생성 (Sprint 24 BL-064)
+                                  - plain_text 부재 → 400 (Sprint 23 6차 P2 회귀 가드)
+GET    /{id}/embedding-status     Sprint 24 BL-064: embedding 진행 상태 polling (NEW)
+                                  - RBAC: viewer 이상 (read-only)
+                                  - 응답: status (pending/processing/completed/failed/n/a) + chunkCount
 ```
 
 ### Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영)

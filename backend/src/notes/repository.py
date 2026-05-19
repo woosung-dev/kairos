@@ -96,5 +96,43 @@ class NoteRepository:
             )
         )).all())
 
+    # ── Sprint 24 BL-064: embedding-status polling endpoint 지원 ──
+
+    async def count_note_chunks(
+        self, note_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> int:
+        """target note 의 실 EmbeddingChunk 개수 — polling 응답 chunkCount.
+
+        I-9 4-C: workspace_id WHERE 필터 강제.
+        """
+        return (await self.session.exec(
+            select(func.count())
+            .select_from(EmbeddingChunk)
+            .where(
+                EmbeddingChunk.source_type == "note",
+                EmbeddingChunk.source_id == note_id,
+                EmbeddingChunk.workspace_id == workspace_id,
+            )
+        )).one()
+
+    async def find_latest_audit_for_note(
+        self, note_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> ItemPromotionAudit | None:
+        """target ws 의 note 에 대한 가장 최신 ItemPromotionAudit (new_item_id 기준).
+
+        promote 외 흐름의 note 는 audit 부재 — None 반환.
+        """
+        stmt = (
+            select(ItemPromotionAudit)
+            .where(
+                ItemPromotionAudit.item_type == "note",
+                ItemPromotionAudit.new_item_id == note_id,
+                ItemPromotionAudit.target_workspace_id == workspace_id,
+            )
+            .order_by(ItemPromotionAudit.created_at.desc())
+            .limit(1)
+        )
+        return (await self.session.exec(stmt)).one_or_none()
+
     async def commit(self) -> None:
         await self.session.commit()

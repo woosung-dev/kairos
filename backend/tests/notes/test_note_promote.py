@@ -1,9 +1,12 @@
 # Sprint 23 D4 Task 2 Step 2.3 — Notes promote 통합 테스트
+# Sprint 24 BL-064 — chunk 0 + plain_text BG schedule + embedding-status polling
 """Notes promote 1-button: Note 복제 + ItemPromotionAudit + 검증.
 
 I-18 (복제 + tombstone): 원본 Note 변경 없이 target ws 복제본 신규 + audit.
 검증: source != target / target type='team' / promoter 가 target ws 멤버.
-4 케이스: success / same_workspace 400 / target_not_member 403 / target_personal 400.
+기존 4 케이스 (Sprint 23): success / same_workspace 400 / target_not_member 403 / target_personal 400.
+Sprint 24 BL-064 신규 3 케이스: chunk 0 + plain_text → BG schedule + audit pending /
+chunk N>0 lifecycle pending 정합 / plain_text 부재 → 400 회귀 가드.
 """
 import uuid
 
@@ -229,5 +232,147 @@ async def test_promote_target_personal_rejected(
     response = await notes_client.post(
         f"/api/v1/workspaces/{personal_ws.id}/notes/{seed_note.id}/promote",
         json={"targetWorkspaceId": str(other_personal.id)},
+    )
+    assert response.status_code == 400
+
+
+# ── Sprint 24 BL-064: chunk 0 + plain_text 분기 + 회귀 가드 ──
+
+
+@pytest_asyncio.fixture
+async def seed_note_chunk_zero_with_plain_text(
+    integration_session, auth_user, personal_ws
+):
+    """plain_text 존재 + EmbeddingChunk 0 — Sprint 24 BL-064 신규 분기 (BG schedule)."""
+    from src.notes.models import Note
+
+    note = Note(
+        workspace_id=personal_ws.id,
+        project_id=None,
+        title="임베딩 대기 노트",
+        content={"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "임베딩 미완료"}]}]},
+        plain_text="임베딩 미완료",
+        created_by_id=auth_user.id,
+    )
+    integration_session.add(note)
+    await integration_session.flush()
+    await integration_session.commit()
+    return note
+
+
+@pytest_asyncio.fixture
+async def seed_note_empty(integration_session, auth_user, personal_ws):
+    """plain_text 부재 + EmbeddingChunk 0 — Sprint 23 6차 P2 회귀 가드."""
+    from src.notes.models import Note
+
+    note = Note(
+        workspace_id=personal_ws.id,
+        project_id=None,
+        title="빈 노트",
+        content={},
+        plain_text="",
+        created_by_id=auth_user.id,
+    )
+    integration_session.add(note)
+    await integration_session.flush()
+    await integration_session.commit()
+    return note
+
+
+@pytest.mark.asyncio
+async def test_promote_note_chunk_zero_plain_text_schedules_embed(
+    notes_client,
+    integration_session,
+    personal_ws,
+    team_ws,
+    seed_note_chunk_zero_with_plain_text,
+    monkeypatch,
+):
+    """BL-064: chunk 0 + plain_text 존재 → 400 대신 202 + audit pending + BG schedule wrapper 호출.
+
+    Sprint 23 D4 Codex 6차 P2 (chunk 0 거부) 의 보강 — plain_text 존재 시는 BG 재생성.
+    응답의 embedding_status snake_case 노출 + wrapper BG task 가 실 schedule 되어
+    audit 가 pending → processing → completed 전환되는지 검증
+    (pipeline.embed_note_async 는 noop monkeypatch 로 OpenAI 호출 차단).
+    """
+    from src.common.promote_models import ItemPromotionAudit
+
+    # OpenAI 호출 차단 — embed_note_async noop. wrapper 의 lifecycle 만 검증.
+    embed_calls: list[tuple] = []
+
+    async def _noop_embed(self, note_id, workspace_id):
+        embed_calls.append((note_id, workspace_id))
+
+    monkeypatch.setattr(
+        "src.notes.pipeline_service.NotePipelineService.embed_note_async",
+        _noop_embed,
+    )
+
+    response = await notes_client.post(
+        f"/api/v1/workspaces/{personal_ws.id}/notes/{seed_note_chunk_zero_with_plain_text.id}/promote",
+        json={"targetWorkspaceId": str(team_ws.id)},
+    )
+    assert response.status_code == 202, response.text
+    body = response.json()
+    # snake_case 보존 검증 (alias 추가 안 함)
+    assert "new_note_id" in body
+    assert "audit_id" in body
+    assert "embedding_status" in body
+    # response 의 즉시 응답 embedding_status = "pending" (BG task 진입 전 시점의 audit 초기값).
+    assert body["embedding_status"] == "pending"
+
+    # BG task wrapper 가 schedule + 실행되어 embed_note_async 호출 1회.
+    assert len(embed_calls) == 1
+    assert embed_calls[0] == (uuid.UUID(body["new_note_id"]), team_ws.id)
+
+    # BG wrapper lifecycle 검증 — audit 가 "pending" → "processing" → "completed" 전환.
+    # (BackgroundTasks 는 ASGITransport 가 response 직후 await — 본 시점에는 wrapper 완료)
+    await integration_session.refresh(
+        (await integration_session.execute(
+            select(ItemPromotionAudit).where(
+                ItemPromotionAudit.id == uuid.UUID(body["audit_id"])
+            )
+        )).scalar_one()
+    )
+    audit = (await integration_session.execute(
+        select(ItemPromotionAudit).where(
+            ItemPromotionAudit.id == uuid.UUID(body["audit_id"])
+        )
+    )).scalar_one()
+    assert audit.embedding_status == "completed"
+
+
+@pytest.mark.asyncio
+async def test_promote_note_chunk_n_lifecycle_pending(
+    notes_client,
+    personal_ws,
+    team_ws,
+    seed_note,
+):
+    """BL-064: chunk N>0 일 때도 audit.embedding_status="pending" 초기값 정합.
+
+    기존 흐름 회귀 가드 — chunk 복제 BG task 진입 직전 audit pending.
+    """
+    response = await notes_client.post(
+        f"/api/v1/workspaces/{personal_ws.id}/notes/{seed_note.id}/promote",
+        json={"targetWorkspaceId": str(team_ws.id)},
+    )
+    assert response.status_code == 202, response.text
+    body = response.json()
+    assert "embedding_status" in body
+    assert body["embedding_status"] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_promote_note_no_plain_text_no_chunk_rejected(
+    notes_client,
+    personal_ws,
+    team_ws,
+    seed_note_empty,
+):
+    """BL-064: plain_text 부재 + chunk 0 → 400 회귀 가드 (Sprint 23 6차 P2 유지)."""
+    response = await notes_client.post(
+        f"/api/v1/workspaces/{personal_ws.id}/notes/{seed_note_empty.id}/promote",
+        json={"targetWorkspaceId": str(team_ws.id)},
     )
     assert response.status_code == 400
