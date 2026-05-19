@@ -4,14 +4,35 @@
 헌법 I-9 (Sprint 19 PR #1, Codex F-1): 모든 메서드 workspace_id 필수.
 Codex F-2 Critical: create / update 시 project_id / meeting_id / assignee_id secondary FK
 cross-workspace 거부 (3건 가장 큰 분량).
+
+Sprint 23 D4 Task 2 Step 2.5: cross-workspace promote 추가 (4 도메인 중 action — 마지막 4/4).
+- I-18 (복제 + tombstone): 원본 보존 + target ws ActionItem 복제 + ItemPromotionAudit.
+- ActionItem 임베딩 ledger 부재 (actions 도메인 임베딩 미적용) → BG embedding 복제 task
+  schedule 없이 audit.embedding_status='n/a' 즉시 commit (inbox 와 동일).
+- composite FK 강제 (Sprint 21 BL-050): meeting_id / project_id 는 target ws orphan →
+  None reset. assignee_id 도 단순화 None reset (cross-workspace 사용자 책임 모호).
+- workspace_repo 옵션 주입 — promote 호출 시 필수 (없으면 RuntimeError via validate_promote_target).
 """
 import uuid
 from datetime import date, datetime
 
-from src.actions.exceptions import ActionItemNotFoundError
+from fastapi import BackgroundTasks
+
+from src.actions.exceptions import (
+    ActionItemNotFoundError,
+    CannotPromoteToPersonalError,
+    CannotPromoteToSameWorkspaceError,
+    TargetWorkspaceInvalidError,
+)
 from src.actions.models import ActionItem
 from src.actions.repository import ActionItemRepository
+from src.actions.schemas import ActionPromoteOut
 from src.common.exceptions import NotFoundError
+from src.common.promote_helpers import (
+    PromoteValidationError,
+    build_item_promotion_audit,
+    validate_promote_target,
+)
 from src.meetings.exceptions import MeetingNotFoundError
 from src.meetings.repository import MeetingRepository
 from src.projects.exceptions import ProjectNotFoundError
@@ -164,6 +185,104 @@ class ActionItemService:
         item = await self.repo.save(item)
         await self.repo.commit()
         return self._to_dict(item)
+
+    # ── Sprint 23 D4 Task 2 Step 2.5: promote 1-button ──
+
+    async def promote(
+        self,
+        *,
+        action_id: uuid.UUID,
+        source_workspace_id: uuid.UUID,
+        target_workspace_id: uuid.UUID,
+        promoted_by_user_id: uuid.UUID,
+        background_tasks: BackgroundTasks,
+    ) -> ActionPromoteOut:
+        """1-button promote: 원본 보존 + target ws ActionItem 복제 + audit.
+
+        I-18 (Promotion = 복제 + tombstone, 이동 금지): source ActionItem 변경 없음.
+        검증: source != target / target type='team' / promoter 가 target ws 멤버.
+        helper: common/promote_helpers.validate_promote_target + build_item_promotion_audit.
+
+        복제 정책 (composite FK 제약 + 단순화):
+        - meeting_id: None reset — Sprint 21 BL-050 composite FK
+          fk_action_items_meeting_workspace (workspace_id, meeting_id) → meetings(workspace_id, id)
+          강제. source meeting 은 target ws 에 존재 X → None reset.
+        - project_id: None reset — Sprint 19 PR #2 composite FK
+          fk_action_items_project_workspace (workspace_id, project_id) → projects(workspace_id, id)
+          강제. source project 는 target ws 에 존재 X → None reset (사용자가 target ws 에서
+          별도 분류 권장).
+        - assignee_id: None reset — assignee 는 user FK (workspace 무관). target ws 멤버
+          여부 + cross-workspace 사용자 할당 의미가 모호하여 단순화. 사용자가 target ws 에서
+          재할당 (헌법 A-3: assignee 는 워크스페이스 멤버만).
+        - title / description / priority / status / due_date 는 보존 (history 의미).
+        - ActionItem 모델은 created_by_id 필드가 없음 → audit.promoted_by_user_id 로 추적.
+
+        ActionItem 은 임베딩 ledger 부재 → BG embedding 복제 task schedule 없이
+        audit.embedding_status='n/a' 즉시 commit.
+
+        background_tasks 인자: notes/meetings 시그니처와 정렬 — 본 도메인은 미사용.
+        """
+        # 1. promote target 검증 (헬퍼 — 4 도메인 공통 패턴)
+        try:
+            await validate_promote_target(
+                source_workspace_id=source_workspace_id,
+                target_workspace_id=target_workspace_id,
+                promoted_by_user_id=promoted_by_user_id,
+                workspace_repo=self.workspace_repo,
+            )
+        except PromoteValidationError as exc:
+            # PromoteValidationError.code → action 도메인 HTTPException 매핑.
+            if exc.code == "same_workspace":
+                raise CannotPromoteToSameWorkspaceError() from exc
+            if exc.code == "target_personal":
+                raise CannotPromoteToPersonalError() from exc
+            # target_invalid / not_member → 403 (inbox/notes/meetings 패턴 정렬)
+            raise TargetWorkspaceInvalidError() from exc
+
+        # 2. 원본 ActionItem fetch (I-9 workspace_id 강제)
+        source = await self.repo.find_by_id(action_id, source_workspace_id)
+        if source is None:
+            raise ActionItemNotFoundError()
+
+        # 3. 복제 ActionItem (id 새로 발급, workspace_id=target).
+        # I-18: 원본 보존 — source 미변경.
+        # meeting_id / project_id / assignee_id 모두 None reset (위 docstring 참조).
+        new_item = ActionItem(
+            workspace_id=target_workspace_id,
+            meeting_id=None,
+            project_id=None,
+            assignee_id=None,
+            title=source.title,
+            description=source.description,
+            due_date=source.due_date,
+            priority=source.priority,
+            status=source.status,
+        )
+        new_item = await self.repo.save_promoted_action_item(new_item)
+
+        # 4. ItemPromotionAudit row (helper).
+        # embedding_status='n/a': ActionItem 임베딩 ledger 부재 — BG embedding 복제 없음.
+        audit = build_item_promotion_audit(
+            item_type="action",
+            source_item_id=source.id,
+            new_item_id=new_item.id,
+            source_workspace_id=source_workspace_id,
+            target_workspace_id=target_workspace_id,
+            promoted_by_user_id=promoted_by_user_id,
+            embedding_status="n/a",
+        )
+        await self.repo.save_item_promotion_audit(audit)
+
+        await self.repo.commit()
+
+        # 5. BG embedding 복제 task 없음 — ActionItem 은 직접 임베딩 안 됨.
+        # (notes/meetings 와 시그니처 정렬 위해 background_tasks 인자 유지.)
+
+        return ActionPromoteOut(
+            new_action_id=new_item.id,
+            audit_id=audit.id,
+            status="completed",
+        )
 
     @staticmethod
     def _to_dict(item: ActionItem) -> dict:

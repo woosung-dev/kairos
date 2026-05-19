@@ -41,7 +41,9 @@
 | 방향 | 대상 | 레벨 |
 |---|---|---|
 | out | `projects/repository` | Repository (read-only — 후보 프로젝트 조회) |
-| out | `workspaces/repository` | Repository (read-only — `inbox_threshold` 조회) |
+| out | `workspaces/repository` | Repository (read-only — `inbox_threshold` 조회, Sprint 23 D4 promote 시 target 검증) |
+| out | `meetings/repository` | Repository (read-only — classify 의 source_id 검증) |
+| out | `common/promote_helpers` | utility (Sprint 23 D4 — `validate_promote_target` + `build_item_promotion_audit`) |
 | in | `meetings/pipeline_service` | service 위임 (적재 시) |
 | in | `notes/service` | service 위임 (적재 시) |
 | in | `upload/service` | service 위임 (적재 시) |
@@ -80,6 +82,7 @@ POST   /inbox/{id}/dismiss     → 사용자가 무시 (is_processed=true, proje
 | IB-5 | **classify는 idempotent + N:M** — 같은 InboxItem을 여러 번 classify해도 마지막 입력의 project_ids/tags가 최종 |
 | IB-6 | **헌법 I-9 (Sprint 19 PR #1, Codex F-1)** — service / repository 모든 메서드 workspace_id 필수. find_by_id(inbox_id, workspace_id), classify(inbox_id, workspace_id, project_ids), dismiss(inbox_id, workspace_id) 시그니처 |
 | IB-7 | **Codex F-2 Critical secondary FK** — classify 의 project_ids 모두 같은 workspace 내인지 ProjectRepository.find_by_id + project.workspace_id 검증. cross-workspace 거부 → 404 (ProjectNotFoundError). add_meeting_link 시그니처 자체 변경은 후속 (PR #2 BUG-C01-EXT-FK alembic) |
+| IB-8 | **헌법 I-18 promote = 복제 + tombstone (Sprint 23 D4)** — `POST /inbox/{id}/promote` 는 원본 InboxItem 보존 + target ws 복제본 신규 + `ItemPromotionAudit(item_type='inbox')` row. source != target / target.type='team' / promoter 가 target ws 멤버 검증. `ai_suggested_project_id`=None reset (composite FK fk_inbox_suggested_project_workspace 제약, target ws orphan). `is_processed`=False reset (복제본은 사용자 재분류 대기). `source_id`/`ai_suggested_project_title`/`ai_suggested_tags`/`ai_confidence` 는 메타로 보존. InboxItem 임베딩 ledger 부재 → audit.embedding_status='n/a' + status='completed' (notes/meetings 와 차이) |
 
 ---
 
@@ -91,6 +94,7 @@ POST   /inbox/{id}/dismiss     → 사용자가 무시 (is_processed=true, proje
 GET    /                    목록 (미처리 우선)
 POST   /{id}/classify       확정/수정 (project_ids: list, tags: list)
 POST   /{id}/dismiss        무시
+POST   /{id}/promote        Sprint 23 D4 — Inbox → team workspace 복제 (I-18, 202)
 ```
 
 ### Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영)

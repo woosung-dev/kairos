@@ -3,7 +3,6 @@
 
 import { useMemo, useState } from "react";
 import { ChevronDown, Plus, Check } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   DropdownMenu,
@@ -26,7 +25,6 @@ export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
   const activeWid = useWorkspaceStore((s) => s.activeWorkspaceId);
   const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId);
   const queryClient = useQueryClient();
-  const router = useRouter();
   const { mutate: createWorkspace, isPending: isCreating } = useCreateWorkspace();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -40,11 +38,29 @@ export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
   );
   const activeSuffix = active ? suffixMap.get(active.id) : undefined;
 
+  // Sprint 23 D1 fix: queryClient.clear() → predicate invalidate (ws list 보존) + router.refresh() 제거.
+  // queryClient.clear() 가 workspaces.list 까지 invalidate → user 의 ws list 잠시 사라짐 + race.
+  // workspaces.list 만 보존 + 나머지 wid-scoped query 만 invalidate.
+  const invalidateWorkspaceScopedQueries = () => {
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey;
+        // workspaces.list (`["workspaces", "list"]`) 만 보존 — 사용자 ws list 유지
+        return !(
+          Array.isArray(key) &&
+          key[0] === "workspaces" &&
+          key[1] === "list"
+        );
+      },
+    });
+  };
+
   const handleSwitch = (wid: string) => {
     if (wid === activeWid) return;
     setActiveWorkspaceId(wid);
-    queryClient.clear();
-    router.refresh();
+    invalidateWorkspaceScopedQueries();
+    // router.refresh() 제거: invalidateQueries 만으로 wid 의존 컴포넌트 모두 새 데이터.
+    // Sprint 23 D1 진단 결과 — router.refresh() 가 RSC 재페치를 추가 트리거 → race.
   };
 
   const handleCreate = () => {
@@ -53,10 +69,9 @@ export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
     createWorkspace(name, {
       onSuccess: (ws) => {
         setActiveWorkspaceId(ws.id);
-        queryClient.clear();
+        invalidateWorkspaceScopedQueries();
         setNewName("");
         setIsCreateOpen(false);
-        router.refresh();
       },
     });
   };

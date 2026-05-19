@@ -128,7 +128,14 @@ export function useRemoveMember(wid: string | undefined) {
 
 // --- 초대 훅 ---
 
-export function useInvites(wid: string | undefined) {
+// Sprint 23 Codex 7차 P2 fix: enabled override 옵션 — admin/owner 만 호출 가능한
+// GET /workspaces/{id}/invites 가 member/viewer 에게 403 unauthorized 발생하지 않도록.
+// 기존 호출자 (admin manager UI 내부 InviteManager) 는 항상 admin context 라 enabled
+// 미지정 가능 (default true → !!wid).
+export function useInvites(
+  wid: string | undefined,
+  options?: { enabled?: boolean },
+) {
   const { getToken } = useAuth();
 
   return useQuery({
@@ -138,7 +145,7 @@ export function useInvites(wid: string | undefined) {
       if (!token) throw new Error("인증이 필요합니다");
       return fetchInvites(token, wid!);
     },
-    enabled: !!wid,
+    enabled: !!wid && (options?.enabled ?? true),
   });
 }
 

@@ -2,10 +2,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 import { useNotes, useCreateNote } from "../hooks";
 import { useProjects } from "@/features/projects/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
 import type { Note } from "../types";
 
 /* ── 헬퍼: 일반 텍스트 → tiptap JSON 문서 ── */
@@ -221,6 +223,7 @@ export function QuickMemo() {
               key={memo.id}
               memo={memo}
               projectTitle={memo.projectId ? projectTitleMap.get(memo.projectId) ?? null : null}
+              workspaceId={wid ?? null}
             />
           ))}
         </div>
@@ -247,10 +250,13 @@ export function QuickMemo() {
 function MemoCard({
   memo,
   projectTitle,
+  workspaceId,
 }: {
   memo: Note;
   projectTitle: string | null;
+  workspaceId: string | null;
 }) {
+  const [isPromoteOpen, setIsPromoteOpen] = useState(false);
   const createdDate = memo.createdAt?.slice(0, 10) ?? "";
   const preview = memo.plainText?.slice(0, 200) ?? "";
 
@@ -277,16 +283,51 @@ function MemoCard({
       <p className="text-xs line-clamp-2 mb-2" style={{ color: "var(--text-secondary)" }}>
         {preview || "내용 없음"}
       </p>
-      {projectTitle && (
-        <span
-          className="px-1.5 py-0.5 rounded text-[10px]"
-          style={{
-            background: "var(--accent-subtle)",
-            color: "var(--accent)",
-          }}
-        >
-          {projectTitle}
-        </span>
+      <div className="flex items-center justify-between gap-2">
+        {projectTitle ? (
+          <span
+            className="px-1.5 py-0.5 rounded text-[10px]"
+            style={{
+              background: "var(--accent-subtle)",
+              color: "var(--accent)",
+            }}
+          >
+            {projectTitle}
+          </span>
+        ) : (
+          <span />
+        )}
+        {workspaceId && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsPromoteOpen(true);
+            }}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors border"
+            style={{
+              borderColor: "var(--border)",
+              color: "var(--text-muted)",
+              borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              minHeight: "28px",
+            }}
+            aria-label="워크스페이스 이동"
+          >
+            <ArrowUpRight className="h-3 w-3" />
+            워크스페이스 이동
+          </button>
+        )}
+      </div>
+
+      {workspaceId && (
+        <ItemPromoteModal
+          itemType="note"
+          itemId={memo.id}
+          sourceWorkspaceId={workspaceId}
+          open={isPromoteOpen}
+          onOpenChange={setIsPromoteOpen}
+        />
       )}
     </div>
   );

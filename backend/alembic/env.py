@@ -33,6 +33,7 @@ from src.memory.models import (  # noqa: F401
     PromotionAudit,
     MemoryQueryEmbeddingCache,
 )
+from src.common.promote_models import ItemPromotionAudit  # noqa: F401
 
 from sqlmodel import SQLModel
 

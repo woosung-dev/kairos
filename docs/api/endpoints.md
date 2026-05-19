@@ -121,6 +121,10 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 | 41 | 15 | `GET` | `/api/v1/workspaces/{wid}/memory/{memory_id}` | 단일 메모 polling (status + distilled_json) — require_viewer |
 | 42 | 15 | `POST` | `/api/v1/workspaces/{wid}/memory/{memory_id}/promote` | 메모 → team workspace 복제 (I-18 복제+tombstone, 202 + BG) — require_member |
 | 43 | 15 | `POST` | `/api/v1/admin/memory/r2-cleanup` | 30일 경과 voice R2 객체 cleanup (X-Cron-Token header, GCP Cloud Scheduler 호출) |
+| 44 | 23 | `POST` | `/api/v1/workspaces/{wid}/meetings/{mid}/promote` | 회의 → team workspace 복제 (Meeting/Summary/Segments + EmbeddingChunk BG 복제, I-18, 202) — require_member |
+| 45 | 23 | `POST` | `/api/v1/workspaces/{wid}/notes/{nid}/promote` | 노트 → team workspace 복제 (Note + EmbeddingChunk BG 복제, project_id=None 복제본, I-18, 202) — require_member |
+| 46 | 23 | `POST` | `/api/v1/workspaces/{wid}/inbox/{iid}/promote` | Inbox 아이템 → team workspace 복제 (InboxItem 복제, ai_suggested_project_id=None + is_processed=False reset, BG embedding 없음 — audit.embedding_status='n/a', I-18, 202) — require_member |
+| 47 | 23 | `POST` | `/api/v1/workspaces/{wid}/action-items/{aid}/promote` | 액션 아이템 → team workspace 복제 (ActionItem 복제, meeting_id/project_id/assignee_id=None reset, BG embedding 없음 — audit.embedding_status='n/a', I-18, 202) — require_member |
 
 > **Sprint 15 변경 (Memory 모듈 신설)** — ADR-016 Personal↔Team IA + Recall-first wedge:
 > - 38~43: 신규 6 endpoint (memory 도메인). 38/39/40/41/42는 `/api/v1/workspaces/{ws_id}/memory*` 패턴 (I-13 정합). 43은 admin 예외.
@@ -675,6 +679,54 @@ Inbox 아이템을 무시(dismiss) 처리한다.
 
 ---
 
+#### `POST /api/v1/workspaces/{wid}/inbox/{id}/promote`
+
+> **Sprint 23 D4 (Task 2 Step 2.4)** — 헌법 I-18 (Promotion = 복제 + tombstone, 이동 금지) 강제.
+
+Inbox 아이템을 team workspace 로 복제한다. 원본 InboxItem 은 source workspace 에 보존되고, target workspace 에 새 InboxItem 복제본 + `ItemPromotionAudit(item_type='inbox')` row 가 생성된다.
+
+**Request:**
+
+| 항목 | 값 |
+|------|-----|
+| Headers | `Authorization: Bearer <clerk_jwt>` |
+| Path | `wid` — source 워크스페이스 UUID, `id` — Inbox 아이템 UUID |
+| Body | `{ "targetWorkspaceId": "uuid" }` |
+| RBAC | `require_member` (source ws) + promoter 가 target ws 멤버 |
+
+**Response:**
+
+```
+202 Accepted
+```
+
+```json
+{
+  "new_inbox_id": "uuid",
+  "audit_id": "uuid",
+  "status": "completed"
+}
+```
+
+**복제 정책:**
+
+- `title`, `summary`, `source_type`, `source_id`, `ai_suggested_project_title`, `ai_suggested_tags`, `ai_confidence` 는 그대로 복제.
+- `ai_suggested_project_id`=None reset (composite FK `fk_inbox_suggested_project_workspace` 가 (workspace_id, ai_suggested_project_id) 정합 강제 — target ws 와 무관).
+- `is_processed`=False reset (복제본은 target ws 사용자 재분류 대기).
+- `source_id` 는 soft reference (FK 미강제) — cross-workspace transitive 참조 그대로 보존.
+- BG embedding 복제 없음 (InboxItem 은 source_type='inbox' EmbeddingChunk 가 실제 인서트되지 않음 — `_ALLOWED_SOURCE_TYPES` whitelist 만 존재). audit.embedding_status='n/a' + 응답 status='completed' (notes/meetings 의 'embedding_pending' 과 차이).
+
+**에러:**
+
+| 상태 | 사유 | 응답 |
+|:----:|------|------|
+| 400 | source == target | `같은 워크스페이스로는 promote 할 수 없습니다` |
+| 400 | target.type='personal' | `개인 워크스페이스로는 promote 할 수 없습니다` |
+| 403 | target ws 미존재 또는 promoter 가 target ws 멤버 아님 | `대상 워크스페이스가 유효하지 않습니다` |
+| 404 | source inbox_id 미존재 | `Inbox 아이템을 찾을 수 없습니다` |
+
+---
+
 ### Projects
 
 #### `GET /api/v1/workspaces/{wid}/projects`
@@ -1048,6 +1100,55 @@ ActionItem
 
 ---
 
+#### `POST /api/v1/workspaces/{wid}/action-items/{id}/promote`
+
+> **Sprint 23 D4 (Task 2 Step 2.5)** — 헌법 I-18 (Promotion = 복제 + tombstone, 이동 금지) 강제.
+
+액션 아이템을 team workspace 로 복제한다. 원본 ActionItem 은 source workspace 에 보존되고, target workspace 에 새 ActionItem 복제본 + `ItemPromotionAudit(item_type='action')` row 가 생성된다.
+
+**Request:**
+
+| 항목 | 값 |
+|------|-----|
+| Headers | `Authorization: Bearer <clerk_jwt>` |
+| Path | `wid` — source 워크스페이스 UUID, `id` — 액션 아이템 UUID |
+| Body | `{ "targetWorkspaceId": "uuid" }` |
+| RBAC | `require_member` (source ws) + promoter 가 target ws 멤버 |
+
+**Response:**
+
+```
+202 Accepted
+```
+
+```json
+{
+  "new_action_id": "uuid",
+  "audit_id": "uuid",
+  "status": "completed"
+}
+```
+
+**복제 정책:**
+
+- `title`, `description`, `priority`, `status`, `due_date` 는 그대로 복제 (history 의미 보존).
+- `meeting_id`=None reset — Sprint 21 BL-050 composite FK `fk_action_items_meeting_workspace` 가 (workspace_id, meeting_id) → meetings(workspace_id, id) 정합 강제. target ws 는 source meeting 미보유.
+- `project_id`=None reset — Sprint 19 PR #2 composite FK `fk_action_items_project_workspace` 가 (workspace_id, project_id) → projects(workspace_id, id) 정합 강제. target ws 는 source project 미보유 (사용자가 target ws 에서 별도 분류 권장).
+- `assignee_id`=None reset — 단순화 정책. assignee 는 user FK (workspace 무관) 이지만 헌법 A-3 (assignee 는 워크스페이스 멤버만) + cross-workspace 사용자 책임 모호 → None reset. 사용자가 target ws 에서 재할당.
+- BG embedding 복제 없음 (ActionItem 임베딩 ledger 부재 — actions 도메인 임베딩 미적용). audit.embedding_status='n/a' + 응답 status='completed' (inbox 와 동일, notes/meetings 의 'embedding_pending' 과 차이).
+- ActionItem 모델은 created_by_id 필드 없음 → audit.promoted_by_user_id 로 promoter 추적.
+
+**에러:**
+
+| 상태 | 사유 | 응답 |
+|:----:|------|------|
+| 400 | source == target | `같은 워크스페이스로는 promote 할 수 없습니다` |
+| 400 | target.type='personal' | `개인 워크스페이스로는 promote 할 수 없습니다` |
+| 403 | target ws 미존재 또는 promoter 가 target ws 멤버 아님 | `대상 워크스페이스가 유효하지 않습니다` |
+| 404 | source action_id 미존재 | `액션 아이템을 찾을 수 없습니다` |
+
+---
+
 ## Sprint 3: RAG + Notes (구현 완료)
 
 > 설계 문서: `docs/superpowers/specs/2026-04-02-sprint3-rag-notes-design.md`
@@ -1060,6 +1161,7 @@ ActionItem
 | 30 | `POST` | `/api/v1/workspaces/{wid}/notes` | 노트 생성 (`projectId` 선택적) |
 | 31 | `PATCH` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 수정 (debounce 자동저장) |
 | 32 | `DELETE` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 삭제 (204) |
+| 45 | `POST` | `/api/v1/workspaces/{wid}/notes/{id}/promote` | Sprint 23 D4: 노트 → team workspace 복제 (I-18, 202 + BG embedding). target=personal/존재X/non-member 시 400 / 403. ItemPromotionAudit(item_type='note') row 생성. |
 
 ### RAG Ask (`POST /rag/ask`)
 

@@ -22,14 +22,30 @@ import {
 import { useMembers, useUpdateMemberRole, useRemoveMember } from "../hooks";
 import type { Member, WorkspaceRole } from "../types";
 
+// Sprint 23 D2 Variant C: 모든 role badge 가 사각 outline + Geist Mono 11px 통일.
+// 색상 강조는 owner=accent, admin=text-primary, default=text-secondary 로 의미만 분리.
+type RoleTone = "owner" | "admin" | "default";
+
 const ROLE_CONFIG: Record<
   WorkspaceRole,
-  { label: string; icon: typeof Crown; variant: "default" | "secondary" | "outline" | "destructive" }
+  { label: string; icon: typeof Crown; tone: RoleTone }
 > = {
-  owner: { label: "Owner", icon: Crown, variant: "default" },
-  admin: { label: "Admin", icon: ShieldCheck, variant: "secondary" },
-  member: { label: "Member", icon: Shield, variant: "outline" },
-  viewer: { label: "Viewer", icon: Eye, variant: "outline" },
+  owner: { label: "OWNER", icon: Crown, tone: "owner" },
+  admin: { label: "ADMIN", icon: ShieldCheck, tone: "admin" },
+  member: { label: "MEMBER", icon: Shield, tone: "default" },
+  viewer: { label: "VIEWER", icon: Eye, tone: "default" },
+};
+
+const ROLE_TONE_STYLE: Record<RoleTone, React.CSSProperties> = {
+  owner: { borderColor: "var(--accent)", color: "var(--accent)" },
+  admin: {
+    borderColor: "var(--border)",
+    color: "var(--text-primary)",
+  },
+  default: {
+    borderColor: "var(--border)",
+    color: "var(--text-secondary)",
+  },
 };
 
 interface MemberListProps {
@@ -120,8 +136,21 @@ export function MemberList({ workspaceId, currentUserRole }: MemberListProps) {
 
               {/* 오른쪽: 역할 뱃지 + 액션 */}
               <div className="flex items-center gap-2 shrink-0">
-                <Badge variant={config.variant} className="gap-1 text-xs">
-                  <RoleIcon className="w-3 h-3" />
+                <Badge
+                  variant="outline"
+                  className="gap-1 rounded-sm bg-transparent"
+                  style={{
+                    fontFamily:
+                      '"Geist Mono", ui-monospace, "SF Mono", Menlo, Monaco, monospace',
+                    fontSize: 11,
+                    fontWeight: 500,
+                    letterSpacing: "0.04em",
+                    paddingInline: 6,
+                    paddingBlock: 2,
+                    ...ROLE_TONE_STYLE[config.tone],
+                  }}
+                >
+                  <RoleIcon className="w-3 h-3" aria-hidden />
                   {config.label}
                 </Badge>
 

@@ -575,27 +575,12 @@ Stage 5-4 design-review. PromoteModal combobox에 동일한 name "E2E 테스트 
 
 ---
 
-## BL-017 — Mobile FAB collision with bottom nav
+## BL-017 — Mobile FAB collision with bottom nav ✅ **완료 (Sprint 22 OBN-04, 2026-05-19 PR #97 `22da49b`)**
 
-**현 상태:**
-Stage 5-4 design-review mobile viewport (375x667). /memory FAB (bottom-8 right-8 h-14 w-14)와 mobile bottom navigation bar 충돌. FAB가 nav 위에 떠있어 시각적으로 부딪힘, 또는 nav가 FAB 일부를 가림.
+**해소:**
+Sprint 22 OBN-04 (FAB↔BottomNav collision fix) 에서 mobile viewport (`md:hidden`) FAB 의 `bottom-{nav-height + 16px}` margin 적용 + banner flex-wrap + mobile-responsive spec 통합 처리.
 
-**목표 인터페이스:**
-- Mobile `md:hidden` 분기에서 FAB `bottom-{nav-height + 16px}` 적용
-- 또는 FAB → bottom nav "+ 추가" 통합 (이미 nav에 "+ 추가" 있음)
-- 또는 FAB mobile에서 숨김, bottom nav "+ 추가"가 /new 대신 CaptureSheet 트리거
-
-**예상 LOC delta:** +30 (FAB margin 조건부 또는 nav rewire)
-
-**Risk:** 🟢 낮음
-
-**Test harness:** design-review mobile viewport 재실행
-
-**우선순위:** ★★★☆☆ (P2 — mobile 사용성)
-
-**Sprint 묶음 권고:** Sprint 16/17 mobile polish
-
-**근거:** Stage 5-4 design-review specialist 2026-05-14 F-33
+**근거:** Stage 5-4 design-review specialist 2026-05-14 F-33 → Sprint 22 commit `22da49b` 에서 해소.
 
 ---
 
@@ -1521,3 +1506,225 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
   - 2차 scores: 1=2 / 2=5 / 3=4 / 4=5 / 5=3
 
 **근거**: Sprint 19 PR #2 D9 + BL-052 cleanup PR Plan agent verdict + Codex 1차/2차 review.
+
+---
+
+## Sprint 22 carry-over (CO-1~14, 2026-05-19 Sprint 23 진입 시 BL 등재)
+
+> 출처: `~/.claude/projects/.../memory/project_sprint22_done.md` carry-over 섹션. Sprint 24+ 진입 시 각 BL 상세 채움.
+
+## BL-055 — OpenTelemetry full instrumentation (CO-1)
+
+**현 상태:** Sprint 22 Sentry FE+BE conditional init 적용 (ADR-021). OpenTelemetry 는 Sentry 위 layer 로 RAG p50/p95 / pipeline span / cross-domain trace 미구현.
+
+**목표:** OpenTelemetry SDK 도입 → RAG 6-Layer + meetings pipeline + cross-domain orchestrator span 측정. Sentry breadcrumb + OTel span 통합.
+
+**Risk:** 🟡 중간 — production 비용 + Cloud Run cold start 영향 측정 필요.
+
+**우선순위:** ★★★☆☆ (P2, Sprint 24+ observability sprint 묶음)
+
+**Sprint 묶음 권고:** Sprint 25+ production observability deepening
+
+**근거:** Sprint 22 carry-over CO-1.
+
+---
+
+## BL-056 — Email reminder for stuck onboarding (CO-2)
+
+**현 상태:** Sprint 22 OBN-02 onboarding_step 0~4 적용. step ≤ 2 + 24h+ 정체 user 대상 reminder 미구현.
+
+**목표:** BackgroundTask 또는 별도 worker → step ≤ 2 + last_activity > 24h user 에게 email reminder 발송. unsubscribe link 포함.
+
+**Risk:** 🟢 낮음 — email provider 선정 + template 필요.
+
+**우선순위:** ★★☆☆☆ (P3, growth marketing 후순위)
+
+**Sprint 묶음 권고:** 외부 user dogfooding 시작 후 retention 측정 결과 기반.
+
+**근거:** Sprint 22 carry-over CO-2.
+
+---
+
+## BL-057 — Onboarding step 5+ collaboration (CO-3)
+
+**현 상태:** Sprint 22 OBN-02 step 4 (RAG ask) 까지 정의. 협업 액션 (첫 댓글 / 첫 share / 첫 invite) 후속 step 미정의.
+
+**목표:** step 5+ 추가 — 첫 댓글 / 첫 share / 첫 invite 이벤트 hook. 협업 onboarding 측정.
+
+**Risk:** 🟢 낮음 — onboarding 도메인 module 확장.
+
+**우선순위:** ★★☆☆☆ (P3, 협업 기능 활성화 후)
+
+**Sprint 묶음 권고:** Sprint 26+ 협업 기능 sprint.
+
+**근거:** Sprint 22 carry-over CO-3.
+
+---
+
+## BL-058 — A/B test framework for OnboardingBanner copy (CO-4)
+
+**현 상태:** OnboardingBanner copy 하드코딩. A/B 측정 framework 부재.
+
+**목표:** PostHog / GrowthBook 등 도입 → banner copy variant A/B → conversion 측정.
+
+**Risk:** 🟡 중간 — 외부 provider 선정 + feature flag 인프라.
+
+**우선순위:** ★★☆☆☆ (P3, growth experimentation 후순위)
+
+**Sprint 묶음 권고:** Sprint 27+ growth experimentation.
+
+**근거:** Sprint 22 carry-over CO-4.
+
+---
+
+## BL-059 — Sentry observability 후속 (BL-OBS-1/2/3, CO-8/9/10)
+
+**현 상태:** Sprint 22 Sentry FE+BE conditional init 적용. quota 모니터링 + 배포 체크리스트 + PII linter 미구현.
+
+**목표:**
+- BL-OBS-1: Sentry quota 모니터링 (월 한도 임계 알람)
+- BL-OBS-2: 배포 체크리스트 (DSN env 검증 + before_send PII scrub regression 차단)
+- BL-OBS-3: PII linter (CI 단계 `name` / `email` / `phone` 등 민감 필드 server-side 로그 차단)
+
+**Risk:** 🟡 중간 — CI 단계 linter false-positive 조정 + provider 한도 추적.
+
+**우선순위:** ★★★☆☆ (P2, production observability 안정화)
+
+**Sprint 묶음 권고:** Sprint 24/25 observability sprint.
+
+**근거:** Sprint 22 carry-over CO-8/9/10.
+
+---
+
+## BL-060 — Playwright G3/G5/G6 progress N/4 assertion (CO-11)
+
+**현 상태:** Sprint 22 Playwright G2/G7/G8 NEW. G3/G5/G6 progress N/4 assertion 보강 미진행 (runtime fixture 후).
+
+**목표:** Playwright spec G3/G5/G6 에 OnboardingBanner progress N/4 assertion 추가. runtime fixture 도입 후 활성화.
+
+**Risk:** 🟢 낮음.
+
+**우선순위:** ★★☆☆☆ (P3).
+
+**Sprint 묶음 권고:** Sprint 24/25 e2e coverage 보강.
+
+**근거:** Sprint 22 carry-over CO-11.
+
+---
+
+## BL-061 — Playwright G4 SSE mock 디버깅 (CO-12)
+
+**현 상태:** Sprint 22 G4 SSE mock 디버깅 시 sub-agent stall. spec skip 상태.
+
+**목표:** G4 spec runtime PASS — SSE response mock fixture 안정화 + done event 처리.
+
+**Risk:** 🟡 중간 — SSE mock pattern 표준화 필요.
+
+**우선순위:** ★★★☆☆ (P2).
+
+**Sprint 묶음 권고:** Sprint 24 e2e fix.
+
+**근거:** Sprint 22 carry-over CO-12.
+
+---
+
+## BL-062 — BE timezone-aware DateTime 전환 (CO-14)
+
+**현 상태:** Sprint 22 Codex 2차 polish 에서 FE Zod `.datetime()` (Z suffix 강제) 제거 + nullable 유지. BE 가 naive DateTime 사용 중. FE 가 timezone 보장 못함.
+
+**목표:** BE 의 `datetime.utcnow()` → `datetime.now(UTC)` 전 도메인 통일 + alembic timezone aware migration + FE Zod `z.iso.datetime()` 복원.
+
+**Risk:** 🔴 높음 — 전 도메인 모델 + 기존 row backfill + FE all date display 영향.
+
+**우선순위:** ★★★☆☆ (P2 — type safety + global team 대비).
+
+**Sprint 묶음 권고:** Sprint 26+ 전 도메인 timezone migration sprint.
+
+**근거:** Sprint 22 carry-over CO-14 + Sprint 6 dogfooding PR #14 (workspaces timezone-naive 통일).
+
+---
+
+> **CO-5** = BL-050 의 "잔여 3 entity (memory_items / memory_ai_calls / promotion_audit)" 로 흡수. BL-050 §"잔여" 섹션 참조.
+> **CO-6** = ADR-019 Phase B (Gemini 3.1-flash-lite 6 spots swap, 2026-05-28 EOL) — TODO.md Sprint 24+ Next Actions 명시. BL 신설 없음.
+> **CO-7** = BUG-AUTH-WH (Clerk webhook Svix 서명 + event allowlist + idempotency) — Sprint 19 PR #3 carry. BL 신설 없음.
+> **CO-13** = `test_config.py` pyright +3 baseline (본 sprint 무관) — micro fix, BL 신설 가치 적음. Sprint 24+ 자율 cleanup.
+
+---
+
+## BL-063 — ActionItem 도메인 promote source actions 복제 (Sprint 23 CO-15)
+
+**현 상태:** Sprint 23 D4 Meeting promote 가 `action_item_count=0` reset (Codex 3차 P3 fix). 실 ActionItem 행은 복제 안 함 → target meeting 의 action 탭 빈.
+
+**목표:** Meeting promote 시 source 의 ActionItem rows 도 새 meeting_id 로 remap 복제. 또는 사용자 명시 trigger UI (별도 ActionItem promote endpoint 이미 존재).
+
+**Risk:** 🟢 낮음.
+
+**우선순위:** ★★☆☆☆ (P3).
+
+**Sprint 묶음 권고:** Sprint 25+ promote 정합성.
+
+**근거:** Sprint 23 D4 Codex 3차 P3 carry-over.
+
+---
+
+## BL-064 — Note promote 의 임베딩 재계산 옵션 (Sprint 23 CO-16)
+
+**현 상태:** Sprint 23 D4 Note promote 가 source chunk 0 인 경우 `NotePromoteNotEmbeddedError(400)` 거부 (Codex 6차 P2 fix). 사용자에게 재시도 안내.
+
+**목표:** source plain_text 있고 chunk 만 부재 (embed_note_async race) 인 경우 target ws 에 `embed_note_async` 흐름 schedule → 자동 embedding. UX 개선.
+
+**Risk:** 🟡 중간 — EmbeddingService instance + BG task chain.
+
+**우선순위:** ★★☆☆☆ (P3).
+
+**Sprint 묶음 권고:** Sprint 24/25 promote UX 보강.
+
+**근거:** Sprint 23 Codex 6차 P2 권장 "Recompute embeddings".
+
+---
+
+## BL-065 — Member.last_active_at 필드 (Sprint 23 CO-17)
+
+**현 상태:** Sprint 23 D2 Variant C 디자인 보완 detail "last activity Nd ago". `Member` type / BE schema 미존재 → 미적용 (visual-only 스코프 유지).
+
+**목표:** BE `WorkspaceMember.last_active_at` column + alembic + FE `Member.lastActiveAt` + member-list row 우측 "Nd ago" 표시 (Geist Mono 11px).
+
+**Risk:** 🟡 중간 — schema 변경 + activity tracking 로직 (기본 = last API 호출 시점).
+
+**우선순위:** ★★☆☆☆ (P3).
+
+**Sprint 묶음 권고:** Sprint 26+ Settings UX.
+
+**근거:** Sprint 23 D2 Variant C 시안 미적용 carry-over.
+
+---
+
+## BL-066 — D1/D3 dogfood verify (Sprint 23 CO-18)
+
+**현 상태:** Sprint 23 Task 5 D1 (WorkspaceSwitcher) + Task 6 D3 (Inbox dismiss UX) = 정적 분석 + minimal fix. 실 dev server reproduce 미진행.
+
+**목표:** dev server 또는 CI e2e job 결과로 fix 실 효과 확인. 부족 시 root cause 추가 분석.
+
+**Risk:** 🟢 낮음 — verify 작업.
+
+**우선순위:** ★★★☆☆ (P2 — dogfood validation).
+
+**Sprint 묶음 권고:** Sprint 24 첫 dogfood 사이클.
+
+**근거:** Sprint 23 진단 first 미완 (Playwright reproduce 환경 의존).
+
+---
+
+## BL-067 — pyright `_update(...).where(...)` false-positive (Sprint 23 CO-19)
+
+**현 상태:** memory / meetings / notes / actions 도메인 `session.exec(_update(M).where(M.id == X).values(...))` 패턴이 pyright reportAssignmentType false-positive (M.id 의 bool 캐스팅). 4 도메인 동일.
+
+**목표:** pyright stub 또는 SQLModel typing 개선으로 false-positive 차단. 또는 `# type: ignore[...]` 일관성 적용 + 사유 명시.
+
+**Risk:** 🟢 낮음 — type 진단만, runtime 무관.
+
+**우선순위:** ★☆☆☆☆ (P4 — quality of life).
+
+**Sprint 묶음 권고:** Sprint 27+ pyright cleanup.
+
+**근거:** Sprint 23 다수 sub-agent 발견.

@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-05-17 (Sprint 19 v3 진입 — 2차 codex BLOCK → tenant/auth boundary fix scope 축소 + matrix 45 lock-in)
+> 마지막 업데이트: 2026-05-19 (Sprint 23 cozy-crystal 완료 — PR #98 draft, Codex 6 cycle 11 finding 100% 수락)
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조 — Completed / Blocked / Questions / Next Actions 4섹션 운영.
 
@@ -10,41 +10,78 @@
 
 > 차단(Blocked) 항목은 이유 + 필요한 조치를 함께 기록. AI가 사용자에게 빈번하게 질문하는 대신 본 섹션에 누적 후 자연스러운 타이밍에 일괄 전달.
 
-- _현재 차단 항목 없음._
+- [ ] **Clerk Production key 발급** — Sprint 14 부터 carry. `pk_live_*` / `sk_live_*` 발급 후 Vercel env 등록. 효과: dev 배지 제거 + 외부 dogfooding 활성화.
+- [ ] **Sentry DSN 발급** — Sprint 22 conditional init 활성화. 발급 + Vercel/Cloud Run env 등록 + 알람 verify.
+- [ ] **외부 user 1명 실제 dogfooding** — Sprint 22 spec `docs/dev-log/2026-05-19-sprint22-dogfooding.md` 12분 walkthrough.
 
 ---
 
-## Next Actions (Sprint 19 v3 — P0 9건만, P1 전부 Sprint 20 carry-over)
+## Next Actions (Sprint 24 — ADR-019 Phase B + dogfood verify carry-over)
 
-> v3 lock-in (2026-05-17, post-2차-codex BLOCK): `docs/dev-log/sprint-19-plan.md` §9 + `~/.claude/plans/read-docs-dev-log-sprint-19-plan-md-hazy-catmull.md`
-> Sprint 기간: 2주 (2026-05-17 ~ 06-01 추정). 워크트리 `../kairos-sprint-19/`, 브랜치 `sprint-19/tenant-boundary-hardening`.
+> Sprint 23 cozy-crystal 완료 (2026-05-19, PR #98 draft 19 commits). D1~D4 + F1~F4 8건 통합 + Codex 6 cycle 11 finding 100% 수락. 다음 Sprint 24 = ADR-019 Phase B (Gemini 3.1-flash-lite swap, 2026-05-28 EOL) + Sprint 23 dogfood verify (BL-066).
 
-### P0 (Sprint 19 — 9 PR stack, ~92-132h)
-- [ ] **PR #1 BUG-C01-EXT v3** — workspace-scoped endpoint **45** workspace_id 강제 (matrix lock-in: projects 11 / meetings 6 / notes 6 / memory 5 / workspaces 8 / inbox 3 / actions 3 / upload 2 / rag 1). 42-60h. **회귀 테스트 골격 완료 (failing TDD, 2026-05-17)** → 도메인별 commit fix 진행.
-- [ ] **PR #2 BUG-C01-EXT-FK** — inbox.classify + actions.create FK cross-workspace 검증 (6-8h)
-- [ ] **PR #3 BUG-AUTH-WH** — Clerk webhook Svix 서명 검증 + event allowlist + idempotency (4-6h)
-- [ ] **PR #4 BUG-UPL-OWN** — upload_assets DB ledger + alembic migration (6-10h)
-- [ ] **PR #5 BUG-PROJ-DEL** — project delete cascade 정책 + alembic (8-12h, 진입 시 cascade vs archive 사용자 결정)
-- [ ] **PR #6 BUG-PIPE-LLM** — meetings pipeline LLM 추천 project_id set membership 검증 (2-3h)
-- [ ] **PR #7 BUG-P1-05 + P1-06** — 보안 헤더 6종 + SlowAPI middleware ordering (12-14h)
-- [ ] **PR #8 BUG-C02 + BUG-C03** — `/projects` `/meetings` page + FE/BE API contract 통일 (8-13h)
-- [ ] **PR #9 closeout** — verification + nightly heavy spec + retro + Sprint 20 carry-over BL 등재 (4-6h)
+### 🔴 P0 — 데드라인 임박
+- [ ] **ADR-019 Phase B** (2026-05-28 데드라인) — `backend/src/common/prompts.py` 또는 도메인별 6 spots `gemini-2.5-flash` → `gemini-3.1-flash-lite` swap. spike validated 5.76x speedup / 20% cost 절감.
 
-### P1 / P2 — Sprint 20 carry-over (전부)
-- BL-017 Mobile FAB collision / BL-024 pg_prewarm / 온보딩 (ISSUE-OBN-01~04) / BUG-C04 Export UI
-- ADR-019 Phase B verify / production observability / BL-040/036 measure
-- BL-016 / BL-019 / BL-026 / BL-028 / BL-045 / spec PASSWORD ENV화 확장
-- IDOR timing side-channel nightly (Codex M3) / G.3 SSE BE cleanup (Codex H10-7 verification)
-- H10-8 React Query workspace switch RAG state clear / H10-9 Clerk session lazy create / M10-1 invite race
+### 🟡 P1 — Sprint 24 권장 포함
+- [ ] **BL-066** Sprint 23 D1/D3 dogfood verify — dev server reproduce 또는 CI e2e job 결과 확인. fix 부족 시 추가 root cause 분석.
+- [ ] **BL-063** ActionItem 도메인 promote source actions 복제 (Sprint 23 D4 CO-15)
+- [ ] **BL-064** Note promote 의 임베딩 재계산 옵션 (Sprint 23 D4 CO-16)
 
-### PR #1 진입 직전 [확인 필요]
-- [x] ~~endpoint matrix 30+ 자동 생성 후 사용자 확정~~ → DONE 2026-05-17 (45 lock-in)
-- [ ] BUG-PROJ-DEL 정책 (cascade vs archive only) — PR #5 진입 시. 권장: archive only
-- [ ] BUG-UPL-OWN 기존 R2 객체 backfill 정책 — PR #4 진입 시
-- [ ] CSP report endpoint (BE vs Sentry) — PR #7 진입 시
-- [ ] BUG-C03 실제 진입점 — Casual 페르소나 보고서 재확인 (PR #8 진입 시)
+### Sprint 25+ carry-over
+- CO-1~14 (Sprint 22 carry, BACKLOG 등재)
+- CO-15~19 (Sprint 23 carry, BL-063~067 등재)
+- BL-024 pg_prewarm Cloud Run cold start
+- BL-026 옵션 A — dev DB export + ground truth (production scale recall)
+- BL-065 Member.last_active_at 필드 (Sprint 23 D2 carry CO-17)
+- BL-067 pyright `_update(...).where(...)` false-positive (Sprint 23 CO-19)
 
 ---
+
+## Recently Completed (2026-05-19 Sprint 23 cozy-crystal — PR #98 draft)
+
+- [x] **Sprint 23 — cozy-crystal dogfood fix (D1~D4) + Sprint 22 sync (F1~F4) (2026-05-19, PR #98 draft, 19 commits)**
+  - [x] **D1** WorkspaceSwitcher 클릭 컨텍스트 전환 → `queryClient.clear()` → `invalidateQueries(predicate)` + dashboard render-time setState → useEffect + router.refresh() 제거 (`9e2eee2`)
+  - [x] **D2** Settings Variant C Compact 시안 구현 + Suspense wrap (`96997bb` + Codex 2.5차 polish `a33d86b`)
+  - [x] **D3** Inbox dismiss UX → `useInbox({ isProcessed: false })` + queryKey 격리 + invalidate prefix + autoProcessed 그룹 제거 (`928fc7c` + Codex 2.5차 camelCase param `a33d86b`)
+  - [x] **D4 BE** ItemPromotionAudit + promote_helpers + 4 도메인 promote endpoint (meetings/notes/inbox/actions) — 6 commits (`6b1dce1`/`2f724f0`/`dc20757`/`ce8fd6c`/`7c54438`/`e3e9ee8`)
+  - [x] **D4 FE** ItemPromoteModal generic + 4 entry mount + memory wrapper (`ede91eb`)
+  - [x] **F1** TODO.md + REFACTORING-BACKLOG.md Sprint 19-22 closeout sync (`afa55a5`)
+  - [x] **F2** memory `project_sprint22_done.md` final (외부 storage, 본 PR 외)
+  - [x] **F3** HTML 결과 보고서 Codex 2차 APPROVE + CI 5/5 final 갱신 (`5d960f9`)
+  - [x] **F4** G7 spec storageState key fix + skip 가드 제거 (`5d960f9`)
+  - [x] Codex 6 cycle review 11 finding 100% 수락 (P1 memory alias, P1 Suspense, P1 RBAC viewer, P2 meeting status/non-terminal, P2 inbox source/camelCase, P2 BG rollback, P2 RAG cache notes/meetings, P2 note chunk 0, P3 meeting action count, P3 error_message) — polish 6 commits (`3fbb0ef`/`a33d86b`/`b8dddd2`/`e78096f`/`d1fa88d`/`1141c37`)
+  - 검증: pytest **379 passed + 1 skipped** (baseline 352 + 27 신규) / FE typecheck 0 / build 12/12 OK / vitest 49/49 PASS
+  - 산출물: 메모리 `project_sprint23_cozy_crystal_done.md`
+  - 잔여 사용자 작업: PR ready → squash merge, D1/D3 dev server dogfood, Codex 7차 재시도 (7:46 PM 이후 또는 GitHub Codex action)
+
+---
+
+## Recently Completed (2026-05-19 Sprint 22 expressive-squirrel — PR #97 `22da49b`)
+
+- [x] **Sprint 22 — Onboarding (OBN-01~04) + Playwright G2/G7/G8 NEW + Sentry FE+BE observability (2026-05-19, PR #97 `22da49b`, 32 commits)**
+  - [x] OBN-01: personal workspace lazy seed 회귀 test 3건 (`tests/auth/test_personal_workspace_race.py`). partial unique index + ON CONFLICT idempotency PASS.
+  - [x] OBN-02: `User.onboarding_step` (0~4) + `onboarded_at` + alembic backfill + 새 onboarding 도메인 모듈 + 4 단계 BE event hook + FE useOnboarding + OnboardingBanner refactor.
+  - [x] OBN-03: EmptyState onboarding-aware copy (meetings/projects/notes) + Export discoverability (BUG-C04).
+  - [x] OBN-04: FAB↔BottomNav collision fix (BL-017 ✅) + banner flex-wrap + mobile-responsive spec.
+  - [x] Sentry BE + FE conditional init (ADR-021) + PII scrub before_send.
+  - [x] Playwright NEW 3 (G2/G7/G8) + G1 보강 + e2e baseline fix 4 commit.
+  - [x] Codex 1차 (REVISE 7 finding plan v2 patch) + 1.5차 (Schema APPROVE) + 2차 (REVISE 3 P2 polish 수락) 3-cycle 100% 수락.
+  - 검증: pytest **352 passed + 1 skipped** (baseline 325 + 27 신규) / pyright 신규 0 / FE typecheck 0 / FE build 12/12 OK.
+  - 산출물: `docs/dev-log/2026-05-19-sprint22-result-report.html` + `docs/dev-log/2026-05-19-sprint22-dogfooding.md`.
+
+## Recently Completed (2026-05-18 Sprint 20/21 cleanup PR)
+
+- [x] **Sprint 21 BL-050 Simple 4 — cross-workspace composite FK hardening (PR #96 `1a83af6`)** — 4 entity composite FK + drift gate allowlist + Codex 1차 REVISE→수락 + 2차 APPROVE. BL-050 잔여 3 entity (memory_items / memory_ai_calls / promotion_audit) carry-over Sprint 24+.
+- [x] **Sprint 20 BL-054 cleanup — session.execute → session.exec migration (PR #93 `3eb141c` → PR #95 cherry-pick `c1b29c1` 보정)** — 57 변환 + manifest 5 카테고리 + 헌법 I-14/B-10 patch + Codex 1차+2차 REVISE 5 finding 100% 수락. ⚠️ PR #93 base 사고 사례 ([[feedback_stack_pr_base_check]]).
+- [x] **Sprint 20 BL-053 — AsyncSession Level 3 (SM) cleanup (PR #92 `48e7aab`)** — 6 commits, 29 파일, 321 PASS, pyright 131 -1, Codex 2차 APPROVE 4.6/5.
+- [x] **Sprint 20 BL-052 — SQLAlchemy → SQLModel import 통일 (PR #91 `195b8e3`)** — 8 commits, 21 code/test + 2 docs, 317 PASS, pyright 72 감소, Codex 2차 APPROVE.
+
+## Recently Completed (2026-05-17~18 Sprint 19 tenant/auth boundary)
+
+- [x] **Sprint 19 PR #2 BUG-C01-EXT-FK — composite FK + alembic (PR #90 `5789822`)** — 4 entity composite FK + drift detection (`compare_metadata`) + 12 commits. Codex 1차 BLOCK→PASS + 2차 REVISE→PASS. 317 PASS.
+- [x] **Sprint 19 PR #1 closeout — BUG-C01-EXT v3 잔여 27 endpoint (PR #89 `3f3679d`)** — 45/45 matrix 100% 완료 (PR #88 18 + PR #89 27). Codex 1차+2차 PASS.
+- [x] **Sprint 19 PR #1 진입 — BUG-C01-EXT v3 18 endpoint (PR #88 `e2e3805`)** — 10 commits, 4 도메인 real DB + audit, Codex 1차/2차 PASS.
 
 ## Recently Completed (2026-05-17 Multi-Agent QA + BUG-C01)
 

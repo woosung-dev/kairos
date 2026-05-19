@@ -40,7 +40,9 @@
 |---|---|---|
 | in | `meetings/pipeline` | Repository — 추출된 액션 저장 |
 | out | `projects/repository` | Repository (read-only) — 부모 프로젝트 검증 (project_id 있을 때만) |
-| out | `workspaces/repository` | Repository (read-only) — 담당자(WorkspaceMember) 검증 |
+| out | `workspaces/repository` | Repository (read-only) — 담당자(WorkspaceMember) 검증 + promote target 검증 (I-18) |
+| out | `common/promote_helpers` | utility — validate_promote_target + build_item_promotion_audit (Sprint 23 D4) |
+| out | `common/promote_models` | Model — ItemPromotionAudit row 저장 (item_type='action') |
 
 ---
 
@@ -66,7 +68,20 @@
 GET    /                목록 (필터: project / assignee / status)
 POST   /                생성 (201)
 PATCH  /{id}            수정 (status / assignee / due_date / project_id 등)
+POST   /{id}/promote    cross-workspace 복제 (I-18, Sprint 23 D4, 202)
 ```
+
+### Promote 정책 (Sprint 23 D4, I-18 강제)
+
+- `POST /api/v1/workspaces/{wid}/action-items/{id}/promote` — body `{ "targetWorkspaceId": uuid }`
+- 검증: source != target / target.type='team' / promoter 가 target ws 멤버
+- 복제 정책:
+  - `meeting_id` / `project_id`: **None reset** (composite FK `fk_action_items_meeting_workspace` / `fk_action_items_project_workspace` 강제 — target ws 와 무관)
+  - `assignee_id`: **None reset** (단순화 — 헌법 A-3: assignee 는 워크스페이스 멤버만 + cross-workspace 사용자 책임 모호. 사용자가 target ws 에서 재할당)
+  - `title` / `description` / `priority` / `status` / `due_date`: 보존 (history 의미)
+- 임베딩 ledger 부재 → BG embedding 복제 없음. `ItemPromotionAudit.embedding_status='n/a'` + 응답 `status='completed'` (inbox 와 동일, notes/meetings 의 'embedding_pending' 과 차이)
+- 에러: 400 (same_workspace / target_personal), 403 (target_invalid / not_member), 404 (source action_id)
+- 회귀 가드: `backend/tests/actions/test_action_promote.py` 4 케이스
 
 ### Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영)
 

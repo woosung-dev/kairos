@@ -25,7 +25,7 @@
 
 ---
 
-## 2. 핵심 엔티티 (18개)
+## 2. 핵심 엔티티 (19개)
 
 > ERD 원본: `docs/architecture/erd.md`. 본 문서가 코드 사실 기준 — ERD와 충돌 시 본 문서 우선.
 
@@ -43,7 +43,8 @@
 | **ActionItem** | actions | status: `todo` / `in_progress` / `done` / `cancelled`. `project_id` / `meeting_id` / `assignee_id` / `due_date` 모두 **nullable** | workspace 범위 |
 | **Note** | notes | Tiptap JSON 콘텐츠 (Project 종속) | project 내 |
 | **MemoryItem** | memory | Recall-first wedge. `type`: `text` / `voice`. status: `processing` / `transcription_pending` / `embedding_pending` / `embedding_failed` / `active` / `archived`. `r2_audio_key` (voice, 30일 TTL) + `distilled_json` (Gemini 출력) | (workspace_id, id). Sprint 15 신설 |
-| **PromoteAudit** | memory | Promote (복제 + tombstone) 감사 row. `memory_id` (source) + `target_workspace_id` + `new_memory_id` + `promoted_by_user_id`. **I-18 강제** | (memory_id, new_memory_id). Sprint 15 신설 |
+| **PromoteAudit** | memory | Promote (복제 + tombstone) 감사 row. `memory_id` (source) + `target_workspace_id` + `new_memory_id` + `promoted_by_user_id`. **I-18 강제** (memory 도메인 한정) | (memory_id, new_memory_id). Sprint 15 신설 |
+| **ItemPromotionAudit** | common | 4 도메인 (meeting / note / inbox / action) cross-workspace promote 감사 row. `item_type` literal CHECK + `source_item_id` + `new_item_id` + `source_workspace_id` + `target_workspace_id` + `promoted_by_user_id` + `embedding_status`. **I-18 강제** (4 도메인 적용 확장, Sprint 23 D4). source_item_id 는 도메인별 soft FK (item_type generic 으로 composite FK 강제 불가, BL-050 적용 도메인 model 만) | id 단일 PK + 5 index. Sprint 23 신설 |
 | **MemoryAiCall** | memory | distill / embedding / transcribe 호출 cost+latency 로그. `model_id` + `tokens_in/out` + `cost_usd` + `elapsed_ms` | memory_id 범위. Sprint 15 신설 |
 | **MemoryQueryEmbeddingCache** | memory | Recall query 임베딩 캐시 (C3 fix). 1536d **halfvec** (Sprint 16 ADR-020 — embedding_chunks JOIN 타입 정합). normalized_query + workspace_id 복합 키 | (workspace_id, normalized_query). Sprint 15 신설 |
 | **MemoryEvent** | memory | R7 metrics 원천 (capture / recall / promote count + recall latency). Cloud Run stateless 정합. memory_id 가 nullable (recall 이벤트는 memory FK 없음) | (workspace_id, event_type, created_at). Sprint 15 신설 |
@@ -214,7 +215,7 @@ shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
 | I-15 | **Secret은 `SecretStr`**: 사용 시 `.get_secret_value()` | `core/config.py` |
 | I-16 | **DB snake_case ↔ API camelCase**: Pydantic alias로 변환 | `<domain>/schemas.py` |
 | I-17 | **cross-workspace ProjectMember 추가 차단 = ProjectService 책임**: `ProjectService.add_member`는 반드시 `WorkspaceRepository.find_member(workspace_id, user_id)`를 호출하여 대상 user가 동일 워크스페이스 멤버임을 검증한다. None이면 `CrossWorkspaceMemberError(403)`. I-9(Repository read 필터)와 레이어 분리: I-9는 read 필터, I-17은 write 검증. | `backend/src/projects/service.py:add_member` |
-| I-18 | **Promotion은 항상 복제 + tombstone, 이동 금지** (Sprint 15 ADR-016 AD-41 + ADR-016 reframe note). `MemoryService.promote`는 source MemoryItem을 보존하고 target workspace에 새 MemoryItem 행을 생성한다. `PromoteAudit`는 `memory_id`(source) + `new_memory_id`(target) + `target_workspace_id` + `promoted_by_user_id` 4-key 강제. 원본 MemoryItem은 archived status 또는 보존 (구현 결정). | `backend/src/memory/service.py:promote` |
+| I-18 | **Promotion은 항상 복제 + tombstone, 이동 금지** (Sprint 15 ADR-016 AD-41 + ADR-016 reframe note + Sprint 23 D4 적용 도메인 확장). 적용 도메인 5 (memory / meeting / note / inbox / action) 모두 source 보존 + target workspace 에 새 row 복제 + audit row 강제. **audit table**: memory 도메인 = `PromoteAudit` (`memory_id` FK 강제, Sprint 15 신설). 그 외 4 도메인 = `ItemPromotionAudit` (Sprint 23 D4 신설, `item_type` literal CHECK + soft FK). 도메인별 audit 분리 사유: memory.PromotionAudit 가 memory_id FK 강제로 generic 재사용 불가 → Option B (공통 별도 테이블) lock-in. **4 도메인 공통 헬퍼 (Sprint 23)**: `backend/src/common/promote_helpers.py` 의 `validate_promote_target` (target 검증) + `build_item_promotion_audit` (audit row 빌더). abstract base 대신 utility 패턴 (도메인 service 가 명시적 호출, 의존 명확). | `backend/src/memory/service.py:promote` (memory) + `backend/src/common/promote_helpers.py` (4 도메인 utility, Sprint 23) |
 | I-19 | **Personal workspace는 1인 격리**: `Workspace.type=='personal'`인 워크스페이스는 항상 1명 owner. 팀 초대 불가 (`WorkspaceInvite` 발급 금지). BE schema 제약 + service 검증 양쪽 강제. ProjectMember도 1명 (R5 invariant). | `backend/src/workspaces/service.py` + `backend/src/projects/service.py` (personal_project_invariants) |
 | I-20 | **벡터 컬럼 타입 `halfvec(1536)` 고정** (Sprint 16 ADR-020). `EmbeddingChunk.embedding` + `SemanticCache.question_embedding` 양쪽. `Vector(1536)` 직접 사용 금지. 인덱스는 **HNSW**(`m=16, ef_construction=64`)만, ivfflat 신규 사용 금지. cosine 거리 연산자 `<=>` 유지 (`halfvec_cosine_ops`). 당근 DB 밋업 1회 운영 기본값 채택. | `backend/src/embeddings/models.py`, `backend/alembic/versions/<pgvector_hnsw_halfvec>.py` |
 | I-21 | **벡터 검색 쿼리 세션 변수 강제** (Sprint 16 ADR-020). 벡터 검색(`vector_search` / `find_similar_cache`) 트랜잭션 진입 시 `SET LOCAL hnsw.ef_search = 40` + `SET LOCAL hnsw.iterative_scan = 'relaxed_order'` + `SET LOCAL hnsw.max_scan_tuples = 20000` 강제. `_apply_hnsw_session_params(session)` 헬퍼 위임. **pgvector 서버 확장** ≥0.8 의존 (`iterative_scan` 지원). Python 패키지(`pgvector`)는 ≥0.4.2면 HALFVEC import 가능. RBAC/visibility 포스트필터 결과 부족 해소. | `backend/src/embeddings/repository.py:_apply_hnsw_session_params` |

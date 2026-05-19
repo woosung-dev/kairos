@@ -233,6 +233,18 @@ erDiagram
         timestamp created_at
     }
 
+    ItemPromotionAudit {
+        uuid id PK
+        string item_type "CHECK: meeting | note | inbox | action (Sprint 23 D4)"
+        uuid source_item_id "도메인별 soft FK (item_type generic)"
+        uuid new_item_id "target 복제본 ID"
+        uuid source_workspace_id FK
+        uuid target_workspace_id FK
+        uuid promoted_by_user_id FK
+        enum embedding_status "pending | processing | completed | failed | n/a"
+        timestamp created_at
+    }
+
     User ||--o{ Workspace : "소유"
     Workspace ||--o{ WorkspaceMember : "멤버"
     User ||--o{ WorkspaceMember : "소속"
@@ -263,9 +275,13 @@ erDiagram
     Workspace ||--o{ MemoryItem : "포함 (I-9 격리)"
     User ||--o{ MemoryItem : "생성"
     MemoryItem ||--o| EmbeddingChunk : "1:1 source_type=memory"
-    MemoryItem ||--o{ PromotionAudit : "복제 audit (I-18 tombstone)"
+    MemoryItem ||--o{ PromotionAudit : "복제 audit (I-18 tombstone, memory only)"
     Workspace ||--o{ PromotionAudit : "source + target"
     User ||--o{ PromotionAudit : "promoter"
+
+    %% Sprint 23 D4 — 4 도메인 promote audit (item_type='meeting|note|inbox|action')
+    Workspace ||--o{ ItemPromotionAudit : "source + target (I-18 4 도메인 확장)"
+    User ||--o{ ItemPromotionAudit : "promoter"
     MemoryItem ||--o{ MemoryAICall : "AI 호출 로그"
     Workspace ||--o{ MemoryAICall : "tenant 격리"
     Workspace ||--o{ MemoryQueryEmbeddingCache : "C3 cache (workspace 격리)"
@@ -306,6 +322,30 @@ erDiagram
 ### MemoryEvent (R7)
 - DB-backed metrics. capture/recall/promote count + recall latency_ms.
 - Cloud Run stateless 정합 (모듈-level deque 폐기).
+
+## Sprint 23 신설 엔티티 (D4 cozy-crystal — 4 도메인 promote 확장)
+
+> CONTEXT-MAP §2 entity 18 → 19로 확장. D4 dogfood fix (워크스페이스 이동 UI 4 도메인 확장) 의 BE foundation.
+> 관련 ADR: ADR-016 Personal↔Team IA (헌법 I-18 적용 도메인 확장).
+
+### ItemPromotionAudit (I-18 4 도메인 확장)
+- Sprint 23 D4 — 4 도메인 (meeting / note / inbox / action) cross-workspace promote 감사 row.
+- memory.PromotionAudit 와 별개 — 그쪽은 `memory_id` FK 강제로 generic 재사용 불가.
+- 사용자 Option B lock-in (2026-05-19): 공통 별도 테이블 + `item_type` literal CHECK constraint.
+- alembic revision `9dd1a3b80431` (down_revision: `d8623df0adab`).
+
+**Schema**:
+- `id` PK / `item_type` String (CHECK `IN ('meeting','note','inbox','action')`)
+- `source_item_id` / `new_item_id` (도메인별 soft FK — item_type generic 으로 composite FK 강제 불가)
+- `source_workspace_id` FK → `workspaces.id` + `target_workspace_id` FK → `workspaces.id`
+- `promoted_by_user_id` FK → `users.id`
+- `embedding_status`: pending / processing / completed / failed / n/a
+- `created_at` (server-side timestamp)
+- 5 index (item_type, source_item_id, source_workspace_id, target_workspace_id, created_at)
+
+**설계 사유 (FK soft reference)**:
+- BL-050 composite FK 패턴은 도메인 model 만 적용. 본 audit 테이블은 item_type 으로 분기 = soft FK 유지.
+- Codex 가 BL-050 정합 trip 시 본 commit message + I-18 변경 line 참조 (Sprint 23 commit message lock-in).
 
 ## 관계 설명
 

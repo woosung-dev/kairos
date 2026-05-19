@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useWorkspaces, useCreateWorkspace } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { useRagStream } from "@/features/rag/hooks";
@@ -120,10 +120,12 @@ export default function DashboardPage() {
       ? activeWorkspaceId
       : workspaces?.[0]?.id;
 
-  // active 동기화
-  if (currentWid && currentWid !== activeWorkspaceId) {
-    setActiveWorkspaceId(currentWid);
-  }
+  // active 동기화 — Sprint 23 D1 fix: render-time setState → useEffect (React 19 anti-pattern + strict mode double-invoke 회피)
+  useEffect(() => {
+    if (currentWid && currentWid !== activeWorkspaceId) {
+      setActiveWorkspaceId(currentWid);
+    }
+  }, [currentWid, activeWorkspaceId, setActiveWorkspaceId]);
 
   // 로딩 상태
   if (isLoadingWs) {

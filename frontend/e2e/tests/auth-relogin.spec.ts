@@ -4,23 +4,24 @@ import { test, expect } from "@playwright/test";
  * Golden Path G7 (Sprint 22): 로그아웃 → 재로그인 → state 보존
  *
  * 검증 대상:
- * - localStorage 의 `activeWorkspaceId` 가 logout 후에도 유지되거나
- *   재로그인 시 동일 workspace 로 복원된다
+ * - Zustand persist key `kairos-workspace` 의 `state.activeWorkspaceId` 가
+ *   logout 후에도 유지되거나 재로그인 시 동일 workspace 로 복원된다
  * - onboarding step 도 server-side persistence 로 동일하게 복원 (재페치)
  *
- * 본 spec 은 storageState 의존 — fresh session 검증은 별도 carry-over.
+ * Sprint 23 F4: storageState key 정정 (`activeWorkspaceId` → `kairos-workspace.state.activeWorkspaceId`)
+ * + skip 가드 제거 → 실 검증 활성화. UserButton/menu selector 미설정은 별도 carry-over.
  */
 
-test.describe("G7 — logout → login → state 보존 (Sprint 22)", () => {
-  test("activeWorkspaceId localStorage 가 logout 전후로 복원 (또는 동일 workspace 자동 진입)", async ({ page }) => {
+test.describe("G7 — logout → login → state 보존 (Sprint 22, Sprint 23 F4 storageState fix)", () => {
+  test("activeWorkspaceId 가 logout 전후로 복원 (또는 동일 workspace 자동 진입)", async ({ page }) => {
     await page.goto("/dashboard");
     await page.waitForLoadState("networkidle");
 
-    const wsIdBefore = await page.evaluate(() => localStorage.getItem("activeWorkspaceId"));
-    // Sprint 22 (origin/main e2e CI 학습): CI 환경에서 storageState 의 activeWorkspaceId 가
-    // page context 진입 시 미주입 case 가 있음 — 본 spec 의 의도 (logout 전후 보존) 가
-    // before state 없으면 검증 의미 0 → skip.
-    test.skip(!wsIdBefore, "activeWorkspaceId 미설정 — storageState 의존 carry-over");
+    // Zustand persist key = `kairos-workspace`, shape = { state: { activeWorkspaceId, ... }, version }
+    const wsIdBefore = await page.evaluate(
+      () => JSON.parse(localStorage.getItem("kairos-workspace") ?? "{}").state?.activeWorkspaceId,
+    );
+    expect(wsIdBefore).toBeTruthy();
 
     // 헤더의 user menu / signout 버튼 위치는 codebase 따라 다름.
     // 본 spec 은 fallback — UserButton (Clerk) 또는 settings link → signout
@@ -48,7 +49,9 @@ test.describe("G7 — logout → login → state 보존 (Sprint 22)", () => {
     await page.goto("/dashboard");
     await page.waitForLoadState("networkidle");
 
-    const wsIdAfter = await page.evaluate(() => localStorage.getItem("activeWorkspaceId"));
+    const wsIdAfter = await page.evaluate(
+      () => JSON.parse(localStorage.getItem("kairos-workspace") ?? "{}").state?.activeWorkspaceId,
+    );
     // 동일 또는 새로 복원
     expect(wsIdAfter).toBeTruthy();
   });

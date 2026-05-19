@@ -23,11 +23,18 @@ async def get_meeting_repository(
 
 async def get_meeting_service(
     session: AsyncSession = Depends(get_async_session),
+    session_factory: async_sessionmaker[AsyncSession] = Depends(get_session_factory),
 ) -> MeetingService:
+    # Sprint 23 D4 (Task 2 Step 2.2): workspace_repo + session_factory 주입.
+    # promote 흐름 (cross-workspace 검증 + BG embedding 복제) 필수.
+    from src.workspaces.repository import WorkspaceRepository
+
     return MeetingService(
         repo=MeetingRepository(session),
         action_repo=ActionItemRepository(session),
         project_repo=ProjectRepository(session),
+        workspace_repo=WorkspaceRepository(session),
+        session_factory=session_factory,
     )
 
 

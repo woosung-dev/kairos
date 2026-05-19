@@ -5,6 +5,8 @@ import uuid
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import func, select
 
+from src.common.promote_models import ItemPromotionAudit
+from src.embeddings.models import EmbeddingChunk
 from src.meetings.models import Meeting, MeetingSummary, TranscriptSegment
 from src.projects.models import MeetingProjectLink
 
@@ -156,6 +158,57 @@ class MeetingRepository:
                 Meeting.workspace_id == workspace_id,
             )
         )).one_or_none()
+
+    # ── Sprint 23 D4 Task 2 Step 2.2: promote 지원 메서드 ──
+
+    async def save_promoted_meeting(self, meeting: Meeting) -> Meeting:
+        """promote 복제본 Meeting INSERT — workspace_id 는 호출자가 target 으로 설정.
+
+        save() 와 시그니처 동일하지만, promote 흐름에서 명시적으로 호출 출처 분리.
+        I-9 검증은 호출자 (service.promote) 가 사전에 target workspace 멤버십을 확인.
+        """
+        self.session.add(meeting)
+        await self.session.flush()
+        return meeting
+
+    async def save_promoted_summary(
+        self, summary: MeetingSummary
+    ) -> MeetingSummary:
+        """promote 복제본 MeetingSummary INSERT — meeting_id 는 호출자가 새 meeting.id 로 설정."""
+        self.session.add(summary)
+        await self.session.flush()
+        return summary
+
+    async def save_promoted_segments(
+        self, segments: list[TranscriptSegment]
+    ) -> None:
+        """promote 복제본 TranscriptSegment[] INSERT — meeting_id 는 호출자가 새 meeting.id 로 설정."""
+        for seg in segments:
+            self.session.add(seg)
+        await self.session.flush()
+
+    async def save_item_promotion_audit(
+        self, audit: ItemPromotionAudit
+    ) -> ItemPromotionAudit:
+        """4 도메인 공통 ItemPromotionAudit INSERT — commit 은 호출자."""
+        self.session.add(audit)
+        await self.session.flush()
+        return audit
+
+    async def find_meeting_chunks(
+        self, meeting_id: uuid.UUID, source_workspace_id: uuid.UUID
+    ) -> list[EmbeddingChunk]:
+        """promote BG 흐름용: source meeting 의 모든 EmbeddingChunk 조회 (target ws 복제용).
+
+        I-9 4-C: source_workspace_id WHERE 필터 강제 — cross-workspace 격리.
+        """
+        return list((await self.session.exec(
+            select(EmbeddingChunk).where(
+                EmbeddingChunk.source_type == "meeting",
+                EmbeddingChunk.source_id == meeting_id,
+                EmbeddingChunk.workspace_id == source_workspace_id,
+            )
+        )).all())
 
     async def commit(self) -> None:
         await self.session.commit()

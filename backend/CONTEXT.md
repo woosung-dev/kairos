@@ -53,7 +53,7 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 | embeddings | 전역 규칙만 (전용 CONTEXT.md 없음) | EmbeddingChunk + SemanticCache 저장/검색 (pgvector) |
 | rag | `src/rag/CONTEXT.md` | RAG 6-Layer + Gemini 답변 (SSE 스트리밍) |
 | onboarding | `src/onboarding/CONTEXT.md` | User.onboarding_step (0~4) lifecycle — workspaces/projects/meetings/rag 가 hook 호출 (Sprint 22 OBN-02) |
-| common | — | database / r2 / pagination / exceptions / prompts |
+| common | — | database / r2 / pagination / exceptions / prompts / **promote_models** + **promote_helpers** (Sprint 23 D4 — ItemPromotionAudit 4 도메인 audit + validate_promote_target/build_item_promotion_audit utility) |
 | core | — | config (pydantic-settings) |
 
 > `services/` 폴더는 외부 API wrapper: `transcription.py` (Whisper+pyannote), `ai_processing.py` (Gemini).

@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { ArrowUpRight } from "lucide-react";
 import { MeetingSummaryView } from "./meeting-summary-view";
 import { TranscriptView } from "./transcript-view";
 import { ActionView } from "./action-view";
 import { MeetingExportButton } from "./export-button";
 import { useMeetingDetail } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
 import type { MeetingStatus } from "../types";
 
 /* ── 3뷰 탭 ── */
@@ -83,6 +85,7 @@ interface MeetingDetailProps {
 
 export function MeetingDetail({ meetingId }: MeetingDetailProps) {
   const [activeTab, setActiveTab] = useState<TabType>("요약");
+  const [isPromoteOpen, setIsPromoteOpen] = useState(false);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
   const { data: meeting, isLoading, error } = useMeetingDetail(
@@ -151,6 +154,23 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
             {STATUS_LABELS[meeting.status]}
           </span>
           <MeetingExportButton meetingId={meetingId} meetingTitle={meeting.title} />
+          {/* Sprint 23 D4: 워크스페이스 이동 (promote 1-button) */}
+          <button
+            type="button"
+            onClick={() => setIsPromoteOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors border"
+            style={{
+              borderColor: "var(--border)",
+              color: "var(--text-secondary)",
+              borderRadius: "var(--radius-sm)",
+              cursor: "pointer",
+              minHeight: "32px",
+            }}
+            aria-label="워크스페이스 이동"
+          >
+            <ArrowUpRight className="h-3.5 w-3.5" />
+            워크스페이스 이동
+          </button>
         </div>
 
         {/* 메타 정보 */}
@@ -232,6 +252,17 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
             <ActionView meetingId={meetingId} />
           )}
         </>
+      )}
+
+      {/* Sprint 23 D4: 워크스페이스 이동 modal */}
+      {activeWorkspaceId && (
+        <ItemPromoteModal
+          itemType="meeting"
+          itemId={meetingId}
+          sourceWorkspaceId={activeWorkspaceId}
+          open={isPromoteOpen}
+          onOpenChange={setIsPromoteOpen}
+        />
       )}
     </div>
   );
