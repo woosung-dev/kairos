@@ -24,6 +24,7 @@ from src.meetings.exceptions import (
     CannotPromoteToPersonalError,
     CannotPromoteToSameWorkspaceError,
     MeetingNotFoundError,
+    MeetingPromoteNonTerminalError,
     TargetWorkspaceInvalidError,
 )
 from src.meetings.models import Meeting, MeetingSummary, TranscriptSegment
@@ -293,6 +294,12 @@ class MeetingService:
         if source is None:
             raise MeetingNotFoundError()
 
+        # Sprint 23 Codex 4차 P2-1 fix: terminal status (completed / failed) 만 promote 허용.
+        # uploading / transcribing / analyzing 같은 transient 는 target ws 에서 영원히 stuck
+        # (pipeline 미실행, 동기화 없음) → 거부 + 사용자 안내.
+        if source.status not in ("completed", "failed"):
+            raise MeetingPromoteNonTerminalError()
+
         source_summary = await self.repo.get_summary(
             meeting_id, source_workspace_id
         )
@@ -313,6 +320,8 @@ class MeetingService:
             # 사유: uploading/transcribing/analyzing/failed source 를 promote 시 target ws 에
             # misleadingly 'completed' 표시 → 사용자 인지 오류. STT/Gemini 재실행 안 함이므로
             # source 상태 그대로 복제 = source 진행상황 정직하게 반영.
+            # Sprint 23 Codex 4차 P2-1 fix: source.status 가 terminal (completed/failed) 인 경우만
+            # 통과 (검증은 위에서 raise 로 처리). 본 row 는 source.status 그대로 복제 = 정직 반영.
             status=source.status,
             has_transcript=source.has_transcript,
             has_summary=source.has_summary,
@@ -477,6 +486,10 @@ async def _bg_promote_embed_meeting(
                 "meeting promote embedding 복제 실패 (audit=%s): %s",
                 audit_id, exc,
             )
+            # Sprint 23 Codex 4차 P2-2 fix: rollback 먼저 — session.flush() 실패 시 transaction
+            # state failed → 후속 update 도 fail → audit 가 'processing' stuck. rollback 으로
+            # session 재사용 가능 상태로 복구 후 failed mark.
+            await session.rollback()
             await session.exec(
                 _update(ItemPromotionAudit)
                 .where(ItemPromotionAudit.id == audit_id)

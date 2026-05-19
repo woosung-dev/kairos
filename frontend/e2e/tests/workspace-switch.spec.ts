@@ -37,36 +37,37 @@ test.describe("D1 — 워크스페이스 스위처 즉시 전환 (Sprint 23)", (
     await expect(trigger).toBeVisible({ timeout: 10_000 });
     await trigger.click();
 
-    // dropdown 내 다른 workspace option 검색
-    const dropdownItems = page.getByRole("menuitem");
-    const itemCount = await dropdownItems.count();
-    if (itemCount < 2) {
+    // Sprint 23 Codex 4차 P2-3 fix: active row 검출을 active workspace name 비교로 변경.
+    // 이전: svg[class*="text-accent"] — Check 아이콘이 inline style color 사용 → match X.
+    // 이후: WorkspaceSwitcher trigger 의 currently selected name 과 menuitem text 비교.
+    // 또한 "새 워크스페이스" CTA 항목도 menuitem 이라 명시적 exclude.
+    const triggerText = (await trigger.textContent()) ?? "";
+
+    const allMenuItems = await page.getByRole("menuitem").all();
+    // 실제 workspace option 만 추출 (create CTA 제외 + active 제외)
+    const workspaceOptions: typeof allMenuItems = [];
+    for (const item of allMenuItems) {
+      const text = (await item.textContent()) ?? "";
+      if (text.includes("새 워크스페이스")) continue;
+      // active row 는 trigger 의 name 과 동일 prefix 포함 (length 비교 + trim)
+      if (
+        triggerText.trim().length > 0 &&
+        text.trim().startsWith(triggerText.trim().split(/\s+/)[0])
+      ) {
+        continue;
+      }
+      workspaceOptions.push(item);
+    }
+
+    if (workspaceOptions.length === 0) {
       test.skip(
         true,
-        "2개 이상의 워크스페이스 시드 없음 — local/CI dev 환경 가드",
+        "non-active workspace option 0 — 1개 ws 만 seed 된 환경 carry-over",
       );
       return;
     }
 
-    // 현재 active 가 아닌 option 클릭
-    let clicked = false;
-    for (let i = 0; i < itemCount; i++) {
-      const item = dropdownItems.nth(i);
-      const check = item.locator('svg[class*="text-accent"]');
-      const isActive = (await check.count()) > 0;
-      if (!isActive) {
-        const text = await item.textContent();
-        if (!text?.includes("새 워크스페이스")) {
-          await item.click();
-          clicked = true;
-          break;
-        }
-      }
-    }
-    if (!clicked) {
-      test.skip(true, "non-active workspace option 미발견 carry-over");
-      return;
-    }
+    await workspaceOptions[0].click();
 
     // localStorage activeWorkspaceId 가 새 wid 로 갱신
     await page.waitForFunction(

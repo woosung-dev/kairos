@@ -36,3 +36,17 @@ class CannotPromoteToSameWorkspaceError(HTTPException):
         super().__init__(
             status_code=400, detail="같은 워크스페이스로는 promote 할 수 없습니다"
         )
+
+
+class MeetingPromoteNonTerminalError(HTTPException):
+    """Sprint 23 Codex 4차 P2 fix: terminal (completed/failed) 상태가 아닌 meeting promote 시도.
+
+    사유: uploading / transcribing / analyzing 같은 transient status 의 meeting 을 promote 하면
+    target ws 의 새 meeting 이 영원히 stuck (pipeline 미실행, 동기화 없음). 거부 + 사용자 안내.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=400,
+            detail="진행 중인 회의는 promote 할 수 없습니다 (완료 또는 실패 상태만 가능)",
+        )

@@ -406,6 +406,10 @@ async def _bg_promote_embed_note(
                 "note promote embedding 복제 실패 (audit=%s): %s",
                 audit_id, exc,
             )
+            # Sprint 23 Codex 4차 P2-2 fix: rollback 먼저 — session.flush() 실패 시 transaction
+            # state failed → 후속 update 도 fail → audit 가 'processing' stuck. rollback 으로
+            # session 재사용 가능 상태로 복구 후 failed mark.
+            await session.rollback()
             await session.exec(
                 _update(ItemPromotionAudit)
                 .where(ItemPromotionAudit.id == audit_id)
