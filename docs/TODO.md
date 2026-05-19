@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-05-19 (Sprint 23 cozy-crystal 진입 — dogfood fix D1~D4 + Sprint 22 sync F1~F4 통합)
+> 마지막 업데이트: 2026-05-19 (Sprint 23 cozy-crystal 완료 — PR #98 draft, Codex 6 cycle 11 finding 100% 수락)
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조 — Completed / Blocked / Questions / Next Actions 4섹션 운영.
 
@@ -16,33 +16,44 @@
 
 ---
 
-## Next Actions (Sprint 23 cozy-crystal — dogfood fix 8건, ~22-30h 단일 PR)
+## Next Actions (Sprint 24 — ADR-019 Phase B + dogfood verify carry-over)
 
-> Sprint 23 진입 결정 (2026-05-19): Sprint 22 closeout 직후 dogfooding 4 issue (D1~D4) + Sprint 22 미완료 4 sync (F1~F4) 통합. ADR-019 Phase B (Gemini 3.1-flash-lite swap, 2026-05-28 EOL) 는 Sprint 24 로 defer.
-> 워크트리 `../kairos-sprint-23/`, 브랜치 `sprint-23/cozy-crystal`. spec: `docs/superpowers/specs/2026-05-19-sprint23-cozy-crystal-design.md`. plan: `docs/superpowers/plans/2026-05-19-sprint23-cozy-crystal-tasks.md`.
+> Sprint 23 cozy-crystal 완료 (2026-05-19, PR #98 draft 19 commits). D1~D4 + F1~F4 8건 통합 + Codex 6 cycle 11 finding 100% 수락. 다음 Sprint 24 = ADR-019 Phase B (Gemini 3.1-flash-lite swap, 2026-05-28 EOL) + Sprint 23 dogfood verify (BL-066).
 
-### 🔴 P0 — dogfood high (3건, ~17-24h)
-- [ ] **D1** 워크스페이스 스위처 클릭 후 컨텍스트 전환 안 됨 (2-4h) — 진단 first → minimal fix. `WorkspaceSwitcher.tsx:43` + `dashboard/page.tsx:124` + `store.ts`.
-- [ ] **D3** Inbox 무시/확정 처리 persist 안 됨 (3-5h) — BE persist 정상 확인, FE Zod schema field name mismatch 가설. 진단 first + `useInbox` explicit `is_processed=false` params.
-- [ ] **D4** 워크스페이스 이동 UI memory only → 풀 generic 화 (12-15h) — BE 4 도메인 promote endpoint 신설 + FE `ItemPromoteModal` 추출 + 4 entry point mount.
+### 🔴 P0 — 데드라인 임박
+- [ ] **ADR-019 Phase B** (2026-05-28 데드라인) — `backend/src/common/prompts.py` 또는 도메인별 6 spots `gemini-2.5-flash` → `gemini-3.1-flash-lite` swap. spike validated 5.76x speedup / 20% cost 절감.
 
-### 🟡 P1 — Sprint 23 권장 포함 (5건, ~5-7h)
-- [ ] **D2** Settings 페이지 design-shotgun 신규 실행 + 구현 (3-4h) — 시안 doc 부재 확정, sprint 안에서 4-6 variant 생성 → 사용자 1 안 선택.
-- [x] **F1** `docs/TODO.md` + `docs/REFACTORING-BACKLOG.md` sync (본 patch) — Sprint 19/20/21/22 closeout 등재 + CO-1~14 carry-over.
-- [ ] **F2** memory `project_sprint22_done.md` final — merge SHA `22da49b` + 6 follow-up commit.
-- [ ] **F3** HTML 결과 보고서 final — Codex 2차 APPROVE 반영.
-- [ ] **F4** G7 spec storageState key fix — `kairos-workspace` Zustand persist wrapper 정정.
+### 🟡 P1 — Sprint 24 권장 포함
+- [ ] **BL-066** Sprint 23 D1/D3 dogfood verify — dev server reproduce 또는 CI e2e job 결과 확인. fix 부족 시 추가 root cause 분석.
+- [ ] **BL-063** ActionItem 도메인 promote source actions 복제 (Sprint 23 D4 CO-15)
+- [ ] **BL-064** Note promote 의 임베딩 재계산 옵션 (Sprint 23 D4 CO-16)
 
-### Sprint 24+ carry-over (변경 없음)
-- **ADR-019 Phase B** (2026-05-28 데드라인, 6 spots gemini-2.5-flash → gemini-3.1-flash-lite swap. spike validated 5.76x speedup / 20% cost 절감)
-- CO-1~14 (Sprint 22 carry, BACKLOG 등재): OpenTelemetry / Email reminder / Onboarding step 5+ / A/B framework / BL-050 잔여 3 entity / Clerk webhook / Sentry observability 후속 / Playwright G3-G6 progress / G4 SSE mock / test_config.py / BE timezone-aware
+### Sprint 25+ carry-over
+- CO-1~14 (Sprint 22 carry, BACKLOG 등재)
+- CO-15~19 (Sprint 23 carry, BL-063~067 등재)
 - BL-024 pg_prewarm Cloud Run cold start
 - BL-026 옵션 A — dev DB export + ground truth (production scale recall)
+- BL-065 Member.last_active_at 필드 (Sprint 23 D2 carry CO-17)
+- BL-067 pyright `_update(...).where(...)` false-positive (Sprint 23 CO-19)
 
-### 진입 시 [확인 필요]
-- [ ] D2 design-shotgun 4-6 variant 중 1 안 선택 — Task 1 진입 시 사용자 결정 게이트
-- [ ] D1 진단 결과 코드 외부 원인 확인 시 carry-over 결정
-- [ ] scope overrun (35h+) 시 D4 일부 또는 D2 carry-over 결정
+---
+
+## Recently Completed (2026-05-19 Sprint 23 cozy-crystal — PR #98 draft)
+
+- [x] **Sprint 23 — cozy-crystal dogfood fix (D1~D4) + Sprint 22 sync (F1~F4) (2026-05-19, PR #98 draft, 19 commits)**
+  - [x] **D1** WorkspaceSwitcher 클릭 컨텍스트 전환 → `queryClient.clear()` → `invalidateQueries(predicate)` + dashboard render-time setState → useEffect + router.refresh() 제거 (`9e2eee2`)
+  - [x] **D2** Settings Variant C Compact 시안 구현 + Suspense wrap (`96997bb` + Codex 2.5차 polish `a33d86b`)
+  - [x] **D3** Inbox dismiss UX → `useInbox({ isProcessed: false })` + queryKey 격리 + invalidate prefix + autoProcessed 그룹 제거 (`928fc7c` + Codex 2.5차 camelCase param `a33d86b`)
+  - [x] **D4 BE** ItemPromotionAudit + promote_helpers + 4 도메인 promote endpoint (meetings/notes/inbox/actions) — 6 commits (`6b1dce1`/`2f724f0`/`dc20757`/`ce8fd6c`/`7c54438`/`e3e9ee8`)
+  - [x] **D4 FE** ItemPromoteModal generic + 4 entry mount + memory wrapper (`ede91eb`)
+  - [x] **F1** TODO.md + REFACTORING-BACKLOG.md Sprint 19-22 closeout sync (`afa55a5`)
+  - [x] **F2** memory `project_sprint22_done.md` final (외부 storage, 본 PR 외)
+  - [x] **F3** HTML 결과 보고서 Codex 2차 APPROVE + CI 5/5 final 갱신 (`5d960f9`)
+  - [x] **F4** G7 spec storageState key fix + skip 가드 제거 (`5d960f9`)
+  - [x] Codex 6 cycle review 11 finding 100% 수락 (P1 memory alias, P1 Suspense, P1 RBAC viewer, P2 meeting status/non-terminal, P2 inbox source/camelCase, P2 BG rollback, P2 RAG cache notes/meetings, P2 note chunk 0, P3 meeting action count, P3 error_message) — polish 6 commits (`3fbb0ef`/`a33d86b`/`b8dddd2`/`e78096f`/`d1fa88d`/`1141c37`)
+  - 검증: pytest **379 passed + 1 skipped** (baseline 352 + 27 신규) / FE typecheck 0 / build 12/12 OK / vitest 49/49 PASS
+  - 산출물: 메모리 `project_sprint23_cozy_crystal_done.md`
+  - 잔여 사용자 작업: PR ready → squash merge, D1/D3 dev server dogfood, Codex 7차 재시도 (7:46 PM 이후 또는 GitHub Codex action)
 
 ---
 

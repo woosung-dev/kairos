@@ -1648,3 +1648,83 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 > **CO-6** = ADR-019 Phase B (Gemini 3.1-flash-lite 6 spots swap, 2026-05-28 EOL) — TODO.md Sprint 24+ Next Actions 명시. BL 신설 없음.
 > **CO-7** = BUG-AUTH-WH (Clerk webhook Svix 서명 + event allowlist + idempotency) — Sprint 19 PR #3 carry. BL 신설 없음.
 > **CO-13** = `test_config.py` pyright +3 baseline (본 sprint 무관) — micro fix, BL 신설 가치 적음. Sprint 24+ 자율 cleanup.
+
+---
+
+## BL-063 — ActionItem 도메인 promote source actions 복제 (Sprint 23 CO-15)
+
+**현 상태:** Sprint 23 D4 Meeting promote 가 `action_item_count=0` reset (Codex 3차 P3 fix). 실 ActionItem 행은 복제 안 함 → target meeting 의 action 탭 빈.
+
+**목표:** Meeting promote 시 source 의 ActionItem rows 도 새 meeting_id 로 remap 복제. 또는 사용자 명시 trigger UI (별도 ActionItem promote endpoint 이미 존재).
+
+**Risk:** 🟢 낮음.
+
+**우선순위:** ★★☆☆☆ (P3).
+
+**Sprint 묶음 권고:** Sprint 25+ promote 정합성.
+
+**근거:** Sprint 23 D4 Codex 3차 P3 carry-over.
+
+---
+
+## BL-064 — Note promote 의 임베딩 재계산 옵션 (Sprint 23 CO-16)
+
+**현 상태:** Sprint 23 D4 Note promote 가 source chunk 0 인 경우 `NotePromoteNotEmbeddedError(400)` 거부 (Codex 6차 P2 fix). 사용자에게 재시도 안내.
+
+**목표:** source plain_text 있고 chunk 만 부재 (embed_note_async race) 인 경우 target ws 에 `embed_note_async` 흐름 schedule → 자동 embedding. UX 개선.
+
+**Risk:** 🟡 중간 — EmbeddingService instance + BG task chain.
+
+**우선순위:** ★★☆☆☆ (P3).
+
+**Sprint 묶음 권고:** Sprint 24/25 promote UX 보강.
+
+**근거:** Sprint 23 Codex 6차 P2 권장 "Recompute embeddings".
+
+---
+
+## BL-065 — Member.last_active_at 필드 (Sprint 23 CO-17)
+
+**현 상태:** Sprint 23 D2 Variant C 디자인 보완 detail "last activity Nd ago". `Member` type / BE schema 미존재 → 미적용 (visual-only 스코프 유지).
+
+**목표:** BE `WorkspaceMember.last_active_at` column + alembic + FE `Member.lastActiveAt` + member-list row 우측 "Nd ago" 표시 (Geist Mono 11px).
+
+**Risk:** 🟡 중간 — schema 변경 + activity tracking 로직 (기본 = last API 호출 시점).
+
+**우선순위:** ★★☆☆☆ (P3).
+
+**Sprint 묶음 권고:** Sprint 26+ Settings UX.
+
+**근거:** Sprint 23 D2 Variant C 시안 미적용 carry-over.
+
+---
+
+## BL-066 — D1/D3 dogfood verify (Sprint 23 CO-18)
+
+**현 상태:** Sprint 23 Task 5 D1 (WorkspaceSwitcher) + Task 6 D3 (Inbox dismiss UX) = 정적 분석 + minimal fix. 실 dev server reproduce 미진행.
+
+**목표:** dev server 또는 CI e2e job 결과로 fix 실 효과 확인. 부족 시 root cause 추가 분석.
+
+**Risk:** 🟢 낮음 — verify 작업.
+
+**우선순위:** ★★★☆☆ (P2 — dogfood validation).
+
+**Sprint 묶음 권고:** Sprint 24 첫 dogfood 사이클.
+
+**근거:** Sprint 23 진단 first 미완 (Playwright reproduce 환경 의존).
+
+---
+
+## BL-067 — pyright `_update(...).where(...)` false-positive (Sprint 23 CO-19)
+
+**현 상태:** memory / meetings / notes / actions 도메인 `session.exec(_update(M).where(M.id == X).values(...))` 패턴이 pyright reportAssignmentType false-positive (M.id 의 bool 캐스팅). 4 도메인 동일.
+
+**목표:** pyright stub 또는 SQLModel typing 개선으로 false-positive 차단. 또는 `# type: ignore[...]` 일관성 적용 + 사유 명시.
+
+**Risk:** 🟢 낮음 — type 진단만, runtime 무관.
+
+**우선순위:** ★☆☆☆☆ (P4 — quality of life).
+
+**Sprint 묶음 권고:** Sprint 27+ pyright cleanup.
+
+**근거:** Sprint 23 다수 sub-agent 발견.
