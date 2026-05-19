@@ -395,6 +395,14 @@ async def _bg_promote_embed_note(
                     session.add(dup)
             await session.flush()
 
+            # Sprint 23 Codex 5차 P2-1 fix: target ws 의 SemanticCache 무효화 — 새 chunk 가
+            # 추가됐으니 stale RAG 답변 (TTL 7d) 이 우회되도록.
+            # 기존 note embedding pipeline 도 chunk 변경 후 invalidate_cache 호출 (pattern 정합).
+            from src.embeddings.repository import EmbeddingRepository as _EmbeddingRepository
+
+            embed_repo = _EmbeddingRepository(session)
+            await embed_repo.delete_caches(target_workspace_id, None)
+
             await session.exec(
                 _update(ItemPromotionAudit)
                 .where(ItemPromotionAudit.id == audit_id)

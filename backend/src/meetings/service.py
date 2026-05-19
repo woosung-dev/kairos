@@ -325,6 +325,10 @@ class MeetingService:
             status=source.status,
             has_transcript=source.has_transcript,
             has_summary=source.has_summary,
+            # Sprint 23 Codex 5차 P3 fix: failed meeting 의 error_message 보존.
+            # status='failed' 도 terminal 로 허용 (4차 P2-1) — 그러면 target 의 error_message 가 None
+            # 이면 사용자가 실패 이유 알 수 없음. source.error_message 그대로 복제.
+            error_message=source.error_message,
             # Sprint 23 Codex 3차 P3 fix: ActionItem 행은 복제 안 함 → count=0 reset.
             # 이전 source.action_item_count 보존은 target meeting 이 N개 표시하나 실제 행 0 = 사용자 인지 불일치.
             # 별도 task 로 ActionItem 도메인 promote endpoint 제공 (사용자가 명시 promote 시).
@@ -474,6 +478,14 @@ async def _bg_promote_embed_meeting(
                     )
                     session.add(dup)
             await session.flush()
+
+            # Sprint 23 Codex 5차 P2-2 fix: target ws 의 SemanticCache 무효화 — 새 chunk 가
+            # 추가됐으니 stale RAG 답변 (TTL 7d) 이 우회되도록.
+            # 기존 meeting embedding pipeline 도 chunk 변경 후 invalidate_cache 호출 (pattern 정합).
+            from src.embeddings.repository import EmbeddingRepository as _EmbeddingRepository
+
+            embed_repo = _EmbeddingRepository(session)
+            await embed_repo.delete_caches(target_workspace_id, None)
 
             await session.exec(
                 _update(ItemPromotionAudit)
