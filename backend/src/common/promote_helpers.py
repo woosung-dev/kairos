@@ -83,6 +83,14 @@ async def validate_promote_target(
         raise PromoteValidationError(
             "not_member", "promoter 가 target workspace 멤버 아님"
         )
+    # Sprint 23 Codex 3차 P1 fix: target ws viewer role 거부 (RBAC bypass 차단).
+    # 사유: route 의 require_member 는 source workspace_id 만 적용 → target 의 viewer 도
+    # 통과 가능했으나, promote 는 target ws insert 작업이라 member 이상 write 권한 필요.
+    if getattr(member, "role", None) == "viewer":
+        raise PromoteValidationError(
+            "not_member",
+            "target workspace viewer role 은 promote 불가 (write 권한 필요)",
+        )
 
 
 def build_item_promotion_audit(

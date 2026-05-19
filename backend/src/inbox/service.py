@@ -211,14 +211,18 @@ class InboxService:
         #   composite FK fk_inbox_suggested_project_workspace 가 (workspace_id, project_id) 정합 강제.
         #   target ws 와 무관 → None reset. 사용자가 target ws 에서 별도 분류 권장.
         # ai_suggested_project_title: 단순 텍스트 메타 — 보존 (사용자 참고용).
-        # source_id: soft reference (FK 미강제) — 그대로 보존. AI 추천 메타도 보존.
+        # Sprint 23 Codex 3차 P2 fix: source_type='attachment' + 새 UUID source_id 로 reset.
+        #   사유: source.source_type='meeting' 일 때 source.source_id 는 source ws 의 meeting →
+        #   target ws 에 존재 X → classify 가 meeting_repo.find_by_id(source_id, target_ws) 실패.
+        #   target ws 의 사용자가 classify 불가. attachment 로 reset → meeting verify 분기 회피.
         # is_processed=False: 복제본은 미처리 상태로 reset (사용자 재분류 필요).
+        import uuid as _uuid
         new_item = InboxItem(
             workspace_id=target_workspace_id,
             title=source.title,
             summary=source.summary,
-            source_type=source.source_type,
-            source_id=source.source_id,
+            source_type="attachment",
+            source_id=_uuid.uuid4(),
             ai_suggested_project_id=None,
             ai_suggested_project_title=source.ai_suggested_project_title,
             ai_suggested_tags=list(source.ai_suggested_tags or []),

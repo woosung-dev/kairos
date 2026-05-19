@@ -316,7 +316,10 @@ class MeetingService:
             status=source.status,
             has_transcript=source.has_transcript,
             has_summary=source.has_summary,
-            action_item_count=source.action_item_count,
+            # Sprint 23 Codex 3차 P3 fix: ActionItem 행은 복제 안 함 → count=0 reset.
+            # 이전 source.action_item_count 보존은 target meeting 이 N개 표시하나 실제 행 0 = 사용자 인지 불일치.
+            # 별도 task 로 ActionItem 도메인 promote endpoint 제공 (사용자가 명시 promote 시).
+            action_item_count=0,
             created_by_id=promoted_by_user_id,
         )
         new_meeting = await self.repo.save_promoted_meeting(new_meeting)

@@ -103,9 +103,11 @@ async def test_promote_creates_duplicate_and_audit(
     dup = (await integration_session.execute(dup_q)).scalar_one()
     assert dup.title == seed_inbox_item.title
     assert dup.summary == seed_inbox_item.summary
-    assert dup.source_type == seed_inbox_item.source_type
-    # source_id (soft reference) — cross-workspace transitive 참조 그대로 보존
-    assert dup.source_id == seed_inbox_item.source_id
+    # Sprint 23 Codex 3차 P2 fix: source_type='attachment' + 새 UUID source_id 로 reset
+    # (이전 source.source_type='meeting' 보존은 classify 시 target ws 의 meeting_repo.find_by_id
+    # 실패 유발). attachment 로 reset → classify 의 meeting verify 분기 회피.
+    assert dup.source_type == "attachment"
+    assert dup.source_id != seed_inbox_item.source_id
     # ai_suggested_project_id = None (composite FK 제약 — target ws orphan)
     assert dup.ai_suggested_project_id is None
     # ai_suggested_project_title / tags / confidence 는 메타로 보존
