@@ -1659,9 +1659,9 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 
 **Risk:** 🟢 낮음.
 
-**우선순위:** ★★☆☆☆ (P3).
+**우선순위:** ★★☆☆☆ (P3) → **Sprint 24 P1 승격 (diligent-beaver)**.
 
-**Sprint 묶음 권고:** Sprint 25+ promote 정합성.
+**Sprint 묶음 권고:** ~~Sprint 25+ promote 정합성~~ → **Sprint 24 diligent-beaver 진입** (사용자 결정: 자동 복제 default, action_item_count 0 reset 제거).
 
 **근거:** Sprint 23 D4 Codex 3차 P3 carry-over.
 
@@ -1675,9 +1675,9 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 
 **Risk:** 🟡 중간 — EmbeddingService instance + BG task chain.
 
-**우선순위:** ★★☆☆☆ (P3).
+**우선순위:** ★★☆☆☆ (P3) → **Sprint 24 P1 승격 (diligent-beaver)**.
 
-**Sprint 묶음 권고:** Sprint 24/25 promote UX 보강.
+**Sprint 묶음 권고:** ~~Sprint 24/25 promote UX 보강~~ → **Sprint 24 diligent-beaver 진입** (사용자 결정: BG schedule + embedding_status="regenerating" 필드 + polling endpoint).
 
 **근거:** Sprint 23 Codex 6차 P2 권장 "Recompute embeddings".
 
@@ -1709,7 +1709,7 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 
 **우선순위:** ★★★☆☆ (P2 — dogfood validation).
 
-**Sprint 묶음 권고:** Sprint 24 첫 dogfood 사이클.
+**Sprint 묶음 권고:** **Sprint 24 diligent-beaver 진입** (Task 1, 진단 first 강제).
 
 **근거:** Sprint 23 진단 first 미완 (Playwright reproduce 환경 의존).
 
