@@ -17,8 +17,10 @@ test.describe("Mobile 반응형 (375x812)", () => {
   test("/dashboard 진입 + heading 렌더", async ({ page }) => {
     test.setTimeout(20_000);
     await page.goto("/dashboard");
+    // Sprint 22 baseline fix: dashboard 의 실제 heading 은 "무엇이든 질문하세요" (RAG 검색).
+    // "오늘의 Kairos" (TodayFeed) 는 mount 안 됨 — origin/main e2e baseline fail 원인.
     await expect(
-      page.getByRole("heading", { name: "오늘의 Kairos" }),
+      page.getByRole("heading", { name: "무엇이든 질문하세요" }),
     ).toBeVisible({ timeout: 15_000 });
   });
 

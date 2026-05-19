@@ -10,13 +10,13 @@ import { test, expect } from "@playwright/test";
  */
 
 test.describe("홈 — 인증 후 네비게이션", () => {
-  test("/dashboard 렌더 + Today 피드 섹션 확인", async ({ page }) => {
+  test("/dashboard 렌더 + RAG 검색 진입점 확인", async ({ page }) => {
     await page.goto("/dashboard");
 
-    // TodayFeed 헤더 또는 온보딩 배너 둘 중 하나는 보여야 함
-    // BE 응답 대기를 위해 15s 타임아웃 적용
+    // Sprint 22 baseline fix: dashboard 의 실제 heading 은 "무엇이든 질문하세요" (RAG 검색).
+    // 기존 "오늘의 Kairos" (TodayFeed) 는 mount 안 됨 — origin/main e2e baseline fail 원인.
     await expect(
-      page.getByRole("heading", { name: /오늘의 Kairos/ }),
+      page.getByRole("heading", { name: /무엇이든 질문하세요/ }),
     ).toBeVisible({ timeout: 15_000 });
 
     // Cmd+K 검색 트리거 버튼 존재
