@@ -17,6 +17,7 @@ from src.actions.repository import ActionItemRepository
 from src.common.promote_helpers import (
     PromoteValidationError,
     build_item_promotion_audit,
+    clone_action_items_for_promote,
     validate_promote_target,
 )
 from src.embeddings.models import EmbeddingChunk
@@ -341,9 +342,9 @@ class MeetingService:
             # status='failed' 도 terminal 로 허용 (4차 P2-1) — 그러면 target 의 error_message 가 None
             # 이면 사용자가 실패 이유 알 수 없음. source.error_message 그대로 복제.
             error_message=source.error_message,
-            # Sprint 23 Codex 3차 P3 fix: ActionItem 행은 복제 안 함 → count=0 reset.
-            # 이전 source.action_item_count 보존은 target meeting 이 N개 표시하나 실제 행 0 = 사용자 인지 불일치.
-            # 별도 task 로 ActionItem 도메인 promote endpoint 제공 (사용자가 명시 promote 시).
+            # Sprint 23 Codex 3차 P3 (임시 fix): action_item_count=0 reset.
+            # Sprint 24 BL-063: 아래 clone_action_items_for_promote 호출 후 실 count 로 갱신
+            # (helper 가 target meeting_id 로 ActionItem rows 자동 복제 → 인지 불일치 해소).
             action_item_count=0,
             created_by_id=promoted_by_user_id,
         )
@@ -372,6 +373,21 @@ class MeetingService:
                 for seg in source_segments
             ]
             await self.repo.save_promoted_segments(new_segments)
+
+        # 5.5. Sprint 24 BL-063: source ActionItem rows 자동 복제 (assignee_id target ws verify).
+        # parent SAVEPOINT 활용 — 부분 실패 시 entire promote rollback (transactional 보장).
+        # target_project_id=None — cross-ws project 제약 (사용자가 추후 수동 연결).
+        cloned_action_count = await clone_action_items_for_promote(
+            source_meeting_id=source.id,
+            target_meeting_id=new_meeting.id,
+            target_workspace_id=target_workspace_id,
+            target_project_id=None,
+            session=self.repo.session,
+        )
+        if cloned_action_count > 0:
+            new_meeting.action_item_count = cloned_action_count
+            self.repo.session.add(new_meeting)
+            await self.repo.session.flush()
 
         # 6. ItemPromotionAudit row (helper)
         audit = build_item_promotion_audit(

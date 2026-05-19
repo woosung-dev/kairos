@@ -121,7 +121,7 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 | 41 | 15 | `GET` | `/api/v1/workspaces/{wid}/memory/{memory_id}` | 단일 메모 polling (status + distilled_json) — require_viewer |
 | 42 | 15 | `POST` | `/api/v1/workspaces/{wid}/memory/{memory_id}/promote` | 메모 → team workspace 복제 (I-18 복제+tombstone, 202 + BG) — require_member |
 | 43 | 15 | `POST` | `/api/v1/admin/memory/r2-cleanup` | 30일 경과 voice R2 객체 cleanup (X-Cron-Token header, GCP Cloud Scheduler 호출) |
-| 44 | 23 | `POST` | `/api/v1/workspaces/{wid}/meetings/{mid}/promote` | 회의 → team workspace 복제 (Meeting/Summary/Segments + EmbeddingChunk BG 복제, I-18, 202) — require_member |
+| 44 | 23 | `POST` | `/api/v1/workspaces/{wid}/meetings/{mid}/promote` | 회의 → team workspace 복제 (Meeting/Summary/Segments + **ActionItem 자동 복제 (Sprint 24 BL-063, assignee_id target ws 비멤버는 None reset, composite FK remap)** + EmbeddingChunk BG 복제, I-18, 202) — require_member. 응답 `actionItemCount` = 실 복제된 row count (Sprint 23 의 0 reset 보강). |
 | 45 | 23 | `POST` | `/api/v1/workspaces/{wid}/notes/{nid}/promote` | 노트 → team workspace 복제 (Note + EmbeddingChunk BG 복제, project_id=None 복제본, I-18, 202) — require_member |
 | 46 | 23 | `POST` | `/api/v1/workspaces/{wid}/inbox/{iid}/promote` | Inbox 아이템 → team workspace 복제 (InboxItem 복제, ai_suggested_project_id=None + is_processed=False reset, BG embedding 없음 — audit.embedding_status='n/a', I-18, 202) — require_member |
 | 47 | 23 | `POST` | `/api/v1/workspaces/{wid}/action-items/{aid}/promote` | 액션 아이템 → team workspace 복제 (ActionItem 복제, meeting_id/project_id/assignee_id=None reset, BG embedding 없음 — audit.embedding_status='n/a', I-18, 202) — require_member |

@@ -268,3 +268,199 @@ async def test_promote_target_personal_rejected(
         json={"targetWorkspaceId": str(other_personal.id)},
     )
     assert response.status_code == 400
+
+
+# ── Sprint 24 Task 2 (BL-063): ActionItem 자동 복제 통합 테스트 ──
+
+
+@pytest.mark.asyncio
+async def test_promote_clones_action_items_with_count(
+    meetings_client,
+    integration_session,
+    personal_ws,
+    team_ws,
+    seed_meeting,
+    auth_user,
+):
+    """BL-063: Meeting promote 시 source ActionItem 3 rows 자동 복제 + count 갱신.
+
+    Sprint 23 D4 Codex 3차 P3 임시 fix (action_item_count=0) 보강.
+    cloned actions 의 status 종류 보존 + Meeting.action_item_count 가 실 row count 와 정합.
+    """
+    from src.actions.models import ActionItem
+    from src.meetings.models import Meeting
+
+    # seed_meeting 에 3 ActionItem (status 다양) 추가 (source 측)
+    statuses = ["todo", "done", "in_progress"]
+    for s in statuses:
+        integration_session.add(
+            ActionItem(
+                workspace_id=personal_ws.id,
+                meeting_id=seed_meeting.id,
+                project_id=None,
+                title=f"액션 {s}",
+                description=None,
+                assignee_id=None,
+                status=s,
+                priority="medium",
+            )
+        )
+    await integration_session.flush()
+    await integration_session.commit()
+
+    response = await meetings_client.post(
+        f"/api/v1/workspaces/{personal_ws.id}/meetings/{seed_meeting.id}/promote",
+        json={"targetWorkspaceId": str(team_ws.id)},
+    )
+    assert response.status_code == 202, response.text
+    body = response.json()
+    new_meeting_id = uuid.UUID(
+        body["newMeetingId"] if "newMeetingId" in body else body["new_meeting_id"]
+    )
+
+    # target 의 ActionItem rows 3개 + status 종류 보존
+    target_actions = (
+        await integration_session.execute(
+            select(ActionItem).where(ActionItem.meeting_id == new_meeting_id)
+        )
+    ).scalars().all()
+    assert len(target_actions) == 3
+    assert {a.status for a in target_actions} == set(statuses)
+    # composite FK remap — workspace_id 가 target 으로 갱신됐는지 verify
+    assert all(a.workspace_id == team_ws.id for a in target_actions)
+
+    # Meeting.action_item_count 가 실 row count 와 정합 (Sprint 23 의 0 reset 보강)
+    target_meeting = (
+        await integration_session.execute(
+            select(Meeting).where(Meeting.id == new_meeting_id)
+        )
+    ).scalar_one()
+    assert target_meeting.action_item_count == 3
+
+    # source 의 ActionItem 은 변경 없이 보존 (I-18 tombstone)
+    source_actions = (
+        await integration_session.execute(
+            select(ActionItem).where(ActionItem.meeting_id == seed_meeting.id)
+        )
+    ).scalars().all()
+    assert len(source_actions) == 3
+
+
+@pytest.mark.asyncio
+async def test_promote_with_zero_action_items_keeps_count_zero(
+    meetings_client,
+    integration_session,
+    personal_ws,
+    team_ws,
+    seed_meeting,
+):
+    """BL-063: ActionItem 0 건 promote → action_item_count=0 + ActionItem rows 0.
+
+    회귀 가드 — 기존 Sprint 23 4 case (ActionItem 없음) 동작 보존.
+    """
+    from src.actions.models import ActionItem
+    from src.meetings.models import Meeting
+
+    response = await meetings_client.post(
+        f"/api/v1/workspaces/{personal_ws.id}/meetings/{seed_meeting.id}/promote",
+        json={"targetWorkspaceId": str(team_ws.id)},
+    )
+    assert response.status_code == 202, response.text
+    body = response.json()
+    new_meeting_id = uuid.UUID(
+        body["newMeetingId"] if "newMeetingId" in body else body["new_meeting_id"]
+    )
+
+    target_actions = (
+        await integration_session.execute(
+            select(ActionItem).where(ActionItem.meeting_id == new_meeting_id)
+        )
+    ).scalars().all()
+    assert len(target_actions) == 0
+
+    target_meeting = (
+        await integration_session.execute(
+            select(Meeting).where(Meeting.id == new_meeting_id)
+        )
+    ).scalar_one()
+    assert target_meeting.action_item_count == 0
+
+
+@pytest.mark.asyncio
+async def test_promote_resets_assignee_when_not_target_workspace_member(
+    meetings_client,
+    integration_session,
+    personal_ws,
+    team_ws,
+    seed_meeting,
+    auth_user,
+):
+    """BL-063: source ActionItem assignee_id 가 target ws 비멤버 → None reset (cross-ws 누출 차단).
+
+    사용자 결정 게이트 #5 — silent reset 정책 (target ws member 가 아니면 assignee_id=None).
+    """
+    from src.actions.models import ActionItem
+    from src.auth.models import User
+
+    # auth_user 는 personal_ws/team_ws 둘 다 멤버.
+    # 별도 user X — source ws (personal_ws) 멤버 가정하지 않더라도, 본 테스트의 핵심은
+    # target ws (team_ws) 의 멤버가 아닌 user_id 가 assignee 일 때 None reset 여부.
+    # → external_user 는 어떤 ws 멤버도 아니어도 됨 (assignee_id 필드는 nullable FK
+    #   to users.id 라 user 가 존재만 하면 OK; target ws WorkspaceMember 부재가 핵심).
+    external_user = User(
+        clerk_id="external_clerk_bl063",
+        display_name="외부 사용자",
+        email="external_bl063@kairos.test",
+    )
+    integration_session.add(external_user)
+    await integration_session.flush()
+
+    # source meeting 에 ActionItem 2건 추가 — 하나는 external assignee, 하나는 auth_user (target 멤버)
+    integration_session.add(
+        ActionItem(
+            workspace_id=personal_ws.id,
+            meeting_id=seed_meeting.id,
+            project_id=None,
+            title="외부 assignee",
+            assignee_id=external_user.id,
+            status="todo",
+            priority="medium",
+        )
+    )
+    integration_session.add(
+        ActionItem(
+            workspace_id=personal_ws.id,
+            meeting_id=seed_meeting.id,
+            project_id=None,
+            title="내부 assignee",
+            assignee_id=auth_user.id,
+            status="todo",
+            priority="medium",
+        )
+    )
+    await integration_session.flush()
+    await integration_session.commit()
+
+    response = await meetings_client.post(
+        f"/api/v1/workspaces/{personal_ws.id}/meetings/{seed_meeting.id}/promote",
+        json={"targetWorkspaceId": str(team_ws.id)},
+    )
+    assert response.status_code == 202, response.text
+    body = response.json()
+    new_meeting_id = uuid.UUID(
+        body["newMeetingId"] if "newMeetingId" in body else body["new_meeting_id"]
+    )
+
+    target_actions = (
+        await integration_session.execute(
+            select(ActionItem)
+            .where(ActionItem.meeting_id == new_meeting_id)
+            .order_by(ActionItem.title)
+        )
+    ).scalars().all()
+    assert len(target_actions) == 2
+    by_title = {a.title: a for a in target_actions}
+    # external assignee → None reset
+    assert by_title["외부 assignee"].assignee_id is None
+    # 내부 assignee (auth_user) — target ws member 이므로 보존
+    assert by_title["내부 assignee"].assignee_id == auth_user.id
