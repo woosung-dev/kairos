@@ -78,19 +78,22 @@ Sprint 23 D4 promote sprint (`d659c03`) 가 4 도메인 (meetings/notes/inbox/ac
    ├─ source.plain_text 부재 + chunk 0  → 400 NotePromoteNotEmbeddedError (회귀 유지)
    ├─ source.plain_text 존재 + chunk N>0 → promote OK + embedding_status="ready"
    └─ source.plain_text 존재 + chunk 0   → promote OK
-          ↓ target note 생성 (chunk 미복제)
-          ↓ BackgroundTasks.add_task(embed_note_async, target_note_id, target_ws_id)
-          ↓ ItemPromotionAudit row 저장 (`regenerated_embedding=True` column)
-          ↓ response.embedding_status = "regenerating" (transient field, audit table 컬럼 아님)
-       ↓
+          ↓ target note 생성 (chunk 미복제, source EmbeddingChunk 복제 분기 skip)
+          ↓ BackgroundTasks.add_task(embed_note_async, target_note_id, target_ws_id)  ← chunk 0 분기 신규
+          ↓ ItemPromotionAudit row 저장 (기존 `embedding_status` column, 초기값 "pending")
+          ↓ BG task lifecycle: "pending" → "processing" → "completed" / "failed"
+          ↓ response.embedding_status = audit raw value 그대로 (초기 "pending")
+
 [FE ItemPromoteModal success callback]
-       ↓ response.embedding_status 분기
-   ├─ "ready" → toast "Promote 완료"
-   └─ "regenerating" → toast "Promote 완료 (임베딩 재생성 중)"
+       ↓ response.embeddingStatus 분기 (camelCase, BE alias 정합)
+   ├─ "completed" → toast "Promote 완료"
+   ├─ "n/a"       → toast "Promote 완료" (임베딩 ledger 부재 도메인, 본 sprint scope 외)
+   └─ "pending" | "processing" → toast "Promote 완료 (임베딩 재생성 중)"
                        + setInterval(5000ms) × 3회
                             ↓ GET /workspaces/{wid}/notes/{tid}/embedding-status
-                            ↓ status === "ready" → clearInterval + toast 갱신
-                            ↓ 3회 실패 → toast "재생성 진행 중, 잠시 후 확인"
+                            ↓ status === "completed" → clearInterval + toast 갱신
+                            ↓ status === "failed" → clearInterval + toast "재생성 실패"
+                            ↓ 3회 후에도 pending/processing → toast "잠시 후 확인"
 ```
 
 ### BL-066 — Sprint 23 D1/D3 dogfood verify
@@ -133,24 +136,25 @@ Sprint 23 D4 promote sprint (`d659c03`) 가 4 도메인 (meetings/notes/inbox/ac
 
 ### BL-064
 
+> **알람**: spec 작성 시 가정 오류 발견 (R1 fact-check) → `ItemPromotionAudit.embedding_status` column 이 이미 존재 (default "pending", enum: pending/processing/completed/failed/n/a). 신규 column / alembic / drift gate 변경 **불필요**. 기존 lifecycle 활용. spec 정정 commit 으로 반영.
+
 | 파일 | 역할 | 변경 |
 |---|---|---|
-| `backend/src/notes/service.py` | `promote_note` 의 chunk 0 분기 → BG schedule | MOD |
+| `backend/src/notes/service.py` | `promote_note` 의 chunk 0 + plain_text 분기 → `embed_note_async` BG schedule (audit `embedding_status` 는 기존 "pending" 초기값 그대로) | MOD |
 | `backend/src/notes/router.py` | `GET /workspaces/{wid}/notes/{id}/embedding-status` (`require_viewer`) | NEW endpoint |
-| `backend/src/notes/schemas.py` | `PromoteNoteResponse.embedding_status: Literal["ready","regenerating","missing"]` + `EmbeddingStatusOut` | MOD |
-| `backend/src/common/promote_models.py` | `ItemPromotionAudit.regenerated_embedding: bool = False NOT NULL` | MOD |
-| `backend/alembic/versions/<new>_sprint24_embedding_regenerated_flag.py` | down=`9dd1a3b80431` | NEW revision |
-| `backend/tests/integration/test_alembic_upgrade.py` | drift gate `PR2_MANAGED_COLUMNS` allowlist 갱신 | MOD |
-| `backend/tests/notes/test_note_promote.py` | 4 → 7 case (3 신규: chunk 0+plain_text → regenerating / chunk N → ready / plain_text 부재 → 400 회귀) | EXT |
-| `backend/tests/notes/test_embedding_regenerate.py` | embed_note_async schedule + polling endpoint RBAC | NEW |
+| `backend/src/notes/schemas.py` | `PromoteNoteResponse.embedding_status: Literal["pending","processing","completed","failed","n/a"]` (audit raw values) + `EmbeddingStatusOut` | MOD |
+| `backend/src/common/promote_models.py` | 변경 없음 (기존 `embedding_status` column 활용) | — |
+| alembic | 변경 없음 (head `9dd1a3b80431` 유지) | — |
+| `backend/tests/notes/test_note_promote.py` | 4 → 7 case (3 신규: chunk 0+plain_text → embed_note_async schedule + audit pending / chunk N → 기존 흐름 정합 / plain_text 부재 → 400 회귀) | EXT |
+| `backend/tests/notes/test_embedding_regenerate.py` | embed_note_async idempotency + polling endpoint RBAC | NEW |
 | `frontend/src/features/notes/api.ts` | `getEmbeddingStatus(workspaceId, noteId)` client | NEW function |
-| `frontend/src/features/inbox/components/ItemPromoteModal.tsx` | regenerating 분기 + polling | MOD |
-| `frontend/tests/features/notes/note-promote-modal.test.tsx` | regenerating toast + polling | NEW |
-| `backend/src/notes/CONTEXT.md` | §엔드포인트 patch | MOD |
-| `backend/src/common/CONTEXT.md` | §엔티티 `ItemPromotionAudit.regenerated_embedding` 컬럼 등재 | MOD |
-| `docs/api/endpoints.md` | `/notes/{id}/promote` 응답 + `/notes/{id}/embedding-status` 신설 | MOD |
-| `docs/architecture/cross-domain-pipeline.md` | notes promote BG schedule 흐름 추가 | MOD |
-| `CONTEXT-MAP.md` | §2 entity 표 — `ItemPromotionAudit.regenerated_embedding` 컬럼 | MOD |
+| `frontend/src/features/inbox/components/ItemPromoteModal.tsx` | embeddingStatus pending/processing 분기 + polling | MOD |
+| `frontend/tests/features/notes/note-promote-modal.test.tsx` | pending → polling → completed transition | NEW |
+| `backend/src/notes/CONTEXT.md` | §엔드포인트 patch (chunk 0 + plain_text 분기 추가 명시) | MOD |
+| `backend/src/common/CONTEXT.md` | 변경 없음 (column 추가 X) | — |
+| `docs/api/endpoints.md` | `/notes/{id}/promote` 응답 enum 명시 + `/notes/{id}/embedding-status` 신설 | MOD |
+| `docs/architecture/cross-domain-pipeline.md` | notes promote chunk 0 case BG schedule 흐름 추가 | MOD |
+| `CONTEXT-MAP.md` | 변경 없음 (column 추가 X) | — |
 
 ### BL-066
 
@@ -212,16 +216,20 @@ async def embed_note_async(note_id: UUID, workspace_id: UUID):
 
 다중 schedule 발생 (예: promote 후 사용자가 manual retry button 또 클릭) 해도 결과 멱등.
 
-### BL-064 embedding_status enum
+### BL-064 embedding_status enum (기존 audit raw values 그대로 노출)
 
 ```python
-EmbeddingStatus = Literal["ready", "regenerating", "missing"]
+EmbeddingStatus = Literal["pending", "processing", "completed", "failed", "n/a"]
 
-# response.embedding_status:
-#   "ready"        — target chunk count > 0 (정상 promote)
-#   "regenerating" — BG task scheduled, target chunk count == 0
-#   "missing"      — BG task 영구 실패 후 audit 상태 (현재 sprint 에서는 발생 안 함, 후속)
+# response.embedding_status (audit raw value 그대로):
+#   "pending"     — promote 직후 초기값, BG task 진입 대기
+#   "processing"  — BG task 진행 중 (chunk insert)
+#   "completed"   — BG task 성공 (target chunk count > 0)
+#   "failed"      — BG task 영구 실패
+#   "n/a"         — 임베딩 ledger 부재 도메인 (inbox/actions, notes 에는 발생 안 함)
 ```
+
+기존 `notes/service.py` 의 BG task lifecycle (`pending → processing → completed/failed`) 그대로 활용. chunk 0 + plain_text 분기는 신규 `embed_note_async` schedule 만 추가 (audit row 의 lifecycle 동일).
 
 ### BL-066 진단 first 강제 (R3 mitigation)
 
@@ -238,11 +246,11 @@ Playwright MCP browser_navigate/click/snapshot 결과로 D1/D3 실 효과 확인
 | **BL-063: source ActionItem 0건** | 200 | promote OK + `action_item_count = 0` |
 | **BL-063: composite FK remap 실패** | 500 | rollback (alembic preflight 가 미리 검증) |
 | **BL-064: plain_text 부재 + chunk 0** | 400 | `NotePromoteNotEmbeddedError` (Sprint 23 6차 P2 동작 유지) |
-| **BL-064: plain_text 존재 + chunk 0** | 200 | promote OK + `embedding_status="regenerating"` + BG schedule |
-| **BL-064: BG embed 진행 중 polling** | 200 | `status="regenerating"` + `chunkCount=0` |
-| **BL-064: BG embed 완료 후 polling** | 200 | `status="ready"` + `chunkCount=N>0` |
+| **BL-064: plain_text 존재 + chunk 0** | 200 | promote OK + audit `embedding_status="pending"` + `embed_note_async` BG schedule |
+| **BL-064: BG embed 진행 중 polling** | 200 | `status="pending"` 또는 `"processing"` + `chunkCount=0` |
+| **BL-064: BG embed 완료 후 polling** | 200 | `status="completed"` + `chunkCount=N>0` |
 | **BL-064: target note 부재 polling** | 404 | (정상 RBAC 후 발생 가능 — note 삭제됨) |
-| **BL-064: BG embed 영구 실패** | — | audit `embedding_status` 갱신 안 함 (현 sprint scope 외). FE 3회 polling 후 "잠시 후 확인" toast |
+| **BL-064: BG embed 영구 실패** | 200 polling | audit `embedding_status="failed"` → FE toast "재생성 실패" |
 | **BL-064: polling endpoint RBAC** | 403 | non-member 호출 → require_viewer dependency 차단 |
 | **BL-066: dev server 기동 실패** | — | 환경 의존 issue → carry-over BL 등재, 본 sprint scope 외로 처리 |
 
@@ -262,17 +270,17 @@ Playwright MCP browser_navigate/click/snapshot 결과로 D1/D3 실 효과 확인
 
 | Case | Setup | 검증 |
 |---|---|---|
-| `test_promote_note_chunk_zero_plain_text_schedules_bg` | source note: plain_text="..." + chunk 0 | response.embedding_status == "regenerating" + audit.regenerated_embedding == True + BG task scheduled (mock verify) |
-| `test_promote_note_chunk_n_ready` | source note: plain_text + chunk count N>0 | response.embedding_status == "ready" + audit.regenerated_embedding == False |
-| `test_promote_note_no_plain_text_no_chunk_rejected` | source note: plain_text="" + chunk 0 | 400 NotePromoteNotEmbeddedError (Sprint 23 6차 패턴 회귀 가드) |
-| `test_embed_note_async_idempotent` | target note chunk count > 0 일 때 embed_note_async 호출 | skip (멱등 verify) |
-| `test_embedding_status_endpoint_rbac_viewer` | non-member 가 GET /notes/{id}/embedding-status | 403 |
+| `test_promote_note_chunk_zero_plain_text_schedules_embed` | source note: plain_text="..." + chunk 0 | response.embedding_status == "pending" + audit row "pending" + embed_note_async scheduled (mock verify) |
+| `test_promote_note_chunk_n_completed_lifecycle` | source note: plain_text + chunk count N>0 (기존 흐름) | response.embedding_status == "pending" (BG schedule 직후) + EmbeddingChunk 복제 BG task scheduled |
+| `test_promote_note_no_plain_text_no_chunk_rejected` | source note: plain_text="" + chunk 0 | 400 NotePromoteNotEmbeddedError (Sprint 23 6차 회귀 가드) |
+| `test_embed_note_async_idempotent` | target note 이미 chunk count > 0 일 때 embed_note_async 재호출 | skip (early return 멱등 verify) |
+| `test_embedding_status_endpoint_rbac_viewer` | non-member 가 GET /notes/{id}/embedding-status | 403 + viewer/member/admin/owner = 200 |
 
 ### BL-064 vitest 1 신규 (`frontend/tests/features/notes/note-promote-modal.test.tsx`)
 
 | Case | 검증 |
 |---|---|
-| `regenerating status triggers toast and polling` | response.embedding_status="regenerating" → toast 노출 + 5s 후 polling endpoint 호출 verify (mock) |
+| `pending status triggers toast and polling` | response.embeddingStatus="pending" → toast 노출 + 5s 후 polling endpoint 호출 verify (mock) + "completed" 응답 시 clearInterval |
 
 ### BL-066 Playwright spec 보강
 
@@ -281,11 +289,12 @@ Playwright MCP browser_navigate/click/snapshot 결과로 D1/D3 실 효과 확인
 
 ### 회귀 baseline
 
-- BE pytest: **379 → 387** expected (3+3+2 신규 case + drift gate 가드)
+- BE pytest: **379 → 385** expected (BL-063 3 신규 + BL-064 3 신규 + embedding_regenerate 2 신규 - 1 회귀 갱신)
+  - 정확히는: meeting_promote 4→7 (+3), note_promote 4→7 (+3), test_embedding_regenerate.py NEW 2, alembic 변경 없음
 - FE vitest: 49 → 50 expected
-- alembic upgrade head OK
-- drift gate green (PR2_MANAGED_COLUMNS allowlist 갱신)
-- E2E Playwright: 신규 spec PASS
+- alembic upgrade head: 변경 없음 (head `9dd1a3b80431` 유지)
+- drift gate: 변경 없음 (allowlist 변경 X)
+- E2E Playwright: 신규 spec PASS (선택)
 
 ### Codex iterative
 
@@ -298,10 +307,10 @@ Playwright MCP browser_navigate/click/snapshot 결과로 D1/D3 실 효과 확인
 | ID | 검증 |
 |---|---|
 | **BL-063 success** | target meeting 의 action 탭에 source row 복제 (assignee remap 정합) 노출, `action_item_count` = 실 row count, transactional 일관성 (부분 실패 = entire rollback) |
-| **BL-064 success** | source chunk 0 + plain_text note 의 promote = 400 대신 OK + 5-15s 내 임베딩 완료 (target chunk count > 0), `GET embedding-status` polling endpoint 동작 + RBAC viewer |
+| **BL-064 success** | source chunk 0 + plain_text note 의 promote = 400 대신 OK + audit `embedding_status` "pending" 시작 + 5-15s 내 `embed_note_async` 완료 → audit "completed" + target chunk count > 0, `GET embedding-status` polling endpoint 동작 + RBAC viewer. **alembic / column 변경 0** (기존 `embedding_status` column 활용) |
 | **BL-066 success** | D1/D3 fix 실 효과 dev server / Playwright reproduce 로 확인, 효과 부족 시 carry-over BL 등재 |
 | **Codex iterative** | APPROVE (Sprint 23 동급 ~10 cycle 예산) |
-| **회귀 가드** | pytest 387 + 1 skipped / vitest 50 / FE typecheck 0 / build 12/12 / E2E Playwright 신규 PASS / alembic head 적용 + drift gate green |
+| **회귀 가드** | pytest **385** + 1 skipped / vitest 50 / FE typecheck 0 / build 12/12 / E2E Playwright 신규 PASS / alembic head 변경 X (`9dd1a3b80431` 유지) / drift gate 변경 X |
 | **Atomic Update §4** | docs sync 매트릭스 (CONTEXT-MAP / CONTEXT.md / endpoints.md / cross-domain-pipeline.md) 동일 PR 내 동시 갱신 |
 
 ---
@@ -312,7 +321,8 @@ Playwright MCP browser_navigate/click/snapshot 결과로 D1/D3 실 효과 확인
 - **BL-067** pyright `_update(...).where(...)` false-positive (Sprint 23 CO-19, P4 → Sprint 27+)
 - **BL-024** pg_prewarm Cloud Run cold start
 - **BL-026** dev DB export + ground truth (production scale recall)
-- BL-064 "missing" 상태의 영구 실패 처리 (BG task 재시도 후 audit 갱신) — 후속 sprint
+- BL-064 audit `embedding_status="failed"` 상태의 사용자 명시 retry button — 후속 sprint
+- BL-064 의 inbox/actions 도메인 (audit `embedding_status="n/a"`) polling 확장 — 본 sprint 는 notes 만 적용
 - ActionItem 명시 trigger UI (별도 endpoint 활용) — BL-063 자동 복제 default 채택으로 불필요
 - Clerk Production key / Sentry DSN 발급 — founder 작업, founder 외부 환경 의존
 - 외부 user 1명 실제 dogfooding (Sprint 22 spec 12분 walkthrough) — founder 작업
@@ -327,7 +337,7 @@ Playwright MCP browser_navigate/click/snapshot 결과로 D1/D3 실 효과 확인
 | **R2. Sub-agent stall** | BL-063 + BL-064 BE 만 sub-agent dispatch. FE 는 controller 직접. ~1.5h 한도 |
 | **R3. 코드 외부 원인** | BL-066 = 진단 first. Playwright reproduce 결과 부족 시 carry-over BL |
 | **R4. BE/FE shape mismatch** | NotePromoteResponse 의 `embedding_status` snake/camel alias 명시 (헌법 I-16). Sprint 23 D3 inbox camelCase 학습 |
-| **R5. alembic migration scope** | `regenerated_embedding` 컬럼 = nullable + default False (backward compat). drift gate allowlist 갱신 |
+| **R5. alembic migration scope** | spec 초안 의 alembic / column 추가 = R1 fact-check 로 불필요 확인 (기존 `embedding_status` column 활용). alembic head `9dd1a3b80431` 유지, drift gate 변경 0 |
 | **R6. scope overrun** | 30h 초과 시 BL-064 만 carry-over (BL-063 + BL-066 우선 완료) |
 | **R7. stack PR base** | `gh pr view <N> --json baseRefName` = "main" verify (PR #93 사고 학습) |
 | **R8. stash@{0} 보존** | 어떤 worktree 에서도 pop 금지. Sprint 22 design-review 잔재 보존 |
