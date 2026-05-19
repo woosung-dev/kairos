@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class MemoryCreateOut(BaseModel):
@@ -51,9 +51,16 @@ class MemoryRecallOut(BaseModel):
 
 
 class MemoryPromoteIn(BaseModel):
-    """POST /memory/{id}/promote 요청 — 대상 팀 workspace."""
+    """POST /memory/{id}/promote 요청 — 대상 팀 workspace.
 
-    target_workspace_id: uuid.UUID
+    Sprint 23 Codex 2차 P1 fix: camelCase alias 추가 — 4 도메인 promote (meeting/note/inbox/action)
+    의 camelCase 요청과 정합. ItemPromoteModal 의 generic dispatch 가 모든 도메인에 camelCase 사용.
+    populate_by_name=True 로 snake_case 도 계속 허용 (기존 호출자 호환).
+    """
+
+    target_workspace_id: uuid.UUID = Field(alias="targetWorkspaceId")
+
+    model_config = {"populate_by_name": True}
 
 
 class MemoryPromoteOut(BaseModel):

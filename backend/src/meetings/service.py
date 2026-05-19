@@ -309,9 +309,11 @@ class MeetingService:
             source=source.source,
             recorded_at=source.recorded_at,
             duration_sec=source.duration_sec,
-            # promote 직후 embedding 복제 대기 — onboarding/dashboard 흐름에 noise 없도록 'completed'
-            # 가 아닌 별도 status 사용. STT/Gemini 재실행은 하지 않음 (단순 복제 + chunk re-INSERT).
-            status="completed",
+            # Sprint 23 Codex 2차 P2 fix: source.status 보존 (이전: 'completed' 하드코드).
+            # 사유: uploading/transcribing/analyzing/failed source 를 promote 시 target ws 에
+            # misleadingly 'completed' 표시 → 사용자 인지 오류. STT/Gemini 재실행 안 함이므로
+            # source 상태 그대로 복제 = source 진행상황 정직하게 반영.
+            status=source.status,
             has_transcript=source.has_transcript,
             has_summary=source.has_summary,
             action_item_count=source.action_item_count,
