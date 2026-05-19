@@ -42,10 +42,13 @@
 |---|---|---|---|
 | out | `actions/repository` | Repository | 추출된 액션 저장 |
 | out | `projects/repository` | Repository (read-only) | `get_meeting_detail` projects 필드 채움 (Sprint 14 T-8 BUG-H04, MeetingProjectLink 읽기) |
+| out | `workspaces/repository` | Repository (read-only) | promote target 검증 (Sprint 23 D4 — find_by_id / find_member) |
 | out | `services/transcription` | external wrapper | Whisper + pyannote |
 | out | `services/ai_processing` | external wrapper | Gemini 요약/분류 |
 | out | `inbox/service` | via pipeline | Inbox 적재 (`MeetingPipelineService` 안) |
 | out | `embeddings/service` | via pipeline | 트랜스크립트 임베딩 |
+| out | `common/promote_helpers` | utility | promote target 검증 + audit row 빌더 (Sprint 23 D4 Task 2 Step 2.2) |
+| out | `common/promote_models` | model | ItemPromotionAudit 저장 (Sprint 23 D4 — 4 도메인 공통) |
 | in | (외부 호출) | — | upload 모듈에서 트리거 |
 
 ---
@@ -97,6 +100,7 @@ GET    /                  목록
 GET    /{id}              디테일 (요약 + 트랜스크립트)
 GET    /{id}/export       내보내기
 GET    /{id}/status       진행상태 polling
+POST   /{id}/promote      cross-workspace 복제 (I-18, 202 + BG embedding 복제, Sprint 23 D4)
 ```
 
 ### Tenant boundary (Sprint 19 PR #1, Codex F-1/F-4/F-6 반영)
@@ -126,3 +130,28 @@ GET    /{id}/status       진행상태 polling
 - 무음 구간 / 짧은 회의 (< 30초) → AI 요약 스킵 옵션 (Phase B)
 - 외부 API timeout → status=`failed`, `error_message` 저장, 사용자에게 재시도 버튼
 - 같은 파일 재업로드 → 중복 검출 부재 (CONTEXT-MAP §7 D-8) — R2 hash 비교 미구현
+
+---
+
+## 9. cross-workspace promote (Sprint 23 D4 Task 2 Step 2.2)
+
+`POST /{meeting_id}/promote` — I-18 (복제 + tombstone, 이동 금지).
+
+**검증 (`common/promote_helpers.validate_promote_target`)**:
+- source != target → 400 `CannotPromoteToSameWorkspaceError`
+- target workspace 미존재 또는 promoter 가 멤버 아님 → 403 `TargetWorkspaceInvalidError`
+- target type='personal' → 400 `CannotPromoteToPersonalError`
+
+**복제 산출물 (동일 트랜잭션)**:
+- 신규 `Meeting` (target workspace_id, 새 UUID, `status="completed"`, `created_by_id=promoter`).
+- 1:1 `MeetingSummary` 복제 (있는 경우).
+- N개 `TranscriptSegment` 복제 (있는 경우).
+- `ItemPromotionAudit` row (item_type='meeting', source_item_id / new_item_id, embedding_status='pending').
+
+**BG embedding 복제 (`_bg_promote_embed_meeting`)**:
+- source workspace 의 `EmbeddingChunk` 들을 target workspace 로 복제 (vector 그대로 — Gemini cost 절감).
+- L1/L2 hierarchy 보존: `parent_chunk_id` 매핑 (old → new UUID).
+- audit `embedding_status`: pending → processing → completed / failed / n/a (chunk 0개).
+- 실패는 비차단 — Meeting/Summary/Segments 는 이미 INSERT 완료.
+
+**원본 보존**: source Meeting/Summary/Segments/Chunks 모두 변경 없음.

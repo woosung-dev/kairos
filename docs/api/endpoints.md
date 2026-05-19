@@ -121,6 +121,7 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 | 41 | 15 | `GET` | `/api/v1/workspaces/{wid}/memory/{memory_id}` | 단일 메모 polling (status + distilled_json) — require_viewer |
 | 42 | 15 | `POST` | `/api/v1/workspaces/{wid}/memory/{memory_id}/promote` | 메모 → team workspace 복제 (I-18 복제+tombstone, 202 + BG) — require_member |
 | 43 | 15 | `POST` | `/api/v1/admin/memory/r2-cleanup` | 30일 경과 voice R2 객체 cleanup (X-Cron-Token header, GCP Cloud Scheduler 호출) |
+| 44 | 23 | `POST` | `/api/v1/workspaces/{wid}/meetings/{mid}/promote` | 회의 → team workspace 복제 (Meeting/Summary/Segments + EmbeddingChunk BG 복제, I-18, 202) — require_member |
 
 > **Sprint 15 변경 (Memory 모듈 신설)** — ADR-016 Personal↔Team IA + Recall-first wedge:
 > - 38~43: 신규 6 endpoint (memory 도메인). 38/39/40/41/42는 `/api/v1/workspaces/{ws_id}/memory*` 패턴 (I-13 정합). 43은 admin 예외.

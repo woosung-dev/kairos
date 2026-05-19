@@ -26,6 +26,7 @@ import src.notes.models  # noqa: F401 — notes
 import src.inbox.models  # noqa: F401 — inbox_items
 import src.embeddings.models  # noqa: F401 — embedding_chunks, semantic_caches
 import src.memory.models  # noqa: F401 — memory_items, memory_ai_calls, memory_events, promotion_audit, memory_query_embedding_cache
+import src.common.promote_models  # noqa: F401 — item_promotion_audit (Sprint 23 D4)
 
 
 @pytest.fixture(scope="module")

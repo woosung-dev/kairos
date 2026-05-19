@@ -11,7 +11,12 @@ from src.auth.rbac import require_member, require_viewer
 from src.workspaces.models import WorkspaceMember
 from src.meetings.dependencies import get_meeting_service, get_pipeline_service
 from src.meetings.pipeline_service import MeetingPipelineService
-from src.meetings.schemas import CaptureTextRequest, CreateMeetingRequest
+from src.meetings.schemas import (
+    CaptureTextRequest,
+    CreateMeetingRequest,
+    MeetingPromoteIn,
+    MeetingPromoteOut,
+)
 from src.meetings.service import MeetingService
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}/meetings", tags=["meetings"])
@@ -114,3 +119,30 @@ async def get_meeting_status(
     service: MeetingService = Depends(get_meeting_service),
 ):
     return await service.get_meeting_status(meeting_id, workspace_id)
+
+
+# Sprint 23 D4 Task 2 Step 2.2: meetings promote — I-18 복제 + audit + BG embedding.
+@router.post(
+    "/{meeting_id}/promote",
+    response_model=MeetingPromoteOut,
+    status_code=202,
+)
+async def promote_meeting(
+    workspace_id: uuid.UUID,
+    meeting_id: uuid.UUID,
+    body: MeetingPromoteIn,
+    background_tasks: BackgroundTasks,
+    member: WorkspaceMember = Depends(require_member),
+    service: MeetingService = Depends(get_meeting_service),
+) -> MeetingPromoteOut:
+    """회의 → team workspace 복제 + audit row + 백그라운드 embedding 복제.
+
+    202 Accepted — BG 흐름에서 EmbeddingChunk 복제 후 ItemPromotionAudit.embedding_status 갱신.
+    """
+    return await service.promote(
+        meeting_id=meeting_id,
+        source_workspace_id=workspace_id,
+        target_workspace_id=body.target_workspace_id,
+        promoted_by_user_id=member.user_id,
+        background_tasks=background_tasks,
+    )
