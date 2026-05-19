@@ -38,9 +38,13 @@ export function MeetingExportButton({ meetingId, meetingTitle }: MeetingExportBu
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="inline-flex items-center justify-center h-8 w-8 rounded-md cursor-pointer transition-colors duration-150 hover:bg-[var(--surface-active)]"
+        aria-label="내보내기"
+        title="내보내기 (Markdown / JSON)"
+        className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-md cursor-pointer border text-xs font-medium transition-colors duration-150 hover:bg-[var(--surface-active)]"
+        style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
       >
-        <Download className="w-4 h-4" style={{ color: "var(--text-secondary)" }} />
+        <Download className="w-4 h-4" />
+        <span>내보내기</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem className="cursor-pointer" onClick={() => handleExport("md")}>

@@ -73,6 +73,20 @@ class ProjectService:
             tags=tags or [],
         )
         project = await self.repo.save(project)
+
+        # Sprint 22 OBN-02: 첫 프로젝트 생성 시 onboarding step=2 (same transaction).
+        # commit 이전 위치 — UPDATE rollback 방지.
+        # graceful: hook 실패 시도 project 생성 흐름 보존 (CI E2E fail 학습).
+        try:
+            from src.onboarding.service import OnboardingService
+            onboarding = OnboardingService(self.repo.session)
+            await onboarding.increment_step(created_by_id, 2)
+        except Exception as ob_err:
+            import logging
+            logging.getLogger(__name__).warning(
+                "onboarding step=2 advance 실패 (비치명적): %s", ob_err
+            )
+
         await self.repo.commit()
         return self._to_dict(project)
 

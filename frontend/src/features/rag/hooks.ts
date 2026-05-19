@@ -2,13 +2,16 @@
 
 import { useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import { onboardingKeys } from "@/features/onboarding/api";
 import { askRag } from "./api";
 import { useRagStore } from "./store";
 import type { SSESearchResultsEvent, SSEAnswerEvent } from "./types";
 
 export function useRagStream() {
   const { getToken } = useAuth();
+  const queryClient = useQueryClient();
   const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
   const {
     addMessage,
@@ -90,6 +93,10 @@ export function useRagStream() {
                     break;
                   }
                   case "done":
+                    // Sprint 22 OBN-02: 첫 RAG ask 성공 시 BE 가 step=4 advance → 재조회
+                    queryClient.invalidateQueries({
+                      queryKey: onboardingKeys.all,
+                    });
                     break;
                 }
               } catch {
@@ -106,7 +113,7 @@ export function useRagStream() {
         setIsStreaming(false);
       }
     },
-    [wid, getToken, addMessage, updateLastAssistantMessage, setSourcesOnLastAssistant, setIsStreaming, searchFilter]
+    [wid, getToken, addMessage, updateLastAssistantMessage, setSourcesOnLastAssistant, setIsStreaming, searchFilter, queryClient]
   );
 
   return { ask };

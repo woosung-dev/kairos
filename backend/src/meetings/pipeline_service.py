@@ -152,6 +152,17 @@ class MeetingPipelineService:
         except Exception as emb_err:
             logger.warning("임베딩 생성 실패 (비치명적, meeting=%s): %s", meeting.id, emb_err)
 
+        # Sprint 22 OBN-02: AI distillation 완료 시 onboarding step=3.
+        # meeting.created_by_id = 실제 회의 업로드한 user (workspace owner 와 다를 수 있음).
+        # graceful: hook 실패 시도 pipeline 완료 흐름 보존.
+        if meeting.created_by_id is not None:
+            try:
+                from src.onboarding.service import OnboardingService
+                onboarding = OnboardingService(meeting_repo.session)
+                await onboarding.increment_step(meeting.created_by_id, 3)
+            except Exception as ob_err:
+                logger.warning("onboarding step=3 advance 실패 (비치명적, meeting=%s): %s", meeting.id, ob_err)
+
         await meeting_repo.update_status(meeting.id, workspace_id, "completed")
         await meeting_repo.commit()
 
@@ -206,6 +217,9 @@ class MeetingPipelineService:
                      "start_sec": seg.start_sec, "end_sec": seg.end_sec}
                     for seg in segments
                 ]
+                if meeting is None:
+                    logger.error("Meeting %s not found after transcription, skipping analyze", meeting_id)
+                    return
                 await self._analyze_and_store(
                     meeting=meeting,
                     workspace_id=workspace_id,

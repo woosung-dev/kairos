@@ -49,7 +49,7 @@
 | **MemoryEvent** | memory | R7 metrics 원천 (capture / recall / promote count + recall latency). Cloud Run stateless 정합. memory_id 가 nullable (recall 이벤트는 memory FK 없음) | (workspace_id, event_type, created_at). Sprint 15 신설 |
 | **EmbeddingChunk** | embeddings | 1536d **halfvec** 벡터 (Sprint 16 ADR-020 — fp16, 4B→2B) + 계층 (L1/L2 사용, L0 미사용). MemoryItem도 source_type=`memory`로 적재 | source_type + source_id + chunk_index |
 | **SemanticCache** | embeddings | TTL 7일, 유사도 ≥0.93 히트. 1536d **halfvec** 벡터 (Sprint 16 ADR-020). RAG는 호출자(read/write) | PK `id`. 의미적 식별 (workspace_id, project_id, question_embedding) — DB unique constraint 없음 |
-| **User** | auth | Clerk 인증 외부 ID 매핑 | clerk_id 유일 |
+| **User** | auth | Clerk 인증 외부 ID 매핑 + 서버 측 영속 onboarding 단계 (`onboarding_step` 0~4: 0=NOT_STARTED, 1=WORKSPACE_CREATED, 2=FIRST_PROJECT, 3=FIRST_MEETING, 4=FIRST_RAG) + `onboarded_at` (step=4 도달 시 set). Sprint 22 OBN-02 | clerk_id 유일 |
 
 ### 별칭 금지 (도메인 용어 위반 감지 대상)
 

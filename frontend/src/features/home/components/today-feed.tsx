@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import {
   Inbox,
@@ -11,22 +10,40 @@ import {
   ArrowRight,
   GraduationCap,
   FolderOpen,
+  Sparkles,
 } from "lucide-react";
 import {
   useActivityFeed,
   type ActionDueEntry,
   type RecentActivity,
 } from "../hooks";
+import { useOnboarding } from "@/features/onboarding/hooks";
 
 /* ─── 서브 컴포넌트 ─── */
 
+/**
+ * OnboardingBanner — server state (Sprint 22 OBN-02).
+ *
+ * BE `users.onboarding_step` (0~4) 기반 progress + 다음 단계 CTA.
+ * step === 4 (isCompleted) 면 null return (다시 보지 않기 자동).
+ */
 function OnboardingBanner() {
-  const [isDismissed, setIsDismissed] = useState(false);
+  const { data, isLoading } = useOnboarding();
 
-  if (isDismissed) return null;
+  if (isLoading || !data || data.isCompleted) return null;
+
+  const { step, totalSteps } = data;
+  const steps: { n: number; label: string }[] = [
+    { n: 1, label: "워크스페이스 만들기" },
+    { n: 2, label: "첫 프로젝트 생성" },
+    { n: 3, label: "첫 회의 업로드" },
+    { n: 4, label: "AI 에게 질문" },
+  ];
+  const nextLabel = steps[step]?.label ?? "완료";
 
   return (
     <div
+      data-testid="onboarding-banner"
       className="rounded-lg border p-5 mb-6"
       style={{
         background: "var(--surface)",
@@ -34,7 +51,7 @@ function OnboardingBanner() {
         borderRadius: "var(--radius-lg)",
       }}
     >
-      <div className="flex items-start gap-3 mb-4">
+      <div className="flex items-start gap-3 mb-4 flex-wrap">
         <div
           className="flex items-center justify-center w-8 h-8 rounded shrink-0"
           style={{
@@ -44,7 +61,7 @@ function OnboardingBanner() {
         >
           <GraduationCap size={18} style={{ color: "var(--accent)" }} />
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <h3
             className="text-sm font-semibold mb-1"
             style={{
@@ -52,68 +69,95 @@ function OnboardingBanner() {
               fontFamily: "var(--font-display)",
             }}
           >
-            Kairos 시작 가이드
+            온보딩 {step}/{totalSteps} 단계
           </h3>
           <p
             className="text-xs leading-relaxed"
             style={{ color: "var(--text-secondary)" }}
           >
-            사이드바의 <strong>🚀 시작하기</strong> · <strong>💡 아이디어</strong> · <strong>📋 회의록</strong> 프로젝트에서 바로 시작할 수 있습니다.
-            회의를 녹음하거나 메모를 작성하면 AI가 자동으로 요약·액션·태그를 붙입니다.
+            다음 단계: <strong>{nextLabel}</strong>
           </p>
+        </div>
+        <div
+          className="flex items-center gap-1.5 flex-wrap"
+          aria-label={`온보딩 진행률 ${step}/${totalSteps}`}
+        >
+          {steps.map((s) => (
+            <span
+              key={s.n}
+              title={s.label}
+              className="h-1.5 w-8 rounded-full"
+              style={{
+                background:
+                  s.n <= step ? "var(--accent)" : "var(--border-subtle)",
+              }}
+            />
+          ))}
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-3">
-        <Link
-          href="/projects"
-          className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium transition-colors cursor-pointer"
-          style={{
-            background: "var(--accent)",
-            color: "var(--background)",
-            borderRadius: "var(--radius-sm)",
-            minHeight: 36,
-          }}
-        >
-          <FolderOpen size={14} />
-          프로젝트 둘러보기
-        </Link>
-        <Link
-          href="/new"
-          className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium border transition-colors cursor-pointer"
-          style={{
-            borderColor: "var(--border)",
-            color: "var(--text-secondary)",
-            borderRadius: "var(--radius-sm)",
-            minHeight: 36,
-          }}
-        >
-          <Mic size={14} />
-          첫 회의 녹음하기
-        </Link>
-        <Link
-          href="/notes"
-          className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium border transition-colors cursor-pointer"
-          style={{
-            borderColor: "var(--border)",
-            color: "var(--text-secondary)",
-            borderRadius: "var(--radius-sm)",
-            minHeight: 36,
-          }}
-        >
-          <FileText size={14} />
-          빠른 메모 작성
-        </Link>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => setIsDismissed(true)}
-        className="text-[11px] cursor-pointer"
-        style={{ color: "var(--text-muted)" }}
-      >
-        다시 보지 않기
-      </button>
+      {step < 4 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {step < 2 && (
+            <Link
+              href="/projects"
+              className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium transition-colors cursor-pointer"
+              style={{
+                background: "var(--accent)",
+                color: "var(--background)",
+                borderRadius: "var(--radius-sm)",
+                minHeight: 36,
+              }}
+            >
+              <FolderOpen size={14} />
+              프로젝트 만들기
+            </Link>
+          )}
+          {step >= 2 && step < 3 && (
+            <Link
+              href="/new"
+              className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium transition-colors cursor-pointer"
+              style={{
+                background: "var(--accent)",
+                color: "var(--background)",
+                borderRadius: "var(--radius-sm)",
+                minHeight: 36,
+              }}
+            >
+              <Mic size={14} />
+              회의 업로드
+            </Link>
+          )}
+          {step >= 3 && step < 4 && (
+            <Link
+              href="/dashboard?rag=open"
+              className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium transition-colors cursor-pointer"
+              style={{
+                background: "var(--accent)",
+                color: "var(--background)",
+                borderRadius: "var(--radius-sm)",
+                minHeight: 36,
+              }}
+            >
+              <Sparkles size={14} />
+              AI 에게 질문
+            </Link>
+          )}
+          <Link
+            href="/notes"
+            className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium border transition-colors cursor-pointer"
+            style={{
+              borderColor: "var(--border)",
+              color: "var(--text-secondary)",
+              borderRadius: "var(--radius-sm)",
+              minHeight: 36,
+            }}
+          >
+            <FileText size={14} />
+            빠른 메모
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
@@ -320,12 +364,17 @@ export function TodayFeed({ workspaceId }: TodayFeedProps) {
         오늘의 Kairos
       </h1>
 
+      {/* Sprint 22 OBN-02: banner 는 step < 4 인 동안 콘텐츠 유무와 무관하게 노출 */}
+      <OnboardingBanner />
+
       {!isReady ? (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           불러오는 중...
         </p>
       ) : !hasContent ? (
-        <OnboardingBanner />
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          오늘 표시할 활동이 없습니다. 위 가이드를 따라 시작해 보세요.
+        </p>
       ) : (
         <div className="space-y-4">
           {inboxCount > 0 && <InboxCard count={inboxCount} />}

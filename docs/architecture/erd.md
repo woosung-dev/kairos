@@ -10,6 +10,8 @@ erDiagram
         string display_name
         string email
         string avatar_url
+        int onboarding_step "0~4 (Sprint 22 OBN-02)"
+        timestamp onboarded_at "step=4 도달 시 set"
     }
 
     Workspace {

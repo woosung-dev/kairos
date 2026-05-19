@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -11,6 +12,7 @@ import {
   captureText,
   type CaptureTextRequest,
 } from "./api";
+import { onboardingKeys } from "@/features/onboarding/api";
 import type { CreateMeetingRequest, MeetingStatus } from "./types";
 
 /**
@@ -68,11 +70,16 @@ const POLLING_STATUSES: MeetingStatus[] = [
 
 /**
  * 회의 처리 상태 폴링 (3초 간격, 진행 중일 때만)
+ *
+ * Sprint 22 OBN-02: 폴링 중 status 가 "completed" 로 전이될 때 onboarding 캐시 무효화.
+ * BE pipeline_service 가 distillation 완료 시 step=3 advance.
  */
 export function useMeetingStatus(wid: string | undefined, id: string) {
   const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+  const previousStatusRef = useRef<MeetingStatus | undefined>(undefined);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: meetingKeys.status(wid ?? "", id),
     queryFn: async () => {
       const token = await getToken();
@@ -80,14 +87,27 @@ export function useMeetingStatus(wid: string | undefined, id: string) {
       return fetchMeetingStatus(token, wid!, id);
     },
     enabled: !!wid,
-    refetchInterval: (query) => {
-      const status = query.state.data?.status;
+    refetchInterval: (q) => {
+      const status = q.state.data?.status;
       if (status && POLLING_STATUSES.includes(status)) {
         return 3000;
       }
       return false;
     },
   });
+
+  useEffect(() => {
+    const currentStatus = query.data?.status;
+    if (
+      currentStatus === "completed" &&
+      previousStatusRef.current !== "completed"
+    ) {
+      queryClient.invalidateQueries({ queryKey: onboardingKeys.all });
+    }
+    previousStatusRef.current = currentStatus;
+  }, [query.data?.status, queryClient]);
+
+  return query;
 }
 
 /**

@@ -24,6 +24,7 @@ import type {
   UpdateProjectRequest,
 } from "./types";
 import { meetingKeys } from "../meetings/api";
+import { onboardingKeys } from "@/features/onboarding/api";
 import type { Meeting } from "../meetings/types";
 import type { Note } from "../notes/types";
 
@@ -106,6 +107,8 @@ export function useCreateProject(wid: string | undefined) {
       if (wid) {
         queryClient.invalidateQueries({ queryKey: projectKeys.list(wid) });
       }
+      // Sprint 22 OBN-02: 프로젝트 생성 시 BE 가 onboarding step=2 advance → 재조회
+      queryClient.invalidateQueries({ queryKey: onboardingKeys.all });
     },
   });
 }

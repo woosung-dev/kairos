@@ -1,9 +1,11 @@
 import logging
 
+import sentry_sdk
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import text
 
@@ -18,6 +20,7 @@ from src.meetings.router import router as meetings_router
 from src.memory.admin_router import admin_router as memory_admin_router
 from src.memory.router import router as memory_router
 from src.notes.router import router as notes_router
+from src.onboarding.router import router as onboarding_router
 from src.projects.router import meeting_project_router, router as projects_router
 from src.rag.router import router as rag_router
 from src.upload.router import router as upload_router
@@ -33,6 +36,30 @@ logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
+
+
+def _scrub_pii_hook(event, hint):
+    """Sentry before_send PII 스크럽 — transcript / email / password / audio_url 제거."""
+    request = event.get("request")
+    if request and isinstance(request.get("data"), dict):
+        for field in ("transcript", "email", "password", "audio_url"):
+            request["data"].pop(field, None)
+    if event.get("user"):
+        event["user"].pop("email", None)
+        event["user"].pop("ip_address", None)
+    return event
+
+
+# Sentry 초기화 (DSN 설정 시에만 활성. dev 환경 기본 비활성)
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn.get_secret_value(),
+        integrations=[FastApiIntegration()],
+        send_default_pii=False,
+        before_send=_scrub_pii_hook,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        environment=settings.environment,
+    )
 
 # 허용 Origin 목록 (쉼표 구분 문자열에서 파싱)
 ALLOWED_ORIGINS = [o.strip() for o in settings.cors_origins.split(",")]
@@ -111,6 +138,7 @@ app.include_router(inbox_router)
 app.include_router(memory_router)
 app.include_router(memory_admin_router)
 app.include_router(notes_router)
+app.include_router(onboarding_router)
 app.include_router(rag_router)
 app.include_router(upload_router)
 app.include_router(member_router)

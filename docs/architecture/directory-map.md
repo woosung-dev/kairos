@@ -81,6 +81,7 @@ backend/
     ├── actions/                       # 액션 아이템
     ├── notes/                         # Tiptap 노트 + pipeline_service (Sprint 6 ADR-014)
     ├── rag/                           # RAG 검색 + Gemini 답변 + pipeline_service (Sprint 6 ADR-014)
+    ├── onboarding/                    # User.onboarding_step (0~4) lifecycle — workspaces/projects/meetings/rag 가 hook 호출 (Sprint 22 OBN-02)
     ├── workspaces/                    # Workspace (type=personal/team, Sprint 15) + Member + Invite (default_project_visibility, Sprint 6)
     ├── memory/                        # Sprint 15 Recall-first wedge — MemoryItem capture/distill/recall/promote + admin_router (Cron R2 cleanup)
     ├── embeddings/                    # EmbeddingChunk + SemanticCache (cross-domain shared service) — source_type 'memory' 추가 (Sprint 15)
