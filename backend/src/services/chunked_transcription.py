@@ -78,9 +78,12 @@ async def _ffmpeg_split(
         start = max(0.0, i * chunk_seconds - overlap_seconds)
         end = min(duration, (i + 1) * chunk_seconds + overlap_seconds)
         chunk_path = tempfile.mktemp(suffix=".wav")
+        # Codex F-13 fix (Sprint 24 Wave 2 P2): input-side seek (-ss BEFORE -i).
+        # 기존 -ss after -i = output-side seek → 매 chunk 마다 full prefix decode.
+        # input-side -ss = fast seek to keyframe (4hr 누적 decode 회피).
         proc = await asyncio.create_subprocess_exec(
-            "ffmpeg", "-y", "-i", audio_url,
-            "-ss", str(start), "-to", str(end),
+            "ffmpeg", "-y",
+            "-ss", str(start), "-i", audio_url, "-t", str(end - start),
             "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le",  # Whisper-safe 16kHz mono WAV
             chunk_path,
             stdout=asyncio.subprocess.DEVNULL,
@@ -155,6 +158,38 @@ def _merge_with_offset(
     return merged
 
 
+async def _ffmpeg_split_single(
+    audio_url: str,
+    chunk_index: int,
+    chunk_seconds: int = CHUNK_SECONDS,
+    overlap_seconds: int = OVERLAP_SECONDS,
+    total_duration: float = 0.0,
+) -> str:
+    """단일 chunk 만 생성 (batch 단위 streaming 용, Codex F-12).
+
+    F-13: input-side -ss + -t (end-start) — fast seek 적용.
+    F-8: 16kHz mono WAV transcode (Whisper-safe).
+    """
+    start = max(0.0, chunk_index * chunk_seconds - overlap_seconds)
+    end = min(total_duration, (chunk_index + 1) * chunk_seconds + overlap_seconds)
+    chunk_path = tempfile.mktemp(suffix=".wav")
+    proc = await asyncio.create_subprocess_exec(
+        "ffmpeg", "-y",
+        "-ss", str(start), "-i", audio_url, "-t", str(end - start),
+        "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le",
+        chunk_path,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        Path(chunk_path).unlink(missing_ok=True)
+        raise RuntimeError(
+            f"ffmpeg chunk 분할 실패 (chunk={chunk_index}): {stderr.decode(errors='ignore')}"
+        )
+    return chunk_path
+
+
 async def transcribe_chunked(audio_url: str) -> list[dict]:
     """4시간+ chunk 분할 transcription entry point.
 
@@ -165,34 +200,46 @@ async def transcribe_chunked(audio_url: str) -> list[dict]:
         전체 timeline segment 리스트. 각 segment: {"start", "end", "text"}.
 
     Behavior:
-        - duration ≤ CHUNK_SECONDS (1hr): 단일 Whisper 호출 (split 없음).
-        - duration > CHUNK_SECONDS: ffmpeg 로 1hr chunk + 5초 overlap 분할 →
-          asyncio.gather 로 병렬 Whisper → offset merge + overlap dedup.
-        - chunk 임시파일은 finally 에서 cleanup (실패해도 누수 X).
+        - duration ≤ CHUNK_SECONDS: 단일 Whisper 호출 (split 없음).
+        - duration > CHUNK_SECONDS: Codex F-12 fix — batch streaming.
+          MAX_CONCURRENT_CHUNKS 단위 batch 로 chunk 생성/transcribe/cleanup 반복.
+          기존 24 × 19MB = 450MB+ disk 누수 회피.
+        - chunk 임시파일은 batch 마다 cleanup (실패해도 누수 X).
     """
     duration = await _ffmpeg_probe_duration(audio_url)
     if duration <= CHUNK_SECONDS:
         logger.debug("audio duration=%.1fs ≤ %ds, 단일 호출", duration, CHUNK_SECONDS)
         return await _whisper_transcribe_single(audio_url)
 
+    n_chunks = int(duration // CHUNK_SECONDS) + (1 if duration % CHUNK_SECONDS > 0 else 0)
     logger.info(
-        "audio duration=%.1fs > %ds, chunk 분할 시작",
-        duration, CHUNK_SECONDS,
+        "audio duration=%.1fs > %ds, chunk 분할 시작 (n_chunks=%d, batch=%d)",
+        duration, CHUNK_SECONDS, n_chunks, MAX_CONCURRENT_CHUNKS,
     )
-    chunk_paths = await _ffmpeg_split(audio_url, CHUNK_SECONDS, OVERLAP_SECONDS)
-    try:
-        # Codex F-10 fix (Sprint 24 Wave 2 P2): Whisper 동시 업로드 concurrency cap.
-        # 4hr = 24 chunks 동시 시 Cloud Run OOM / OpenAI 429 위험 → Semaphore 로 4 동시 제한.
-        semaphore = asyncio.Semaphore(MAX_CONCURRENT_CHUNKS)
 
-        async def _transcribe_bounded(path: str) -> list[dict]:
-            async with semaphore:
-                return await _whisper_transcribe_single(path)
+    # Codex F-12 fix (Sprint 24 Wave 2 P1): batch streaming.
+    # 24 chunks (4hr) 사전 생성 시 ~450MB temp 파일 + original audio = OOM/ENOSPC.
+    # 해결: MAX_CONCURRENT_CHUNKS 단위로 생성/transcribe/cleanup 반복 → 동시 disk = 4 chunks × 19MB = ~76MB.
+    all_chunked_segments: list[list[dict]] = []
+    for batch_start in range(0, n_chunks, MAX_CONCURRENT_CHUNKS):
+        batch_indices = list(range(batch_start, min(batch_start + MAX_CONCURRENT_CHUNKS, n_chunks)))
+        batch_paths: list[str] = []
+        try:
+            # batch 의 chunk 들 동시 생성 (ffmpeg 병렬, disk peak = batch size × 19MB)
+            batch_paths = await asyncio.gather(*[
+                _ffmpeg_split_single(audio_url, i, CHUNK_SECONDS, OVERLAP_SECONDS, duration)
+                for i in batch_indices
+            ])
+            # batch 의 chunk 들 동시 transcribe (Whisper 병렬, concurrency=batch size)
+            batch_segments = await asyncio.gather(*[
+                _whisper_transcribe_single(p) for p in batch_paths
+            ])
+            all_chunked_segments.extend(batch_segments)
+        finally:
+            # batch cleanup 즉시 (disk 누수 회피)
+            for p in batch_paths:
+                Path(p).unlink(missing_ok=True)
 
-        chunked_segments = await asyncio.gather(
-            *[_transcribe_bounded(p) for p in chunk_paths]
-        )
-        return _merge_with_offset(chunked_segments, CHUNK_SECONDS, OVERLAP_SECONDS)
-    finally:
-        for p in chunk_paths:
-            Path(p).unlink(missing_ok=True)
+    return _merge_with_offset(all_chunked_segments, CHUNK_SECONDS, OVERLAP_SECONDS)
+
+

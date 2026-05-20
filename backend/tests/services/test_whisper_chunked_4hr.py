@@ -64,6 +64,11 @@ async def test_4hr_audio_uses_4_chunks_with_overlap(monkeypatch):
         idx = fake_chunk_paths.index(path)
         return chunk_outputs[idx]
 
+    # Codex F-12 fix 후 transcribe_chunked 가 _ffmpeg_split_single 을 batch loop 로 호출.
+    # mock 도 single 변환. chunk_index 별로 fake path 반환.
+    async def fake_split_single(audio_url, chunk_index, *args, **kwargs):
+        return fake_chunk_paths[chunk_index]
+
     with patch.object(
         chunked_transcription,
         "_ffmpeg_probe_duration",
@@ -71,8 +76,8 @@ async def test_4hr_audio_uses_4_chunks_with_overlap(monkeypatch):
     ):
         with patch.object(
             chunked_transcription,
-            "_ffmpeg_split",
-            AsyncMock(return_value=fake_chunk_paths),
+            "_ffmpeg_split_single",
+            AsyncMock(side_effect=fake_split_single),
         ):
             with patch.object(
                 chunked_transcription,
@@ -127,6 +132,9 @@ async def test_chunk_overlap_dedupe(monkeypatch):
             return chunk0_segments
         return chunk1_segments
 
+    async def fake_split_single_2hr(audio_url, chunk_index, *args, **kwargs):
+        return fake_chunk_paths[chunk_index]
+
     with patch.object(
         chunked_transcription,
         "_ffmpeg_probe_duration",
@@ -134,8 +142,8 @@ async def test_chunk_overlap_dedupe(monkeypatch):
     ):
         with patch.object(
             chunked_transcription,
-            "_ffmpeg_split",
-            AsyncMock(return_value=fake_chunk_paths),
+            "_ffmpeg_split_single",
+            AsyncMock(side_effect=fake_split_single_2hr),
         ):
             with patch.object(
                 chunked_transcription,
