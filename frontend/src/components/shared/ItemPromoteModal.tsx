@@ -3,7 +3,7 @@
 // 기존 features/memory/components/PromoteModal.tsx 의 로직을 추출 + itemType dispatch.
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Users } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -126,6 +126,17 @@ export function ItemPromoteModal({
   // Sprint 24 Codex 3차 P2 fix: note polling 중 confirm button 재클릭 → duplicate
   // promote API 호출 방지. polling 동안 isDisabled 에 합산.
   const [isPolling, setIsPolling] = useState<boolean>(false);
+  // Sprint 24 Gemini P1 fix: polling interval 의 unmount cleanup (memory leak +
+  // setState on unmounted component 방지). useRef 로 cancellable handle 추적.
+  const pollIntervalRef = useRef<number | null>(null);
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current !== null) {
+        window.clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, []);
   const selectedTarget = targetId || teamOptions[0]?.id || "";
 
   const promote = useMutation({
@@ -174,6 +185,7 @@ export function ItemPromoteModal({
         setIsPolling(true);
         const toastId = toast.loading("노트 복사 완료 (임베딩 재생성 중)");
         let attempts = 0;
+        // Sprint 24 Gemini P1 fix: ref 에 interval handle 저장 — unmount cleanup 가능.
         const intervalId = window.setInterval(async () => {
           attempts += 1;
           try {
@@ -217,6 +229,7 @@ export function ItemPromoteModal({
             onOpenChange(false);
           }
         }, NOTE_POLL_INTERVAL_MS);
+        pollIntervalRef.current = intervalId;
         return;
       }
 
@@ -241,8 +254,15 @@ export function ItemPromoteModal({
     await promote.mutateAsync(selectedTarget);
   }
 
+  // Sprint 24 Gemini P1 fix: polling 중 manual close 차단 (Escape / overlay 클릭 무시).
+  // 단 polling 자체의 timeout/completed/failed 분기에서는 직접 onOpenChange(false) 호출 OK.
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && isPolling) return;
+    onOpenChange(nextOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-lg">팀으로 올리기</DialogTitle>
@@ -284,7 +304,7 @@ export function ItemPromoteModal({
             type="button"
             variant="ghost"
             onClick={() => onOpenChange(false)}
-            disabled={promote.isPending}
+            disabled={promote.isPending || isPolling}
           >
             취소
           </Button>

@@ -133,7 +133,9 @@ async def delete_note(
 
 
 # Sprint 23 D4 Task 2 Step 2.3: notes promote — I-18 복제 + audit + BG embedding.
-# Sprint 24 BL-064: pipeline DI 주입 + chunk 0 + plain_text BG re-embedding 분기 + status endpoint.
+# Sprint 24 BL-064: chunk 0 + plain_text BG re-embedding 분기 + status endpoint.
+# Sprint 24 Gemini P2 fix: pipeline DI 제거 — wrapper 가 자체 session_factory 로 fresh
+# NotePipelineService 인스턴스화 (request-scoped session pool 점유 방지).
 @router.post(
     "/{note_id}/promote",
     response_model=NotePromoteOut,
@@ -146,14 +148,13 @@ async def promote_note(
     background_tasks: BackgroundTasks,
     member: WorkspaceMember = Depends(require_member),
     service: NoteService = Depends(get_note_service),
-    pipeline: NotePipelineService = Depends(get_note_pipeline_service),
 ) -> NotePromoteOut:
     """노트 → team workspace 복제 + audit row + 백그라운드 embedding 복제.
 
     202 Accepted — BG 흐름에서 EmbeddingChunk 복제 후 ItemPromotionAudit.embedding_status 갱신.
     project_id 는 복제본에서 None (cross-workspace 제약, 사용자가 별도 연결).
 
-    Sprint 24 BL-064: chunk 0 + plain_text 분기 BG embedding 재생성 — pipeline DI 주입.
+    Sprint 24 BL-064: chunk 0 + plain_text 분기 BG embedding 재생성 (wrapper 자체 pipeline).
     """
     return await service.promote(
         note_id=note_id,
@@ -161,7 +162,6 @@ async def promote_note(
         target_workspace_id=body.target_workspace_id,
         promoted_by_user_id=member.user_id,
         background_tasks=background_tasks,
-        pipeline=pipeline,
     )
 
 

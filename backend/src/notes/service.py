@@ -230,7 +230,6 @@ class NoteService:
         target_workspace_id: uuid.UUID,
         promoted_by_user_id: uuid.UUID,
         background_tasks: BackgroundTasks,
-        pipeline: "NotePipelineService | None" = None,
     ) -> NotePromoteOut:
         """1-button promote: 원본 보존 + target ws 복제 + audit + bg embedding 복제.
 
@@ -242,9 +241,9 @@ class NoteService:
         사용자가 target ws 에서 PATCH /notes/{id} 로 별도 연결.
 
         Sprint 24 BL-064: chunk 0 + plain_text 존재 시 → 400 대신 promote OK +
-        `_regenerate_embed_with_audit_async` BG schedule (audit lifecycle 책임).
-        pipeline DI = NotePipelineService.embed_note_async 호출용 (Codex 1차 P2-3 fix:
-        instance method, module-level function 부재).
+        `_bg_regenerate_embed_with_audit` BG schedule (audit lifecycle 책임).
+        Sprint 24 Gemini P2 fix: wrapper 가 자체 session_factory 로 fresh NotePipelineService
+        를 인스턴스화 — request-scoped pipeline 전달 제거 (connection pool 점유 방지).
         """
         # Sprint 23 D4 (Task 2 Step 2.3): promote 흐름 의존성 fail-closed 검증.
         if self._session_factory is None:
@@ -284,12 +283,7 @@ class NoteService:
             source.id, source_workspace_id
         )
         needs_embed_regenerate = not existing_chunks
-        if needs_embed_regenerate and pipeline is None:
-            # Sprint 24 BL-064: chunk 0 분기는 pipeline 필수 (embed_note_async 호출).
-            # 일반 chunk N 흐름은 pipeline 불요 (기존 _bg_promote_embed_note 사용).
-            raise RuntimeError(
-                "pipeline 필수 (BL-064 chunk 0 + plain_text BG embedding 재생성, fail-closed)"
-            )
+        # Sprint 24 Gemini P2 fix: wrapper 가 자체 pipeline 인스턴스화 — caller 의 pipeline DI 불요.
 
         # 3. 복제 Note (id 새로 발급, workspace_id=target, project_id=None).
         # I-18: 원본 보존 — source 미변경.
@@ -330,7 +324,6 @@ class NoteService:
                 new_note_id=new_note.id,
                 target_workspace_id=target_workspace_id,
                 audit_id=audit.id,
-                pipeline=pipeline,
                 session_factory=self._session_factory,
             )
         else:
@@ -505,7 +498,6 @@ async def _bg_regenerate_embed_with_audit(
     new_note_id: uuid.UUID,
     target_workspace_id: uuid.UUID,
     audit_id: uuid.UUID,
-    pipeline: "NotePipelineService",
     session_factory: "async_sessionmaker[AsyncSession]",
 ) -> None:
     """chunk 0 + plain_text 분기 — target note 에 신규 embedding 생성 + audit lifecycle.
@@ -514,13 +506,19 @@ async def _bg_regenerate_embed_with_audit(
     pipeline.embed_note_async 만 호출 시 audit 가 pending stuck — wrapper 가 lifecycle 책임
     (Codex 2차 P1 fix).
 
-    pipeline 은 호출자 (NoteService.promote) 가 외부에서 DI 로 주입 — instance binding 보존.
-    pipeline.embed_note_async 내부는 자체 session 을 사용 (NotePipelineService 의 note_repo /
-    embedding_service 가 이미 별도 session 보유), 본 wrapper 의 session 은 audit row update 전용.
+    Sprint 24 Gemini review P2 fix: 이전 구현은 request-scoped pipeline 을 BG task 에
+    전달 → request 의 AsyncSession 이 long-running OpenAI embedding 호출 동안 connection
+    pool 점유 → pool exhaustion 위험. 본 wrapper 가 session_factory 의 새 session 으로
+    NotePipelineService 를 인스턴스화 — Sprint 23 `_bg_promote_embed_note` 와 동일 패턴.
     """
     from sqlmodel import update as _update
 
     from src.common.promote_models import ItemPromotionAudit
+    from src.embeddings.repository import EmbeddingRepository
+    from src.embeddings.service import EmbeddingService
+    from src.notes.pipeline_service import NotePipelineService
+    from src.notes.repository import NoteRepository
+    from src.projects.repository import ProjectRepository
 
     async with session_factory() as session:
         # processing 마크
@@ -532,10 +530,16 @@ async def _bg_regenerate_embed_with_audit(
         await session.commit()
 
         try:
-            # NotePipelineService.embed_note_async 는 자체 repo session 사용.
+            # Sprint 24 Gemini P2 fix: 새 session 으로 fresh NotePipelineService 인스턴스 생성.
+            # 본 wrapper 의 session 만 사용 — request-scoped session pool 점유 방지.
+            bg_pipeline = NotePipelineService(
+                note_repo=NoteRepository(session),
+                embedding_service=EmbeddingService(EmbeddingRepository(session)),
+                project_repo=ProjectRepository(session),
+            )
             # plain_text fallback 가드 (pipeline_service.py:41) 가 plain_text 부재 시 early return —
             # promote 흐름에서 plain_text 존재 확인됨, 정상 신규 embedding 생성.
-            await pipeline.embed_note_async(new_note_id, target_workspace_id)
+            await bg_pipeline.embed_note_async(new_note_id, target_workspace_id)
 
             await session.exec(
                 _update(ItemPromotionAudit)
