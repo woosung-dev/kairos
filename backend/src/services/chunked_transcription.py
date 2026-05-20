@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 # 10분 chunk = 16000 × 2 × 600 = ~19.2MB (margin 25% 안전).
 CHUNK_SECONDS = 600   # 10분 (Whisper 25MB 한도 정합)
 OVERLAP_SECONDS = 5   # chunk 경계 문장 잘림 방지용 overlap
+# Codex F-10 fix (Sprint 24 Wave 2 P2): Whisper 동시 업로드 cap.
+# 4hr recording → 24 chunks 동시 upload 시 Cloud Run OOM + OpenAI 429 위험.
+# 4 동시 = 합리적 margin (production 부담 ↓, throughput ↑ — 4 × 25MB = 100MB instant peak).
+MAX_CONCURRENT_CHUNKS = 4
 
 
 async def _ffmpeg_probe_duration(audio_url: str) -> float:
@@ -177,9 +181,16 @@ async def transcribe_chunked(audio_url: str) -> list[dict]:
     )
     chunk_paths = await _ffmpeg_split(audio_url, CHUNK_SECONDS, OVERLAP_SECONDS)
     try:
-        # 병렬 Whisper — chunk N개 동시에 호출 (4hr → ~4 chunk → 4 병렬)
+        # Codex F-10 fix (Sprint 24 Wave 2 P2): Whisper 동시 업로드 concurrency cap.
+        # 4hr = 24 chunks 동시 시 Cloud Run OOM / OpenAI 429 위험 → Semaphore 로 4 동시 제한.
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_CHUNKS)
+
+        async def _transcribe_bounded(path: str) -> list[dict]:
+            async with semaphore:
+                return await _whisper_transcribe_single(path)
+
         chunked_segments = await asyncio.gather(
-            *[_whisper_transcribe_single(p) for p in chunk_paths]
+            *[_transcribe_bounded(p) for p in chunk_paths]
         )
         return _merge_with_offset(chunked_segments, CHUNK_SECONDS, OVERLAP_SECONDS)
     finally:

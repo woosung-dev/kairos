@@ -70,6 +70,11 @@ export function OnboardingTooltip({
     }
 
     setOpen(true);
+    // Codex F-11 fix (Sprint 24 Wave 2 P3): open 시점에 storage key set.
+    // 페이지 leave / Cmd+K close 시 dismiss handler 미호출 → 재발화 위험. open=shown 으로 보장.
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(STORAGE_KEY(page), "1");
+    }
     trackEvent("tooltip_shown", page);
   }, [page, onboarding, isEmpty]);
 
