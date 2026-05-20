@@ -21,8 +21,16 @@ MEETING_SUMMARY_SYSTEM_PROMPT = """당신은 회의 트랜스크립트를 구조
 
 
 # ── 액션 아이템 추출 + 프로젝트 연결 추천 프롬프트 ──
+# Sprint 24 Wave 2 T-AI-DATE (BUG-CURIOUS-001):
+#   - 현재 연도 컨텍스트 주입으로 due_date hallucinate (2024 등 과거 연도) 방지.
+#   - DELTA-3 회귀 fix: assignee 명시 의무 + 회의 일정 over-extraction 방지 가이드.
 MEETING_ACTIONS_AND_LINKING_PROMPT = """당신은 회의 트랜스크립트를 분석하여 액션 아이템을 추출하고,
 관련 프로젝트를 추천하는 AI 비서입니다.
+
+## 컨텍스트
+- 현재 연도: {current_year}
+- 현재 날짜: {current_date}
+- 트랜스크립트 언어: 한국어
 
 ## 트랜스크립트
 {transcript}
@@ -35,16 +43,46 @@ MEETING_ACTIONS_AND_LINKING_PROMPT = """당신은 회의 트랜스크립트를 �
 
 ## 지시사항
 1. 트랜스크립트에서 구체적인 액션 아이템(할 일, 결정된 작업)을 추출하세요.
-2. 기존 프로젝트 목록과 비교하여 가장 관련 있는 프로젝트를 추천하세요.
-3. 관련 프로젝트가 없으면 새 프로젝트 이름을 제안하세요.
-4. 회의 내용에 맞는 태그를 추천하세요.
+2. **due_date 연도 추론**: 트랜스크립트에 연도가 명시되지 않은 경우 (예: "7월 25일") 반드시 현재 연도 ({current_year}) 또는 가까운 미래 연도로 추론하세요. **과거 연도 추론 금지** (예: 2024 hallucinate 금지). 일자가 불명확하면 `null`.
+3. **assignee 명시 의무 (DELTA-3 fix)**: 한국어 담당자 이름 (예: "박개발", "김PM", "이마케팅") 이 트랜스크립트에 등장하면 반드시 `title` 또는 `description` 에 해당 이름을 포함시키세요. assignee 누락 금지.
+4. **action vs 회의 일정 구분 (DELTA-3 fix)**: 회의 일정 자체 (예: "8월 첫째주에 회의", "다음주 화요일 오후 3시 디자인 리뷰") 는 액션 아이템이 **아닙니다**. 누군가 무엇을 하기로 한 작업만 액션입니다.
+5. 기존 프로젝트 목록과 비교하여 가장 관련 있는 프로젝트를 추천하세요.
+6. 관련 프로젝트가 없으면 새 프로젝트 이름을 제안하세요.
+7. 회의 내용에 맞는 태그를 추천하세요.
 
+## Few-shot 예시
+
+### 예시 1 — 연도 미명시 + assignee 포함 (정상 추출)
+입력: "박개발이 7월 25일까지 인증 모듈 완료해야 합니다."
+출력 actionItem:
+{{
+  "title": "박개발: 인증 모듈 완료",
+  "description": "박개발이 {current_year}-07-25 까지 인증 모듈 작업 완료",
+  "priority": "high",
+  "dueDate": "{current_year}-07-25"
+}}
+
+### 예시 2 — 회의 일정 (action 아님, 추출 금지)
+입력: "다음주 화요일 오후 3시에 디자인 리뷰 회의 합시다."
+출력 actionItems: []  (회의 일정 자체는 action 이 아님)
+
+### 예시 3 — 연도 명시 (그대로 보존)
+입력: "{current_year_plus_1}년 1월까지 랜딩 리뉴얼 완료해주세요."
+출력 actionItem:
+{{
+  "title": "랜딩 리뉴얼 완료",
+  "description": "{current_year_plus_1}-01-31 까지 랜딩 페이지 리뉴얼",
+  "priority": "medium",
+  "dueDate": "{current_year_plus_1}-01-31"
+}}
+
+## 출력 형식
 반드시 아래 JSON 형식으로만 응답하세요:
 {{
   "actionItems": [
     {{
-      "title": "구체적인 액션 아이템 제목",
-      "description": "상세 설명 (선택, 없으면 null)",
+      "title": "구체적인 액션 아이템 제목 (assignee 한국어 이름 포함 권장)",
+      "description": "상세 설명 (assignee 명시 의무, 없으면 null)",
       "priority": "high 또는 medium 또는 low",
       "dueDate": "YYYY-MM-DD 또는 null"
     }}

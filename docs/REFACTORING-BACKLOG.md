@@ -1760,3 +1760,54 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 **Sprint 묶음 권고:** Sprint 25+ e2e Clerk infrastructure (BL-068 동반).
 
 **근거:** Sprint 24 BL-066 carry-over.
+
+---
+
+## BL-NEW-RAG-SOURCE-SELECT — RAG source-level selection v1 (Sprint 25+ 검토)
+
+**현 상태:** 미시작 (carry-over from Sprint 24 Wave 2 T-RAG-MOCK-REMOVE / BUG-POW-005).
+
+Sprint 24 Wave 2 T-RAG-MOCK-REMOVE 에서 `frontend/src/features/rag/components/search-scope.tsx` 의 MOCK_SELECTABLE_SOURCES 5건 제거 후 "선택한 소스" 탭을 "소스 선택 기능 준비 중 — 현재는 전체 워크스페이스에서 검색합니다" empty state 로 변경. 장기적으로 source-level (회의/노트 단위) RAG 검색 범위 선택이 실제로 필요한가는 Power persona 데이터 수집 후 결정.
+
+**목표:**
+
+1. BE: `GET /api/v1/workspaces/{wid}/embeddings/sources?type=meeting|note` — indexable source list endpoint (페이지네이션 + name + type + project_id + project_name).
+2. FE: selection state (Zustand or local) + RAG `/ask` 요청에 `source_ids: list[uuid]` 전달.
+3. BE: `embeddings/repository.py vector_search` 에 `source_ids` filter SQL clause 추가 (workspace_id + source_ids).
+
+**Risk:** 🟡 중간 — 신규 endpoint + RAG filter SQL clause 추가. 인덱스 영향 검증 필요 (workspace_id + source_type composite index 활용 가능 여부).
+
+**우선순위:** ★★☆☆☆ (P2 — Power user feature, wedge 정합 미증명).
+
+**Sprint 묶음 권고:** Power persona 인터뷰 (F4 outreach) 결과 confirmed + 명시적 요구 시 Sprint 25+ 진입. 아닐 시 폐기 + UI 자체 hide.
+
+**예상 시간:** 3-5h.
+
+**근거:** Sprint 24 Wave 2 T-RAG-MOCK-REMOVE — MOCK 데이터가 실 워크스페이스 명/회의 명을 false-impression 출력해 Power user 가 selection 시도 → 검색 결과 mismatch 발생.
+
+---
+
+## BL-NEW-DELTA3-REMEASURE — Phase B swap DELTA-3 P/R n=20 재측정 (Sprint 24 Wave 2 carry)
+
+**현 상태:** 미시작 (carry-over from Sprint 24 Wave 2 Phase 1 T-2 post-swap delta gate).
+
+Phase B `gemini-2.5-flash → gemini-3.1-flash-lite` swap 후 DELTA-3 액션 추출 P/R 측정 결과 `ΔP=-30% / ΔR=-22.2%` (n=5 sample, token-level overlap). 수치상 gate 임계 -10% 초과 FAIL 이지만 (1) sample size n=5 + 1 mismatch=±10% jump 의 noise floor, (2) 주 원인이 양 모델 공통 `due_date` 2024 hallucinate (Phase 2 T-AI-DATE 가 fix), (3) assignee 누락 + 회의 일정 over-extraction (Phase 2 prompt 강화로 fix) → **conditional PASS** 판정 후 Phase 2 진입.
+
+Phase 2 T-AI-DATE 완료 후 n=20 으로 확장 재측정해 P/R 회복 confirmation 필요.
+
+**목표:**
+
+1. `backend/tests/llm/fixtures/sample_transcripts.py` 의 DELTA_3 ground-truth sample 을 5 → 20 으로 확장 (다양한 회의 시나리오 — 1:1, 4+명 회의, 마감일 명시/미명시 mix, assignee 명시/미명시 mix).
+2. `backend/scripts/sprint24_wave2_delta.py` (또는 후속 sprint 의 동등 스크립트) 로 post-Phase-2 모델 (gemini-3.1-flash-lite + T-AI-DATE prompt) 재측정.
+3. 결과 비교: baseline `P=1.000 R=1.000` (n=5) vs post-Phase-2 (n=20) — gate 임계 P/R ≥ 0.9.
+4. fail 시: prompt 추가 강화 (예: assignee 명시 의무 위반 사례 Few-shot 추가) 또는 hybrid (chain-of-thought 또는 2-step extraction) 도입 검토.
+
+**Risk:** 🟢 낮음 — 측정 작업. 실 API key + 비용 (~$0.50 예상, n=20 × 2 모델).
+
+**우선순위:** ★★★☆☆ (P1 — Phase B swap gate 의 conditional 조건 해소 + ADR-019 Phase B 정합성 closure).
+
+**Sprint 묶음 권고:** Sprint 25 첫 commit 또는 Sprint 24 closeout 직후. carry-over 시 conditional 조건 closure 까지 추적.
+
+**예상 시간:** 1-2h (fixture 확장 1h + 측정 + 비교 1h).
+
+**근거:** `docs/dev-log/2026-05-20-sprint24-wave2/post-swap-delta-report.md` §4 + §7 + §9 — Phase 2 진입 conditional 조건 명시 + Gate FAIL revert 미발동 사유 의존.

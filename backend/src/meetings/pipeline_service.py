@@ -72,8 +72,13 @@ class MeetingPipelineService:
             {"id": str(p.id), "title": p.title, "status": p.status}
             for p in existing_projects
         ]
+        # T-AI-DATE (BUG-CURIOUS-001): current_year 컨텍스트 명시 전달.
+        # 기본값은 service 가 date.today().year 사용하지만 호출처에서 명시해 audit 추적 가능.
         actions_data = await self.ai_service.extract_actions_and_link(
-            transcript_text, summary_data.get("summary", ""), project_list
+            transcript_text,
+            summary_data.get("summary", ""),
+            project_list,
+            current_year=date.today().year,
         )
 
         # ActionItem 저장 (workspace_id 명시 — cross-domain orchestrator 안전)
