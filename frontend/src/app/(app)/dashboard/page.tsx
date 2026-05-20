@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { useWorkspaces, useCreateWorkspace } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
-import { useRagStream } from "@/features/rag/hooks";
 import { EmptyState } from "@/components/empty-state";
 import { useUIStore } from "@/store/ui";
 import { OnboardingTooltip } from "@/components/onboarding/onboarding-tooltip";
+import { DashboardSuggestions } from "@/features/home/components/dashboard-suggestions";
 
 // 워크스페이스 생성 다이얼로그
 function CreateWorkspaceDialog({
@@ -107,8 +107,9 @@ function CreateWorkspaceDialog({
 export default function DashboardPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toggleCmdK } = useUIStore();
-  const { ask } = useRagStream();
-  // messages 는 RAG overlay 에서 별도 구독 — dashboard page 본문은 직접 사용 안 함
+  // Sprint 24 Wave 2 T-CMD-K-FIX: 추천 질문 클릭은 cmd-k palette open + query 자동 입력으로 변경.
+  // 이전: ask() 직접 호출 → palette 안 열림 (BUG-CURIOUS-002 dead-click).
+  // 추천 질문 UI 는 DashboardSuggestions 컴포넌트로 분리 (vitest 단위 테스트 가능).
 
   const { data: workspaces, isLoading: isLoadingWs } = useWorkspaces();
   const { activeWorkspaceId, setActiveWorkspaceId } = useWorkspaceStore();
@@ -204,42 +205,8 @@ export default function DashboardPage() {
         </OnboardingTooltip>
       </div>
 
-      {/* 추천 질문 */}
-      <div className="w-full max-w-2xl mb-12">
-        <h2
-          className="text-sm font-semibold mb-4 uppercase tracking-wider"
-          style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}
-        >
-          추천 질문
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {[
-            "최근 회의에서 결정된 사항은?",
-            "진행 중인 프로젝트 현황은?",
-            "이번 주 액션 아이템은?",
-            "보안 관련 논의 내용은?",
-          ].map((q) => (
-            <button
-              key={q}
-              onClick={() => ask(q)}
-              className="text-left px-3 py-2.5 rounded border text-sm transition-colors"
-              style={{
-                borderColor: "var(--border-subtle)",
-                color: "var(--text-secondary)",
-                borderRadius: "var(--radius-sm)",
-              }}
-              onMouseOver={(e) =>
-                (e.currentTarget.style.borderColor = "var(--accent)")
-              }
-              onMouseOut={(e) =>
-                (e.currentTarget.style.borderColor = "var(--border-subtle)")
-              }
-            >
-              {q}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* 추천 질문 — Sprint 24 Wave 2 T-CMD-K-FIX (BUG-CURIOUS-002) */}
+      <DashboardSuggestions />
 
       {/* 빠른 접근 */}
       <div className="w-full max-w-2xl">

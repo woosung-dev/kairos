@@ -1,7 +1,9 @@
 // 빠른 메모 페이지 — BE notes API 연동 (Sprint 17 fix: ISSUE-005)
+// Sprint 24 Wave 2 T-NOTE-DETAIL — 메모 카드 클릭 시 /notes/[id] 상세 페이지로 이동 (BUG-POW-003)
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 import { useNotes, useCreateNote } from "../hooks";
@@ -262,42 +264,49 @@ function MemoCard({
 
   return (
     <div
-      className="p-4 rounded-lg border transition-colors"
+      className="p-4 rounded-lg border transition-colors relative"
       style={{
         background: "var(--surface)",
         borderColor: "var(--border-subtle)",
         borderRadius: "var(--radius-lg)",
-        cursor: "pointer",
       }}
       onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent)")}
       onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
     >
-      <div className="flex items-start justify-between mb-1">
-        <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-          {memo.title || "제목 없음"}
-        </h3>
-        <span className="text-[10px] shrink-0 ml-2" style={{ color: "var(--text-muted)" }}>
-          {createdDate}
-        </span>
-      </div>
-      <p className="text-xs line-clamp-2 mb-2" style={{ color: "var(--text-secondary)" }}>
-        {preview || "내용 없음"}
-      </p>
-      <div className="flex items-center justify-between gap-2">
-        {projectTitle ? (
-          <span
-            className="px-1.5 py-0.5 rounded text-[10px]"
-            style={{
-              background: "var(--accent-subtle)",
-              color: "var(--accent)",
-            }}
-          >
-            {projectTitle}
+      {/* Sprint 24 Wave 2 T-NOTE-DETAIL: 카드 본문 클릭 → /notes/[id]. Promote 버튼은 별도 layer 로 stopPropagation. */}
+      <Link
+        href={`/notes/${memo.id}`}
+        className="block cursor-pointer"
+        data-testid="memo-card-link"
+      >
+        <div className="flex items-start justify-between mb-1">
+          <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+            {memo.title || "제목 없음"}
+          </h3>
+          <span className="text-[10px] shrink-0 ml-2" style={{ color: "var(--text-muted)" }}>
+            {createdDate}
           </span>
-        ) : (
-          <span />
-        )}
-        {workspaceId && (
+        </div>
+        <p className="text-xs line-clamp-2 mb-2" style={{ color: "var(--text-secondary)" }}>
+          {preview || "내용 없음"}
+        </p>
+        <div className="flex items-center gap-2">
+          {projectTitle && (
+            <span
+              className="px-1.5 py-0.5 rounded text-[10px]"
+              style={{
+                background: "var(--accent-subtle)",
+                color: "var(--accent)",
+              }}
+            >
+              {projectTitle}
+            </span>
+          )}
+        </div>
+      </Link>
+
+      {workspaceId && (
+        <div className="mt-2 flex justify-end">
           <button
             type="button"
             onClick={(e) => {
@@ -317,8 +326,8 @@ function MemoCard({
             <ArrowUpRight className="h-3 w-3" />
             워크스페이스 이동
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {workspaceId && (
         <ItemPromoteModal

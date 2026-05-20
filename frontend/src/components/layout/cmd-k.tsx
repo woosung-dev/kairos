@@ -32,7 +32,13 @@ const CMD_GROUPS = [
 ];
 
 export function CmdK() {
-  const { cmdKOpen, toggleCmdK, toggleRagOverlay } = useUIStore();
+  const {
+    cmdKOpen,
+    toggleCmdK,
+    toggleRagOverlay,
+    cmdKInitialQuery,
+    setCmdKInitialQuery,
+  } = useUIStore();
   const [search, setSearch] = useState("");
   const [isRagMode, setIsRagMode] = useState(false);
   const { ask } = useRagStream();
@@ -53,6 +59,16 @@ export function CmdK() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [cmdKOpen, toggleCmdK]);
+
+  // Sprint 24 Wave 2 T-CMD-K-FIX: openCmdKWithQuery 로 진입한 경우 query 자동 입력 + RAG 모드.
+  // store 의 cmdKInitialQuery 가 set 되면 palette 도 열려있어야 함 (openCmdKWithQuery 가 함께 set).
+  useEffect(() => {
+    if (cmdKOpen && cmdKInitialQuery) {
+      setSearch(cmdKInitialQuery);
+      setIsRagMode(true);
+      setCmdKInitialQuery(""); // 1회성 consumption
+    }
+  }, [cmdKOpen, cmdKInitialQuery, setCmdKInitialQuery]);
 
   // ? 접두사로 RAG 모드 자동 전환
   useEffect(() => {
