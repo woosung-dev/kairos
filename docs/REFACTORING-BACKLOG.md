@@ -1315,6 +1315,12 @@ PR #1 audit 4 case (action_items.project_id / notes.project_id / mpl / project_m
 - ✅ embedding_chunks.project_id (composite FK + audit)
 - ✅ semantic_caches.project_id (composite FK + audit)
 
+### 회귀 안전망 (Sprint 24 Wave 2 T-N+2, 2026-05-20)
+
+`backend/tests/fixtures/composite_fk.py` + `backend/tests/integration/test_composite_fk_scn_matrix.py` —
+SCN-FK-01~12 매트릭스 (4 entity × 3 op = 12 case) 자동화. 회귀 시 SCN ID 로 즉시 식별.
+기존 `test_workspace_fk_cross_tenant_block.py` (7 case) 와 상호 보완.
+
 ### Carry-over (Sprint 22+)
 
 - memory_items.embedding_chunk_id — embedding_chunks(id, workspace_id) UNIQUE 선행 작업 필요
