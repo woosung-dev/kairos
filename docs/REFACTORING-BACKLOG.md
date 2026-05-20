@@ -1839,3 +1839,36 @@ Sprint 22 OBN-01~04 의 OnboardingBanner 는 Sprint 24 Wave 2 에서 폐기 (Cod
 **예상 시간:** 4-6h (재도입 시) — UI 설계 2h + BE 재활용 1h + analytics 추가 1h + E2E 1-2h.
 
 **근거:** `docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md` §T-OBN-05 D 옵션 + Codex/Gemini deep research 합의 메모.
+
+
+## BL-NEW-BE-PERF-COLD-START — Cloud Run + Neon cold start 진단 (Sprint 25+)
+
+**상태**: 미시작 (carry-over from Sprint 24 Wave 2 T-BE-PERF spike)
+**우선순위**: P1 (모바일 사용성 직결, BUG-MOBILE-005 의 main bottleneck 추정)
+**예상 시간**: 4-6h
+
+### 배경
+Sprint 24 Wave 2 Phase 6 spike 결과: localhost 측정 BE 4 API 직렬 25ms (sub-second). Multi-Agent QA Mobile 보고는 3015-3865ms. 150x 갭 → BE 로직 외 origin (cold start + 외부 인프라).
+
+### 진입 조건
+- Sentry distributed trace 도입 후 production cold start 측정 가능
+
+### 작업
+1. Cloud Run min-instances 0 → 1 trade-off (cost vs latency)
+2. Neon connection pool pre-warm + autoscale window
+3. Vercel→Cloud Run RTT 진단
+
+---
+
+## BL-NEW-BE-PERF-PARALLEL-API — Dashboard 4 API 병렬화 (Sprint 25+)
+
+**상태**: 미시작 (carry-over from Sprint 24 Wave 2 T-BE-PERF spike)
+**우선순위**: P2
+
+### 배경
+dashboard 4 API (workspaces / members / meetings / inbox) 가 직렬 호출. workspaceId 의존 chain 검토 시 병렬화 가능 가능성. localhost 25ms → 12ms (~50%) 추정.
+
+### 작업
+- FE hook 의존 매트릭스 검토 (workspaceId 가 다른 hook 의존 여부)
+- Promise.all 또는 useQueries 도입
+- E2E timing 회귀 가드
