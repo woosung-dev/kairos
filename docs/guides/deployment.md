@@ -234,7 +234,7 @@ E2E 테스트까지 활성화하려면 추가로:
 |---|---|
 | `E2E_CLERK_PUBLISHABLE_KEY` | Clerk dev 공개 키 |
 | `E2E_CLERK_SECRET_KEY` | Clerk dev 비밀 키 |
-| `E2E_API_URL` | `https://kairos-api-rfzkx2dyra-du.a.run.app` |
+| `E2E_API_URL` | `https://kairos-api-imrsiyibaa-du.a.run.app` |
 | `E2E_USER_EMAIL` | 테스트 계정 이메일 |
 | `E2E_USER_PASSWORD` | 테스트 계정 비밀번호 |
 | (Variable) `E2E_ENABLED` | `true` |
