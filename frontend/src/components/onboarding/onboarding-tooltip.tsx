@@ -102,14 +102,15 @@ export function OnboardingTooltip({
         }
       }}
     >
-      {/* Codex F-6 fix (Sprint 24 Wave 2 P2): display:contents 는 layout box 없음 →
-          Base UI Popover 가 trigger bounding rect 0 로 잘못된 위치에 표시됨.
-          inline-block wrapper 로 real layout box 보장. children 의 outer box 영향 없도록 부모 layout 상속. */}
+      {/* Codex F-6 + F-16 fix (Sprint 24 Wave 2 P2): real layout box + full-width 보존.
+          F-6: display:contents 는 bounding rect 0 → Popover positioning 깨짐. wrapper 필수.
+          F-16: inline-block 은 shrink-wrap → 자식 w-full / block 컨트롤 (search button, Cmd-K) 가 collapse.
+          해결: block + w-full + min-w-0 — 자식의 full-width 보존, 부모 flex container 에서도 안전. */}
       <PopoverTrigger
         render={(props) => (
-          <span {...props} className="inline-block">
+          <div {...props} className="block w-full min-w-0">
             {children}
-          </span>
+          </div>
         )}
       />
       <PopoverContent

@@ -68,9 +68,11 @@ export function NoteDetail({ noteId }: NoteDetailProps) {
   }, []);
 
   // note fetch 완료 시 titleRef seed (사용자 입력 전 명시 save 대비). ref 만 mutation — setState 아님.
+  // Codex F-15 fix (Sprint 24 Wave 2 P2): edit 중에는 server title 로 overwrite 안 함
+  // (autosave invalidation/refetch 시 사용자 draft title 손실 회피).
   useEffect(() => {
-    if (note) titleRef.current = note.title;
-  }, [note]);
+    if (note && !isEditing) titleRef.current = note.title;
+  }, [note, isEditing]);
 
   const handleTitleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
