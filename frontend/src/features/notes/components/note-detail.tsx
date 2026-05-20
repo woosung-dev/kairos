@@ -29,7 +29,11 @@ export function NoteDetail({ noteId }: NoteDetailProps) {
 
   const [isEditing, setIsEditing] = useState(false);
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Codex F-9 fix (Sprint 24 Wave 2 P2): title/content autosave 별도 timer.
+  // 기존: 공유 debounceRef → title 입력 1s 안에 content 입력 시 title save cancel (또는 그 반대).
+  // 해결: 별도 ref 로 독립 debounce, 둘 다 안전하게 commit.
+  const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contentDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 입력 추적용 ref — 명시 save 시 최신 값 읽기 (uncontrolled input 패턴, react-hooks/set-state-in-effect 회피)
   const titleRef = useRef<string>("");
 
@@ -41,8 +45,8 @@ export function NoteDetail({ noteId }: NoteDetailProps) {
       content: (note?.content as Record<string, unknown>) ?? { type: "doc", content: [] },
       onUpdate: ({ editor: ed }) => {
         if (!isEditing) return;
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => {
+        if (contentDebounceRef.current) clearTimeout(contentDebounceRef.current);
+        contentDebounceRef.current = setTimeout(() => {
           updateNote.mutate({ id: noteId, data: { content: ed.getJSON() } });
         }, AUTOSAVE_DEBOUNCE_MS);
       },
@@ -55,10 +59,11 @@ export function NoteDetail({ noteId }: NoteDetailProps) {
     if (editor) editor.setEditable(isEditing);
   }, [editor, isEditing]);
 
-  // unmount cleanup
+  // unmount cleanup — 두 timer 모두 정리 (Codex F-9)
   useEffect(() => {
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current);
+      if (contentDebounceRef.current) clearTimeout(contentDebounceRef.current);
     };
   }, []);
 
@@ -72,8 +77,9 @@ export function NoteDetail({ noteId }: NoteDetailProps) {
       const value = e.target.value;
       titleRef.current = value;
       if (!isEditing) return;
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
+      // Codex F-9: title 전용 debounce (content 와 독립)
+      if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current);
+      titleDebounceRef.current = setTimeout(() => {
         updateNote.mutate({ id: noteId, data: { title: value } });
       }, AUTOSAVE_DEBOUNCE_MS);
     },
@@ -81,10 +87,14 @@ export function NoteDetail({ noteId }: NoteDetailProps) {
   );
 
   const handleSaveAndExit = useCallback(() => {
-    // 명시 save: debounce 비우고 즉시 mutate (현재 editor + title 상태 둘 다)
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-      debounceRef.current = null;
+    // 명시 save: 두 debounce timer 모두 비우고 즉시 mutate (Codex F-9)
+    if (titleDebounceRef.current) {
+      clearTimeout(titleDebounceRef.current);
+      titleDebounceRef.current = null;
+    }
+    if (contentDebounceRef.current) {
+      clearTimeout(contentDebounceRef.current);
+      contentDebounceRef.current = null;
     }
     if (editor) {
       updateNote.mutate({

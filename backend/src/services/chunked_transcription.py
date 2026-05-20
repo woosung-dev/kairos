@@ -65,19 +65,20 @@ async def _ffmpeg_split(
     if n_chunks <= 0:
         return []
 
-    # Codex F-3 fix (Sprint 24 Wave 2 P2): source container preserve.
-    # 기존: .mp3 강제 + `-c copy` → AAC-in-M4A / PCM WAV 등 입력 시 ffmpeg 가 stream-copy 불가.
-    # fix: source URL 의 suffix 그대로 재사용 (.m4a / .wav / .mp3 / .webm 등).
-    source_suffix = Path(audio_url).suffix or ".mp3"
-
+    # Codex F-3 + F-8 fix (Sprint 24 Wave 2 P2): chunk 자체를 16kHz mono WAV 로 transcode.
+    # F-3: 기존 .mp3 강제 + -c copy → AAC-in-M4A / PCM WAV stream-copy 실패. .wav 강제 + transcode 로 input format 무관.
+    # F-8: 44.1kHz stereo WAV chunk 도 25MB 초과 위험 (44100*4*600 ≈ 100MB) — TranscriptionService 가 WAV input 시 conversion skip.
+    # 해결: chunk 단계에서 -ar 16000 -ac 1 -c:a pcm_s16le 명시 → 10분 chunk ≈ 19MB (25MB 한도 정합).
     chunks: list[str] = []
     for i in range(n_chunks):
         start = max(0.0, i * chunk_seconds - overlap_seconds)
         end = min(duration, (i + 1) * chunk_seconds + overlap_seconds)
-        chunk_path = tempfile.mktemp(suffix=source_suffix)
+        chunk_path = tempfile.mktemp(suffix=".wav")
         proc = await asyncio.create_subprocess_exec(
             "ffmpeg", "-y", "-i", audio_url,
-            "-ss", str(start), "-to", str(end), "-c", "copy", chunk_path,
+            "-ss", str(start), "-to", str(end),
+            "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le",  # Whisper-safe 16kHz mono WAV
+            chunk_path,
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.PIPE,
         )
