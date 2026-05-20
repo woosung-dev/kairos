@@ -131,3 +131,17 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 - `KAIROS_FOUNDER_CLERK_ID` ENV — founder 워크스페이스 매칭 시 ABORT
 - User row 보존 (Clerk dashboard 수동 정리)
 - R2 object 별도 정리
+
+---
+
+## 10. STT 파이프라인 (Sprint 24 Wave 2 갱신 — BL-T2-003 closure)
+
+- **entry**: `services/transcription.py:TranscriptionService.transcribe_with_chunking(audio_bytes, filename)` — pipeline `meetings/pipeline_service.py` 가 호출.
+- **임계값**: `chunked_transcription.CHUNK_SECONDS = 3600` (1시간).
+- **1hr 이하**: 단일 Whisper API 호출 (`TranscriptionService.transcribe` 경로 그대로 — Whisper `whisper-1`, verbose_json, segment timestamps).
+- **1hr 초과**: `services/chunked_transcription.py:transcribe_chunked` —
+  1. `_ffmpeg_probe_duration` 으로 duration 측정
+  2. `_ffmpeg_split` 으로 1hr chunk + 5초 overlap 분할 (chunk 경계 문장 잘림 방지)
+  3. `asyncio.gather` 로 chunk 병렬 Whisper 호출
+  4. `_merge_with_offset` 으로 chunk index 기반 offset (i * 3600) 적용 + 양쪽 overlap 영역 동일 text segment dedup
+- BL-T2-003 closure (Sprint 24 Wave 2 T-N+4, 2026-05-20). production 4hr+ recording 처리 차단 해소.

@@ -44,7 +44,8 @@ async def test_pipeline_success():
         TranscriptSegment(speaker="Speaker", start_sec=0.0, end_sec=5.0, text="테스트"),
     ]
     mock_transcription.download_audio.return_value = b"fake_audio"
-    mock_transcription.transcribe.return_value = (segments, 5.0)
+    # Sprint 24 Wave 2 T-N+4 (BL-T2-003): pipeline 진입점이 transcribe_with_chunking 로 변경
+    mock_transcription.transcribe_with_chunking.return_value = (segments, 5.0)
 
     mock_ai = AsyncMock()
     mock_ai.summarize.return_value = {
@@ -143,7 +144,8 @@ async def test_pipeline_auto_confirm():
         TranscriptSegment(speaker="Speaker", start_sec=0.0, end_sec=10.0, text="설계 논의"),
     ]
     mock_transcription.download_audio.return_value = b"fake_audio"
-    mock_transcription.transcribe.return_value = (segments, 10.0)
+    # Sprint 24 Wave 2 T-N+4 (BL-T2-003): pipeline 진입점이 transcribe_with_chunking 로 변경
+    mock_transcription.transcribe_with_chunking.return_value = (segments, 10.0)
 
     mock_ai = AsyncMock()
     mock_ai.summarize.return_value = {
@@ -319,9 +321,10 @@ async def test_capture_text_success():
         )
         await pipeline.capture_text(meeting_id, workspace_id, transcript_text)
 
-    # STT 메서드 호출 안 됨
+    # STT 메서드 호출 안 됨 (Sprint 24 Wave 2 T-N+4: 진입점 transcribe_with_chunking 로 변경)
     mock_r2.get_download_url.assert_not_called()
     mock_transcription.transcribe.assert_not_called()
+    mock_transcription.transcribe_with_chunking.assert_not_called()
 
     # 상태 전이 확인 (Codex F-1: update_status 시그니처 (meeting_id, workspace_id, status))
     status_calls = [call.args[2] for call in mock_meeting_repo.update_status.call_args_list]

@@ -1747,6 +1747,30 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 
 ---
 
+## ~~BL-T2-003~~ — Whisper chunk 분할 (4hr+) ✅ **완료 (Sprint 24 Wave 2 T-N+4, 2026-05-20)**
+
+**현 상태**: **[해소 2026-05-20] Sprint 24 Wave 2 T-N+4**. 4시간+ recording production 처리 차단 해소.
+
+**원본 발견**: Sprint 24 Multi-Agent QA Day 1 Sentinel Tier 2 (`docs/dev-log/2026-05-19-sprint24-qa-multi-agent/verification.md:272`).
+
+**문제**:
+- `transcription.py:TranscriptionService.transcribe()` 가 Whisper API 단일 호출.
+- 60MB+ audio (Whisper 25MB 제한 초과) 업로드 시 API 400 — 4hr+ recording 처리 불가.
+
+**해소 결과 (PR: Sprint 24 Wave 2 Phase 8)**:
+- `services/chunked_transcription.py` 신설 — `_ffmpeg_probe_duration` + `_ffmpeg_split` + `_whisper_transcribe_single` + `_merge_with_offset` + `transcribe_chunked` (5 모듈 함수).
+- `services/transcription.py` 에 `TranscriptionService.transcribe_with_chunking(audio_bytes, filename)` entry 추가 — 1hr 이하 단일 호출, 1hr 초과 chunked 경로 분기.
+- `meetings/pipeline_service.py:process_meeting` 호출처 교체 (`transcribe` → `transcribe_with_chunking`).
+- `tests/services/test_whisper_chunked_4hr.py` — 3 신규 test (short single / 4hr 4 chunk offset / overlap dedupe). mock 기반 (ffmpeg/Whisper 실제 호출 회피).
+
+**Atomic Update**: `backend/CONTEXT.md` §10 STT 파이프라인 + `docs/architecture/ai-pipeline.md` §"STT (Speech-to-Text)" + 본 BL closed mark.
+
+**제약·후속**:
+- 4hr 라이브 audio 실측은 별도 dogfood 과제 (테스트는 mock 검증). 사용자 audio sample 확보 시점에 production 1회 verify 권장.
+- 더 정교한 dedup (text 유사도 / 시간 fuzzy match) 필요 시 후속 BL 발의 — 현재는 exact text match within overlap window.
+
+---
+
 ## BL-NEW-RAG-SOURCE-SELECT — RAG source-level selection v1 (Sprint 25+ 검토)
 
 **현 상태:** 미시작 (carry-over from Sprint 24 Wave 2 T-RAG-MOCK-REMOVE / BUG-POW-005).

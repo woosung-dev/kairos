@@ -1,6 +1,16 @@
 # AI 파이프라인 명세
 
-## 전체 흐름
+## STT (Speech-to-Text)
+
+- **Provider**: OpenAI Whisper API (`whisper-1`, `response_format=verbose_json`, `timestamp_granularities=["segment"]`)
+- **호출 위치**: `meetings/pipeline_service.py:process_meeting` → `services/transcription.py:TranscriptionService.transcribe_with_chunking(audio_bytes, filename)`
+- **사전 변환**: 비표준 오디오(카카오톡 m4a 등)는 ffmpeg 로 WAV(16kHz mono, PCM s16le) 변환 후 Whisper 전달.
+- **Sprint 24 Wave 2 T-N+4 (BL-T2-003 closure, 2026-05-20)**: 4hr+ audio chunked.
+  - 1hr (`CHUNK_SECONDS=3600`) 이하: 기존 단일 Whisper 호출.
+  - 1hr 초과: `services/chunked_transcription.py:transcribe_chunked` — ffprobe duration → 1hr chunk + 5초 overlap (`OVERLAP_SECONDS=5`) ffmpeg 분할 → `asyncio.gather` 로 chunk 병렬 Whisper → chunk index 기반 offset (`i * CHUNK_SECONDS`) 보존 merge + 양쪽 overlap 영역 동일 text segment dedup.
+- 화자 분리: Sprint 1 MVP 미적용 (모든 segment `speaker="Speaker"`). pyannote 도입은 후속.
+
+## 전체 흐름 (Gemini)
 
 ```
 트랜스크립트 입력

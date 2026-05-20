@@ -140,3 +140,61 @@ class TranscriptionService:
             resp = await client.get(url, timeout=300.0)
             resp.raise_for_status()
             return resp.content
+
+    async def transcribe_with_chunking(
+        self, audio_bytes: bytes, filename: str = "audio.mp3"
+    ) -> tuple[list[TranscriptSegment], float]:
+        """Sprint 24 Wave 2 T-N+4 (BL-T2-003) — 4hr+ chunk 분할 진입점.
+
+        - 1hr 이하: 단일 Whisper 호출 (기존 transcribe 동작 그대로).
+        - 1hr 초과: ffmpeg duration probe + 1hr chunk + 5초 overlap + 병렬 Whisper + merge.
+
+        contract: (list[TranscriptSegment], duration_sec) — pipeline_service.py 기존 계약과 호환.
+        """
+        from src.services.chunked_transcription import (
+            CHUNK_SECONDS,
+            _ffmpeg_probe_duration,
+            transcribe_chunked,
+        )
+
+        # 1. 입력 bytes 를 임시파일로 — ffprobe duration 측정 + chunked_transcription 진입점 입력.
+        ext = os.path.splitext(filename)[1] or ".mp3"
+        input_fd, input_tmp = tempfile.mkstemp(suffix=ext)
+        os.write(input_fd, audio_bytes)
+        os.close(input_fd)
+
+        try:
+            # 2. duration probe — 분기 결정
+            try:
+                duration = await _ffmpeg_probe_duration(input_tmp)
+            except Exception as probe_err:
+                # probe 실패 시 fallback: 단일 호출 (작은 파일 가정 — 4hr+ 영향 X).
+                logger.warning(
+                    "duration probe 실패 (%s), 단일 호출 fallback: %s",
+                    filename, probe_err,
+                )
+                return await self.transcribe(audio_bytes, filename)
+
+            # 3. 1hr 이하: 기존 단일 호출 경로 (변환·세그먼트화 그대로)
+            if duration <= CHUNK_SECONDS:
+                return await self.transcribe(audio_bytes, filename)
+
+            # 4. 1hr 초과: chunked path. dict segments → TranscriptSegment 변환.
+            logger.info(
+                "4hr+ chunked transcription 진입: filename=%s duration=%.1fs",
+                filename, duration,
+            )
+            dict_segments = await transcribe_chunked(input_tmp)
+            segments = [
+                TranscriptSegment(
+                    speaker="Speaker",
+                    start_sec=seg["start"],
+                    end_sec=seg["end"],
+                    text=seg["text"],
+                )
+                for seg in dict_segments
+            ]
+            return segments, duration
+        finally:
+            if os.path.exists(input_tmp):
+                os.unlink(input_tmp)
