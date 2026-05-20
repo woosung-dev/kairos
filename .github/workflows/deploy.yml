@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  GCP_PROJECT: woosung-dev
+  GCP_PROJECT: jetaime-dev
   GCP_REGION: asia-northeast3
   SERVICE_NAME: kairos-api
   ARTIFACT_REGISTRY: kairos-docker

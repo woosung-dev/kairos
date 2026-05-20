@@ -155,7 +155,7 @@ echo -n "new-value" | gcloud secrets versions add database-url --data-file=-
 #### B. Workload Identity Federation 풀 + 프로바이더 생성
 
 ```bash
-PROJECT_ID=woosung-dev
+PROJECT_ID=jetaime-dev
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
 REPO=woosung-dev/kairos
 
@@ -224,7 +224,7 @@ Repo → Settings → Secrets and variables → Actions:
 | Secret 이름 | 값 |
 |---|---|
 | `GCP_WIF_PROVIDER` | 위 스크립트가 출력한 provider resource name |
-| `GCP_DEPLOYER_SA` | `kairos-deployer@woosung-dev.iam.gserviceaccount.com` |
+| `GCP_DEPLOYER_SA` | `github-actions-sa@jetaime-dev.iam.gserviceaccount.com` (공유 SA — truewords/kairos 동시 사용) |
 | `CORS_ORIGINS` | `https://kairos-zeta-ebon.vercel.app,...` |
 | `FRONTEND_URL` | `https://kairos-zeta-ebon.vercel.app` |
 
