@@ -1,0 +1,38 @@
+# Kairos Sprint 24 — Multi-Agent QA Environment Fingerprint
+
+## Timestamp (post-boot)
+UTC: 2026-05-19T13:36:44Z
+Local (KST): 2026-05-19 22:36:44 KST
+
+## Git
+Main branch HEAD: d659c03d4f4b6b20dc427bd3012c09c2f0049f75
+QA worktree: sprint-24/multi-agent-qa-mongoose-orbit @ d659c03d4f4b6b20dc427bd3012c09c2f0049f75
+Sub-agent baseline diff: CLEAN
+
+## Runtime
+node v24.12.0 | python 3.14.5 | pnpm 8.15.9 | uv 0.10.4 | pytest 9.0.2 | playwright 1.59.1
+
+## Reachability (post-boot, FINAL)
+Kairos FE: http://localhost:3000 ✅ (200 — Clerk middleware active, dev-browser-missing OK)
+Kairos BE: http://localhost:8000 ✅
+  /api/v1/health: {"status":"ok","version":"0.1.0"}
+  /api/v1/ready : {"status":"ready","db":"ok","version":"0.1.0"}
+
+⚠️ **IMPORTANT for sub-agents**: Kairos FE는 :3000 (playwright.config.ts default :3003 아님)
+   페르소나 dispatch 시: E2E_PORT=3000 또는 baseURL=http://localhost:3000 명시 필수
+
+## Coexisting (외부, 영향 없음)
+- :3001 = TrueWords newsroom (Next.js, 세계평화통일가정연합 newsroom)
+
+## Secrets (presence only)
+[frontend/.env.local] Clerk test mode (pk_test_*, sk_test_*) / E2E owner+viewer / API_URL=:8000
+[backend/.env] DATABASE_URL(Neon) / R2 / Gemini live / OpenAI live / APP_ENV=development
+Sentry DSN: NOT_SET → Tier 1 #9 [Blocked: mock test 대체] (사용자 결정)
+Gemini model: gemini-2.5-flash (baseline) → Sprint 24 Phase B = gemini-3.1-flash-lite swap
+
+## Pre-flight Status: GO ✅
+- FE/BE 부팅 완료
+- 자격증명 모두 SET
+- Playwright Chromium 설치됨
+- QA worktree clean (sub-agent 보호 baseline)
+- Sentry only blocked (mock 대체 확정)
