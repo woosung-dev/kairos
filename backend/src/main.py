@@ -13,6 +13,7 @@ from src.common.database import get_async_session
 
 from src.actions.router import router as actions_router
 from src.auth.router import router as auth_router
+from src.common.audit_router import router as audit_router
 from src.core.config import get_settings
 from src.core.lifespan import lifespan
 from src.inbox.router import router as inbox_router
@@ -144,6 +145,7 @@ app.include_router(upload_router)
 app.include_router(member_router)
 app.include_router(invite_router)
 app.include_router(invite_public_router)
+app.include_router(audit_router)
 
 
 @app.get("/api/v1/health")

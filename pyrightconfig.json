@@ -3,5 +3,11 @@
   "venv": ".venv",
   "pythonVersion": "3.12",
   "extraPaths": ["backend"],
-  "include": ["backend/src", "backend/tests", "backend/scripts", "backend/alembic"]
+  "include": ["backend/src", "backend/tests", "backend/scripts", "backend/alembic"],
+  "executionEnvironments": [
+    { "root": "backend", "extraPaths": ["."] },
+    { "root": "backend/src", "extraPaths": [".."] },
+    { "root": "backend/tests", "extraPaths": [".."] },
+    { "root": "backend/scripts", "extraPaths": [".."] }
+  ]
 }

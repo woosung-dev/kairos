@@ -101,6 +101,7 @@ class RagService:
         }
 
         # [4] Hybrid Search — visibility filter 포함 (ISSUE-040)
+        # Sprint 24 Wave 2 T-RAG-TIME-FILTER: time_range chain 전달.
         vector_results = await self.embedding_repo.vector_search(
             question_embedding,
             workspace_id,
@@ -108,6 +109,7 @@ class RagService:
             requester_role=requester_role,
             project_id=project_id,
             source_type=source_type,
+            time_range=time_range,
             limit=50,
         )
         text_results = await self.embedding_repo.text_search(
@@ -117,6 +119,7 @@ class RagService:
             requester_role=requester_role,
             project_id=project_id,
             source_type=source_type,
+            time_range=time_range,
             limit=50,
         )
 

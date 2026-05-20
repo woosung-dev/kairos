@@ -4,5 +4,11 @@
   "pythonVersion": "3.12",
   "pythonPath": "/Users/woosung/project/agy-project/kairos/backend/.venv/bin/python",
   "extraPaths": ["./"],
-  "include": ["src", "tests", "scripts", "alembic"]
+  "include": ["src", "tests", "scripts", "alembic"],
+  "executionEnvironments": [
+    { "root": ".", "extraPaths": ["."] },
+    { "root": "src", "extraPaths": [".."] },
+    { "root": "tests", "extraPaths": [".."] },
+    { "root": "scripts", "extraPaths": [".."] }
+  ]
 }
