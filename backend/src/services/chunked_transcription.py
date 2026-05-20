@@ -17,7 +17,10 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-CHUNK_SECONDS = 3600  # 1시간 (Whisper 25MB 제한 회피 안전 마진 포함)
+# Codex F-5 fix (Sprint 24 Wave 2 P1): Whisper 25MB upload 한도 정합.
+# TranscriptionService.transcribe 는 16kHz mono WAV 로 변환 → 1hr ≈ 115MB > 25MB.
+# 10분 chunk = 16000 × 2 × 600 = ~19.2MB (margin 25% 안전).
+CHUNK_SECONDS = 600   # 10분 (Whisper 25MB 한도 정합)
 OVERLAP_SECONDS = 5   # chunk 경계 문장 잘림 방지용 overlap
 
 

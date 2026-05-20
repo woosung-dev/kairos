@@ -74,9 +74,10 @@ export default function ProjectsPage() {
             icon="📁"
             title="프로젝트가 없습니다"
             description="첫 번째 프로젝트를 만들어 콘텐츠를 정리하세요"
+            // Codex F-7 fix: /new (content add) 가 아닌 CreateProjectDialog 열기
             action={
               canWrite
-                ? { label: "새 프로젝트", href: "/new" }
+                ? { label: "새 프로젝트", onClick: () => setIsCreateOpen(true) }
                 : undefined
             }
           />

@@ -2,14 +2,17 @@
 // Sprint 22 OBN-03 의 onboarding-aware hint 분기는 제거. plain copy 유지.
 "use client";
 
+// Codex F-7 fix (Sprint 24 Wave 2 P3): action 이 href Link 만이 아니라 onClick 도 지원.
+// /projects empty state CTA 가 /new (content add) 가 아닌 CreateProjectDialog 를 열어야 함.
+type EmptyStateAction =
+  | { label: string; href: string; onClick?: never }
+  | { label: string; onClick: () => void; href?: never };
+
 interface EmptyStateProps {
   icon?: string;
   title: string;
   description?: string;
-  action?: {
-    label: string;
-    href: string;
-  };
+  action?: EmptyStateAction;
 }
 
 export function EmptyState({
@@ -18,6 +21,12 @@ export function EmptyState({
   description,
   action,
 }: EmptyStateProps) {
+  const actionClassName = "px-4 py-2 rounded text-sm font-medium transition-colors";
+  const actionStyle = {
+    background: "var(--accent)",
+    color: "var(--background)",
+    borderRadius: "var(--radius-sm)",
+  };
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       {icon && <span className="text-4xl mb-4">{icon}</span>}
@@ -32,19 +41,15 @@ export function EmptyState({
           {description}
         </p>
       )}
-      {action && (
-        <a
-          href={action.href}
-          className="px-4 py-2 rounded text-sm font-medium transition-colors"
-          style={{
-            background: "var(--accent)",
-            color: "var(--background)",
-            borderRadius: "var(--radius-sm)",
-          }}
-        >
+      {action && (action.href ? (
+        <a href={action.href} className={actionClassName} style={actionStyle}>
           {action.label}
         </a>
-      )}
+      ) : (
+        <button type="button" onClick={action.onClick} className={actionClassName} style={actionStyle}>
+          {action.label}
+        </button>
+      ))}
     </div>
   );
 }

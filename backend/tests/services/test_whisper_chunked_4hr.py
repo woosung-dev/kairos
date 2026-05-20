@@ -12,13 +12,16 @@ from unittest.mock import AsyncMock, patch
 
 @pytest.mark.asyncio
 async def test_short_audio_uses_single_call():
-    """1hr 이하 audio = 단일 Whisper 호출 (split 미발생, ffmpeg_split 미호출)."""
+    """CHUNK_SECONDS 이하 audio = 단일 Whisper 호출 (split 미발생, ffmpeg_split 미호출).
+
+    Codex F-5 fix 후 default = 600s (10min). 본 test 는 mock duration < CHUNK_SECONDS 확인.
+    """
     from src.services import chunked_transcription
 
     with patch.object(
         chunked_transcription,
         "_ffmpeg_probe_duration",
-        AsyncMock(return_value=1800.0),  # 30min
+        AsyncMock(return_value=300.0),  # 5min (Codex F-5: CHUNK_SECONDS=600 정합)
     ):
         with patch.object(
             chunked_transcription,
@@ -39,9 +42,16 @@ async def test_short_audio_uses_single_call():
 
 
 @pytest.mark.asyncio
-async def test_4hr_audio_uses_4_chunks_with_overlap():
-    """4hr audio = 4 chunk + offset 보존 (chunk i 의 모든 segment start += i * 3600)."""
+async def test_4hr_audio_uses_4_chunks_with_overlap(monkeypatch):
+    """4hr audio = 4 chunk + offset 보존 (chunk i 의 모든 segment start += i * CHUNK_SECONDS).
+
+    monkeypatch: 본 test 는 CHUNK_SECONDS=3600 가정 하 작성됨. Codex F-5 (Whisper 25MB) 후
+    default 가 600 (10분) 으로 변경됨 → test 격리 위해 monkeypatch 로 3600 강제.
+    실 production 에서는 4hr = 24 chunks 처리 (mock 무관, default 600s 적용).
+    """
     from src.services import chunked_transcription
+
+    monkeypatch.setattr(chunked_transcription, "CHUNK_SECONDS", 3600)
 
     fake_chunk_paths = ["/tmp/c0.mp3", "/tmp/c1.mp3", "/tmp/c2.mp3", "/tmp/c3.mp3"]
 
@@ -86,15 +96,18 @@ async def test_4hr_audio_uses_4_chunks_with_overlap():
 
 
 @pytest.mark.asyncio
-async def test_chunk_overlap_dedupe():
+async def test_chunk_overlap_dedupe(monkeypatch):
     """chunk N 마지막 overlap 영역 + chunk N+1 처음 overlap 영역 동일 text segment dedup.
 
     시나리오: 2 chunk (2hr) 가정. Codex F-4 fix 후 chunk 1 offset = 3600 - 5 = 3595.
+    monkeypatch: CHUNK_SECONDS=3600 강제 (Codex F-5 default 600 무관 test 격리).
     - chunk 0 마지막 segment: start=3595, end=3599, text="overlap-word"
     - chunk 1 첫 segment (post-offset 3595): start=3596 (=1+3595), end=3599, text="overlap-word"
     - merge 시 chunk 1 의 동일 text segment 는 직전 segment 와 같은 영역 → dedup.
     """
     from src.services import chunked_transcription
+
+    monkeypatch.setattr(chunked_transcription, "CHUNK_SECONDS", 3600)
 
     fake_chunk_paths = ["/tmp/c0.mp3", "/tmp/c1.mp3"]
 

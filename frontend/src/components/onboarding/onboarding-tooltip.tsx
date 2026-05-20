@@ -83,11 +83,14 @@ export function OnboardingTooltip({
 
   return (
     <Popover open={open} onOpenChange={(o) => (o ? setOpen(true) : handleDismiss())}>
+      {/* Codex F-6 fix (Sprint 24 Wave 2 P2): display:contents 는 layout box 없음 →
+          Base UI Popover 가 trigger bounding rect 0 로 잘못된 위치에 표시됨.
+          inline-block wrapper 로 real layout box 보장. children 의 outer box 영향 없도록 부모 layout 상속. */}
       <PopoverTrigger
         render={(props) => (
-          <div {...props} className="contents">
+          <span {...props} className="inline-block">
             {children}
-          </div>
+          </span>
         )}
       />
       <PopoverContent
