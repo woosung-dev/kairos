@@ -152,10 +152,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from src.services.ai_processing import (
-    extract_action_items,
-    generate_meeting_summary,
-)
+from src.services.ai_processing import AIProcessingService  # Codex F-2 fix: class method 사용
 from backend.tests.llm.fixtures.sample_transcripts import (
     DELTA_1_RAG_QUESTIONS,
     DELTA_2_MEETING_TRANSCRIPT,
@@ -165,16 +162,22 @@ from backend.tests.llm.fixtures.sample_transcripts import (
 
 
 async def measure_current() -> dict:
-    """현재 main (gemini-3.1-flash-lite) 측정."""
+    """현재 main (gemini-3.1-flash-lite) 측정 — AIProcessingService 통해 호출."""
+    svc = AIProcessingService()  # 또는 __init__ params 가 필요하면 적절히 주입
     result = {
         "model": "gemini-3.1-flash-lite",
         "measured_at": datetime.utcnow().isoformat(),
-        "delta_2_summary": await generate_meeting_summary(DELTA_2_MEETING_TRANSCRIPT),
+        "delta_2_summary": await svc.summarize(DELTA_2_MEETING_TRANSCRIPT),
         "delta_3_actions": [],
         # delta_1 RAG / delta_4 한국어 / delta_5 inbox — 추후 보강
     }
     for sample in DELTA_3_ACTION_SAMPLES:
-        actions = await extract_action_items(sample["transcript"], current_year=2026)
+        # extract_actions_and_link 의 실제 시그니처에 맞춰 호출
+        # (transcript 외 meeting_id / workspace_id 등 필요 시 fixture 에서 mock 주입)
+        actions = await svc.extract_actions_and_link(
+            transcript=sample["transcript"],
+            current_year=2026,  # T-AI-DATE 후 추가될 param
+        )
         result["delta_3_actions"].append({
             "input": sample["transcript"][:100],
             "actions": [a.model_dump() for a in actions],
@@ -212,13 +215,15 @@ Expected: `docs/dev-log/2026-05-20-sprint24-wave2/post-swap-delta-result.json` �
 - [ ] **Step 5: 별도 worktree 에서 baseline 캡쳐 (R8 stash 보존 + worktree race 회피)**
 
 ```bash
+# Codex F-3 fix: 경로 정확화. baseline worktree 의 root 에서 cp 실행
 git worktree add ../kairos-baseline-003908a-prev 003908a~1
-cd ../kairos-baseline-003908a-prev/backend
-uv sync
-# fixture 파일을 worktree 에 복사 (commit 안 됨)
+cd ../kairos-baseline-003908a-prev   # ← backend/ 가 아닌 worktree root
+uv sync --directory backend           # backend 디렉토리 명시
+# fixture + script 복사 — 둘 다 worktree root 기준 상대 경로
+mkdir -p backend/tests/llm/fixtures
 cp ../kairos-sprint-24-wave2/backend/tests/llm/fixtures/sample_transcripts.py backend/tests/llm/fixtures/sample_transcripts.py
-cp ../kairos-sprint-24-wave2/backend/scripts/sprint24_wave2_delta.py backend/scripts/
-uv run python -m scripts.sprint24_wave2_delta --output /tmp/baseline-2.5-flash.json
+cp ../kairos-sprint-24-wave2/backend/scripts/sprint24_wave2_delta.py backend/scripts/sprint24_wave2_delta.py
+cd backend && uv run python -m scripts.sprint24_wave2_delta --output /tmp/baseline-2.5-flash.json
 ```
 
 - [ ] **Step 6: baseline + current 비교 보고서 작성**
@@ -1335,39 +1340,64 @@ async def test_time_range_1w_filters_chunks_older_than_7_days(
     db_session,
     workspace_factory,
     embedding_chunk_factory,
+    user_factory,
 ):
     workspace = await workspace_factory()
+    owner = await user_factory(workspace_id=workspace.id, role="owner")
     repo = EmbeddingRepository(db_session)
-    
+
     recent_chunk = await embedding_chunk_factory(workspace_id=workspace.id, created_at=datetime.now(timezone.utc) - timedelta(days=3))
     old_chunk = await embedding_chunk_factory(workspace_id=workspace.id, created_at=datetime.now(timezone.utc) - timedelta(days=14))
-    
+
     query_emb = [0.1] * 1536
-    results = await repo.vector_search(query_embedding=query_emb, workspace_id=workspace.id, time_range="1w", limit=20)
-    
-    result_ids = {r.id for r in results}
+    # Codex F-1 fix: requester_user_id / requester_role 필수 (visibility filter)
+    results = await repo.vector_search(
+        query_embedding=query_emb,
+        workspace_id=workspace.id,
+        requester_user_id=owner.id,
+        requester_role="owner",
+        time_range="1w",
+        limit=20,
+    )
+
+    result_ids = {r["id"] for r in results}
     assert recent_chunk.id in result_ids
     assert old_chunk.id not in result_ids
 
 
 @pytest.mark.asyncio
-async def test_time_range_all_or_none_no_filter(db_session, workspace_factory, embedding_chunk_factory):
+async def test_time_range_all_or_none_no_filter(db_session, workspace_factory, embedding_chunk_factory, user_factory):
     workspace = await workspace_factory()
+    owner = await user_factory(workspace_id=workspace.id, role="owner")
     repo = EmbeddingRepository(db_session)
     old_chunk = await embedding_chunk_factory(workspace_id=workspace.id, created_at=datetime.now(timezone.utc) - timedelta(days=365))
-    
+
     query_emb = [0.1] * 1536
-    results = await repo.vector_search(query_embedding=query_emb, workspace_id=workspace.id, time_range="all", limit=20)
-    result_ids = {r.id for r in results}
+    results = await repo.vector_search(
+        query_embedding=query_emb,
+        workspace_id=workspace.id,
+        requester_user_id=owner.id,
+        requester_role="owner",
+        time_range="all",
+        limit=20,
+    )
+    result_ids = {r["id"] for r in results}
     assert old_chunk.id in result_ids
 
 
 @pytest.mark.asyncio
-async def test_time_range_invalid_value_raises(db_session, workspace_factory):
+async def test_time_range_invalid_value_raises(db_session, workspace_factory, user_factory):
     workspace = await workspace_factory()
+    owner = await user_factory(workspace_id=workspace.id, role="owner")
     repo = EmbeddingRepository(db_session)
     with pytest.raises(ValueError, match="invalid time_range"):
-        await repo.vector_search(query_embedding=[0.1] * 1536, workspace_id=workspace.id, time_range="invalid")
+        await repo.vector_search(
+            query_embedding=[0.1] * 1536,
+            workspace_id=workspace.id,
+            requester_user_id=owner.id,
+            requester_role="owner",
+            time_range="invalid",
+        )
 ```
 
 - [ ] **Step 53: 테스트 실행 (FAIL 확인)**
@@ -1378,7 +1408,9 @@ cd backend && uv run pytest tests/embeddings/test_rag_time_range_sql_clause.py -
 
 Expected: FAIL (time_range param 미존재).
 
-- [ ] **Step 54: vector_search 에 time_range param + SQL clause 추가**
+- [ ] **Step 54: vector_search 에 time_range param + SQL clause 추가 (Codex F-1 P1 — visibility filter 보존 강제)**
+
+**중요 (Codex F-1)**: 기존 `requester_user_id` / `requester_role` / `project_id` / `source_type` / `_visibility_filter_sql()` 파라미터는 **모두 보존**. ISSUE-040 private chunk leak 회귀 방지. time_range 만 새로 추가.
 
 Modify `backend/src/embeddings/repository.py:155`:
 
@@ -1395,36 +1427,61 @@ async def vector_search(
     self,
     query_embedding: list[float],
     workspace_id: uuid.UUID,
-    project_ids: list[uuid.UUID] | None = None,
-    time_range: str | None = None,
-    limit: int = 20,
-) -> list[EmbeddingChunk]:
-    """Sprint 24 Wave 2 T-RAG-TIME-FILTER: time_range param 추가."""
-    await _apply_hnsw_session_params(self.session)
+    requester_user_id: uuid.UUID,       # 기존 보존 (RBAC visibility)
+    requester_role: str,                # 기존 보존
+    project_id: uuid.UUID | None = None,
+    source_type: str | None = None,     # 기존 보존
+    time_range: str | None = None,      # Sprint 24 Wave 2 T-RAG-TIME-FILTER 신규
+    limit: int = 50,
+) -> list[dict]:
+    """Sprint 24 Wave 2 T-RAG-TIME-FILTER: time_range param 추가 (시그니처 확장 only).
     
+    ISSUE-040 visibility filter (`_visibility_filter_sql()`) 보존. 기존 인자 모두 유지.
+    """
+    await _apply_hnsw_session_params(self.session)
+
     if time_range and time_range not in TIME_RANGE_INTERVAL:
         raise ValueError(f"invalid time_range: {time_range}")
-    
-    where_clauses = ["workspace_id = :wid", "chunk_level = 2"]
-    params: dict = {"wid": str(workspace_id), "qe": query_embedding, "lim": limit}
-    
-    if project_ids:
-        where_clauses.append("project_id = ANY(:pids)")
-        params["pids"] = [str(p) for p in project_ids]
-    
-    interval = TIME_RANGE_INTERVAL.get(time_range)
+
+    filters = "workspace_id = :wid AND chunk_level = 2"
+    params: dict = {
+        "wid": str(workspace_id),
+        "limit": limit,
+        "req_uid": str(requester_user_id),
+        "req_role": requester_role,
+    }
+
+    if project_id:
+        filters += " AND project_id = :pid"
+        params["pid"] = str(project_id)
+    if source_type:
+        filters += " AND source_type = :stype"
+        params["stype"] = source_type
+
+    # Sprint 24 Wave 2 T-RAG-TIME-FILTER: time_range SQL clause 추가
+    interval = TIME_RANGE_INTERVAL.get(time_range) if time_range else None
     if interval:
-        where_clauses.append(f"created_at >= now() - interval '{interval}'")
-    
-    sql = text(f"""
-        SELECT * FROM embedding_chunks
-        WHERE {' AND '.join(where_clauses)}
-        ORDER BY embedding <=> :qe::halfvec
-        LIMIT :lim
+        filters += f" AND created_at >= now() - interval '{interval}'"
+
+    visibility_clause = self._visibility_filter_sql()  # ISSUE-040 RBAC 보존
+
+    query = text(f"""
+        SELECT id, chunk_text, source_id, source_type, metadata_json,
+               parent_chunk_id, created_at,
+               1 - (embedding <=> CAST(:qvec AS halfvec)) AS score
+        FROM embedding_chunks
+        WHERE {filters}
+          {visibility_clause}
+        ORDER BY embedding <=> CAST(:qvec AS halfvec)
+        LIMIT :limit
     """)
-    result = await self.session.exec(select(EmbeddingChunk).from_statement(sql).params(**params))
-    return list(result.all())
+    params["qvec"] = str(query_embedding)
+
+    result = await self.session.execute(query, params)
+    return [dict(r._mapping) for r in result]
 ```
+
+**RagService.ask() 호출처 영향**: 기존 인자 모두 유지 + time_range 만 신규 전달. RAG pipeline 변경 minimal.
 
 - [ ] **Step 55: 테스트 실행 (PASS 확인)**
 
