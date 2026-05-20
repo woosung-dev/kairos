@@ -64,10 +64,16 @@ test.describe("Onboarding Tooltip (T-OBN-05 D 옵션, Sprint 24 Wave 2)", () => 
       await dashTip.getByRole("button", { name: "닫기" }).click();
     }
 
-    await page.keyboard.press("Meta+K");
+    // CI fix: page.keyboard.press("Meta+K") 가 Linux CI 에서 OS metaKey 매핑 race 가능.
+    // 헤더의 ⌘K display button click 으로 cmd-k 발화 (page snapshot 에 button "팀 지식 검색... ⌘K" 확인).
+    const cmdKBtn = page
+      .getByRole("button", { name: /지식 검색|⌘K/ })
+      .first();
+    await cmdKBtn.click();
+
     await expect(
       page.getByTestId("onboarding-tooltip-search"),
-    ).toBeVisible({ timeout: 5_000 });
+    ).toBeVisible({ timeout: 10_000 });
     await expect(
       page.getByText(/검색 범위는 현재 워크스페이스 전체/),
     ).toBeVisible();
