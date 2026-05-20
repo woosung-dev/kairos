@@ -4,7 +4,7 @@
 // 2 무조건 (dashboard, search) + 2 조건부 (projects step<2, new step<3) — Codex cross-check 권장
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import {
@@ -56,9 +56,16 @@ export function OnboardingTooltip({
 }: OnboardingTooltipProps) {
   const { data: onboarding } = useOnboarding();
   const [open, setOpen] = useState(false);
+  // CI fix (Sprint 24 Wave 2 PR #101 e2e fail): React 18 Strict Mode 의 useEffect 2회 실행 우회.
+  // 기존: useEffect 안에서 setOpen + localStorage.setItem 동시 실행 → 첫 mount 시 마크 set
+  //      → Strict Mode 두 번째 mount (cleanup → re-mount) 에서 localStorage 이미 set → early return
+  //      → setOpen(true) 호출 안 됨 → tooltip 발화 X (CI e2e onboarding-tooltip-search FAIL 원인).
+  // fix: useRef 로 첫 mount 한 번만 setOpen, localStorage 마크는 dismiss / open 후 setTimeout 으로 분리.
+  const didInitRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (didInitRef.current) return; // Strict Mode re-mount 차단
     if (window.localStorage.getItem(STORAGE_KEY(page))) return; // 재방문 X
 
     // 조건부 페이지 gate (projects / new)
@@ -69,13 +76,15 @@ export function OnboardingTooltip({
       if (!isEmpty) return;
     }
 
+    didInitRef.current = true;
     setOpen(true);
-    // Codex F-11 fix (Sprint 24 Wave 2 P3): open 시점에 storage key set.
-    // 페이지 leave / Cmd+K close 시 dismiss handler 미호출 → 재발화 위험. open=shown 으로 보장.
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY(page), "1");
-    }
     trackEvent("tooltip_shown", page);
+    // Codex F-11 fix (Sprint 24 Wave 2 P3): open 후 storage key set — 페이지 leave / Cmd+K close 시 재발화 회피.
+    // Strict Mode 호환: setOpen 직후 동기 setItem 하면 두 번째 mount 시 early return → setOpen 안 됨.
+    // setTimeout 으로 다음 tick (Strict Mode 의 unmount → re-mount cycle 완료 후) 에 setItem.
+    window.setTimeout(() => {
+      window.localStorage.setItem(STORAGE_KEY(page), "1");
+    }, 0);
   }, [page, onboarding, isEmpty]);
 
   const handleDismiss = () => {
