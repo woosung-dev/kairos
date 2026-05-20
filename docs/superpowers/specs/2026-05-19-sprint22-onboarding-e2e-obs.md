@@ -1,5 +1,8 @@
 # Sprint 22 — Onboarding + Playwright G1~G8 + Sentry Observability Design
 
+> ⚠️ **Sprint 24 Wave 2 부분 deprecated** (2026-05-20): OBN-01~04 의 OnboardingBanner FE 부분은 폐기됨 (D 옵션, Codex+Gemini deep research 합의). BE step lifecycle 자산은 유지.
+> 결정 anchor: `docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md` §T-OBN-05
+
 > 코드네임: **expressive-squirrel**
 > 기간: 2026-05-19 ~ ETA (단일 세션 22-28h 목표, 단일 PR)
 > 진입 baseline: main HEAD `1a83af6` (Sprint 21 BL-050 Simple 4 closeout, 325 PASS + 1 skipped, pyright 132)

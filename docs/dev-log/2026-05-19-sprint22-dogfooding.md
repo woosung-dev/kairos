@@ -1,5 +1,8 @@
 # Sprint 22 — 가상 외부 user "Alice" Dogfooding Walkthrough
 
+> ⚠️ **Sprint 24 Wave 2 부분 deprecated** (2026-05-20): OnboardingBanner FE 부분은 폐기됨 (D 옵션, Codex+Gemini deep research 합의). 본 walkthrough 의 banner 발화 narrative 는 더 이상 유효하지 않음. BE step lifecycle 자산은 유지.
+> 상세: `docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md` §T-OBN-05
+
 > 2026-05-19, Sprint 22 expressive-squirrel
 > 본 문서 = OBN-01~04 의 user journey 통합 검증 narrative
 > 실행은 Stage 6 closeout 단계 (사용자가 직접 진행 또는 PR review 후 staging dogfooding)

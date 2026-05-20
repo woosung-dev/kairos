@@ -1811,3 +1811,31 @@ Phase 2 T-AI-DATE 완료 후 n=20 으로 확장 재측정해 P/R 회복 confirma
 **예상 시간:** 1-2h (fixture 확장 1h + 측정 + 비교 1h).
 
 **근거:** `docs/dev-log/2026-05-20-sprint24-wave2/post-swap-delta-report.md` §4 + §7 + §9 — Phase 2 진입 conditional 조건 명시 + Gate FAIL revert 미발동 사유 의존.
+
+---
+
+## BL-NEW-OBN-DATA-RETRY — Onboarding 재설계 data-driven retry (Sprint 25+)
+
+**현 상태:** 미시작 (carry-over from Sprint 24 Wave 2 T-OBN-05 D 옵션 결정).
+
+Sprint 22 OBN-01~04 의 OnboardingBanner 는 Sprint 24 Wave 2 에서 폐기 (Codex+Gemini deep research 합의 + Multi-Agent QA 데이터 TTFV 255초 / 글로벌 checklist 완료율 19.2% / PERSONA-001 power user 정합 분석). PERSONA-002/003 (PM 가설) 또는 tooltip analytics 결과 confirmed 시 onboarding 재설계 검토.
+
+**진입 조건 (둘 중 하나):**
+- F4 외부 인터뷰 (`docs/requirements/interview-results.md`) 결과 PM 페르소나 confirmed (다른 페르소나 친화 onboarding 가 ROI 확인).
+- 또는 Sprint 24 Wave 2 tooltip analytics (`tooltip_shown` / `tooltip_dismissed`) 4-6주 데이터 축적 후 power user friction 또는 효과 부재 입증.
+
+**목표 (재도입 시):**
+1. AI personalize (1인 founder vs 팀 wedge 분화 — branching tutorial).
+2. step 별 CTA 가 page transition 자동 trigger (passive banner → active deep-link).
+3. measure 자체 강화 (activation funnel — workspace → project → meeting → RAG ask 각 step transition rate).
+4. tooltip 산출물과 통합 (Linear-style first-visit hint 유지 + 명시적 walkthrough overlay 옵션 추가).
+
+**Risk:** 🟢 낮음 — 신규 도입. 기존 BE 자산 (`User.onboarding_step` + event hook) 재활용 가능.
+
+**우선순위:** ★★☆☆☆ (P3 — F4 외부 인터뷰 결과 또는 analytics 데이터 의존).
+
+**Sprint 묶음 권고:** Sprint 25+ (F4 결과 또는 analytics 데이터 누적 후). 사용자 cohort sample size n≥20 권고.
+
+**예상 시간:** 4-6h (재도입 시) — UI 설계 2h + BE 재활용 1h + analytics 추가 1h + E2E 1-2h.
+
+**근거:** `docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md` §T-OBN-05 D 옵션 + Codex/Gemini deep research 합의 메모.

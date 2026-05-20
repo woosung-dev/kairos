@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { useWorkspaces, useCreateWorkspace } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { useRagStream } from "@/features/rag/hooks";
-import { useRagStore } from "@/features/rag/store";
 import { EmptyState } from "@/components/empty-state";
 import { useUIStore } from "@/store/ui";
+import { OnboardingTooltip } from "@/components/onboarding/onboarding-tooltip";
 
 // 워크스페이스 생성 다이얼로그
 function CreateWorkspaceDialog({
@@ -22,7 +22,7 @@ function CreateWorkspaceDialog({
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
@@ -108,7 +108,7 @@ export default function DashboardPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toggleCmdK } = useUIStore();
   const { ask } = useRagStream();
-  const { messages } = useRagStore();
+  // messages 는 RAG overlay 에서 별도 구독 — dashboard page 본문은 직접 사용 안 함
 
   const { data: workspaces, isLoading: isLoadingWs } = useWorkspaces();
   const { activeWorkspaceId, setActiveWorkspaceId } = useWorkspaceStore();
@@ -178,28 +178,30 @@ export default function DashboardPage() {
         >
           무엇이든 질문하세요
         </h1>
-        <button
-          onClick={toggleCmdK}
-          className="w-full flex items-center justify-between px-4 py-3 rounded border text-sm transition-colors"
-          style={{
-            background: "var(--surface)",
-            borderColor: "var(--border)",
-            color: "var(--text-muted)",
-            borderRadius: "var(--radius-md)",
-          }}
-        >
-          <span>검색하거나 질문 입력...</span>
-          <kbd
-            className="px-2 py-0.5 rounded text-[10px]"
+        <OnboardingTooltip page="dashboard">
+          <button
+            onClick={toggleCmdK}
+            className="w-full flex items-center justify-between px-4 py-3 rounded border text-sm transition-colors"
             style={{
-              background: "var(--surface-active)",
-              borderRadius: "var(--radius-sm)",
-              fontFamily: "var(--font-mono)",
+              background: "var(--surface)",
+              borderColor: "var(--border)",
+              color: "var(--text-muted)",
+              borderRadius: "var(--radius-md)",
             }}
           >
-            ⌘K
-          </kbd>
-        </button>
+            <span>검색하거나 질문 입력...</span>
+            <kbd
+              className="px-2 py-0.5 rounded text-[10px]"
+              style={{
+                background: "var(--surface-active)",
+                borderRadius: "var(--radius-sm)",
+                fontFamily: "var(--font-mono)",
+              }}
+            >
+              ⌘K
+            </kbd>
+          </button>
+        </OnboardingTooltip>
       </div>
 
       {/* 추천 질문 */}

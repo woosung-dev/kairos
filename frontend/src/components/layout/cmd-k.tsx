@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUIStore } from "@/store/ui";
 import { useRagStream } from "@/features/rag/hooks";
+import { OnboardingTooltip } from "@/components/onboarding/onboarding-tooltip";
 
 const CMD_GROUPS = [
   {
@@ -103,6 +104,7 @@ export function CmdK() {
         }}
       />
 
+      <OnboardingTooltip page="search">
       <div
         className="relative w-full max-w-[520px] rounded-lg border shadow-2xl overflow-hidden"
         style={{
@@ -192,6 +194,7 @@ export function CmdK() {
           </div>
         )}
       </div>
+      </OnboardingTooltip>
     </div>
   );
 }
