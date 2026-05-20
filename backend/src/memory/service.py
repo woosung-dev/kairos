@@ -49,6 +49,7 @@ from src.memory.models import (
     MemoryItem,
     PromotionAudit,
 )
+from src.memory.pipeline_service import MemoryPipelineService
 from src.memory.repository import MemoryRepository
 from src.workspaces.repository import WorkspaceRepository
 from src.memory.schemas import (
@@ -83,6 +84,7 @@ class MemoryService:
         session_factory: async_sessionmaker[AsyncSession],
         r2_service: R2Service,
         workspace_repo: WorkspaceRepository | None = None,
+        pipeline: MemoryPipelineService | None = None,
     ) -> None:
         self.repo = repo
         self._session_factory = session_factory
@@ -90,6 +92,9 @@ class MemoryService:
         # Sprint 19 PR #1 C10 (Codex F-4): promote 의 cross-workspace 검증을 repo API 로 이동
         # (backend rule §3 회복 — service 가 session 직접 사용 금지)
         self.workspace_repo = workspace_repo
+        # Sprint 24 Wave 2 BL-006: embeddings 호출은 MemoryPipelineService 경유 (헌법 §4.2 / ADR-014).
+        # `_bg_*` 흐름 진입 전 fail-closed 검사 — pipeline 미주입 = orchestrator 우회 = 헌법 위반.
+        self._pipeline = pipeline
 
     # ── 요청 핸들러 ──
 
@@ -418,6 +423,11 @@ class MemoryService:
         # Sprint 19 PR #1 C10 (Codex F-4): fail-closed — workspace_repo 미주입 시 RuntimeError
         if self.workspace_repo is None:
             raise RuntimeError("workspace_repo 필수 (F-4 promote target 검증)")
+        # Sprint 24 Wave 2 BL-006: pipeline 주입 강제 (BG embed 단계에서 embeddings 위임).
+        if self._pipeline is None:
+            raise RuntimeError(
+                "MemoryPipelineService 미주입 — BL-006 헌법 §4.2 위반 (embeddings 직접 호출 금지)"
+            )
 
         # 1. 원본 fetch (workspace_id 강제 필터로 I-9 격리)
         source = await self.repo.get_by_id(memory_id, source_workspace_id)
@@ -485,6 +495,7 @@ class MemoryService:
             audit_id=audit.id,
             embed_text=embed_text,
             session_factory=self._session_factory,
+            pipeline=self._pipeline,
         )
 
         return MemoryPromoteOut(
@@ -502,6 +513,11 @@ class MemoryService:
         raw_text: str,
     ) -> None:
         """Text capture 후 distill → embed 백그라운드 처리."""
+        # Sprint 24 Wave 2 BL-006: pipeline 주입 강제 (fail-closed).
+        if self._pipeline is None:
+            raise RuntimeError(
+                "MemoryPipelineService 미주입 — BL-006 헌법 §4.2 위반 (embeddings 직접 호출 금지)"
+            )
         async with self._session_factory() as session:
             repo = MemoryRepository(session)
             # 1. distill
@@ -545,14 +561,13 @@ class MemoryService:
                 await repo.commit()
                 return
 
-            # I-9 4-C: EmbeddingRepository.save_chunk 가 workspace_id 매칭 assertion.
-            # source='memory' — recall(R3) source_type 필터.
-            from src.embeddings.repository import EmbeddingRepository
-
-            chunk = await EmbeddingRepository(session).save_chunk(
+            # Sprint 24 Wave 2 BL-006: embeddings 호출은 MemoryPipelineService 위임 (헌법 §4.2).
+            # source_type='memory' 는 pipeline 이 고정. I-9 4-C workspace_id 매칭 assertion 은
+            # EmbeddingRepository.save_chunk 가 강제.
+            chunk = await self._pipeline.save_memory_chunk(
+                session,
                 workspace_id=workspace_id,
                 source_workspace_id=workspace_id,
-                source_type="memory",
                 source_id=memory_id,
                 chunk_text=embed_text,
                 embedding=embedding,
@@ -748,10 +763,12 @@ async def _bg_promote_embed(
     audit_id: uuid.UUID,
     embed_text: str,
     session_factory: "async_sessionmaker[AsyncSession]",
+    pipeline: MemoryPipelineService,
 ) -> None:
     """R6 promote 백그라운드: 복제 MemoryItem에 embedding 생성 + audit status 갱신.
 
     pending → processing → completed/failed 흐름. session_factory로 별도 session.
+    Sprint 24 Wave 2 BL-006: embeddings 호출은 MemoryPipelineService 위임 (헌법 §4.2).
     """
     from sqlmodel import update as _update
 
@@ -776,13 +793,12 @@ async def _bg_promote_embed(
             await session.commit()
             return
 
-        # I-9 4-C: EmbeddingRepository.save_chunk 가 target workspace 매칭 assertion.
-        from src.embeddings.repository import EmbeddingRepository
-
-        chunk = await EmbeddingRepository(session).save_chunk(
+        # Sprint 24 Wave 2 BL-006: pipeline 위임 (헌법 §4.2). I-9 4-C target workspace
+        # 매칭 assertion 은 EmbeddingRepository.save_chunk 가 강제.
+        chunk = await pipeline.save_memory_chunk(
+            session,
             workspace_id=target_workspace_id,
             source_workspace_id=target_workspace_id,
-            source_type="memory",
             source_id=new_memory_id,
             chunk_text=embed_text,
             embedding=embedding,

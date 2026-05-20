@@ -1,24 +1,20 @@
+// 회의 요약 카드 — AI 요약 + 결정사항 + 토픽 (Sprint 24 Wave 2 T-OBN-05 D 옵션 적용)
 "use client";
 
 import type { MeetingSummary as MeetingSummaryType } from "../types";
 import { EmptyState } from "@/components/empty-state";
-import { useOnboarding } from "@/features/onboarding/hooks";
 
 interface MeetingSummaryProps {
   summary: MeetingSummaryType | null;
 }
 
 export function MeetingSummary({ summary }: MeetingSummaryProps) {
-  const { data: onboarding } = useOnboarding();
-
   if (!summary) {
     return (
       <EmptyState
         icon="📋"
         title="요약이 아직 없습니다"
         description="AI가 회의 내용을 분석하면 요약이 생성됩니다"
-        onboardingStep={onboarding?.step}
-        context="meetings"
       />
     );
   }

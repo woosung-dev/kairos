@@ -1,3 +1,6 @@
+// 사용자의 오늘 활동 피드 (Today) — Sprint 24 Wave 2 T-OBN-05 D 옵션 적용
+// OnboardingBanner 는 폐기 (Codex+Gemini deep research 합의). 결정 anchor:
+// docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md §T-OBN-05
 "use client";
 
 import Link from "next/link";
@@ -8,159 +11,14 @@ import {
   Mic,
   FileText,
   ArrowRight,
-  GraduationCap,
-  FolderOpen,
-  Sparkles,
 } from "lucide-react";
 import {
   useActivityFeed,
   type ActionDueEntry,
   type RecentActivity,
 } from "../hooks";
-import { useOnboarding } from "@/features/onboarding/hooks";
 
 /* ─── 서브 컴포넌트 ─── */
-
-/**
- * OnboardingBanner — server state (Sprint 22 OBN-02).
- *
- * BE `users.onboarding_step` (0~4) 기반 progress + 다음 단계 CTA.
- * step === 4 (isCompleted) 면 null return (다시 보지 않기 자동).
- */
-function OnboardingBanner() {
-  const { data, isLoading } = useOnboarding();
-
-  if (isLoading || !data || data.isCompleted) return null;
-
-  const { step, totalSteps } = data;
-  const steps: { n: number; label: string }[] = [
-    { n: 1, label: "워크스페이스 만들기" },
-    { n: 2, label: "첫 프로젝트 생성" },
-    { n: 3, label: "첫 회의 업로드" },
-    { n: 4, label: "AI 에게 질문" },
-  ];
-  const nextLabel = steps[step]?.label ?? "완료";
-
-  return (
-    <div
-      data-testid="onboarding-banner"
-      className="rounded-lg border p-5 mb-6"
-      style={{
-        background: "var(--surface)",
-        borderColor: "var(--accent)",
-        borderRadius: "var(--radius-lg)",
-      }}
-    >
-      <div className="flex items-start gap-3 mb-4 flex-wrap">
-        <div
-          className="flex items-center justify-center w-8 h-8 rounded shrink-0"
-          style={{
-            background: "var(--accent-subtle)",
-            borderRadius: "var(--radius-sm)",
-          }}
-        >
-          <GraduationCap size={18} style={{ color: "var(--accent)" }} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h3
-            className="text-sm font-semibold mb-1"
-            style={{
-              color: "var(--text-primary)",
-              fontFamily: "var(--font-display)",
-            }}
-          >
-            온보딩 {step}/{totalSteps} 단계
-          </h3>
-          <p
-            className="text-xs leading-relaxed"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            다음 단계: <strong>{nextLabel}</strong>
-          </p>
-        </div>
-        <div
-          className="flex items-center gap-1.5 flex-wrap"
-          aria-label={`온보딩 진행률 ${step}/${totalSteps}`}
-        >
-          {steps.map((s) => (
-            <span
-              key={s.n}
-              title={s.label}
-              className="h-1.5 w-8 rounded-full"
-              style={{
-                background:
-                  s.n <= step ? "var(--accent)" : "var(--border-subtle)",
-              }}
-            />
-          ))}
-        </div>
-      </div>
-
-      {step < 4 && (
-        <div className="flex flex-wrap items-center gap-2">
-          {step < 2 && (
-            <Link
-              href="/projects"
-              className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium transition-colors cursor-pointer"
-              style={{
-                background: "var(--accent)",
-                color: "var(--background)",
-                borderRadius: "var(--radius-sm)",
-                minHeight: 36,
-              }}
-            >
-              <FolderOpen size={14} />
-              프로젝트 만들기
-            </Link>
-          )}
-          {step >= 2 && step < 3 && (
-            <Link
-              href="/new"
-              className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium transition-colors cursor-pointer"
-              style={{
-                background: "var(--accent)",
-                color: "var(--background)",
-                borderRadius: "var(--radius-sm)",
-                minHeight: 36,
-              }}
-            >
-              <Mic size={14} />
-              회의 업로드
-            </Link>
-          )}
-          {step >= 3 && step < 4 && (
-            <Link
-              href="/dashboard?rag=open"
-              className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium transition-colors cursor-pointer"
-              style={{
-                background: "var(--accent)",
-                color: "var(--background)",
-                borderRadius: "var(--radius-sm)",
-                minHeight: 36,
-              }}
-            >
-              <Sparkles size={14} />
-              AI 에게 질문
-            </Link>
-          )}
-          <Link
-            href="/notes"
-            className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium border transition-colors cursor-pointer"
-            style={{
-              borderColor: "var(--border)",
-              color: "var(--text-secondary)",
-              borderRadius: "var(--radius-sm)",
-              minHeight: 36,
-            }}
-          >
-            <FileText size={14} />
-            빠른 메모
-          </Link>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function InboxCard({ count }: { count: number }) {
   return (
@@ -363,9 +221,6 @@ export function TodayFeed({ workspaceId }: TodayFeedProps) {
       >
         오늘의 Kairos
       </h1>
-
-      {/* Sprint 22 OBN-02: banner 는 step < 4 인 동안 콘텐츠 유무와 무관하게 노출 */}
-      <OnboardingBanner />
 
       {!isReady ? (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>

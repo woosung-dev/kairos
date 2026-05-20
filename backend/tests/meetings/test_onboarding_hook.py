@@ -49,7 +49,8 @@ async def test_pipeline_advances_onboarding_step_3_with_creator_id():
         TranscriptSegment(speaker="화자", start_sec=0.0, end_sec=5.0, text="테스트"),
     ]
     mock_transcription.download_audio.return_value = b"fake_audio"
-    mock_transcription.transcribe.return_value = (segments, 5.0)
+    # Sprint 24 Wave 2 T-N+4 (BL-T2-003): pipeline 진입점이 transcribe_with_chunking 로 변경
+    mock_transcription.transcribe_with_chunking.return_value = (segments, 5.0)
 
     mock_ai = AsyncMock()
     mock_ai.summarize.return_value = {
@@ -147,7 +148,8 @@ async def test_pipeline_skips_onboarding_when_created_by_id_is_none():
     mock_r2.get_download_url.return_value = "https://r2.example.com/audio.mp3"
     mock_transcription = AsyncMock()
     mock_transcription.download_audio.return_value = b"fake_audio"
-    mock_transcription.transcribe.return_value = (
+    # Sprint 24 Wave 2 T-N+4 (BL-T2-003): pipeline 진입점이 transcribe_with_chunking 로 변경
+    mock_transcription.transcribe_with_chunking.return_value = (
         [TranscriptSegment(speaker="화자", start_sec=0.0, end_sec=5.0, text="x")],
         5.0,
     )

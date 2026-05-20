@@ -14,13 +14,30 @@ Memory 도메인은 **개인 메모리 레이어**를 담당. Notion/Apple Notes
 
 - **Capture**: 텍스트 또는 음성을 받아 MemoryItem 생성 (202 + BackgroundTask)
 - **Distill**: Gemini로 `{title, atomic_notes, suggested_visibility}` 추출 (Background)
-- **Embed**: 1536d 임베딩 적재 (`source_type='memory'`) — embeddings 모듈 호출
+- **Embed**: 1536d 임베딩 적재 (`source_type='memory'`) — `MemoryPipelineService.save_memory_chunk` 위임 (Sprint 24 Wave 2 BL-006 해소, 헌법 §4.2)
 - **Recall**: 사용자 query → query embedding → vector search Top 3 + keyword fallback (O-A lock-in)
 - **Promote**: Personal → Team workspace 복제 + tombstone (PromoteAudit row, I-18)
 - **Metrics**: capture/recall/promote count + recall p50/p95 (memory_events 기반, R7)
 - **Cleanup**: 30일 경과 voice R2 객체 삭제 (admin_router, Cron secret token)
 
 비책임: 회의 (meetings), Tiptap Note (notes), Project insights (projects).
+
+### 모듈 구조 (Sprint 24 Wave 2 BL-006 해소)
+
+```
+backend/src/memory/
+├── router.py              HTTP I/O (POST capture / GET recall / metrics / promote)
+├── service.py             단일 도메인 로직 (capture/recall/promote + BG task). embeddings.* 직접 import 금지
+├── pipeline_service.py    cross-domain orchestrator (Sprint 24 Wave 2 신설)
+│   └── MemoryPipelineService.save_memory_chunk(...) — embeddings.repository 호출 캡슐화
+├── repository.py          AsyncSession 보유 + `_apply_hnsw_session_params` E-9 외부 사용 (capsule 우회 약속, Sprint 16)
+├── dependencies.py        Depends 조립 (MemoryPipelineService 동반 주입, fail-closed)
+├── models.py              MemoryItem / MemoryAICall / MemoryEvent / MemoryQueryEmbeddingCache / PromotionAudit
+├── schemas.py             snake_case → camelCase 직렬화
+└── exceptions.py          도메인 예외
+```
+
+`MemoryService` 는 `pipeline=None` 진입 시 `RuntimeError` (fail-closed, BL-006 §4.2 위반 차단).
 
 ---
 
@@ -38,11 +55,12 @@ Memory 도메인은 **개인 메모리 레이어**를 담당. Notion/Apple Notes
 
 | 호출 대상 | 목적 | 현 호출 위치 | BL |
 |----------|------|-------------|-----|
-| `embeddings.service.create_chunk` | 1536d 임베딩 적재 | `service.py:724` (`_create_memory_embedding_chunk`) | **BL-006** (P0 헌법 갭) — `memory/pipeline_service.py` 분리 대기 |
-| `services/ai_processing.distill_meeting` 패턴 (Gemini) | `{title, atomic_notes, suggested_visibility}` 추출 | `service.py:644` (`_call_distill`) | **BL-007** (P1) — `services/memory_ai_calls.py` 통합 검토 |
-| `services/transcription.transcribe_audio` 패턴 (Whisper) | voice → text | `service.py:696` (`_call_transcribe`) | **BL-007** |
-| `R2Service` (boto3 wrapper) | voice audio 객체 저장 / 삭제 | `service.py:602, 620` (boto3 client 재생성) | **BL-008** (P1) — R2Service public API로 상향 |
-| `workspaces.repository` | Personal/Team 검증 | `service.py:420, 431` (session 직접 접근) | **BL-005** (P0 헌법 갭) — WorkspaceRepository 메서드화 |
+| `embeddings.repository.EmbeddingRepository.save_chunk` | 1536d 임베딩 적재 | `pipeline_service.py:MemoryPipelineService.save_memory_chunk` (Sprint 24 Wave 2 BL-006 해소) | **BL-006 closed** (2026-05-20) — `memory/service.py` 의 lazy import 2 hit 제거, orchestrator 경유. architecture gate `tests/architecture/test_no_memory_to_embeddings_lazy_import.py` 회귀 방지. |
+| `embeddings.repository._apply_hnsw_session_params` | 벡터 검색 트랜잭션 HNSW SET LOCAL | `memory/repository.py:33` (E-9 외부 사용처 — embeddings/CONTEXT.md 명시 예외) | 유지 (E-9 capsule 우회 최소 비용 약속, Sprint 16) |
+| `services/ai_processing.distill_meeting` 패턴 (Gemini) | `{title, atomic_notes, suggested_visibility}` 추출 | `service.py:_call_distill` | **BL-007** (P1) — `services/memory_ai_calls.py` 통합 검토 |
+| `services/transcription.transcribe_audio` 패턴 (Whisper) | voice → text | `service.py:_call_transcribe` | **BL-007** |
+| `R2Service` (boto3 wrapper) | voice audio 객체 저장 / 삭제 | `service.py:_upload_audio_to_r2 / _download_audio_from_r2` (boto3 client 재생성) | **BL-008** (P1) — R2Service public API로 상향 |
+| `workspaces.repository` | Personal/Team 검증 | `service.py:promote` (`WorkspaceRepository.find_by_id / find_member`) | **BL-005 closed** — Sprint 19 PR #1 C10 (Codex F-4) 에서 이미 해소 |
 
 ---
 
@@ -101,8 +119,8 @@ backend/tests/memory/
 
 ## 8. 후속 (BL refactor backlog — `docs/REFACTORING-BACKLOG.md` + `docs/TODO.md` 참조)
 
-- **BL-005** [P0]: promote() 메서드의 Service Session 직접 접근 제거 → WorkspaceRepository 메서드화
-- **BL-006** [P0]: embeddings.service.create_chunk 직접 호출 → `memory/pipeline_service.py` 분리 (ADR-014 정합)
+- ~~**BL-005**~~ [closed Sprint 19 PR #1 C10]: promote() 메서드의 Service Session 직접 접근 제거 → WorkspaceRepository 메서드화
+- ~~**BL-006**~~ [closed Sprint 24 Wave 2, 2026-05-20]: embeddings.service.create_chunk 직접 호출 → `memory/pipeline_service.py` 분리 (ADR-014 정합). architecture gate `tests/architecture/test_no_memory_to_embeddings_lazy_import.py` 회귀 방지.
 - **BL-007** [P1]: AI 호출 helper (`_call_distill` 외 2종) → `services/memory_ai_calls.py` 통합 + BG task session 정합
 - **BL-008** [P1]: R2 boto3 client 재생성 → R2Service 메서드로 상향
 - **BL-009** [P2]: MemoryItem status state machine 분리 — 3 BG task 유사 코드 제거

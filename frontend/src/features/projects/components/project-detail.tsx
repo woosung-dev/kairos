@@ -23,7 +23,6 @@ import {
 import { EmptyState } from "@/components/empty-state";
 import { useWorkspaceRole } from "@/features/members/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
-import { useOnboarding } from "@/features/onboarding/hooks";
 
 import {
   useArchiveProject,
@@ -83,7 +82,6 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
   );
   const deleteMutation = useDeleteProject(activeWorkspaceId ?? undefined);
   const archiveMutation = useArchiveProject(activeWorkspaceId ?? undefined);
-  const { data: onboarding } = useOnboarding();
 
   const handleVisibilityChange = (next: ProjectVisibility) => {
     updateProject.mutate(
@@ -252,8 +250,6 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
         title="콘텐츠를 추가하세요"
         description="회의, 노트, 자료를 추가하면 여기에 표시됩니다"
         action={{ label: "콘텐츠 추가", href: "/new" }}
-        onboardingStep={onboarding?.step}
-        context="meetings"
       />
 
       {/* Sprint 6 FE-T4: Project 멤버 관리 패널 (시안 2A 단순화) */}

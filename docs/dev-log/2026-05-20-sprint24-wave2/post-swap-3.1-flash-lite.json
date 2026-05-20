@@ -1,0 +1,476 @@
+{
+  "model": "gemini-3.1-flash-lite",
+  "measured_at": "2026-05-20T03:09:34.843351+00:00",
+  "delta_1_rag": [
+    {
+      "question": "이 회의에서 결정된 액션은?",
+      "answer": "Q3 로드맵 회의에서 결정된 액션 아이템은 다음과 같습니다.\n\n* **인증 모듈 완료:** 박개발 님이 7월 25일까지 완료 (📎 Q3 로드맵 회의 (2026-05-20))\n* **랜딩 페이지 리뉴얼 시작:** 이마케팅 님이 8월 첫째 주부터 시작 (📎 Q3 로드맵 회의 (2026-05-20))\n* **QA 일정 비상 계획:** SSO 벤더 응답 지연 발생 시, QA 시작일을 8월 8일로 1주 연기 (📎 Q3 로드맵 회의 (2026-05-20))\n* **디자인 리뷰 미팅:** 다음 주 화요일(5월 26일) 오후 3시에 김PM, 박개발, 이마케팅 3인 sync 진행 (📎 Q3 로드맵 회의 (2026-05-20))",
+      "length_chars": 345,
+      "elapsed_sec": 1.47,
+      "error": null
+    },
+    {
+      "question": "발표자가 누구였나?",
+      "answer": "제공된 소스에 따르면, 회의에 참석하여 발언한 인물들은 다음과 같습니다.\n\n* **김PM**: 회의를 주관하고 로드맵 결정사항을 정리함 📎 Q3 로드맵 회의 (2026-05-20)\n* **박개발**: 인증 모듈 개발 및 SSO 진행 상황 보고 📎 Q3 로드맵 회의 (2026-05-20)\n* **이마케팅**: 랜딩 페이지 리뉴얼 및 마케팅 캠페인 일정 공유 📎 Q3 로드맵 회의 (2026-05-20)",
+      "length_chars": 224,
+      "elapsed_sec": 1.05,
+      "error": null
+    },
+    {
+      "question": "프로젝트 일정은 어떻게 변경되나?",
+      "answer": "제공된 소스에 따른 프로젝트 일정 변경 내용은 다음과 같습니다.\n\n*   **QA 시작일:** 기본 일정은 8월 1일이나, 외부 SSO 벤더의 응답 지연이 1주 이상 지속될 경우 8월 8일로 연기됩니다.\n*   **기타 일정:**\n    *   인증 모듈 완료: 7월 25일\n    *   랜딩 페이지 리뉴얼 시작: 8월 첫째 주\n    *   마케팅 캠페인: 9월 1일 (인증 GA 일정에 따라 변경 가능)\n\n출처: 📎 Q3 로드맵 회의 (2026-05-20)",
+      "length_chars": 258,
+      "elapsed_sec": 1.06,
+      "error": null
+    },
+    {
+      "question": "5월 안에 해야 할 일?",
+      "answer": "제공된 소스를 바탕으로 5월 내에 수행해야 할 업무를 정리해 드립니다.\n\n*   **디자인 리뷰 준비 및 진행**\n    *   내용: 랜딩 페이지 리뉴얼 관련 디자인 시안 리뷰\n    *   일정: 다음 주 화요일(5월 26일) 오후 3시\n    *   참석자: 김PM, 박개발, 이마케팅\n    *   출처: 📎 Q3 로드맵 회의 (2026-05-20)\n\n*   **디자인 시안 공유**\n    *   내용: 랜딩 페이지 리뉴얼을 위한 1차 디자인 시안 공유\n    *   일정: 다음 주 월요일(5월 25일)\n    *   출처: 📎 Q3 로드맵 회의 (2026-05-20)\n\n※ 이외의 인증 모듈 개발(OAuth 통합, SSO 테스트 등)은 7월과 8월 일정이 중심이므로 5월 내 별도의 마감 업무로 언급되지 않았습니다.",
+      "length_chars": 407,
+      "elapsed_sec": 2.07,
+      "error": null
+    },
+    {
+      "question": "철수가 한 말 중 중요한 것?",
+      "answer": "제공된 소스에서 관련 정보를 찾지 못했습니다.\n\n(참고: 제공된 소스에는 '철수'라는 인물이 등장하지 않으며, '박개발', '김PM', '이마케팅'이 대화에 참여하고 있습니다.) 📎 Q3 로드맵 회의 (2026-05-20)",
+      "length_chars": 124,
+      "elapsed_sec": 0.76,
+      "error": null
+    }
+  ],
+  "delta_2_summary": {
+    "transcript_chars": 699,
+    "result": {
+      "summary": "Q3 로드맵을 주제로 인증 모듈 개발 현황과 랜딩 페이지 리뉴얼 일정을 점검했습니다. 인증 모듈은 7월 25일까지 완료 예정이며, 8월 1일 QA 착수를 목표로 합니다. 외부 SSO 벤더 이슈에 따른 QA 일정 지연 가능성을 확인하고 대응 방안을 수립했습니다. 랜딩 페이지 리뉴얼은 8월 첫째 주 시작하며, 관련 디자인 리뷰를 위한 후속 회의 일정을 확정했습니다.",
+      "key_decisions": [
+        "인증 모듈 완료일 7월 25일로 확정",
+        "랜딩 페이지 리뉴얼 시작일 8월 1일로 확정",
+        "SSO 벤더 지연 발생 시 QA 일정을 8월 8일로 1주 연기",
+        "다음 회의(디자인 리뷰) 8월 6일 화요일 오후 3시 개최"
+      ],
+      "risks_and_issues": [
+        "외부 SSO 벤더의 응답 지연으로 인한 개발 버퍼 필요",
+        "SSO 이슈 장기화 시 QA 및 마케팅 캠페인 일정 전반의 연기 가능성"
+      ],
+      "participants": [
+        "김PM",
+        "박개발",
+        "이마케팅"
+      ],
+      "topics": [
+        "Q3 로드맵 점검",
+        "인증 모듈 개발 현황 및 QA 일정",
+        "랜딩 페이지 리뉴얼 계획",
+        "마케팅 캠페인 일정 연계"
+      ],
+      "next_meeting_agenda": [
+        "랜딩 페이지 리뉴얼 디자인 1차 시안 리뷰",
+        "디자인 관련 주요 의사결정 및 싱크"
+      ]
+    },
+    "summary_chars": 203,
+    "key_decisions_count": 4,
+    "risks_count": 2,
+    "participants_count": 3,
+    "topics_count": 4,
+    "next_agenda_count": 2,
+    "elapsed_sec": 2.19,
+    "error": null
+  },
+  "delta_3_actions": {
+    "samples": [
+      {
+        "transcript_preview": "박개발이 7월 25일까지 인증 모듈 완료해야 합니다. 이마케팅은 8월 첫째주 랜딩 페이지 시작 예정입니다.",
+        "ground_truth": [
+          {
+            "assignee": "박개발",
+            "due_date": "2026-07-25",
+            "title_hint": "인증 모듈"
+          },
+          {
+            "assignee": "이마케팅",
+            "due_date": "2026-08-01",
+            "title_hint": "랜딩"
+          }
+        ],
+        "actions": [
+          {
+            "title": "인증 모듈 개발 완료",
+            "description": "박개발 담당자가 인증 모듈 개발을 완료해야 함",
+            "priority": "high",
+            "dueDate": "2024-07-25"
+          },
+          {
+            "title": "랜딩 페이지 개발 착수",
+            "description": "이마케팅팀 주관 랜딩 페이지 작업 시작",
+            "priority": "medium",
+            "dueDate": "2024-08-01"
+          }
+        ],
+        "pr": {
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0
+        },
+        "elapsed_sec": 1.23,
+        "error": null
+      },
+      {
+        "transcript_preview": "디자인 시안은 다음주 월요일까지 이마케팅님이 1차 공유. 박개발님은 SSO 테스트 결과를 이번주 금요일까지 정리.",
+        "ground_truth": [
+          {
+            "assignee": "이마케팅",
+            "due_date": null,
+            "title_hint": "디자인 시안"
+          },
+          {
+            "assignee": "박개발",
+            "due_date": null,
+            "title_hint": "SSO 테스트"
+          }
+        ],
+        "actions": [
+          {
+            "title": "디자인 시안 1차 공유",
+            "description": "이마케팅님이 디자인 시안을 1차로 준비하여 공유",
+            "priority": "high",
+            "dueDate": "2024-05-27"
+          },
+          {
+            "title": "SSO 테스트 결과 정리",
+            "description": "박개발님이 SSO(Single Sign-On) 테스트 수행 결과 정리",
+            "priority": "high",
+            "dueDate": "2024-05-24"
+          }
+        ],
+        "pr": {
+          "tp": 2,
+          "fp": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0
+        },
+        "elapsed_sec": 1.31,
+        "error": null
+      },
+      {
+        "transcript_preview": "김PM이 9월 1일 마케팅 캠페인 launch 날짜 확정 공지. 박개발은 8월 8일 QA 대비 SSO 벤더 escalation 진행.",
+        "ground_truth": [
+          {
+            "assignee": "김PM",
+            "due_date": "2026-09-01",
+            "title_hint": "마케팅 캠페인"
+          },
+          {
+            "assignee": "박개발",
+            "due_date": "2026-08-08",
+            "title_hint": "SSO"
+          }
+        ],
+        "actions": [
+          {
+            "title": "9월 1일 마케팅 캠페인 런칭 공지",
+            "description": "김PM 주관 하에 9월 1일로 캠페인 런칭 날짜 확정 공지 진행",
+            "priority": "high",
+            "dueDate": "2024-09-01"
+          },
+          {
+            "title": "SSO 벤더 escalation 진행",
+            "description": "8월 8일 QA 일정을 맞추기 위해 SSO 관련 문제 해결을 위한 벤더 escalation 수행",
+            "priority": "high",
+            "dueDate": "2024-08-08"
+          }
+        ],
+        "pr": {
+          "tp": 1,
+          "fp": 1,
+          "fn": 1,
+          "precision": 0.5,
+          "recall": 0.5
+        },
+        "elapsed_sec": 1.53,
+        "error": null
+      },
+      {
+        "transcript_preview": "회의록 정리는 김PM이 오늘 안에 슬랙 공유. 다음 회의는 다음주 화요일 오후 3시 디자인 리뷰.",
+        "ground_truth": [
+          {
+            "assignee": "김PM",
+            "due_date": null,
+            "title_hint": "회의록"
+          }
+        ],
+        "actions": [
+          {
+            "title": "회의록 정리 및 공유",
+            "description": "회의록을 정리하여 슬랙 채널에 공유",
+            "priority": "high",
+            "dueDate": "2024-05-22"
+          },
+          {
+            "title": "디자인 리뷰 회의 참석",
+            "description": "다음주 화요일 오후 3시 디자인 리뷰 진행",
+            "priority": "medium",
+            "dueDate": "2024-05-28"
+          }
+        ],
+        "pr": {
+          "tp": 0,
+          "fp": 2,
+          "fn": 1,
+          "precision": 0.0,
+          "recall": 0.0
+        },
+        "elapsed_sec": 1.39,
+        "error": null
+      },
+      {
+        "transcript_preview": "이번주 안에 박개발님이 SSO 통합 테스트 완료. 이마케팅님은 랜딩 카피 초안을 7월 30일까지 작성.",
+        "ground_truth": [
+          {
+            "assignee": "박개발",
+            "due_date": null,
+            "title_hint": "SSO 통합 테스트"
+          },
+          {
+            "assignee": "이마케팅",
+            "due_date": "2026-07-30",
+            "title_hint": "랜딩 카피"
+          }
+        ],
+        "actions": [
+          {
+            "title": "SSO 통합 테스트 완료",
+            "description": "박개발님 담당, 이번 주 내 완료",
+            "priority": "high",
+            "dueDate": "2024-07-28"
+          },
+          {
+            "title": "랜딩 페이지 카피 초안 작성",
+            "description": "이마케팅님 담당",
+            "priority": "medium",
+            "dueDate": "2024-07-30"
+          }
+        ],
+        "pr": {
+          "tp": 1,
+          "fp": 1,
+          "fn": 1,
+          "precision": 0.5,
+          "recall": 0.5
+        },
+        "elapsed_sec": 1.22,
+        "error": null
+      }
+    ],
+    "aggregate": {
+      "tp": 6,
+      "fp": 4,
+      "fn": 3,
+      "precision": 0.6,
+      "recall": 0.667
+    }
+  },
+  "delta_4_korean": [
+    {
+      "label": "emoji_polite",
+      "input": "어제 회의에서 김PM이 다음주까지 보고서 마무리할 거에요 🙂. 이마케팅님도 자료 준비 부탁드린다고 하셨어요!",
+      "summary": "김PM은 다음 주까지 보고서를 완료하기로 하였으며, 이마케팅님에게 필요한 관련 자료 준비를 요청하였습니다. 이번 회의를 통해 프로젝트 진행 상황을 점검하고 향후 업무 협업 방향을 명확히 하였습니다.",
+      "summary_chars": 110,
+      "parsed_ok": true,
+      "participants": [
+        "김PM",
+        "이마케팅님"
+      ],
+      "elapsed_sec": 1.39,
+      "error": null
+    },
+    {
+      "label": "dialect",
+      "input": "회의 끝났습니데이. 박개발이 다음주 월요일에 코드 리뷰 마무리하기로 했심더. 그래도 일정은 미뤄질 수도 있다 카네요.",
+      "summary": "박개발이 다음 주 월요일까지 코드 리뷰를 완료하기로 결정하였습니다. 다만, 현재 일정의 변동 가능성이 있어 프로젝트 진행에 주의가 필요합니다.",
+      "summary_chars": 79,
+      "parsed_ok": true,
+      "participants": [
+        "박개발"
+      ],
+      "elapsed_sec": 1.23,
+      "error": null
+    },
+    {
+      "label": "korean_english_mix",
+      "input": "오늘 미팅 cancel ㅠㅠ. 대신 박개발이 PR review 마무리하고, 이마케팅이 launch checklist 다시 보내준다고 했음.",
+      "summary": "금일 예정되었던 미팅은 취소되었으며, 업무 진행 상황 공유 및 후속 조치 사항만 확인하였습니다. 박개발 님은 PR 리뷰를 마무리하기로 하였고, 이마케팅 님은 런칭 체크리스트를 재발송하기로 결정했습니다.",
+      "summary_chars": 112,
+      "parsed_ok": true,
+      "participants": [
+        "박개발",
+        "이마케팅"
+      ],
+      "elapsed_sec": 1.54,
+      "error": null
+    }
+  ],
+  "delta_5_inbox": {
+    "samples": [
+      {
+        "kind": "meeting",
+        "content_preview": "OAuth 통합 90% 완료, SSO 테스트 남았음. 7월 25일 마감 목표. 박개발이 진행 중.",
+        "expected_project_hint": "Q3 인증 모듈",
+        "suggested": {
+          "existingProjectId": "11111111-1111-1111-1111-111111111111",
+          "newProjectTitle": null,
+          "confidence": 0.95
+        },
+        "matched_project_title": "Q3 인증 모듈",
+        "is_correct": true,
+        "confidence": 0.95,
+        "elapsed_sec": 1.21,
+        "error": null
+      },
+      {
+        "kind": "meeting",
+        "content_preview": "랜딩 페이지 시안 1차 공유. 디자인 리뷰는 박개발+이마케팅+김PM 30분 sync. 8월 1일 개발 시작 목표.",
+        "expected_project_hint": "랜딩 페이지 리뉴얼",
+        "suggested": {
+          "existingProjectId": "22222222-2222-2222-2222-222222222222",
+          "newProjectTitle": null,
+          "confidence": 1.0
+        },
+        "matched_project_title": "랜딩 페이지 리뉴얼",
+        "is_correct": true,
+        "confidence": 1.0,
+        "elapsed_sec": 1.49,
+        "error": null
+      },
+      {
+        "kind": "meeting",
+        "content_preview": "9월 1일 마케팅 캠페인 launch 일정 확정. 카피 초안과 배너 디자인 분리해서 진행 결정.",
+        "expected_project_hint": "마케팅 9월 캠페인",
+        "suggested": {
+          "existingProjectId": "33333333-3333-3333-3333-333333333333",
+          "newProjectTitle": null,
+          "confidence": 1.0
+        },
+        "matched_project_title": "마케팅 9월 캠페인",
+        "is_correct": true,
+        "confidence": 1.0,
+        "elapsed_sec": 1.35,
+        "error": null
+      },
+      {
+        "kind": "meeting",
+        "content_preview": "데이터 웨어하우스 BigQuery 마이그레이션 일정 논의. 8월 중순 dry-run 후 9월 전환 결정.",
+        "expected_project_hint": "데이터 분석 인프라",
+        "suggested": {
+          "existingProjectId": "44444444-4444-4444-4444-444444444444",
+          "newProjectTitle": null,
+          "confidence": 0.95
+        },
+        "matched_project_title": "데이터 분석 인프라",
+        "is_correct": true,
+        "confidence": 0.95,
+        "elapsed_sec": 1.55,
+        "error": null
+      },
+      {
+        "kind": "meeting",
+        "content_preview": "신규 가입자 첫 1주차 retention 27% — 온보딩 체크리스트 개편 결정. UX 카피 점검과 튜토리얼 단축 진행.",
+        "expected_project_hint": "고객 온보딩 개선",
+        "suggested": {
+          "existingProjectId": "55555555-5555-5555-5555-555555555555",
+          "newProjectTitle": null,
+          "confidence": 1.0
+        },
+        "matched_project_title": "고객 온보딩 개선",
+        "is_correct": true,
+        "confidence": 1.0,
+        "elapsed_sec": 1.31,
+        "error": null
+      },
+      {
+        "kind": "note",
+        "content_preview": "SSO 벤더 응답 시간이 길어지고 있음. escalation 필요. 백업 IDP 도 검토.",
+        "expected_project_hint": "Q3 인증 모듈",
+        "suggested": {
+          "existingProjectId": "11111111-1111-1111-1111-111111111111",
+          "newProjectTitle": null,
+          "confidence": 0.9
+        },
+        "matched_project_title": "Q3 인증 모듈",
+        "is_correct": true,
+        "confidence": 0.9,
+        "elapsed_sec": 1.28,
+        "error": null
+      },
+      {
+        "kind": "note",
+        "content_preview": "랜딩 페이지 카피 톤 정리 — 신규 사용자 첫 화면에서 가치 전달 1줄 명확화 필요.",
+        "expected_project_hint": "랜딩 페이지 리뉴얼",
+        "suggested": {
+          "existingProjectId": "22222222-2222-2222-2222-222222222222",
+          "newProjectTitle": null,
+          "confidence": 0.95
+        },
+        "matched_project_title": "랜딩 페이지 리뉴얼",
+        "is_correct": true,
+        "confidence": 0.95,
+        "elapsed_sec": 1.23,
+        "error": null
+      },
+      {
+        "kind": "note",
+        "content_preview": "9월 캠페인 채널 — 페이스북/구글애드/뉴스레터 3채널. 예산은 다음주 확정.",
+        "expected_project_hint": "마케팅 9월 캠페인",
+        "suggested": {
+          "existingProjectId": "33333333-3333-3333-3333-333333333333",
+          "newProjectTitle": null,
+          "confidence": 1.0
+        },
+        "matched_project_title": "마케팅 9월 캠페인",
+        "is_correct": true,
+        "confidence": 1.0,
+        "elapsed_sec": 1.42,
+        "error": null
+      },
+      {
+        "kind": "note",
+        "content_preview": "Looker 대시보드에서 daily active 사용자 추적용 view 신설 필요. SQL 초안 작성.",
+        "expected_project_hint": "데이터 분석 인프라",
+        "suggested": {
+          "existingProjectId": "44444444-4444-4444-4444-444444444444",
+          "newProjectTitle": null,
+          "confidence": 0.95
+        },
+        "matched_project_title": "데이터 분석 인프라",
+        "is_correct": true,
+        "confidence": 0.95,
+        "elapsed_sec": 1.33,
+        "error": null
+      },
+      {
+        "kind": "note",
+        "content_preview": "튜토리얼 3단계 완료율이 41% — 2단계로 줄이는 안 검토. 사용자 인터뷰 5명 일정 잡기.",
+        "expected_project_hint": "고객 온보딩 개선",
+        "suggested": {
+          "existingProjectId": "55555555-5555-5555-5555-555555555555",
+          "newProjectTitle": null,
+          "confidence": 0.95
+        },
+        "matched_project_title": "고객 온보딩 개선",
+        "is_correct": true,
+        "confidence": 0.95,
+        "elapsed_sec": 1.34,
+        "error": null
+      }
+    ],
+    "aggregate": {
+      "avg_confidence": 0.965,
+      "auto_confirm_ratio": 1.0,
+      "correct_match_ratio": 1.0,
+      "n": 10
+    }
+  }
+}

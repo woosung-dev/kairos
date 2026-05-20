@@ -173,6 +173,36 @@ GET /workspaces/{wid}/notes/{id}/embedding-status  (NEW, require_viewer)
 
 ---
 
+## Sprint 24 Wave 2 BL-006 추가 적용 — Memory orchestrator 분리 (2026-05-20)
+
+Sprint 15 신설 당시 `memory/service.py` 는 `_bg_distill_and_embed` (capture flow) 와 module-level `_bg_promote_embed` (R6 promote flow) 안에서 `from src.embeddings.repository import EmbeddingRepository` 를 lazy import 후 직접 `save_chunk` 호출. CONTEXT-MAP §4.2 + ADR-014 옵션 A 위반.
+
+```
+backend/src/memory/
+├── service.py               capture/recall/promote + BG task — `embeddings.*` 직접 import 금지 (architecture gate 강제)
+├── pipeline_service.py      MemoryPipelineService (Sprint 24 Wave 2 신설)
+│   └── save_memory_chunk(session, ...) — EmbeddingRepository.save_chunk 호출 캡슐화
+│       (session 은 호출자 BG task 가 보유 — 단일 트랜잭션 정합)
+└── dependencies.py          MemoryPipelineService 동반 주입 (fail-closed)
+```
+
+**해소 흐름**:
+- `_bg_distill_and_embed` (capture) → `self._pipeline.save_memory_chunk(session, workspace_id=..., source_workspace_id=..., source_id=memory_id, ...)`
+- `_bg_promote_embed` (promote) → 모듈-level 함수 시그니처에 `pipeline: MemoryPipelineService` 추가, BackgroundTasks.add_task 시 `self._pipeline` 전달.
+- `MemoryService.__init__` `pipeline: MemoryPipelineService | None = None` — `_bg_*` 진입 전 None 가드 → `RuntimeError` (fail-closed, BL-006 §4.2 위반 차단).
+- `source_type='memory'` 는 orchestrator 가 고정 — service 가 임의로 다른 타입 인서트 불가.
+
+**E-9 예외 (유지 결정)**:
+- `memory/repository.py:33` 의 `from src.embeddings.repository import _apply_hnsw_session_params` 1 hit 는 벡터 검색 트랜잭션 진입 HNSW SET LOCAL 위해 유지 (Sprint 16 capsule 우회 최소 비용 약속, embeddings/CONTEXT.md E-9).
+- vector_search 자체를 embeddings 도메인으로 흡수하는 작업은 LOC vs 가치 비대칭 → 후속 sprint.
+
+**회귀 방지 (architecture gate)**:
+- `backend/tests/architecture/test_no_memory_to_embeddings_lazy_import.py` — 2 케이스:
+  - `test_memory_service_no_embeddings_import` — `memory/service.py` 에 `from src.embeddings.*` 0 hit assertion (lazy import 회귀 차단).
+  - `test_memory_repository_apply_hnsw_helper_keep` — `memory/repository.py` 에 `_apply_hnsw_session_params` import 1 hit 유지 (E-9 예외 침해 차단).
+
+---
+
 ## 호출 흐름도
 
 ```

@@ -38,7 +38,7 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 
 ---
 
-## 4. 도메인 모듈 13개
+## 4. 도메인 모듈 (Sprint 24 Wave 2 memory 행 명시 추가)
 
 | 모듈 | CONTEXT.md | 책임 요약 |
 |---|---|---|
@@ -47,10 +47,11 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 | projects | `src/projects/CONTEXT.md` | Project CRUD, MeetingProjectLink, ProjectMember (Sprint 6 L-6), visibility 권한 분기 (Sprint 6 BE-T8), 태그, 인사이트 |
 | inbox | `src/inbox/CONTEXT.md` | Inbox 적재 + AI 분류 추천 |
 | meetings | `src/meetings/CONTEXT.md` | Meeting 인제스트, STT, 파이프라인 (orchestrator 표준 패턴) |
-| notes | 전역 규칙만 (전용 CONTEXT.md 없음) | Tiptap Note CRUD + NotePipelineService(embedding 위임 + 권한 검증, Sprint 6 ADR-014 옵션 A) |
+| notes | 전역 규칙만 (전용 CONTEXT.md 없음) | Tiptap Note CRUD + NotePipelineService(embedding 위임 + 권한 검증, Sprint 6 ADR-014 옵션 A) + Sprint 24 BL-064 promote chunk 0 BG re-embedding |
 | actions | `src/actions/CONTEXT.md` | ActionItem CRUD (nullable 부모) |
 | upload | 전역 규칙만 (전용 CONTEXT.md 없음) | R2 업로드 (presigned URL, aioboto3) |
-| embeddings | 전역 규칙만 (전용 CONTEXT.md 없음) | EmbeddingChunk + SemanticCache 저장/검색 (pgvector) |
+| embeddings | `src/embeddings/CONTEXT.md` | EmbeddingChunk + SemanticCache 저장/검색 (pgvector HNSW + halfvec). cross-domain shared service — 호출은 호출자 도메인 `pipeline_service.py` 경유 (ADR-014) |
+| memory | `src/memory/CONTEXT.md` | Sprint 15 Recall-first wedge — MemoryItem capture(text+voice) / Distill / Recall / Promote. Sprint 24 Wave 2 BL-006: `MemoryPipelineService.save_memory_chunk` 가 embeddings 호출 격리 (헌법 §4.2) |
 | rag | `src/rag/CONTEXT.md` | RAG 6-Layer + Gemini 답변 (SSE 스트리밍) |
 | onboarding | `src/onboarding/CONTEXT.md` | User.onboarding_step (0~4) lifecycle — workspaces/projects/meetings/rag 가 hook 호출 (Sprint 22 OBN-02) |
 | common | — | database / r2 / pagination / exceptions / prompts / **promote_models** + **promote_helpers** (Sprint 23 D4 — ItemPromotionAudit 4 도메인 audit + validate_promote_target/build_item_promotion_audit utility) |
@@ -130,3 +131,17 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 - `KAIROS_FOUNDER_CLERK_ID` ENV — founder 워크스페이스 매칭 시 ABORT
 - User row 보존 (Clerk dashboard 수동 정리)
 - R2 object 별도 정리
+
+---
+
+## 10. STT 파이프라인 (Sprint 24 Wave 2 갱신 — BL-T2-003 closure)
+
+- **entry**: `services/transcription.py:TranscriptionService.transcribe_with_chunking(audio_bytes, filename)` — pipeline `meetings/pipeline_service.py` 가 호출.
+- **임계값**: `chunked_transcription.CHUNK_SECONDS = 3600` (1시간).
+- **1hr 이하**: 단일 Whisper API 호출 (`TranscriptionService.transcribe` 경로 그대로 — Whisper `whisper-1`, verbose_json, segment timestamps).
+- **1hr 초과**: `services/chunked_transcription.py:transcribe_chunked` —
+  1. `_ffmpeg_probe_duration` 으로 duration 측정
+  2. `_ffmpeg_split` 으로 1hr chunk + 5초 overlap 분할 (chunk 경계 문장 잘림 방지)
+  3. `asyncio.gather` 로 chunk 병렬 Whisper 호출
+  4. `_merge_with_offset` 으로 chunk index 기반 offset (i * 3600) 적용 + 양쪽 overlap 영역 동일 text segment dedup
+- BL-T2-003 closure (Sprint 24 Wave 2 T-N+4, 2026-05-20). production 4hr+ recording 처리 차단 해소.

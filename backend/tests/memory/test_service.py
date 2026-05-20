@@ -11,6 +11,7 @@ from fastapi import BackgroundTasks
 
 from src.memory import service as memory_service
 from src.memory.exceptions import EmptyMemoryError, MemoryNotFoundError
+from src.memory.pipeline_service import MemoryPipelineService
 from src.memory.repository import MemoryRepository
 from src.memory.service import MemoryService
 
@@ -40,6 +41,7 @@ def _make_service(session) -> MemoryService:
         repo=MemoryRepository(session),
         session_factory=_FakeFactory(session),
         r2_service=_FakeR2(),
+        pipeline=MemoryPipelineService(),
     )
 
 

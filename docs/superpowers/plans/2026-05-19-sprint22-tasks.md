@@ -1,5 +1,8 @@
 # Sprint 22 Onboarding + E2E + Sentry Implementation Plan
 
+> ⚠️ **Sprint 24 Wave 2 부분 deprecated** (2026-05-20): OBN-01~04 OnboardingBanner FE 구현 task 는 폐기됨 (D 옵션, Codex+Gemini deep research 합의). BE step lifecycle / Sentry / Playwright G2/G7/G8 자산은 유지.
+> 결정 anchor: `docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md` §T-OBN-05
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 첫 외부 user 가 회원가입 → 첫 RAG 응답까지 24h 내 도달, 그 여정을 production-observable 하게.

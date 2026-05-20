@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-05-19 (Sprint 24 diligent-beaver kickoff — ADR-019 Phase B 사실 verify: 003908a 로 이미 main 적용 완료)
+> 마지막 업데이트: 2026-05-20 (Sprint 24 Wave 2 trusty-heron closeout — Multi-Agent QA P0/P1 16 task fix bundle + T-N+1 BL-006 헌법 + T-N+2 composite FK fixture + T-N+4 BL-T2-003 production)
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조 — Completed / Blocked / Questions / Next Actions 4섹션 운영.
 
@@ -11,34 +11,53 @@
 > 차단(Blocked) 항목은 이유 + 필요한 조치를 함께 기록. AI가 사용자에게 빈번하게 질문하는 대신 본 섹션에 누적 후 자연스러운 타이밍에 일괄 전달.
 
 - [ ] **Clerk Production key 발급** — Sprint 14 부터 carry. `pk_live_*` / `sk_live_*` 발급 후 Vercel env 등록. 효과: dev 배지 제거 + 외부 dogfooding 활성화.
-- [ ] **Sentry DSN 발급** — Sprint 22 conditional init 활성화. 발급 + Vercel/Cloud Run env 등록 + 알람 verify.
+- [ ] **Sentry DSN 발급** — Sprint 22 conditional init 활성화. 발급 + Vercel/Cloud Run env 등록 + 알람 verify. Sprint 24 Wave 2 BL-NEW-BE-PERF-COLD-START 진단 선행 조건.
 - [ ] **외부 user 1명 실제 dogfooding** — Sprint 22 spec `docs/dev-log/2026-05-19-sprint22-dogfooding.md` 12분 walkthrough.
 
 ---
 
-## Next Actions (Sprint 24 — diligent-beaver, promote 정합성 보강)
+## Next Actions (Sprint 25 후보 — Sprint 24 Wave 2 closeout 이후)
 
-> Sprint 23 cozy-crystal merge 완료 (PR #98, `d659c03`). Sprint 24 = **promote 정합성 보강 sprint** (BL-066 dogfood verify + BL-063 ActionItem 자동 복제 + BL-064 Note BG schedule). ADR-019 Phase B 는 **2026-05-15 commit `003908a` (PR #32) 로 이미 main 적용 완료** — Sprint 15 memory 가 stale.
+> Sprint 24 diligent-beaver merge 완료 (PR #99, `f46a075`) → Sprint 24 Wave 2 trusty-heron closeout (PR draft, Multi-Agent QA P0/P1 16 task + 헌법/production carry). Sprint 25 = **Power persona + Sentry trace 데이터 수집 후 결정**.
 
-### ✅ ADR-019 Phase B — closed (003908a, 2026-05-15)
-- [x] `backend/src/services/ai_processing.py:18` `GEMINI_MODEL = "gemini-3.1-flash-lite"` ✓
-- [x] `backend/src/memory/service.py:68` `GEMINI_MODEL = "gemini-3.1-flash-lite"` ✓
-- [x] `backend/tests/services/test_ai_processing.py:69, 84` docstring + assertion ✓
-- [x] `docs/architecture/ai-pipeline.md:23, 151` rule + code sample ✓
-- [x] `.ai/stacks/fastapi/backend.md` Tech Stack ✓ (gitignored, local hub)
-- [x] `docs/architecture/rag-pipeline.md:119, 731` 다이어그램 + 비교 표 ✓
+### 🟡 Sprint 25 candidates (Sprint 24 Wave 2 carry)
+- [ ] **BL-NEW-RAG-SOURCE-SELECT** RAG source-level selection v1 — Power persona 데이터 후 B path 검토 (Sprint 25+)
+- [ ] **BL-NEW-OBN-DATA-RETRY** Onboarding 재설계 data-driven retry — F4 외부 인터뷰 후 (Sprint 25+)
+- [ ] **BL-NEW-BE-PERF-COLD-START** Cloud Run + Neon cold start 진단 — production Sentry trace 후 (Sprint 25+)
+- [ ] **BL-NEW-BE-PERF-PARALLEL-API** Dashboard 4 API 병렬화 — useDashboardStats → Promise.all (Sprint 25+)
+- [ ] **BL-NEW-DELTA3-REMEASURE** Phase B swap DELTA-3 P/R n=20 재측정 — Phase 2 완료 후 (Sprint 24 Wave 2 carry)
 
-### 🟡 P1 — Sprint 24 diligent-beaver scope
-- [ ] **BL-066** Sprint 23 D1 (WorkspaceSwitcher) + D3 (Inbox dismiss) dev server / Playwright reproduce → 실 효과 확인. (~2-4h)
-- [ ] **BL-063** Meeting promote 시 source ActionItem rows **자동 복제** (Codex 3차 P3 fix 보강, `action_item_count` 0 reset 제거). (~4-6h)
-- [ ] **BL-064** Note promote chunk 0 case → target ws `embed_note_async` **BG schedule + embedding_status 진행 표시** + polling endpoint. (~5-8h)
+### Sprint 24 Wave 2 잔여 (P2+ carry)
+- [ ] **T-LAND-01/02** 마케팅 (landing wedge headline + use case)
+- [ ] **BL-T2 P2** 5건 (input/security headers)
+- [ ] **Power P2** (BUG-POW-002 Inbox bulk + 004 zip export + 007 PAT)
+- [ ] **BUG-CASUAL P2/P3** (VOCAB + INBOX-COPY + CMD-K-SEQ + CMD-K-STATE)
+- [ ] **a11y P2** (T-A11Y-SKIP + T-A11Y-CC + T-MOBILE-NAV + T-NAV-BADGE)
+- [ ] **BL-068/069** Sprint 23 D1/D3 Playwright reproduce
 
-### Sprint 25+ carry-over
+### 기존 carry-over
 - CO-1~14 (Sprint 22 carry, BACKLOG 등재)
 - BL-065 Member.last_active_at 필드 (Sprint 23 D2 carry CO-17, P3)
 - BL-067 pyright `_update(...).where(...)` false-positive (Sprint 23 CO-19, P4)
 - BL-024 pg_prewarm Cloud Run cold start
 - BL-026 옵션 A — dev DB export + ground truth (production scale recall)
+
+---
+
+## Recently Completed (2026-05-20 Sprint 24 Wave 2 — trusty-heron, PR draft)
+
+- [x] **Sprint 24 Wave 2 — trusty-heron (PR draft, 2026-05-20)**: Multi-Agent QA P0/P1 16 task fix bundle + 헌법/production carry
+  - [x] **Phase 1** T-2 Post-Swap Delta gate PASS (Phase B swap DELTA-1/2/4/5 통과, DELTA-3 carry → BL-NEW-DELTA3-REMEASURE)
+  - [x] **Phase 2** T-AI-DATE + T-RAG-MOCK-REMOVE (P0 Critical: AI 날짜 후처리 + RAG real-DB mock 제거)
+  - [x] **Phase 3** T-OBN-05 D 옵션 + T-MOBILE-HEADER (P0 High UX: onboarding 4번째 옵션 + mobile sticky header)
+  - [x] **Phase 4** T-PROJ-LIST + T-NOTE-DETAIL + T-CMD-K-FIX (P1 FE: 누락 페이지 신설 + Cmd+K 안정화)
+  - [x] **Phase 5** T-RAG-TIME-FILTER + T-AUDIT-VIEW (P1 RAG time_range + compliance audit UI)
+  - [x] **Phase 6** T-BE-PERF spike + JWT cache Top 1 fix (BUG-MOBILE-005, dashboard cold path)
+  - [x] **Phase 7** T-N+1 BL-006 cross-domain import 해소 (헌법 §4.2 위반 closed — memory → embeddings pipeline_service 분리)
+  - [x] **Phase 8** T-N+4 BL-T2-003 Whisper 4hr+ chunked transcription (production, ffmpeg subprocess + asyncio.gather)
+  - [x] **Phase 9** T-N+2 composite FK fixture (SCN-FK-01~12 회귀 안전망 — Sprint 21 BL-050 가드) + docs closeout
+  - 검증: pytest **423 passed + 1 skipped** (baseline 411 + 12 신규 SCN-FK) / FE typecheck 0 / vitest 50 / Playwright 신규 PASS
+  - 산출물: `docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md` + `docs/superpowers/plans/2026-05-20-sprint24-wave2-trusty-heron-tasks.md` + per-task report
 
 ---
 

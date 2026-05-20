@@ -107,7 +107,7 @@ backend/src/
 ├── meetings/      Meeting 인제스트, STT, 파이프라인
 ├── notes/         Tiptap Note
 ├── actions/       ActionItem (nullable project/meeting/assignee)
-├── memory/        Sprint 15 Recall-first wedge — MemoryItem capture (text+voice) / Distill / Recall (vector+keyword fallback) / Promote (복제+tombstone, I-18). service.py가 orchestrator 역할 (BL-005/BL-006로 pipeline_service.py 분리 등재됨)
+├── memory/        Sprint 15 Recall-first wedge — MemoryItem capture (text+voice) / Distill / Recall (vector+keyword fallback) / Promote (복제+tombstone, I-18). Sprint 24 Wave 2 BL-006 closed (2026-05-20) — `pipeline_service.py` 분리 완료 (embeddings 호출은 `MemoryPipelineService.save_memory_chunk` 위임, 헌법 §4.2 정합). 잔여: BL-005 (promote workspace_repo) 는 Sprint 19 PR #1 C10 에서 이미 해소
 ├── upload/        Cloudflare R2 업로드 (presigned URL)
 ├── embeddings/    EmbeddingChunk + SemanticCache 저장/검색 (pgvector). source_type 추가: `memory`
 ├── rag/           RAG 6-Layer + Gemini 답변 (SSE 스트리밍)
@@ -147,7 +147,7 @@ graph TD
 | `inbox → projects.repository` (AI 추천 후보 조회) | ✅ Repository 레벨까지 | inbox/service.py:현존 |
 | `meetings → actions.repository` (액션 저장) | ✅ Repository 레벨까지 | meetings/service.py:현존 |
 | `actions → projects.repository`, `actions → workspaces.repository` | ✅ Repository 레벨까지 | actions/service.py:현존 |
-| `embeddings.service` 호출 (cross-domain shared service) | ✅ orchestrator(`*/pipeline_service.py` 또는 `services/`) 내부에서만 (ADR-014) | code review |
+| `embeddings.service` 호출 (cross-domain shared service) | ✅ orchestrator(`*/pipeline_service.py` 또는 `services/`) 내부에서만 (ADR-014) | code review + architecture gate `backend/tests/architecture/test_no_memory_to_embeddings_lazy_import.py` (Sprint 24 Wave 2 BL-006 회귀 방지) |
 | 도메인 service.py 끼리 직접 호출 (Repository 우회) | ❌ 금지 | code review |
 | 크로스 도메인 트랜잭션 (3개 이상 모듈 + commit) | ❌ orchestrator 필수 | `<domain>/pipeline_service.py` 또는 `services/` |
 
@@ -187,7 +187,7 @@ shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
 | `backend/src/rag/CONTEXT.md` | RAG 6-Layer + SSE 스트리밍 |
 | `backend/src/projects/CONTEXT.md` | 인사이트 L1~L4 + 멤버십 (Sprint 6 예정) |
 | `backend/src/actions/CONTEXT.md` | 액션 추출/추적 (nullable 부모) |
-| `backend/src/memory/CONTEXT.md` | Recall-first wedge — Capture(text+voice)/Distill/Recall/Promote. service.py가 orchestrator 역할 (BL-005/BL-006 refactor 대기) |
+| `backend/src/memory/CONTEXT.md` | Recall-first wedge — Capture(text+voice)/Distill/Recall/Promote. Sprint 24 Wave 2 BL-006 closed — `pipeline_service.py` (`MemoryPipelineService.save_memory_chunk`) 가 embeddings 호출 격리 (헌법 §4.2). |
 | 그 외 (auth, embeddings, notes, upload, workspaces) | `backend/CONTEXT.md` 안 짧은 섹션 |
 
 ---

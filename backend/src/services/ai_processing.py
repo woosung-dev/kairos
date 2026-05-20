@@ -1,6 +1,8 @@
 # backend/src/services/ai_processing.py
 """Gemini AI 처리 서비스. 모든 LLM 호출을 여기서 집중 관리."""
+import logging
 from collections.abc import AsyncGenerator
+from datetime import date
 
 from google import genai
 
@@ -14,8 +16,44 @@ from src.common.prompts import (
 )
 from src.core.config import get_settings
 
+logger = logging.getLogger(__name__)
+
 # Gemini 모델 고정
 GEMINI_MODEL = "gemini-3.1-flash-lite"
+
+
+def _validate_action_dates(actions: list[dict], current_year: int) -> list[dict]:
+    """T-AI-DATE 후처리 검증: 과거 연도 due_date 또는 파싱 불가 dueDate 를 drop.
+
+    BUG-CURIOUS-001 (Sprint 24 Wave 2) — Gemini 가 연도 hallucinate (예: 2024) 출력 시
+    안전망. 5년+ 미래는 keep (의도적 long-term action 가능).
+
+    in-place mutation 후 동일 list 반환 (caller 가 새 list 든 기존 list 든 동일 결과).
+    """
+    for action in actions:
+        due_raw = action.get("dueDate")
+        if due_raw is None:
+            continue
+        try:
+            parsed = date.fromisoformat(due_raw)
+        except (TypeError, ValueError):
+            logger.warning(
+                "AI dueDate 파싱 실패, drop",
+                extra={"dueDate": due_raw, "title": action.get("title")},
+            )
+            action["dueDate"] = None
+            continue
+        if parsed.year < current_year:
+            logger.warning(
+                "AI hallucinate past year dueDate, drop",
+                extra={
+                    "dueDate": due_raw,
+                    "current_year": current_year,
+                    "title": action.get("title"),
+                },
+            )
+            action["dueDate"] = None
+    return actions
 
 
 class AIProcessingService:
@@ -53,8 +91,13 @@ class AIProcessingService:
         transcript: str,
         summary: str,
         existing_projects: list[dict],
+        current_year: int | None = None,
     ) -> dict:
         """트랜스크립트 → 액션 아이템 + 프로젝트 연결 추천.
+
+        Sprint 24 Wave 2 T-AI-DATE (BUG-CURIOUS-001):
+        - `current_year` 를 프롬프트 컨텍스트에 주입 (연도 미명시 input → 추론).
+        - 응답 dueDate 후처리: 과거 연도 또는 파싱 불가 → None drop.
 
         반환 형식:
         {
@@ -63,6 +106,10 @@ class AIProcessingService:
             "suggestedTags": [...],
         }
         """
+        if current_year is None:
+            current_year = date.today().year
+        current_date_str = date.today().isoformat()
+
         projects_context = "\n".join(
             f"- {p['id']}: {p['title']} ({p['status']})"
             for p in existing_projects
@@ -72,6 +119,9 @@ class AIProcessingService:
             transcript=transcript,
             summary=summary,
             projects_context=projects_context,
+            current_year=current_year,
+            current_year_plus_1=current_year + 1,
+            current_date=current_date_str,
         )
 
         response = await self.client.aio.models.generate_content(
@@ -80,6 +130,11 @@ class AIProcessingService:
         )
         raw = parse_json_response(response.text)
         MeetingActionsResult.model_validate(raw)
+
+        # T-AI-DATE 후처리: 과거 연도 dueDate drop (BUG-CURIOUS-001 안전망)
+        raw["actionItems"] = _validate_action_dates(
+            raw.get("actionItems", []), current_year=current_year
+        )
         return raw
 
     async def stream_rag_answer(

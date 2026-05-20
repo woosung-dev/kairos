@@ -1,6 +1,7 @@
 # backend/src/embeddings/repository.py
 """임베딩 청크 + 시맨틱 캐시 DB 접근."""
 import uuid
+from datetime import timedelta
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import delete, select, text
@@ -11,6 +12,18 @@ from src.embeddings.models import EmbeddingChunk, SemanticCache
 _ALLOWED_SOURCE_TYPES: frozenset[str] = frozenset(
     {"meeting", "note", "action", "inbox", "memory"}
 )
+
+# Sprint 24 Wave 2 T-RAG-TIME-FILTER (BUG-POW-006):
+# RAG 검색에 created_at 시간 필터 적용. None / "all" → 필터 없음.
+# 허용 값 화이트리스트 — SQL injection 방지 (asyncpg interval native binding 위해
+# timedelta 사용 — string interval literal 은 asyncpg DataError).
+TIME_RANGE_INTERVAL: dict[str, timedelta | None] = {
+    "1w": timedelta(days=7),
+    "1m": timedelta(days=30),
+    "3m": timedelta(days=90),
+    "6m": timedelta(days=180),
+    "all": None,
+}
 
 
 async def _apply_hnsw_session_params(session: AsyncSession) -> None:
@@ -160,9 +173,15 @@ class EmbeddingRepository:
         requester_role: str,
         project_id: uuid.UUID | None = None,
         source_type: str | None = None,
+        time_range: str | None = None,
         limit: int = 50,
     ) -> list[dict]:
-        """pgvector 코사인 유사도 검색 (HNSW halfvec, Sprint 16 ADR-020)."""
+        """pgvector 코사인 유사도 검색 (HNSW halfvec, Sprint 16 ADR-020).
+
+        Sprint 24 Wave 2 T-RAG-TIME-FILTER (BUG-POW-006):
+        time_range ∈ {"1w","1m","3m","6m","all"} → created_at >= now() - interval 필터.
+        화이트리스트 외 값 / None / "all" → 필터 없음 (fail-safe, SQL injection 차단).
+        """
         # I-21: 트랜잭션 진입 시 SET LOCAL ef_search/iterative_scan/max_scan_tuples
         await _apply_hnsw_session_params(self.session)
 
@@ -180,6 +199,19 @@ class EmbeddingRepository:
         if source_type:
             filters += " AND source_type = :stype"
             params["stype"] = source_type
+
+        # T-RAG-TIME-FILTER: 화이트리스트 매핑 — 미일치 시 silently skip.
+        interval = TIME_RANGE_INTERVAL.get(time_range) if time_range else None
+        if interval is not None:
+            # asyncpg 가 timedelta 를 interval 로 바인딩 → 명시 cast 로 timestamp 산출.
+            # `now() - $X::interval` 는 timestamptz 반환 → embedding_chunks.created_at
+            # (timestamp without time zone) 과 비교 시 자동 timestamp 캐스팅 불가.
+            # 양쪽 캐스팅으로 type 정합 보장.
+            filters += (
+                " AND created_at >= CAST(now() - CAST(:time_window AS interval)"
+                " AS timestamp)"
+            )
+            params["time_window"] = interval
 
         visibility_clause = self._visibility_filter_sql()
 
@@ -206,9 +238,13 @@ class EmbeddingRepository:
         requester_role: str,
         project_id: uuid.UUID | None = None,
         source_type: str | None = None,
+        time_range: str | None = None,
         limit: int = 50,
     ) -> list[dict]:
-        """pg_trgm 트라이그램 유사도 검색."""
+        """pg_trgm 트라이그램 유사도 검색.
+
+        Sprint 24 Wave 2 T-RAG-TIME-FILTER: time_range 필터는 vector_search 와 동일 의미.
+        """
         filters = "workspace_id = :wid AND chunk_level = 2"
         params: dict = {
             "wid": str(workspace_id),
@@ -224,6 +260,18 @@ class EmbeddingRepository:
         if source_type:
             filters += " AND source_type = :stype"
             params["stype"] = source_type
+
+        interval = TIME_RANGE_INTERVAL.get(time_range) if time_range else None
+        if interval is not None:
+            # asyncpg 가 timedelta 를 interval 로 바인딩 → 명시 cast 로 timestamp 산출.
+            # `now() - $X::interval` 는 timestamptz 반환 → embedding_chunks.created_at
+            # (timestamp without time zone) 과 비교 시 자동 timestamp 캐스팅 불가.
+            # 양쪽 캐스팅으로 type 정합 보장.
+            filters += (
+                " AND created_at >= CAST(now() - CAST(:time_window AS interval)"
+                " AS timestamp)"
+            )
+            params["time_window"] = interval
 
         visibility_clause = self._visibility_filter_sql()
 

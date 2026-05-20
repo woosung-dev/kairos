@@ -3,12 +3,13 @@
 // Sprint 23 D2 Variant C — 워크스페이스 설정 페이지 (Compact Header + Geist Mono + ?tab=*)
 
 import { Suspense } from "react";
-import { Settings, Users, Link2, Building2 } from "lucide-react";
+import { Settings, Users, Link2, Building2, ShieldCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MemberList } from "@/features/members/components/member-list";
 import { InviteManager } from "@/features/members/components/invite-manager";
 import { useMembers, useInvites } from "@/features/members/hooks";
+import { AuditList } from "@/features/audit/components/audit-list";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import {
   useWorkspace,
@@ -16,7 +17,8 @@ import {
 } from "@/features/workspaces/hooks";
 
 const THRESHOLD_PRESETS = [0.7, 0.8, 0.9, 0.95] as const;
-const VALID_TABS = ["members", "invites", "general"] as const;
+// Sprint 24 Wave 2 T-AUDIT-VIEW: audit tab 추가 — admin/owner 만 노출.
+const VALID_TABS = ["members", "invites", "general", "audit"] as const;
 type TabValue = (typeof VALID_TABS)[number];
 
 const ROLE_LABEL: Record<string, string> = {
@@ -177,6 +179,18 @@ function SettingsContent() {
             <Building2 className="w-4 h-4" aria-hidden />
             일반
           </TabsTrigger>
+          {/* Sprint 24 Wave 2 T-AUDIT-VIEW: Audit 탭 — admin/owner 만 노출.
+              viewer/member 에게는 tab trigger 자체를 미렌더 → URL 직접 접근도 BE 403 fall-through. */}
+          {isAdminOrOwner && (
+            <TabsTrigger
+              value="audit"
+              data-testid="audit-tab-trigger"
+              className="gap-1.5 cursor-pointer text-sm"
+            >
+              <ShieldCheck className="w-4 h-4" aria-hidden />
+              Audit
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* 멤버 탭 */}
@@ -290,6 +304,37 @@ function SettingsContent() {
                   워크스페이스 설정 변경은 소유자만 가능합니다.
                 </p>
               </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Sprint 24 Wave 2 T-AUDIT-VIEW: Audit 탭 — admin/owner 만 mount.
+            viewer/member 가 ?tab=audit URL 직접 접근 시 admin gate 가 mount 차단. */}
+        <TabsContent value="audit">
+          <div className="space-y-4">
+            <h2
+              className="text-sm font-medium"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Promote Audit 로그
+            </h2>
+            <p
+              className="text-sm leading-relaxed"
+              style={{ color: "var(--text-muted)" }}
+            >
+              다른 워크스페이스에서 이 워크스페이스로 promote 된 회의·노트·Inbox·액션
+              항목의 audit trail 입니다. 관리자(Admin) 이상 권한에서만 확인할 수
+              있습니다.
+            </p>
+            {isAdminOrOwner ? (
+              <AuditList workspaceId={activeWorkspaceId} />
+            ) : (
+              <p
+                className="text-sm"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Audit 로그 조회는 관리자(Admin) 이상 권한에서만 가능합니다.
+              </p>
             )}
           </div>
         </TabsContent>

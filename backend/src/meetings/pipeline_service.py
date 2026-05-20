@@ -72,8 +72,13 @@ class MeetingPipelineService:
             {"id": str(p.id), "title": p.title, "status": p.status}
             for p in existing_projects
         ]
+        # T-AI-DATE (BUG-CURIOUS-001): current_year 컨텍스트 명시 전달.
+        # 기본값은 service 가 date.today().year 사용하지만 호출처에서 명시해 audit 추적 가능.
         actions_data = await self.ai_service.extract_actions_and_link(
-            transcript_text, summary_data.get("summary", ""), project_list
+            transcript_text,
+            summary_data.get("summary", ""),
+            project_list,
+            current_year=date.today().year,
         )
 
         # ActionItem 저장 (workspace_id 명시 — cross-domain orchestrator 안전)
@@ -197,7 +202,11 @@ class MeetingPipelineService:
                 audio_url = await self.r2_service.get_download_url(meeting.file_key)
                 audio_bytes = await self.transcription_service.download_audio(audio_url)
                 filename = meeting.file_key.split("/")[-1] if "/" in meeting.file_key else meeting.file_key
-                segments, duration = await self.transcription_service.transcribe(audio_bytes, filename)
+                # Sprint 24 Wave 2 T-N+4 (BL-T2-003): 4hr+ chunk 분할 진입점.
+                # 1hr 이하는 기존 transcribe 와 동일 동작, 1hr+ 면 chunked 경로로 분기.
+                segments, duration = await self.transcription_service.transcribe_with_chunking(
+                    audio_bytes, filename
+                )
 
                 await meeting_repo.save_segments(meeting_id, workspace_id, segments)
                 await meeting_repo.set_has_transcript(meeting_id, workspace_id, True)

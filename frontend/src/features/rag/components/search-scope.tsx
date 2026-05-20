@@ -1,8 +1,10 @@
 "use client";
 
+// RAG 검색 범위 + 필터 UI. Sprint 24 Wave 2 T-RAG-MOCK-REMOVE (BUG-POW-005)
+// 로 MOCK_SELECTABLE_SOURCES 제거 후 "선택한 소스" 탭을 empty state 로 변경 (실 API + selection state 는 BL-NEW-RAG-SOURCE-SELECT 진입 시 구현).
+
 import { useState } from "react";
 import { useRagStore } from "../store";
-import { Mic, FileText, Check } from "lucide-react";
 
 type ScopeTab = "all" | "project" | "selected";
 
@@ -19,66 +21,9 @@ const SOURCE_OPTIONS = [
   { value: "note", label: "노트" },
 ] as const;
 
-/** Mock: 선택 가능한 소스 목록 */
-interface SelectableSource {
-  id: string;
-  name: string;
-  type: "meeting" | "note";
-  projectId: string;
-  projectName: string;
-}
-
-const MOCK_SELECTABLE_SOURCES: SelectableSource[] = [
-  { id: "s1", name: "Sprint 3 회고 회의", type: "meeting", projectId: "p1", projectName: "Kairos" },
-  { id: "s2", name: "AI 검색 파이프라인 설계", type: "note", projectId: "p1", projectName: "Kairos" },
-  { id: "s3", name: "배포 전략 회의", type: "meeting", projectId: "p1", projectName: "Kairos" },
-  { id: "s4", name: "사용자 인터뷰 정리", type: "note", projectId: "p2", projectName: "사이드 프로젝트" },
-  { id: "s5", name: "MVP 범위 논의", type: "meeting", projectId: "p2", projectName: "사이드 프로젝트" },
-];
-
 export function SearchScope() {
   const { searchFilter, setSearchFilter } = useRagStore();
   const [scopeTab, setScopeTab] = useState<ScopeTab>("all");
-  const [selectedSourceIds, setSelectedSourceIds] = useState<Set<string>>(
-    new Set(),
-  );
-
-  /** 프로젝트별 그룹핑 */
-  const groupedSources = MOCK_SELECTABLE_SOURCES.reduce<
-    Record<string, { projectName: string; sources: SelectableSource[] }>
-  >((acc, src) => {
-    if (!acc[src.projectId]) {
-      acc[src.projectId] = { projectName: src.projectName, sources: [] };
-    }
-    acc[src.projectId].sources.push(src);
-    return acc;
-  }, {});
-
-  const handleToggleSource = (id: string) => {
-    setSelectedSourceIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  const handleToggleAll = () => {
-    const allIds = MOCK_SELECTABLE_SOURCES.map((s) => s.id);
-    const isAllSelected = allIds.every((id) => selectedSourceIds.has(id));
-    if (isAllSelected) {
-      setSelectedSourceIds(new Set());
-    } else {
-      setSelectedSourceIds(new Set(allIds));
-    }
-  };
-
-  const isAllSelected =
-    MOCK_SELECTABLE_SOURCES.length > 0 &&
-    MOCK_SELECTABLE_SOURCES.every((s) => selectedSourceIds.has(s.id));
 
   return (
     <div className="px-4 py-2 space-y-2">
@@ -112,9 +57,6 @@ export function SearchScope() {
             }}
           >
             {tab.label}
-            {tab.key === "selected" && selectedSourceIds.size > 0 && (
-              <span className="ml-1">({selectedSourceIds.size})</span>
-            )}
           </button>
         ))}
       </div>
@@ -171,129 +113,18 @@ export function SearchScope() {
         </select>
       </div>
 
-      {/* "선택한 소스" 탭: 소스 체크리스트 */}
+      {/* "선택한 소스" 탭 — Sprint 24 Wave 2: MOCK 제거 후 empty state (BL-NEW-RAG-SOURCE-SELECT 진입 시 실 API + selection state). */}
       {scopeTab === "selected" && (
         <div
-          className="mt-1 rounded border overflow-hidden"
+          className="mt-1 rounded border border-dashed px-3 py-3 text-[11px] leading-relaxed"
           style={{
             borderColor: "var(--border-subtle)",
             borderRadius: "var(--radius-sm)",
+            color: "var(--text-muted)",
+            background: "var(--surface)",
           }}
         >
-          {/* 전체 선택/해제 */}
-          <button
-            type="button"
-            onClick={handleToggleAll}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium cursor-pointer transition-colors"
-            style={{
-              background: "var(--surface)",
-              color: "var(--text-secondary)",
-              borderBottom: "1px solid var(--border-subtle)",
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = "var(--surface-hover)";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = "var(--surface)";
-            }}
-          >
-            <span
-              className="flex items-center justify-center rounded"
-              style={{
-                width: 14,
-                height: 14,
-                border: isAllSelected
-                  ? "none"
-                  : "1.5px solid var(--border)",
-                background: isAllSelected
-                  ? "var(--accent)"
-                  : "transparent",
-                borderRadius: 3,
-              }}
-            >
-              {isAllSelected && <Check size={10} style={{ color: "var(--background)" }} />}
-            </span>
-            전체 {isAllSelected ? "해제" : "선택"}
-          </button>
-
-          {/* 프로젝트별 소스 목록 */}
-          <div
-            className="max-h-[200px] overflow-y-auto"
-            style={{ background: "var(--background)" }}
-          >
-            {Object.entries(groupedSources).map(
-              ([projId, { projectName, sources }]) => (
-                <div key={projId}>
-                  <div
-                    className="px-3 py-1 text-[10px] uppercase tracking-wider font-semibold"
-                    style={{
-                      color: "var(--text-muted)",
-                      background: "var(--surface-hover)",
-                    }}
-                  >
-                    {projectName}
-                  </div>
-                  {sources.map((src) => {
-                    const isChecked = selectedSourceIds.has(src.id);
-                    return (
-                      <button
-                        key={src.id}
-                        type="button"
-                        onClick={() => handleToggleSource(src.id)}
-                        className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] cursor-pointer transition-colors"
-                        style={{
-                          color: "var(--text-secondary)",
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background =
-                            "var(--surface-hover)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = "transparent";
-                        }}
-                      >
-                        <span
-                          className="flex items-center justify-center rounded shrink-0"
-                          style={{
-                            width: 14,
-                            height: 14,
-                            border: isChecked
-                              ? "none"
-                              : "1.5px solid var(--border)",
-                            background: isChecked
-                              ? "var(--accent)"
-                              : "transparent",
-                            borderRadius: 3,
-                          }}
-                        >
-                          {isChecked && (
-                            <Check
-                              size={10}
-                              style={{ color: "var(--background)" }}
-                            />
-                          )}
-                        </span>
-                        {src.type === "meeting" ? (
-                          <Mic
-                            size={12}
-                            style={{ color: "var(--text-muted)" }}
-                            className="shrink-0"
-                          />
-                        ) : (
-                          <FileText
-                            size={12}
-                            style={{ color: "var(--text-muted)" }}
-                            className="shrink-0"
-                          />
-                        )}
-                        <span className="truncate">{src.name}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              ),
-            )}
-          </div>
+          소스 선택 기능 준비 중 — 현재는 전체 워크스페이스에서 검색합니다.
         </div>
       )}
     </div>

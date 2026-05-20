@@ -228,39 +228,23 @@ member = await self.workspace_repo.get_member(target_workspace_id, promoted_by_u
 
 ---
 
-## BL-006 — memory → embeddings.create_chunk 직접 호출 → pipeline_service.py 분리 (ADR-014 위반)
+## BL-006 — memory → embeddings.create_chunk 직접 호출 → pipeline_service.py 분리 (ADR-014 위반) ✅ **완료 (Sprint 24 Wave 2 Phase 7, 2026-05-20)**
 
-**현 상태:**
-`backend/src/memory/service.py:724` — `_create_memory_embedding_chunk`에서 `from src.embeddings.service import create_chunk` 직접 호출. CONTEXT-MAP §4.2 + ADR-014 위반 (cross-domain shared service는 orchestrator 경유 필수). memory 모듈에 `pipeline_service.py` 부재.
+**현 상태 (해소 전):**
+`backend/src/memory/service.py:550, :780` — `_bg_distill_and_embed` + module-level `_bg_promote_embed` 가 `from src.embeddings.repository import EmbeddingRepository` 를 lazy import 후 직접 `save_chunk` 호출. CONTEXT-MAP §4.2 + ADR-014 위반.
 
-**목표 인터페이스:**
-```python
-# memory/pipeline_service.py 신설
-class MemoryPipelineService:
-    def __init__(self, memory_service, embeddings_service): ...
-    async def distill_and_embed(self, memory_id, transcript): ...
-    async def transcribe_distill_embed(self, memory_id, r2_key): ...
-    async def promote_embed(self, new_memory_id, source_text): ...
+**해소 (2026-05-20):**
+- 신설: `backend/src/memory/pipeline_service.py` — `MemoryPipelineService.save_memory_chunk(session, ...)` 가 `EmbeddingRepository.save_chunk` 호출 캡슐화. `source_type='memory'` 고정.
+- 갱신: `backend/src/memory/service.py` — lazy import 2 hit 제거, `_bg_distill_and_embed` 와 `_bg_promote_embed` 가 pipeline 위임. `MemoryService.__init__` `pipeline: MemoryPipelineService | None = None` 추가, `_bg_*` 진입 전 fail-closed (`RuntimeError`).
+- 갱신: `backend/src/memory/dependencies.py` — `MemoryPipelineService` 동반 주입.
+- 회귀 방지: `backend/tests/architecture/test_no_memory_to_embeddings_lazy_import.py` 2 케이스 (lazy import 0 hit assertion + E-9 1 hit 유지 assertion).
 
-# memory/service.py는 enqueue + status 전이만, BG task는 PipelineService 위임
-```
+**미해소 (E-9 예외 유지)**:
+- `backend/src/memory/repository.py:33` 의 `from src.embeddings.repository import _apply_hnsw_session_params` 1 hit 는 vector_search HNSW SET LOCAL 위해 유지 (embeddings/CONTEXT.md E-9 — capsule 우회 최소 비용 약속, Sprint 16). vector_search 자체 흡수는 LOC vs 가치 비대칭으로 후속 sprint carry-over.
 
-**영향 파일:**
-- `backend/src/memory/pipeline_service.py` — 신설
-- `backend/src/memory/service.py` — `_bg_*` 3 메서드 + `_create_memory_embedding_chunk` 제거 (또는 위임)
-- `backend/src/memory/dependencies.py` — PipelineService 주입
+**테스트 결과**: pytest 406 → 408 + 1 skipped (architecture gate +2). 기존 memory 27 테스트 회귀 0.
 
-**예상 LOC delta:** +200 (pipeline_service) / -180 (service)
-
-**Risk:** 🟡 중간 — BG task 흐름 재배치. 기존 6 테스트 그대로 통과 필요.
-
-**Test harness:** `test_service.py` 7 케이스 + `test_recall.py` 6 케이스 그대로
-
-**우선순위:** ★★★★★ (P0 헌법 위반)
-
-**Sprint 묶음 권고:** BL-005와 묶어 Sprint 17 우선 처리
-
-**근거:** Sprint 15 Stage 5-1 audit (2026-05-14)
+**근거**: Sprint 24 Wave 2 trusty-heron plan / `docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md` §"T-N+1 BL-006".
 
 ---
 
@@ -1331,6 +1315,12 @@ PR #1 audit 4 case (action_items.project_id / notes.project_id / mpl / project_m
 - ✅ embedding_chunks.project_id (composite FK + audit)
 - ✅ semantic_caches.project_id (composite FK + audit)
 
+### 회귀 안전망 (Sprint 24 Wave 2 T-N+2, 2026-05-20)
+
+`backend/tests/fixtures/composite_fk.py` + `backend/tests/integration/test_composite_fk_scn_matrix.py` —
+SCN-FK-01~12 매트릭스 (4 entity × 3 op = 12 case) 자동화. 회귀 시 SCN ID 로 즉시 식별.
+기존 `test_workspace_fk_cross_tenant_block.py` (7 case) 와 상호 보완.
+
 ### Carry-over (Sprint 22+)
 
 - memory_items.embedding_chunk_id — embedding_chunks(id, workspace_id) UNIQUE 선행 작업 필요
@@ -1760,3 +1750,195 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 **Sprint 묶음 권고:** Sprint 25+ e2e Clerk infrastructure (BL-068 동반).
 
 **근거:** Sprint 24 BL-066 carry-over.
+
+---
+
+## ~~BL-T2-003~~ — Whisper chunk 분할 (4hr+) ✅ **완료 (Sprint 24 Wave 2 T-N+4, 2026-05-20)**
+
+**현 상태**: **[해소 2026-05-20] Sprint 24 Wave 2 T-N+4**. 4시간+ recording production 처리 차단 해소.
+
+**원본 발견**: Sprint 24 Multi-Agent QA Day 1 Sentinel Tier 2 (`docs/dev-log/2026-05-19-sprint24-qa-multi-agent/verification.md:272`).
+
+**문제**:
+- `transcription.py:TranscriptionService.transcribe()` 가 Whisper API 단일 호출.
+- 60MB+ audio (Whisper 25MB 제한 초과) 업로드 시 API 400 — 4hr+ recording 처리 불가.
+
+**해소 결과 (PR: Sprint 24 Wave 2 Phase 8)**:
+- `services/chunked_transcription.py` 신설 — `_ffmpeg_probe_duration` + `_ffmpeg_split` + `_whisper_transcribe_single` + `_merge_with_offset` + `transcribe_chunked` (5 모듈 함수).
+- `services/transcription.py` 에 `TranscriptionService.transcribe_with_chunking(audio_bytes, filename)` entry 추가 — 1hr 이하 단일 호출, 1hr 초과 chunked 경로 분기.
+- `meetings/pipeline_service.py:process_meeting` 호출처 교체 (`transcribe` → `transcribe_with_chunking`).
+- `tests/services/test_whisper_chunked_4hr.py` — 3 신규 test (short single / 4hr 4 chunk offset / overlap dedupe). mock 기반 (ffmpeg/Whisper 실제 호출 회피).
+
+**Atomic Update**: `backend/CONTEXT.md` §10 STT 파이프라인 + `docs/architecture/ai-pipeline.md` §"STT (Speech-to-Text)" + 본 BL closed mark.
+
+**제약·후속**:
+- 4hr 라이브 audio 실측은 별도 dogfood 과제 (테스트는 mock 검증). 사용자 audio sample 확보 시점에 production 1회 verify 권장.
+- 더 정교한 dedup (text 유사도 / 시간 fuzzy match) 필요 시 후속 BL 발의 — 현재는 exact text match within overlap window.
+
+---
+
+## BL-NEW-RAG-SOURCE-SELECT — RAG source-level selection v1 (Sprint 25+ 검토)
+
+**현 상태:** 미시작 (carry-over from Sprint 24 Wave 2 T-RAG-MOCK-REMOVE / BUG-POW-005).
+
+Sprint 24 Wave 2 T-RAG-MOCK-REMOVE 에서 `frontend/src/features/rag/components/search-scope.tsx` 의 MOCK_SELECTABLE_SOURCES 5건 제거 후 "선택한 소스" 탭을 "소스 선택 기능 준비 중 — 현재는 전체 워크스페이스에서 검색합니다" empty state 로 변경. 장기적으로 source-level (회의/노트 단위) RAG 검색 범위 선택이 실제로 필요한가는 Power persona 데이터 수집 후 결정.
+
+**목표:**
+
+1. BE: `GET /api/v1/workspaces/{wid}/embeddings/sources?type=meeting|note` — indexable source list endpoint (페이지네이션 + name + type + project_id + project_name).
+2. FE: selection state (Zustand or local) + RAG `/ask` 요청에 `source_ids: list[uuid]` 전달.
+3. BE: `embeddings/repository.py vector_search` 에 `source_ids` filter SQL clause 추가 (workspace_id + source_ids).
+
+**Risk:** 🟡 중간 — 신규 endpoint + RAG filter SQL clause 추가. 인덱스 영향 검증 필요 (workspace_id + source_type composite index 활용 가능 여부).
+
+**우선순위:** ★★☆☆☆ (P2 — Power user feature, wedge 정합 미증명).
+
+**Sprint 묶음 권고:** Power persona 인터뷰 (F4 outreach) 결과 confirmed + 명시적 요구 시 Sprint 25+ 진입. 아닐 시 폐기 + UI 자체 hide.
+
+**예상 시간:** 3-5h.
+
+**근거:** Sprint 24 Wave 2 T-RAG-MOCK-REMOVE — MOCK 데이터가 실 워크스페이스 명/회의 명을 false-impression 출력해 Power user 가 selection 시도 → 검색 결과 mismatch 발생.
+
+---
+
+## BL-NEW-DELTA3-REMEASURE — Phase B swap DELTA-3 P/R n=20 재측정 (Sprint 24 Wave 2 carry)
+
+**현 상태:** 미시작 (carry-over from Sprint 24 Wave 2 Phase 1 T-2 post-swap delta gate).
+
+Phase B `gemini-2.5-flash → gemini-3.1-flash-lite` swap 후 DELTA-3 액션 추출 P/R 측정 결과 `ΔP=-30% / ΔR=-22.2%` (n=5 sample, token-level overlap). 수치상 gate 임계 -10% 초과 FAIL 이지만 (1) sample size n=5 + 1 mismatch=±10% jump 의 noise floor, (2) 주 원인이 양 모델 공통 `due_date` 2024 hallucinate (Phase 2 T-AI-DATE 가 fix), (3) assignee 누락 + 회의 일정 over-extraction (Phase 2 prompt 강화로 fix) → **conditional PASS** 판정 후 Phase 2 진입.
+
+Phase 2 T-AI-DATE 완료 후 n=20 으로 확장 재측정해 P/R 회복 confirmation 필요.
+
+**목표:**
+
+1. `backend/tests/llm/fixtures/sample_transcripts.py` 의 DELTA_3 ground-truth sample 을 5 → 20 으로 확장 (다양한 회의 시나리오 — 1:1, 4+명 회의, 마감일 명시/미명시 mix, assignee 명시/미명시 mix).
+2. `backend/scripts/sprint24_wave2_delta.py` (또는 후속 sprint 의 동등 스크립트) 로 post-Phase-2 모델 (gemini-3.1-flash-lite + T-AI-DATE prompt) 재측정.
+3. 결과 비교: baseline `P=1.000 R=1.000` (n=5) vs post-Phase-2 (n=20) — gate 임계 P/R ≥ 0.9.
+4. fail 시: prompt 추가 강화 (예: assignee 명시 의무 위반 사례 Few-shot 추가) 또는 hybrid (chain-of-thought 또는 2-step extraction) 도입 검토.
+
+**Risk:** 🟢 낮음 — 측정 작업. 실 API key + 비용 (~$0.50 예상, n=20 × 2 모델).
+
+**우선순위:** ★★★☆☆ (P1 — Phase B swap gate 의 conditional 조건 해소 + ADR-019 Phase B 정합성 closure).
+
+**Sprint 묶음 권고:** Sprint 25 첫 commit 또는 Sprint 24 closeout 직후. carry-over 시 conditional 조건 closure 까지 추적.
+
+**예상 시간:** 1-2h (fixture 확장 1h + 측정 + 비교 1h).
+
+**근거:** `docs/dev-log/2026-05-20-sprint24-wave2/post-swap-delta-report.md` §4 + §7 + §9 — Phase 2 진입 conditional 조건 명시 + Gate FAIL revert 미발동 사유 의존.
+
+---
+
+## BL-NEW-OBN-DATA-RETRY — Onboarding 재설계 data-driven retry (Sprint 25+)
+
+**현 상태:** 미시작 (carry-over from Sprint 24 Wave 2 T-OBN-05 D 옵션 결정).
+
+Sprint 22 OBN-01~04 의 OnboardingBanner 는 Sprint 24 Wave 2 에서 폐기 (Codex+Gemini deep research 합의 + Multi-Agent QA 데이터 TTFV 255초 / 글로벌 checklist 완료율 19.2% / PERSONA-001 power user 정합 분석). PERSONA-002/003 (PM 가설) 또는 tooltip analytics 결과 confirmed 시 onboarding 재설계 검토.
+
+**진입 조건 (둘 중 하나):**
+- F4 외부 인터뷰 (`docs/requirements/interview-results.md`) 결과 PM 페르소나 confirmed (다른 페르소나 친화 onboarding 가 ROI 확인).
+- 또는 Sprint 24 Wave 2 tooltip analytics (`tooltip_shown` / `tooltip_dismissed`) 4-6주 데이터 축적 후 power user friction 또는 효과 부재 입증.
+
+**목표 (재도입 시):**
+1. AI personalize (1인 founder vs 팀 wedge 분화 — branching tutorial).
+2. step 별 CTA 가 page transition 자동 trigger (passive banner → active deep-link).
+3. measure 자체 강화 (activation funnel — workspace → project → meeting → RAG ask 각 step transition rate).
+4. tooltip 산출물과 통합 (Linear-style first-visit hint 유지 + 명시적 walkthrough overlay 옵션 추가).
+
+**Risk:** 🟢 낮음 — 신규 도입. 기존 BE 자산 (`User.onboarding_step` + event hook) 재활용 가능.
+
+**우선순위:** ★★☆☆☆ (P3 — F4 외부 인터뷰 결과 또는 analytics 데이터 의존).
+
+**Sprint 묶음 권고:** Sprint 25+ (F4 결과 또는 analytics 데이터 누적 후). 사용자 cohort sample size n≥20 권고.
+
+**예상 시간:** 4-6h (재도입 시) — UI 설계 2h + BE 재활용 1h + analytics 추가 1h + E2E 1-2h.
+
+**근거:** `docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md` §T-OBN-05 D 옵션 + Codex/Gemini deep research 합의 메모.
+
+
+## BL-NEW-BE-PERF-COLD-START — Cloud Run + Neon cold start 진단 (Sprint 25+)
+
+**상태**: 미시작 (carry-over from Sprint 24 Wave 2 T-BE-PERF spike)
+**우선순위**: P1 (모바일 사용성 직결, BUG-MOBILE-005 의 main bottleneck 추정)
+**예상 시간**: 4-6h
+
+### 배경
+Sprint 24 Wave 2 Phase 6 spike 결과: localhost 측정 BE 4 API 직렬 25ms (sub-second). Multi-Agent QA Mobile 보고는 3015-3865ms. 150x 갭 → BE 로직 외 origin (cold start + 외부 인프라).
+
+### 진입 조건
+- Sentry distributed trace 도입 후 production cold start 측정 가능
+
+### 작업
+1. Cloud Run min-instances 0 → 1 trade-off (cost vs latency)
+2. Neon connection pool pre-warm + autoscale window
+3. Vercel→Cloud Run RTT 진단
+
+---
+
+## BL-NEW-BE-PERF-PARALLEL-API — Dashboard 4 API 병렬화 (Sprint 25+)
+
+**상태**: 미시작 (carry-over from Sprint 24 Wave 2 T-BE-PERF spike)
+**우선순위**: P2
+
+### 배경
+dashboard 4 API (workspaces / members / meetings / inbox) 가 직렬 호출. workspaceId 의존 chain 검토 시 병렬화 가능 가능성. localhost 25ms → 12ms (~50%) 추정.
+
+### 작업
+- FE hook 의존 매트릭스 검토 (workspaceId 가 다른 hook 의존 여부)
+- Promise.all 또는 useQueries 도입
+- E2E timing 회귀 가드
+
+
+## BL-NEW-JWT-CACHE-CACHETOOLS — JWT cache cachetools 전환 (Sprint 25+)
+
+**상태**: 미시작 (carry-over from Sprint 24 Wave 2 Gemini 2차 Medium finding)
+**우선순위**: P3 — functional regression 아님, refactor 권고
+**예상 시간**: 1h
+
+### 배경
+Sprint 24 Wave 2 Phase 6 T-BE-PERF Top 1 fix 에서 `backend/src/auth/dependencies.py` 의 `_JWT_CLAIMS_CACHE` 를 자체 dict + 수동 maxsize 청소로 구현. Gemini 2차 review 가 `cachetools.TTLCache` 권고 (의존성 추가, 검증된 라이브러리).
+
+### 작업
+1. `cachetools` 의존성 추가 (pyproject.toml)
+2. `_JWT_CLAIMS_CACHE: TTLCache(maxsize=1000, ttl=60)` 로 교체
+3. `_jwt_cache_get/_set` 함수 단순화 (TTLCache 가 자동 eviction)
+4. token_exp 상한 로직은 wrapper 로 보존
+
+---
+
+## BL-NEW-RAG-TIME-NONE-EXPLICIT — RAG time_range=None 명시 처리 (Sprint 25+)
+
+**상태**: 미시작 (carry-over from Sprint 24 Wave 2 Gemini 2차 Low finding)
+**우선순위**: P4 — 현재 작동 OK, 가독성 권고
+
+### 배경
+`backend/src/rag/service.py` 의 `is_time_filtered = time_range is not None and time_range != "all"`. None 이 default 라 None 도 cache 적용 (의도된 작동). 그러나 가독성 위해 명시적 처리 권고.
+
+### 작업
+- `is_time_filtered` 를 helper 함수로 추출 + docstring 으로 None/"all" 동치 명시
+
+---
+
+## BL-NEW-CLOUD-RUN-MIN-INSTANCES — Cloud Run min-instances=1 (Sprint 25+ 운영)
+
+**상태**: 운영 권고 (Gemini 2차 Low finding + BL-NEW-BE-PERF-COLD-START 연계)
+**우선순위**: P2 (BL-NEW-BE-PERF-COLD-START 의 일부)
+
+### 배경
+T-BE-PERF spike 결론 = production 3-4s 의 main bottleneck = Cloud Run cold start. Whisper chunked concurrency=4 시 cold start 환경에서 OOM 위험. min-instances=1 = cost vs latency trade.
+
+### 진입 조건
+- BL-NEW-BE-PERF-COLD-START 와 통합 검토
+- Sentry production trace 도입 후 cold start 빈도 측정 → 비용 정당화
+
+---
+
+## BL-NEW-DUE-DATE-LOG-TRACEABILITY — _validate_action_dates 로그 추적성 강화 (Sprint 25+)
+
+**상태**: 미시작 (carry-over from Sprint 24 Wave 2 Gemini 2차 Low finding)
+**우선순위**: P4
+
+### 배경
+`backend/src/services/ai_processing.py` 의 `_validate_action_dates` 후처리 helper 가 past year due_date drop 시 meeting_id + due_date + title 로그. ActionItem 의 다른 식별 정보 (assignee 등) 도 일부 남기면 prompt regression 추적성 향상.
+
+### 작업
+- log warn extra dict 에 `assignee` 등 추가
