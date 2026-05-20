@@ -54,22 +54,23 @@ test.describe("Onboarding Tooltip (T-OBN-05 D 옵션, Sprint 24 Wave 2)", () => 
   });
 
   test("⌘K 첫 열기 시 search tooltip 발화", async ({ page }) => {
+    // dashboard tooltip 이 발화하지 않도록 미리 mark 처리 (잡음 제거 + dismiss race 회피)
+    await page.evaluate(() =>
+      window.localStorage.setItem(
+        "kairos.onboarding.tooltip_shown.dashboard",
+        "1",
+      ),
+    );
     await page.reload();
-    // dashboard tooltip 발화 후 dismiss (잡음 제거)
-    const dashTip = page.getByTestId("onboarding-tooltip-dashboard");
-    const dashVisible = await dashTip
-      .isVisible({ timeout: 5_000 })
-      .catch(() => false);
-    if (dashVisible) {
-      await dashTip.getByRole("button", { name: "닫기" }).click();
-    }
 
-    // CI fix: page.keyboard.press("Meta+K") 가 Linux CI 에서 OS metaKey 매핑 race 가능.
-    // 헤더의 ⌘K display button click 으로 cmd-k 발화 (page snapshot 에 button "팀 지식 검색... ⌘K" 확인).
-    const cmdKBtn = page
-      .getByRole("button", { name: /지식 검색|⌘K/ })
-      .first();
-    await cmdKBtn.click();
+    // CI fix v3: page snapshot 분석 결과 — 헤더 "팀 지식 검색... ⌘K" 는 toggleRagOverlay (RAG 패널) 호출.
+    // 진짜 cmd-k trigger = dashboard 본문의 "검색하거나 질문 입력... ⌘K" button (toggleCmdK).
+    // 정확한 selector = OnboardingTooltip(page="dashboard") 안의 button (dashboard tooltip 이 wrap).
+    // dashboard tooltip 이 mark 처리되어 mount 안 되므로 우리 click 은 직접 button 도달.
+    const cmdKTrigger = page.getByRole("button", {
+      name: /검색하거나 질문 입력/,
+    });
+    await cmdKTrigger.click();
 
     await expect(
       page.getByTestId("onboarding-tooltip-search"),
