@@ -228,39 +228,23 @@ member = await self.workspace_repo.get_member(target_workspace_id, promoted_by_u
 
 ---
 
-## BL-006 — memory → embeddings.create_chunk 직접 호출 → pipeline_service.py 분리 (ADR-014 위반)
+## BL-006 — memory → embeddings.create_chunk 직접 호출 → pipeline_service.py 분리 (ADR-014 위반) ✅ **완료 (Sprint 24 Wave 2 Phase 7, 2026-05-20)**
 
-**현 상태:**
-`backend/src/memory/service.py:724` — `_create_memory_embedding_chunk`에서 `from src.embeddings.service import create_chunk` 직접 호출. CONTEXT-MAP §4.2 + ADR-014 위반 (cross-domain shared service는 orchestrator 경유 필수). memory 모듈에 `pipeline_service.py` 부재.
+**현 상태 (해소 전):**
+`backend/src/memory/service.py:550, :780` — `_bg_distill_and_embed` + module-level `_bg_promote_embed` 가 `from src.embeddings.repository import EmbeddingRepository` 를 lazy import 후 직접 `save_chunk` 호출. CONTEXT-MAP §4.2 + ADR-014 위반.
 
-**목표 인터페이스:**
-```python
-# memory/pipeline_service.py 신설
-class MemoryPipelineService:
-    def __init__(self, memory_service, embeddings_service): ...
-    async def distill_and_embed(self, memory_id, transcript): ...
-    async def transcribe_distill_embed(self, memory_id, r2_key): ...
-    async def promote_embed(self, new_memory_id, source_text): ...
+**해소 (2026-05-20):**
+- 신설: `backend/src/memory/pipeline_service.py` — `MemoryPipelineService.save_memory_chunk(session, ...)` 가 `EmbeddingRepository.save_chunk` 호출 캡슐화. `source_type='memory'` 고정.
+- 갱신: `backend/src/memory/service.py` — lazy import 2 hit 제거, `_bg_distill_and_embed` 와 `_bg_promote_embed` 가 pipeline 위임. `MemoryService.__init__` `pipeline: MemoryPipelineService | None = None` 추가, `_bg_*` 진입 전 fail-closed (`RuntimeError`).
+- 갱신: `backend/src/memory/dependencies.py` — `MemoryPipelineService` 동반 주입.
+- 회귀 방지: `backend/tests/architecture/test_no_memory_to_embeddings_lazy_import.py` 2 케이스 (lazy import 0 hit assertion + E-9 1 hit 유지 assertion).
 
-# memory/service.py는 enqueue + status 전이만, BG task는 PipelineService 위임
-```
+**미해소 (E-9 예외 유지)**:
+- `backend/src/memory/repository.py:33` 의 `from src.embeddings.repository import _apply_hnsw_session_params` 1 hit 는 vector_search HNSW SET LOCAL 위해 유지 (embeddings/CONTEXT.md E-9 — capsule 우회 최소 비용 약속, Sprint 16). vector_search 자체 흡수는 LOC vs 가치 비대칭으로 후속 sprint carry-over.
 
-**영향 파일:**
-- `backend/src/memory/pipeline_service.py` — 신설
-- `backend/src/memory/service.py` — `_bg_*` 3 메서드 + `_create_memory_embedding_chunk` 제거 (또는 위임)
-- `backend/src/memory/dependencies.py` — PipelineService 주입
+**테스트 결과**: pytest 406 → 408 + 1 skipped (architecture gate +2). 기존 memory 27 테스트 회귀 0.
 
-**예상 LOC delta:** +200 (pipeline_service) / -180 (service)
-
-**Risk:** 🟡 중간 — BG task 흐름 재배치. 기존 6 테스트 그대로 통과 필요.
-
-**Test harness:** `test_service.py` 7 케이스 + `test_recall.py` 6 케이스 그대로
-
-**우선순위:** ★★★★★ (P0 헌법 위반)
-
-**Sprint 묶음 권고:** BL-005와 묶어 Sprint 17 우선 처리
-
-**근거:** Sprint 15 Stage 5-1 audit (2026-05-14)
+**근거**: Sprint 24 Wave 2 trusty-heron plan / `docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md` §"T-N+1 BL-006".
 
 ---
 
