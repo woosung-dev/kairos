@@ -1886,3 +1886,59 @@ dashboard 4 API (workspaces / members / meetings / inbox) 가 직렬 호출. wor
 - FE hook 의존 매트릭스 검토 (workspaceId 가 다른 hook 의존 여부)
 - Promise.all 또는 useQueries 도입
 - E2E timing 회귀 가드
+
+
+## BL-NEW-JWT-CACHE-CACHETOOLS — JWT cache cachetools 전환 (Sprint 25+)
+
+**상태**: 미시작 (carry-over from Sprint 24 Wave 2 Gemini 2차 Medium finding)
+**우선순위**: P3 — functional regression 아님, refactor 권고
+**예상 시간**: 1h
+
+### 배경
+Sprint 24 Wave 2 Phase 6 T-BE-PERF Top 1 fix 에서 `backend/src/auth/dependencies.py` 의 `_JWT_CLAIMS_CACHE` 를 자체 dict + 수동 maxsize 청소로 구현. Gemini 2차 review 가 `cachetools.TTLCache` 권고 (의존성 추가, 검증된 라이브러리).
+
+### 작업
+1. `cachetools` 의존성 추가 (pyproject.toml)
+2. `_JWT_CLAIMS_CACHE: TTLCache(maxsize=1000, ttl=60)` 로 교체
+3. `_jwt_cache_get/_set` 함수 단순화 (TTLCache 가 자동 eviction)
+4. token_exp 상한 로직은 wrapper 로 보존
+
+---
+
+## BL-NEW-RAG-TIME-NONE-EXPLICIT — RAG time_range=None 명시 처리 (Sprint 25+)
+
+**상태**: 미시작 (carry-over from Sprint 24 Wave 2 Gemini 2차 Low finding)
+**우선순위**: P4 — 현재 작동 OK, 가독성 권고
+
+### 배경
+`backend/src/rag/service.py` 의 `is_time_filtered = time_range is not None and time_range != "all"`. None 이 default 라 None 도 cache 적용 (의도된 작동). 그러나 가독성 위해 명시적 처리 권고.
+
+### 작업
+- `is_time_filtered` 를 helper 함수로 추출 + docstring 으로 None/"all" 동치 명시
+
+---
+
+## BL-NEW-CLOUD-RUN-MIN-INSTANCES — Cloud Run min-instances=1 (Sprint 25+ 운영)
+
+**상태**: 운영 권고 (Gemini 2차 Low finding + BL-NEW-BE-PERF-COLD-START 연계)
+**우선순위**: P2 (BL-NEW-BE-PERF-COLD-START 의 일부)
+
+### 배경
+T-BE-PERF spike 결론 = production 3-4s 의 main bottleneck = Cloud Run cold start. Whisper chunked concurrency=4 시 cold start 환경에서 OOM 위험. min-instances=1 = cost vs latency trade.
+
+### 진입 조건
+- BL-NEW-BE-PERF-COLD-START 와 통합 검토
+- Sentry production trace 도입 후 cold start 빈도 측정 → 비용 정당화
+
+---
+
+## BL-NEW-DUE-DATE-LOG-TRACEABILITY — _validate_action_dates 로그 추적성 강화 (Sprint 25+)
+
+**상태**: 미시작 (carry-over from Sprint 24 Wave 2 Gemini 2차 Low finding)
+**우선순위**: P4
+
+### 배경
+`backend/src/services/ai_processing.py` 의 `_validate_action_dates` 후처리 helper 가 past year due_date drop 시 meeting_id + due_date + title 로그. ActionItem 의 다른 식별 정보 (assignee 등) 도 일부 남기면 prompt regression 추적성 향상.
+
+### 작업
+- log warn extra dict 에 `assignee` 등 추가
