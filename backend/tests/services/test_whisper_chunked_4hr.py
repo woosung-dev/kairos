@@ -78,9 +78,9 @@ async def test_4hr_audio_uses_4_chunks_with_overlap():
     assert len(segments) == 4
     # offset 보존: chunk i 의 segment.start = i * CHUNK_SECONDS (3600)
     assert segments[0]["start"] == 0.0
-    assert segments[1]["start"] == 3600.0
-    assert segments[2]["start"] == 7200.0
-    assert segments[3]["start"] == 10800.0
+    assert segments[1]["start"] == 3595.0  # 1*3600 - 5 (Codex F-4)
+    assert segments[2]["start"] == 7195.0  # 2*3600 - 5 (Codex F-4)
+    assert segments[3]["start"] == 10795.0  # 3*3600 - 5 (Codex F-4)
     assert segments[0]["text"] == "chunk-0"
     assert segments[3]["text"] == "chunk-3"
 
@@ -89,10 +89,10 @@ async def test_4hr_audio_uses_4_chunks_with_overlap():
 async def test_chunk_overlap_dedupe():
     """chunk N 마지막 overlap 영역 + chunk N+1 처음 overlap 영역 동일 text segment dedup.
 
-    시나리오: 2 chunk (2hr) 가정.
+    시나리오: 2 chunk (2hr) 가정. Codex F-4 fix 후 chunk 1 offset = 3600 - 5 = 3595.
     - chunk 0 마지막 segment: start=3595, end=3599, text="overlap-word"
-    - chunk 1 첫 segment (post-offset): start=3601 (=1+offset 3600), end=3604, text="overlap-word"
-    - merge 시 chunk 1 의 동일 text segment 는 직전 segment end (3599) + overlap(5)=3604 안에 들어가므로 dedup.
+    - chunk 1 첫 segment (post-offset 3595): start=3596 (=1+3595), end=3599, text="overlap-word"
+    - merge 시 chunk 1 의 동일 text segment 는 직전 segment 와 같은 영역 → dedup.
     """
     from src.services import chunked_transcription
 
@@ -105,8 +105,8 @@ async def test_chunk_overlap_dedupe():
         {"start": 3595.0, "end": 3599.0, "text": "overlap-word"},
     ]
     chunk1_segments = [
-        {"start": 1.0, "end": 4.0, "text": "overlap-word"},  # post-offset: 3601~3604, dedup 대상
-        {"start": 100.0, "end": 105.0, "text": "두번째-chunk-신규"},  # post-offset: 3700~3705
+        {"start": 1.0, "end": 4.0, "text": "overlap-word"},  # post-offset 3595: 3596~3599, dedup 대상
+        {"start": 100.0, "end": 105.0, "text": "두번째-chunk-신규"},  # post-offset 3595: 3695~3700
     ]
 
     async def fake_whisper_single(path: str) -> list[dict]:
@@ -138,7 +138,7 @@ async def test_chunk_overlap_dedupe():
     # overlap-word 는 1번만 등장 (chunk 0 의 것 유지, chunk 1 의 것 dedup)
     assert texts.count("overlap-word") == 1
     assert texts == ["첫번째", "overlap-word", "두번째-chunk-신규"]
-    # offset 검증
+    # offset 검증 (Codex F-4 fix: chunk 1 의 offset = 1*3600 - 5 = 3595)
     assert segments[0]["start"] == 0.0           # chunk 0 의 첫번째
     assert segments[1]["start"] == 3595.0        # chunk 0 의 overlap-word (offset=0)
-    assert segments[2]["start"] == 3700.0        # chunk 1 의 신규 (1*3600 + 100)
+    assert segments[2]["start"] == 3695.0        # chunk 1 의 신규 (offset 3595 + 100)

@@ -62,11 +62,16 @@ async def _ffmpeg_split(
     if n_chunks <= 0:
         return []
 
+    # Codex F-3 fix (Sprint 24 Wave 2 P2): source container preserve.
+    # 기존: .mp3 강제 + `-c copy` → AAC-in-M4A / PCM WAV 등 입력 시 ffmpeg 가 stream-copy 불가.
+    # fix: source URL 의 suffix 그대로 재사용 (.m4a / .wav / .mp3 / .webm 등).
+    source_suffix = Path(audio_url).suffix or ".mp3"
+
     chunks: list[str] = []
     for i in range(n_chunks):
         start = max(0.0, i * chunk_seconds - overlap_seconds)
         end = min(duration, (i + 1) * chunk_seconds + overlap_seconds)
-        chunk_path = tempfile.mktemp(suffix=".mp3")
+        chunk_path = tempfile.mktemp(suffix=source_suffix)
         proc = await asyncio.create_subprocess_exec(
             "ffmpeg", "-y", "-i", audio_url,
             "-ss", str(start), "-to", str(end), "-c", "copy", chunk_path,
@@ -111,14 +116,20 @@ def _merge_with_offset(
 ) -> list[dict]:
     """chunk별 segment 리스트 → 전체 timeline 단일 리스트.
 
-    - chunk i 모든 segment start/end 에 offset = i * chunk_seconds 적용 (전체 timeline 복원)
+    - chunk 0 의 actual start = 0, chunk i (i>0) 의 actual start = i*chunk_seconds - overlap_seconds
+      (split 의 `start = max(0, i*chunk_seconds - overlap_seconds)` 와 정합. Codex F-4 fix.)
+    - 모든 segment start/end 에 actual_start offset 적용 (전체 timeline 복원)
     - chunk i 의 뒤쪽 overlap_seconds 영역과 chunk i+1 의 앞쪽 overlap_seconds 영역에서
       동일 text 의 segment 가 두 번 등장하면 (Whisper 가 양쪽에서 같은 발화 인식) 중복 제거.
     - dedup 기준: 직전 chunk 마지막 segment 와 text 가 일치하고 시간 차가 overlap 영역 내.
     """
     merged: list[dict] = []
     for i, segments in enumerate(chunked_segments):
-        offset = i * chunk_seconds
+        # Codex F-4 fix (Sprint 24 Wave 2 P2): split start = max(0, i*chunk_seconds - overlap).
+        # chunk 0 = 0, chunk i (i>0) = i*chunk_seconds - overlap. 기존 i*chunk_seconds 만 사용 시
+        # post-first chunk 의 segment 가 overlap_seconds 만큼 늦게 표기됨 (Whisper timestamp
+        # 가 chunk file 의 0 부터 측정하므로).
+        offset = 0.0 if i == 0 else float(i * chunk_seconds - overlap_seconds)
         for seg in segments:
             seg_copy = {
                 **seg,

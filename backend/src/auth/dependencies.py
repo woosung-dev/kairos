@@ -42,11 +42,16 @@ def _jwt_cache_get(key: str) -> dict | None:
     return claims
 
 
-def _jwt_cache_set(key: str, claims: dict) -> None:
-    """캐시 저장 — maxsize 초과 시 가장 오래된 만료 항목부터 정리."""
+def _jwt_cache_set(key: str, claims: dict, token_exp: float | None = None) -> None:
+    """캐시 저장 — maxsize 초과 시 가장 오래된 만료 항목부터 정리.
+
+    Codex F-1 fix (Sprint 24 Wave 2 P1): cache expiry 를 min(60s, token.exp - now) 로 제한.
+    token 이 60s 안에 만료되면 그 exp 가 cache TTL 의 상한. expired 토큰이 cache hit 통과 위험 회피.
+    token_exp 누락 시 보수적으로 60s 미만 (50s) 적용 (caller 가 exp 안 보낸 경우 fallback).
+    """
+    now = time.time()
     if len(_JWT_CLAIMS_CACHE) >= _JWT_CACHE_MAX_SIZE:
         # 단순 청소: 만료된 것 먼저 제거, 모두 살아있으면 가장 오래된 1개 evict
-        now = time.time()
         expired = [k for k, (_, exp) in _JWT_CLAIMS_CACHE.items() if exp <= now]
         for k in expired:
             _JWT_CLAIMS_CACHE.pop(k, None)
@@ -54,7 +59,16 @@ def _jwt_cache_set(key: str, claims: dict) -> None:
             # FIFO 1개 제거
             oldest = next(iter(_JWT_CLAIMS_CACHE))
             _JWT_CLAIMS_CACHE.pop(oldest, None)
-    _JWT_CLAIMS_CACHE[key] = (claims, time.time() + _JWT_CACHE_TTL_SEC)
+
+    # Codex F-1: cache TTL ≤ token exp 보장
+    cache_ttl = _JWT_CACHE_TTL_SEC
+    if token_exp is not None:
+        ttl_until_token_exp = token_exp - now
+        if ttl_until_token_exp <= 0:
+            # 이미 만료된 token — cache 저장 skip
+            return
+        cache_ttl = min(_JWT_CACHE_TTL_SEC, ttl_until_token_exp)
+    _JWT_CLAIMS_CACHE[key] = (claims, now + cache_ttl)
 
 
 def _get_jwks_client():
@@ -105,7 +119,8 @@ async def verify_clerk_token(authorization: str = Header(default="")) -> dict:
         )
         # Clerk JWT의 sub 클레임 = Clerk 사용자 ID
         result = {"sub": claims["sub"]}
-        _jwt_cache_set(cache_key, result)
+        # Codex F-1 fix: token exp 를 cache TTL 상한으로 (만료된 token cache hit 차단)
+        _jwt_cache_set(cache_key, result, token_exp=claims.get("exp"))
         return result
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="토큰이 만료되었습니다")

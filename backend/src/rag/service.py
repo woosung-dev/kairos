@@ -64,13 +64,20 @@ class RagService:
         question_embedding = embeddings[0]
 
         # [2] Semantic Cache 확인 — BL-041: requester visibility 검증 포함
-        cache_hit = await self.embedding_repo.find_similar_cache(
-            question_embedding,
-            workspace_id,
-            requester_user_id=requester_user_id,
-            requester_role=requester_role,
-            project_id=project_id,
-        )
+        # Codex F-2 fix (Sprint 24 Wave 2 P2): time_range filter 있을 때 cache skip.
+        # cache key 가 question/workspace/project 기반이라 time_range 무관 hit 시
+        # unfiltered (전체 기간) 결과 반환 위험. 안전한 default = filtered query 는
+        # cache miss 처리 (cache key 확장은 별도 BL).
+        is_time_filtered = time_range is not None and time_range != "all"
+        cache_hit = None
+        if not is_time_filtered:
+            cache_hit = await self.embedding_repo.find_similar_cache(
+                question_embedding,
+                workspace_id,
+                requester_user_id=requester_user_id,
+                requester_role=requester_role,
+                project_id=project_id,
+            )
         if cache_hit:
             yield {
                 "event": "search_results",
@@ -209,8 +216,11 @@ class RagService:
                 max_visibility=max_vis,
                 expires_at=datetime.utcnow() + timedelta(days=7),
             )
-            await self.embedding_repo.save_cache(cache)
-            await self.embedding_repo.commit()
+            # Codex F-2 fix: time_range filter 적용된 answer 는 cache 저장 skip
+            # (다른 filter / no-filter 사용자에게 누수 방지)
+            if not is_time_filtered:
+                await self.embedding_repo.save_cache(cache)
+                await self.embedding_repo.commit()
         except Exception as cache_err:
             logger.warning("캐시 저장 실패 (비치명적): %s", cache_err)
 
