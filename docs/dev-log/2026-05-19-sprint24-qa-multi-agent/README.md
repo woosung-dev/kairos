@@ -27,7 +27,7 @@
 - [environment.txt](./environment.txt) — git/runtime/secrets/reachability fingerprint
 - [verification.md](./verification.md) — §7-3/7-4/7-5 + 회귀 + Tier 1/2 결과 매트릭스
 - [evidence-matrix.md](./evidence-matrix.md) — SCN-/BUG-/BL-/T- ID 연결 추적
-- [post-swap-delta-stub.md](./post-swap-delta-stub.md) — Phase B baseline 5 시나리오 정의 (Sprint 24 T-1 직전 채움)
+- [post-swap-delta-stub.md](./post-swap-delta-stub.md) — Phase B baseline 5 시나리오 정의 (T-1 swap closed `003908a`, T-2 측정 시 채움)
 - [ttfv-gap-analysis.md](./ttfv-gap-analysis.md) — Kairos vs Granola vs Notion AI (Curious 페르소나 산출, 작성 중)
 
 ### 페르소나 보고서
@@ -51,7 +51,7 @@
 
 ### 통합 산출물 (Day 3 종료 시)
 - integrated-report.html — Tailwind CDN, 인쇄 친화
-- sprint-24-plan.md — T-1 Phase B + T-2 Delta + T-N+ QA 결함 fix
+- sprint-24-plan.md — Pre-Sprint Closure (Phase B `003908a` + Wave 1 PR #99) + T-2 Delta + T-N+ QA 결함 fix (Wave 2)
 
 ---
 

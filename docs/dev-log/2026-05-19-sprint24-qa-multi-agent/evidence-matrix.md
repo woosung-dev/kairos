@@ -270,8 +270,9 @@
 
 | T | 제목 | 의존 | BUG/BL | 시간 | 우선 |
 |---|---|---|---|---|---|
-| **T-1** | ADR-019 Phase B Gemini 6 spot swap | — | (필수 데드라인 2026-05-28) | 3h | P0 |
-| **T-2** | Post-Swap Delta 측정 (5 시나리오) | T-1 | — | 2h | P0 |
+| ~~T-1~~ | ~~ADR-019 Phase B Gemini 6 spot swap~~ — **closed `003908a` 2026-05-15 PR #32** | — | — | ~~3h~~ ✅ | — |
+| **T-2** | Post-Swap Delta 측정 (5 시나리오) | T-1 ✅ closed | — | 2h | P0 |
+| ~~Wave 1~~ | ~~BL-063 ActionItem 자동 복제 + BL-064 Note BG schedule + BL-066 dogfood verify~~ — **closed `b1c777b` 2026-05-20 PR #99** | — | BL-063/064/066 | ✅ | — |
 | **T-AI-DATE** | AI 액션 마감일 hallucinate fix (prompt 현재 연도 컨텍스트) | — | BUG-CURIOUS-001 | 1.5h | **P0 Critical** |
 | **T-RAG-MOCK-REMOVE** | RAG MOCK_SELECTABLE_SOURCES 제거 (search-scope.tsx:31) | — | BUG-POW-005 | 1h | **P0 Critical** |
 | **T-OBN-05** | Onboarding step 1~4 FE 발화 fix | — | BUG-CURIOUS-003 | 2h | **P0 High** |
@@ -292,7 +293,7 @@
 | **T-A11Y-CC** | color-contrast 5 페이지 (axe serious 5건) | — | BUG-CASUAL-a11y | 2h | P2 |
 | T-INBOX-COPY | Inbox empty state 빠른 메모 mismatch | — | BUG-CASUAL-002 | 1h | P2 |
 | T-CMD-K-STATE | ⌘K 모드 전환 state 보존 | — | BUG-CASUAL-004 | 0.5h | P3 |
-| **T-N+1** | BL-006 cross-domain import 해소 | T-1 후 (carry) | BL-006 + SCN-BL-006-01~04 | 3h | P0 |
+| **T-N+1** | BL-006 cross-domain import 해소 | T-1 closed (carry 해제) | BL-006 + SCN-BL-006-01~04 | 3h | P0 |
 | **T-N+2** | composite FK regression fixture 자동화 | — | SCN-FK-01~12 | 2h | P1 |
 | T-N+3 | BL-T2-001/002/004/006/007 묶음 (input + security headers) | — | BL-T2 5건 | 4h | P2 |
 | **T-N+4** | BL-T2-003 Whisper 4hr+ chunk 분할 | — | BL-T2-003 | 4h | **High (production)** |
@@ -302,20 +303,21 @@
 
 | 단계 | 작업 | 시간 | 누적 | 비고 |
 |---|---|---|---|---|
-| 1 | T-1 + T-2 Phase B Gemini swap + Delta | 5h | 5h | 2026-05-28 데드라인 |
-| 2 | T-AI-DATE + T-RAG-MOCK-REMOVE (**P0 Critical bundle**) | 2.5h | 7.5h | 신뢰 회복 |
-| 3 | T-OBN-05 + **T-MOBILE-HEADER** (P0 High UX bundle) | 2.5-3h | 10.5h | Sprint 22 회귀 + 모바일 헤더 잘림 |
-| 4 | T-PROJ-LIST + T-NOTE-DETAIL (P1 High FE missing pages bundle) | 5h | 15.5h | sidebar dead-end |
-| 5 | T-CMD-K-FIX (P1 High Dashboard, BL-MOB-002 동시 fix) | 1h | 16.5h | UX 신뢰 |
-| 6 | T-RAG-TIME-FILTER + T-AUDIT-VIEW (P1 High compliance) | 6h | 22.5h | RAG/compliance |
-| 7 | **T-BE-PERF** (P1 Performance spike, dashboard 3-4s) | 4-6h | 27.5h | 모바일 사용성 직결 |
-| 8 | T-N+1 (BL-006 헌법 §4.2 위반) | 3h | 30.5h | atomic |
-| 9 | T-N+4 (BL-T2-003 Whisper 4hr+ production 차단) | 4h | 34.5h | production |
-| 10 | T-N+2 (composite FK fixture) | 2h | 36.5h | 회귀 안전망 |
-| 11 | P2 묶음 (T-VOCAB/MOBILE-NAV/A11Y-SKIP/A11Y-CC/CMD-K-SEQ/INBOX-COPY/NAV-BADGE) | 6.5h | 43h | UX/a11y |
+| 0 (closed) | ~~T-1 Phase B swap (003908a)~~ + ~~BL-063/064/066 Wave 1 (PR #99)~~ | — | 0h | Pre-Sprint Closure ✅ |
+| 1 | T-2 Phase B Post-Swap Delta | 2h | 2h | 2026-05-28 데드라인 (swap 충족) |
+| 2 | T-AI-DATE + T-RAG-MOCK-REMOVE (**P0 Critical bundle**) | 2.5h | 4.5h | 신뢰 회복 |
+| 3 | T-OBN-05 + **T-MOBILE-HEADER** (P0 High UX bundle) | 2.5-3h | 7.5h | Sprint 22 회귀 + 모바일 헤더 잘림 |
+| 4 | T-PROJ-LIST + T-NOTE-DETAIL (P1 High FE missing pages bundle) | 5h | 12.5h | sidebar dead-end |
+| 5 | T-CMD-K-FIX (P1 High Dashboard, BL-MOB-002 동시 fix) | 1h | 13.5h | UX 신뢰 |
+| 6 | T-RAG-TIME-FILTER + T-AUDIT-VIEW (P1 High compliance) | 6h | 19.5h | RAG/compliance |
+| 7 | **T-BE-PERF** (P1 Performance spike, dashboard 3-4s) | 4-6h | 24.5h | 모바일 사용성 직결 |
+| 8 | T-N+1 (BL-006 헌법 §4.2 위반) | 3h | 27.5h | atomic |
+| 9 | T-N+4 (BL-T2-003 Whisper 4hr+ production 차단) | 4h | 31.5h | production |
+| 10 | T-N+2 (composite FK fixture) | 2h | 33.5h | 회귀 안전망 |
+| 11 | P2 묶음 (T-VOCAB/MOBILE-NAV/A11Y-SKIP/A11Y-CC/CMD-K-SEQ/INBOX-COPY/NAV-BADGE) | 6.5h | 40h | UX/a11y |
 | (carry) | T-INBOX-BULK + T-API-PAT + T-EXPORT-ZIP + BL-T2-001/002/004/006/007 + T-LAND-01/02 | ~25h | — | Sprint 25 |
 
-**총 P0+P1 = 27.5h / 9일 가용 (~36-72h working) = 충분**. P2/P3는 Sprint 25 carry.
+**총 Wave 2 P0+P1 = 24.5h** (T-1 3h closed 제외) / 8일 가용 (~32-64h working) = 충분. P2/P3는 Sprint 25 carry.
 **Mobile 추가 부담**: T-MOBILE-HEADER 0.5-1h (P0) + T-BE-PERF 4-6h (P1 spike) = +5-7h. 일정 재정렬 시 T-BE-PERF carry 옵션도 가능.
 
 ---

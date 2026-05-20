@@ -1,21 +1,43 @@
-# Sprint 24 Plan — Phase B + Multi-Agent QA P0/P1 Fix Bundle
+# Sprint 24 Plan — Multi-Agent QA P0/P1 Fix Bundle (Wave 2)
 
-> **상태**: Day 3 Mobile 진행 중 (Stub, Mobile 완료 시 보강).
-> **데드라인**: 2026-05-28 (Gemini 모델 EOL).
-> **가용 시간**: 9일 (2026-05-19 ~ 2026-05-28).
+> **상태**: Wave 1 closed (PR #99, 2026-05-20). Wave 2 = QA P0/P1 16 tasks 진입.
+> **데드라인**: 2026-05-28 (Gemini 모델 EOL — Phase B swap `003908a` 로 이미 충족).
+> **가용 시간**: 8일 (2026-05-20 ~ 2026-05-28).
+
+---
+
+## 0. Pre-Sprint Closure (이미 main 적용)
+
+> Sprint 24 entry plan 작성 시점에 누락된 선행 작업. 본 plan 의 잔여 작업은 §1 이하.
+
+### Phase B Gemini swap — closed (`003908a`, 2026-05-15, PR #32)
+- `backend/src/services/ai_processing.py:18` `GEMINI_MODEL = "gemini-3.1-flash-lite"` ✓
+- `backend/src/memory/service.py:68` 동일 ✓
+- `docs/architecture/ai-pipeline.md` rule + code sample ✓
+- `docs/architecture/rag-pipeline.md` 다이어그램 + 비교 표 ✓
+
+→ 기존 T-1 (Gemini swap, 3h) 은 Sprint 24 진입 전 closure. **T-2 Post-Swap Delta 측정 (2h) 만 잔여**.
+
+### Wave 1 promote 정합성 보강 — closed (`b1c777b`, 2026-05-20, PR #99)
+- **BL-063** Meeting promote 시 source ActionItem 자동 복제 (target ws WorkspaceMember 검증 + assignee None reset)
+- **BL-064** Note promote chunk 0 + plain_text → BG `embed_note_async` schedule + `ItemPromotionAudit.embedding_status` lifecycle + polling endpoint
+- **BL-066** Sprint 23 D1 (WorkspaceSwitcher) / D3 (Inbox dismiss) 정적 분석 verify — closed. Playwright reproduce 는 BL-068/069 carry-over.
+- 산출물: 387 pytest PASS + Codex 4 cycle APPROVE + Gemini review 2 finding 100% 수락 (`ac7fcdd`)
+
+→ Sprint 24 본 plan 의 잔여 = **T-2 Delta 측정 + Multi-Agent QA P0/P1 fix bundle (16 tasks)**.
 
 ---
 
 ## 1. 목표 (1줄)
 
-ADR-019 Phase B Gemini `2.5-flash` → `3.1-flash-lite` swap 완료 + Multi-Agent QA가 발견한 P0/P1 dogfood-blocking 결함 fix.
+Multi-Agent QA 가 발견한 P0/P1 dogfood-blocking 결함 fix + Phase B Post-Swap Delta 측정 (Phase B swap `003908a` 및 promote 정합성 `b1c777b` 는 Pre-Sprint Closure §0).
 
 ---
 
 ## 2. 범위
 
-### In-Scope
-- T-1/T-2: ADR-019 Phase B swap + Post-Swap Delta 측정 (~5h, 데드라인 필수)
+### In-Scope (Wave 2)
+- T-2: ADR-019 Phase B Post-Swap Delta 측정 (~2h, T-1 swap 은 Phase 0 closure)
 - P0 Critical bundle: T-AI-DATE + T-RAG-MOCK-REMOVE (~2.5h)
 - P0 High: T-OBN-05 (~2h)
 - P1 High bundle: T-PROJ-LIST + T-NOTE-DETAIL + T-CMD-K-FIX + T-RAG-TIME-FILTER + T-AUDIT-VIEW (~12h)
@@ -23,7 +45,7 @@ ADR-019 Phase B Gemini `2.5-flash` → `3.1-flash-lite` swap 완료 + Multi-Agen
 - Production 차단: T-N+4 BL-T2-003 Whisper 4hr+ chunk 분할 (~4h)
 - 회귀 안전망: T-N+2 composite FK fixture (~2h)
 
-**총 P0+P1 ≈ 21.5~30h** (Mobile 결과로 +α 가능)
+**총 Wave 2 P0+P1 ≈ 18.5~27h** (T-1 3h closed 제외, Mobile 결과로 +α 가능)
 
 ### Out-of-Scope (Sprint 25 carry)
 - T-LAND-01/02: Landing wedge headline + use case (마케팅 sprint 별도 권장)
@@ -38,9 +60,9 @@ ADR-019 Phase B Gemini `2.5-flash` → `3.1-flash-lite` swap 완료 + Multi-Agen
 
 > 상세 evidence-matrix.md "Sprint 24 task T-N" 참조. 본 섹션은 narrative.
 
-### Phase 1 — ADR-019 Phase B (2026-05-20~21, 5h)
-- **T-1 Gemini swap** (3h): `backend/src/common/prompts.py` + 6 spot model name 변경 + ADR-019 update
-- **T-2 Post-Swap Delta 측정** (2h): post-swap-delta-stub.md 의 5 시나리오 baseline → swap 후 재측정 → delta report. 기준 위반 시 fallback.
+### Phase 1 — ADR-019 Phase B Post-Swap Delta (2026-05-21, 2h)
+- **~~T-1 Gemini swap~~** — **closed** (`003908a`, 2026-05-15, PR #32). 상세 §0 Pre-Sprint Closure.
+- **T-2 Post-Swap Delta 측정** (2h): post-swap-delta-stub.md 의 5 시나리오 baseline 수집 → swap 후 재측정 → delta report. 기준 위반 (DELTA-1 worse 1건 / DELTA-3 precision-recall -10% 초과 / DELTA-2/4/5 ±20% 초과) 시 revert PR + prompt tuning.
 
 ### Phase 2 — P0 Critical bundle (2026-05-21~22, 2.5h)
 - **T-AI-DATE** (1.5h): AI 액션 추출 prompt에 `현재 연도={current_year}` 컨텍스트 + 미래 일자 검증 안전망 (`assert deadline_date.year >= current_year`)
@@ -95,12 +117,12 @@ ADR-019 Phase B Gemini `2.5-flash` → `3.1-flash-lite` swap 완료 + Multi-Agen
 
 | 위험 | 영향 | 완화책 |
 |---|---|---|
-| Phase B Gemini 3.1-flash-lite 품질 저하 (Delta 측정 fail) | T-1 rollback 필요 | Post-Swap Delta 측정 critical 1건 worse 시 일시 중단 → prompt tuning → 재swap |
+| Phase B Gemini 3.1-flash-lite 품질 저하 (Delta 측정 fail) | swap revert PR 필요 (003908a 되돌리기) | T-2 Post-Swap Delta 측정 critical 1건 worse 시 일시 revert → prompt tuning → 재swap |
 | T-OBN-05 fix가 dogfood 재현 어려움 (Curious 계정 reuse) | 신규 가입 흐름만 발화 | E2E 테스트 + 별도 incognito 검증 + storageState clear |
 | T-NOTE-DETAIL 디자인 의존 (DESIGN.md follow) | UI 작업 시간 +α | meetings detail 페이지 패턴 reuse |
 | BL-006 lazy import 해소 시 순환 의존 발견 | T-N+1 시간 +α | pipeline_service.py 신규 wrapper 추가 (헌법 §4 권장 패턴) |
 | BL-T2-003 ffmpeg chunk 분할 라이브 테스트 (4hr+ audio) | 테스트 비용/시간 | mock audio + Whisper 30min chunk 단위 stub |
-| 시간 부족 (P0+P1 21.5h+, 9일 / 6 working days = 충분하나 promotion + review) | 일부 P1 carry | T-AUDIT-VIEW 또는 T-RAG-TIME-FILTER 우선 carry 후보 |
+| 시간 부족 (Wave 2 P0+P1 18.5h+, 8일 / 5~6 working days = 충분하나 promotion + review) | 일부 P1 carry | T-AUDIT-VIEW 또는 T-RAG-TIME-FILTER 우선 carry 후보 |
 
 ---
 
@@ -120,17 +142,17 @@ ADR-019 Phase B Gemini `2.5-flash` → `3.1-flash-lite` swap 완료 + Multi-Agen
 
 | 날짜 | 작업 | 누적 시간 |
 |---|---|---|
-| 2026-05-20 | T-1 Gemini swap (3h) | 3h |
-| 2026-05-21 | T-2 Delta 측정 (2h) + T-AI-DATE + T-RAG-MOCK-REMOVE (2.5h) | 7.5h |
-| 2026-05-22 | T-OBN-05 (2h) + T-PROJ-LIST (2h) | 11.5h |
-| 2026-05-23 | T-NOTE-DETAIL (3h) + T-CMD-K-FIX (1h) | 15.5h |
-| 2026-05-24 | T-RAG-TIME-FILTER (2h) + T-AUDIT-VIEW (4h) | 21.5h |
-| 2026-05-25 | T-N+1 BL-006 (3h) | 24.5h |
-| 2026-05-26 | T-N+4 BL-T2-003 (4h) | 28.5h |
-| 2026-05-27 | T-N+2 composite FK fixture (2h) + 통합 dogfood | 30.5h |
-| 2026-05-28 | PR review + merge + Phase B 데드라인 ✅ | 마무리 |
+| ~~2026-05-20~~ | ~~T-1 Gemini swap (3h)~~ — **closed `003908a` 2026-05-15 (Phase 0)** | — |
+| 2026-05-21 | T-2 Delta 측정 (2h) + T-AI-DATE + T-RAG-MOCK-REMOVE (2.5h) | 4.5h |
+| 2026-05-22 | T-OBN-05 (2h) + T-PROJ-LIST (2h) | 8.5h |
+| 2026-05-23 | T-NOTE-DETAIL (3h) + T-CMD-K-FIX (1h) | 12.5h |
+| 2026-05-24 | T-RAG-TIME-FILTER (2h) + T-AUDIT-VIEW (4h) | 18.5h |
+| 2026-05-25 | T-N+1 BL-006 (3h) | 21.5h |
+| 2026-05-26 | T-N+4 BL-T2-003 (4h) | 25.5h |
+| 2026-05-27 | T-N+2 composite FK fixture (2h) + 통합 dogfood | 27.5h |
+| 2026-05-28 | PR review + merge + Phase B 데드라인 ✅ (이미 충족) | 마무리 |
 
-여유 시간 = ~10h (Mobile 결과 +α, T-A11Y/T-LAND/T-VOCAB 등 cherry-pick 가능).
+여유 시간 = ~13h (Mobile 결과 +α, T-A11Y/T-LAND/T-VOCAB 등 cherry-pick 가능, T-1 closure 로 +3h 여유 추가).
 
 ---
 
