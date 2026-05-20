@@ -35,14 +35,14 @@ export function Header() {
 
   return (
     <header
-      className="flex items-center justify-between px-4 py-2 border-b shrink-0 gap-3"
+      className="flex items-center justify-between px-2 md:px-4 py-2 border-b shrink-0 gap-2 md:gap-3"
       style={{
         background: "var(--surface)",
         borderColor: "var(--border-subtle)",
       }}
     >
-      {/* 좌측: 사이드바 토글 + breadcrumb */}
-      <div className="flex items-center gap-3 shrink-0">
+      {/* 좌측: 사이드바 토글 + breadcrumb. Sprint 24 Wave 2 T-MOBILE-HEADER: 모바일에서 min-w-0 + shrink 허용으로 우측 영역 보호 */}
+      <div className="flex items-center gap-2 md:gap-3 min-w-0 shrink">
         {/* Sprint 14 T-10: 모바일에서 사이드바 토글 숨김 (BottomNav 1차 내비). md(768)+에서만 노출. */}
         <button
           onClick={toggleSidebar}
@@ -59,10 +59,10 @@ export function Header() {
         <WorkspaceSwitcher memberCount={members?.length} />
       </div>
 
-      {/* 중앙: RAG 검색바 스타일 (클릭 시 RAG 오버레이 열기) */}
+      {/* 중앙: RAG 검색바 스타일 (클릭 시 RAG 오버레이 열기). Sprint 24 Wave 2 T-MOBILE-HEADER: 모바일 width 축소 + label 단축 (BUG-MOBILE-001 우측 avatar 잘림 fix) */}
       <button
         onClick={toggleRagOverlay}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm flex-1 max-w-md mx-auto transition-colors hover:opacity-90"
+        className="flex items-center gap-1.5 md:gap-2 px-2 md:px-4 py-2 rounded-lg text-sm flex-1 min-w-0 max-w-[160px] md:max-w-md mx-auto transition-colors hover:opacity-90"
         style={{
           background: "var(--surface-hover)",
           color: "var(--text-muted)",
@@ -71,7 +71,8 @@ export function Header() {
         }}
       >
         <Search size={14} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
-        <span className="truncate">팀 지식 검색...</span>
+        <span className="truncate hidden md:inline">팀 지식 검색...</span>
+        <span className="truncate md:hidden">검색</span>
         <kbd
           className="ml-auto px-1.5 py-0.5 rounded text-[10px] shrink-0"
           style={{

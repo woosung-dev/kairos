@@ -67,6 +67,34 @@ test.describe("Mobile 반응형 (375x812)", () => {
     ).toHaveCount(0);
   });
 
+  // Sprint 24 Wave 2 T-MOBILE-HEADER (BUG-MOBILE-001): 모바일 헤더 우측 프로필 잘림 fix
+  // 3 viewport (375/393/412) 모두 avatar 가 viewport 안에 위치
+  for (const vp of [
+    { width: 375, height: 667 },
+    { width: 393, height: 852 },
+    { width: 412, height: 892 },
+  ]) {
+    test(`헤더 우측 프로필 avatar visible — ${vp.width}x${vp.height}`, async ({
+      page,
+    }) => {
+      test.setTimeout(20_000);
+      await page.setViewportSize(vp);
+      await page.goto("/dashboard");
+      // DropdownMenuTrigger (avatar) — aria-haspopup="menu" 로 식별
+      const avatar = page
+        .locator('[aria-haspopup="menu"]')
+        .first();
+      await expect(avatar).toBeVisible({ timeout: 15_000 });
+      const box = await avatar.boundingBox();
+      expect(box).not.toBeNull();
+      if (box) {
+        // avatar 의 우측 끝 (x + width) 이 viewport 너비 안에 위치
+        expect(box.x + box.width).toBeLessThanOrEqual(vp.width);
+        expect(box.x).toBeGreaterThanOrEqual(0);
+      }
+    });
+  }
+
   // Sprint 22 BL-017: /memory FAB 가 bottom-nav 와 겹치지 않음
   test("/memory FAB — mobile bottom-nav 위로 띄움 (BL-017)", async ({
     page,
