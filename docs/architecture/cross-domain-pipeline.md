@@ -133,6 +133,46 @@ notes/                              rag/
 
 ---
 
+## Sprint 24 BL-064 추가 적용 — Note promote chunk 0 분기 BG re-embedding
+
+Sprint 23 D4 의 Note promote 흐름은 source chunk 가 0 일 때 `NotePromoteNotEmbeddedError(400)` 로 거부 (race 회피). Sprint 24 BL-064 는 **plain_text 존재 + chunk 0** 케이스만 분리해 BG 재생성 흐름 추가.
+
+```
+POST /workspaces/{wid}/notes/{id}/promote
+  └─ NoteService.promote(..., pipeline=NotePipelineService) [pipeline DI 추가]
+       ├─ source.plain_text 부재               → 400 NotePromoteNotEmbeddedError (회귀 유지)
+       ├─ source.plain_text 존재 + chunk N>0  → BackgroundTasks(_bg_promote_embed_note) [Sprint 23 흐름]
+       │     └─ source EmbeddingChunk → target ws 복제 + audit pending→processing→completed/failed
+       └─ source.plain_text 존재 + chunk 0    → BackgroundTasks(_bg_regenerate_embed_with_audit) [Sprint 24 신규]
+             ├─ audit: pending → processing 마크
+             ├─ pipeline.embed_note_async(new_note_id, target_workspace_id) 호출 (자체 session)
+             │     ↓ EmbeddingService.embed_note (chunk L1/L2 신규 생성 + OpenAI embedding)
+             │     ↓ EmbeddingService.invalidate_cache (target ws RAG cache 무효화)
+             ├─ 성공: audit → completed 마크
+             └─ 예외: rollback → audit → failed 마크
+
+응답 (snake_case 보존, Codex 2차 P2-3):
+  { new_note_id, audit_id, status: "embedding_pending", embedding_status: "pending" }
+
+GET /workspaces/{wid}/notes/{id}/embedding-status  (NEW, require_viewer)
+  └─ NoteService.get_embedding_status
+       ├─ audit row 존재 → { status: audit.embedding_status, chunkCount: count_note_chunks }
+       └─ audit row 부재 (promote 외 흐름) → chunkCount 기반 status 추론
+            ├─ chunk > 0 → "completed"
+            └─ chunk == 0 → "pending"
+```
+
+**핵심 규칙**:
+- `_bg_regenerate_embed_with_audit` wrapper 가 audit lifecycle 책임 (Codex 2차 P1). `pipeline.embed_note_async` 단독 호출 시 audit pending stuck.
+- Sprint 23 D4 `_bg_promote_embed_note` 와 같은 session_factory 패턴. 부분 실패 시 rollback 먼저 (Codex 4차 P2-2).
+- pipeline DI 는 router → service → BG task 로 전달 (instance binding 보존).
+
+**FE 흐름** (ItemPromoteModal):
+- `embedding_status === "pending" | "processing"` → 5s × 3회 polling (`GET embedding-status`)
+- `status === "completed"` → toast success + close, `"failed"` → toast error + close, 3회 후에도 진행 중이면 "잠시 후 확인" + close.
+
+---
+
 ## 호출 흐름도
 
 ```

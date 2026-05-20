@@ -47,7 +47,7 @@
 | out | `services/ai_processing` | external wrapper | Gemini 요약/분류 |
 | out | `inbox/service` | via pipeline | Inbox 적재 (`MeetingPipelineService` 안) |
 | out | `embeddings/service` | via pipeline | 트랜스크립트 임베딩 |
-| out | `common/promote_helpers` | utility | promote target 검증 + audit row 빌더 (Sprint 23 D4 Task 2 Step 2.2) |
+| out | `common/promote_helpers` | utility | promote target 검증 + audit row 빌더 (Sprint 23 D4 Task 2 Step 2.2) + `clone_action_items_for_promote` (Sprint 24 BL-063, ActionItem 자동 복제) |
 | out | `common/promote_models` | model | ItemPromotionAudit 저장 (Sprint 23 D4 — 4 도메인 공통) |
 | in | (외부 호출) | — | upload 모듈에서 트리거 |
 
@@ -143,9 +143,15 @@ POST   /{id}/promote      cross-workspace 복제 (I-18, 202 + BG embedding 복�
 - target type='personal' → 400 `CannotPromoteToPersonalError`
 
 **복제 산출물 (동일 트랜잭션)**:
-- 신규 `Meeting` (target workspace_id, 새 UUID, `status="completed"`, `created_by_id=promoter`).
+- 신규 `Meeting` (target workspace_id, 새 UUID, `status=source.status`, `created_by_id=promoter`).
+  - `action_item_count` 은 아래 ActionItem 자동 복제 후 실 row count 로 갱신 (Sprint 24 BL-063).
 - 1:1 `MeetingSummary` 복제 (있는 경우).
 - N개 `TranscriptSegment` 복제 (있는 경우).
+- **N개 `ActionItem` 자동 복제 (Sprint 24 BL-063)** — `clone_action_items_for_promote` 호출.
+  - composite FK remap (workspace_id + meeting_id + project_id 모두 target).
+  - `assignee_id` 은 target ws `WorkspaceMember` 멤버 검증 후 부재 시 `None` reset (cross-workspace 누출 차단, 사용자 결정 게이트 #5).
+  - `target_project_id=None` — cross-ws project 제약, 추후 사용자 수동 연결.
+  - parent SAVEPOINT 활용 — 부분 실패 시 entire promote rollback (transactional).
 - `ItemPromotionAudit` row (item_type='meeting', source_item_id / new_item_id, embedding_status='pending').
 
 **BG embedding 복제 (`_bg_promote_embed_meeting`)**:

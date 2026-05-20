@@ -18,6 +18,9 @@ memory 도메인은 본 헬퍼 미사용 (memory.PromotionAudit 별도 + 기존 
 import uuid
 from typing import Any
 
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from .promote_models import PROMOTABLE_ITEM_TYPES, ItemPromotionAudit
 
 
@@ -127,3 +130,92 @@ def build_item_promotion_audit(
         promoted_by_user_id=promoted_by_user_id,
         embedding_status=embedding_status,
     )
+
+
+# ── Sprint 24 Task 2 (BL-063): Meeting promote 의 ActionItem 자동 복제 helper ──
+
+
+async def clone_action_items_for_promote(
+    *,
+    source_meeting_id: uuid.UUID,
+    target_meeting_id: uuid.UUID,
+    target_workspace_id: uuid.UUID,
+    target_project_id: uuid.UUID | None,
+    session: AsyncSession,
+) -> int:
+    """Meeting promote 의 source ActionItem rows 자동 복제 (Sprint 24 BL-063).
+
+    Sprint 23 D4 (Codex 3차 P3) 임시 fix 의 `action_item_count=0` reset 보강:
+    source ActionItem rows 를 target meeting_id 로 remap 복제하여 target meeting 의
+    action 탭에 source 와 동일한 행들이 노출되도록 한다.
+
+    Args:
+        source_meeting_id: 원본 Meeting id
+        target_meeting_id: 복제본 Meeting id
+        target_workspace_id: 복제본 workspace id (composite FK + WorkspaceMember 검증용)
+        target_project_id: 복제본 project id (현재는 None — cross-ws project 제약, 추후 사용자 수동 연결)
+        session: parent SAVEPOINT 안에서 활성 AsyncSession (commit 은 호출자)
+
+    Returns:
+        실제 복제된 ActionItem row count (Meeting.action_item_count 갱신용)
+
+    정책:
+    - assignee_id: target ws WorkspaceMember 멤버 검증 → 부재 시 None reset
+      (cross-workspace 누출 차단, 사용자 결정 게이트 #5)
+    - composite FK: workspace_id + project_id + meeting_id 모두 target 으로 remap
+      (Sprint 19 PR #2 / Sprint 21 BL-050 헌법 I-9 (9))
+    - 트랜잭션: parent SAVEPOINT 활용 — flush() 실패 시 entire promote rollback
+
+    Sprint 23 4 도메인 promote 패턴과 동일하게 utility 함수로 제공 (abstract base 회피).
+    """
+    # 순환 import 회피 — 함수 내 import (Sprint 23 cross-domain pattern 정렬)
+    from src.actions.models import ActionItem
+    from src.workspaces.models import WorkspaceMember
+
+    # 1. source ActionItem rows fetch
+    source_result = await session.exec(
+        select(ActionItem).where(ActionItem.meeting_id == source_meeting_id)
+    )
+    source_items = list(source_result.all())
+    if not source_items:
+        return 0
+
+    # 2. target ws member user_id set fetch — assignee 누출 차단 (사용자 결정 게이트 #5)
+    member_result = await session.exec(
+        select(WorkspaceMember.user_id).where(
+            WorkspaceMember.workspace_id == target_workspace_id
+        )
+    )
+    target_member_ids: set[uuid.UUID] = set(member_result.all())
+
+    # 3. remap (composite FK + assignee None reset)
+    # ActionItem 실 fields (Codex 1차 P2-2 정합):
+    # id(default) / workspace_id / meeting_id / project_id / title / description /
+    # assignee_id / due_date / priority / status / created_at(default) / updated_at(default)
+    # created_by_id 필드 부재 — ActionItem 모델은 promoter 추적 미보유
+    # (audit.promoted_by_user_id 로 ledger 분리, docs/api/endpoints.md §45 참조).
+    cloned: list[ActionItem] = []
+    for src in source_items:
+        cloned.append(
+            ActionItem(
+                workspace_id=target_workspace_id,
+                project_id=target_project_id,
+                meeting_id=target_meeting_id,
+                assignee_id=(
+                    src.assignee_id
+                    if src.assignee_id is not None
+                    and src.assignee_id in target_member_ids
+                    else None
+                ),
+                title=src.title,
+                description=src.description,
+                status=src.status,
+                priority=src.priority,
+                due_date=src.due_date,
+            )
+        )
+
+    # 4. bulk save — parent SAVEPOINT 활용. flush() 로 FK error 즉시 발견.
+    session.add_all(cloned)
+    await session.flush()
+    return len(cloned)

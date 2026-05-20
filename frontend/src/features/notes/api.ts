@@ -83,3 +83,34 @@ export async function deleteNote(
     method: "DELETE",
   });
 }
+
+// ── Sprint 24 BL-064: embedding-status polling ──
+
+export type EmbeddingStatus =
+  | "pending"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "n/a";
+
+export interface EmbeddingStatusOut {
+  status: EmbeddingStatus;
+  chunkCount: number;
+}
+
+/**
+ * Sprint 24 BL-064 — promoted note 의 embedding 진행 상태 polling.
+ *
+ * BE 응답은 camelCase (`chunkCount`) — NEW endpoint 이므로 modal snake_case
+ * 호환성 제약 무관 (기존 promote 응답만 snake_case 보존).
+ */
+export async function getEmbeddingStatus(
+  token: string,
+  workspaceId: string,
+  noteId: string,
+): Promise<EmbeddingStatusOut> {
+  return apiClient<EmbeddingStatusOut>(
+    `/workspaces/${workspaceId}/notes/${noteId}/embedding-status`,
+    { token },
+  );
+}

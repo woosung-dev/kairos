@@ -1,8 +1,9 @@
 // Sprint 23 D4 — 5 도메인 generic promote modal (memory/meeting/note/inbox/action)
+// Sprint 24 BL-064 — note 분기: chunk 0 + plain_text BG re-embedding polling.
 // 기존 features/memory/components/PromoteModal.tsx 의 로직을 추출 + itemType dispatch.
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Users } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -19,7 +20,11 @@ import { useWorkspaces } from "@/features/workspaces/hooks";
 import { API_BASE_URL } from "@/lib/api-client";
 import { memoryKeys } from "@/features/memory/api";
 import { meetingKeys } from "@/features/meetings/api";
-import { noteKeys } from "@/features/notes/api";
+import {
+  getEmbeddingStatus,
+  noteKeys,
+  type EmbeddingStatus,
+} from "@/features/notes/api";
 import { inboxKeys } from "@/features/inbox/api";
 import { actionKeys } from "@/features/actions/api";
 
@@ -89,9 +94,15 @@ const INVALIDATE_KEYS = {
 interface PromoteResponse {
   audit_id: string;
   status: string;
+  // Sprint 24 BL-064: note 응답에 embedding_status 추가 (snake_case 보존).
+  embedding_status?: EmbeddingStatus;
   // newItemId 는 itemType 별로 키가 다르므로 dynamic 접근.
   [key: string]: string | undefined;
 }
+
+// Sprint 24 BL-064: note polling 상수 (5s × 3회).
+const NOTE_POLL_INTERVAL_MS = 5000;
+const NOTE_POLL_MAX_ATTEMPTS = 3;
 
 export function ItemPromoteModal({
   itemType,
@@ -112,6 +123,20 @@ export function ItemPromoteModal({
   );
 
   const [targetId, setTargetId] = useState<string>("");
+  // Sprint 24 Codex 3차 P2 fix: note polling 중 confirm button 재클릭 → duplicate
+  // promote API 호출 방지. polling 동안 isDisabled 에 합산.
+  const [isPolling, setIsPolling] = useState<boolean>(false);
+  // Sprint 24 Gemini P1 fix: polling interval 의 unmount cleanup (memory leak +
+  // setState on unmounted component 방지). useRef 로 cancellable handle 추적.
+  const pollIntervalRef = useRef<number | null>(null);
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current !== null) {
+        window.clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, []);
   const selectedTarget = targetId || teamOptions[0]?.id || "";
 
   const promote = useMutation({
@@ -140,12 +165,76 @@ export function ItemPromoteModal({
       }
       return (await res.json()) as PromoteResponse;
     },
-    onSuccess: (response) => {
+    onSuccess: async (response, targetWorkspaceId) => {
       // 도메인별 invalidate (5 도메인 모두 list/detail 키)
       queryClient.invalidateQueries({ queryKey: INVALIDATE_KEYS[itemType] });
-      toast.success(`${ITEM_LABEL[itemType]}을(를) 팀에 복사 중…`);
       const newId = response[NEW_ID_KEY[itemType]];
       const auditId = response.audit_id;
+
+      // Sprint 24 BL-064 — note 분기: embedding_status pending/processing 이면 polling.
+      // snake_case 보존 — BE 응답 alias 없음 (Codex 2차 P2-3).
+      if (
+        itemType === "note" &&
+        newId &&
+        auditId &&
+        (response.embedding_status === "pending" ||
+          response.embedding_status === "processing")
+      ) {
+        // Sprint 24 Codex 3차 P2 fix: polling 동안 confirm button disable
+        // (mutation.isPending 이 false 로 되돌아가는 시점에도 isPolling 으로 차단).
+        setIsPolling(true);
+        const toastId = toast.loading("노트 복사 완료 (임베딩 재생성 중)");
+        let attempts = 0;
+        // Sprint 24 Gemini P1 fix: ref 에 interval handle 저장 — unmount cleanup 가능.
+        const intervalId = window.setInterval(async () => {
+          attempts += 1;
+          try {
+            const token = await getToken();
+            if (!token) {
+              window.clearInterval(intervalId);
+              setIsPolling(false);
+              toast.error("상태 확인 실패", { id: toastId });
+              onOpenChange(false);
+              return;
+            }
+            const status = await getEmbeddingStatus(
+              token,
+              targetWorkspaceId,
+              newId,
+            );
+            if (status.status === "completed") {
+              window.clearInterval(intervalId);
+              setIsPolling(false);
+              toast.success("임베딩 재생성 완료", { id: toastId });
+              onSuccess?.(newId, auditId);
+              onOpenChange(false);
+            } else if (status.status === "failed") {
+              window.clearInterval(intervalId);
+              setIsPolling(false);
+              toast.error("임베딩 재생성 실패", { id: toastId });
+              onOpenChange(false);
+            } else if (attempts >= NOTE_POLL_MAX_ATTEMPTS) {
+              window.clearInterval(intervalId);
+              setIsPolling(false);
+              toast("재생성이 계속 진행 중이에요. 잠시 후 새로고침하세요", {
+                id: toastId,
+              });
+              onSuccess?.(newId, auditId);
+              onOpenChange(false);
+            }
+          } catch {
+            window.clearInterval(intervalId);
+            setIsPolling(false);
+            toast.error("상태 확인 실패", { id: toastId });
+            onOpenChange(false);
+          }
+        }, NOTE_POLL_INTERVAL_MS);
+        pollIntervalRef.current = intervalId;
+        return;
+      }
+
+      // 기존 도메인 동작 — 즉시 success + close.
+      toast.success(`${ITEM_LABEL[itemType]}을(를) 팀에 복사 중…`);
       if (newId && auditId) onSuccess?.(newId, auditId);
       onOpenChange(false);
     },
@@ -155,15 +244,25 @@ export function ItemPromoteModal({
   });
 
   const isDisabled =
-    !selectedTarget || promote.isPending || teamOptions.length === 0;
+    !selectedTarget ||
+    promote.isPending ||
+    isPolling ||
+    teamOptions.length === 0;
 
   async function handleConfirm() {
     if (!selectedTarget) return;
     await promote.mutateAsync(selectedTarget);
   }
 
+  // Sprint 24 Gemini P1 fix: polling 중 manual close 차단 (Escape / overlay 클릭 무시).
+  // 단 polling 자체의 timeout/completed/failed 분기에서는 직접 onOpenChange(false) 호출 OK.
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && isPolling) return;
+    onOpenChange(nextOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-lg">팀으로 올리기</DialogTitle>
@@ -205,7 +304,7 @@ export function ItemPromoteModal({
             type="button"
             variant="ghost"
             onClick={() => onOpenChange(false)}
-            disabled={promote.isPending}
+            disabled={promote.isPending || isPolling}
           >
             취소
           </Button>

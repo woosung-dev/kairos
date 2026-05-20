@@ -1659,9 +1659,9 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 
 **Risk:** 🟢 낮음.
 
-**우선순위:** ★★☆☆☆ (P3).
+**우선순위:** ★★☆☆☆ (P3) → **Sprint 24 P1 승격 (diligent-beaver)**.
 
-**Sprint 묶음 권고:** Sprint 25+ promote 정합성.
+**Sprint 묶음 권고:** ~~Sprint 25+ promote 정합성~~ → **Sprint 24 diligent-beaver 진입** (사용자 결정: 자동 복제 default, action_item_count 0 reset 제거).
 
 **근거:** Sprint 23 D4 Codex 3차 P3 carry-over.
 
@@ -1675,9 +1675,9 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 
 **Risk:** 🟡 중간 — EmbeddingService instance + BG task chain.
 
-**우선순위:** ★★☆☆☆ (P3).
+**우선순위:** ★★☆☆☆ (P3) → **Sprint 24 P1 승격 (diligent-beaver)**.
 
-**Sprint 묶음 권고:** Sprint 24/25 promote UX 보강.
+**Sprint 묶음 권고:** ~~Sprint 24/25 promote UX 보강~~ → **Sprint 24 diligent-beaver 진입** (사용자 결정: BG schedule + embedding_status="regenerating" 필드 + polling endpoint).
 
 **근거:** Sprint 23 Codex 6차 P2 권장 "Recompute embeddings".
 
@@ -1709,7 +1709,7 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 
 **우선순위:** ★★★☆☆ (P2 — dogfood validation).
 
-**Sprint 묶음 권고:** Sprint 24 첫 dogfood 사이클.
+**Sprint 묶음 권고:** **Sprint 24 diligent-beaver 진입** (Task 1, 진단 first 강제).
 
 **근거:** Sprint 23 진단 first 미완 (Playwright reproduce 환경 의존).
 
@@ -1728,3 +1728,35 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 **Sprint 묶음 권고:** Sprint 27+ pyright cleanup.
 
 **근거:** Sprint 23 다수 sub-agent 발견.
+
+---
+
+## BL-068 — D1 WorkspaceSwitcher Playwright/manual reproduce (Sprint 24 BL-066 carry)
+
+**현 상태:** Sprint 24 BL-066 정적 분석 결과 Sprint 23 `9e2eee2` D1 fix 가 현 코드에 정합 반영됨 (`queryClient.invalidateQueries(predicate)` + `router.refresh()` 제거 + ws list 보존). Playwright reproduce 는 Clerk OAuth (Google) 자동화 한계 + 실 user data (다중 ws account) 의존으로 carry-over.
+
+**목표:** Playwright `storageState` 캡쳐 (사용자 manual 1회 로그인 후 cookie state 저장) 또는 Clerk dev mode test user API (Sprint 22 OBN-01 패턴) 활용한 e2e spec. D1 시나리오: ws switcher 클릭 → 다른 ws 전환 → dashboard data 갱신 + ws list 보존.
+
+**Risk:** 🟢 낮음 — verify 작업. Clerk infrastructure 의존.
+
+**우선순위:** ★★☆☆☆ (P3 — manual dogfood 가능 시 P2 승격).
+
+**Sprint 묶음 권고:** Sprint 25+ e2e Clerk infrastructure.
+
+**근거:** Sprint 24 BL-066 carry-over (Playwright reproduce 환경 의존).
+
+---
+
+## BL-069 — D3 Inbox dismiss Playwright/manual reproduce (Sprint 24 BL-066 carry)
+
+**현 상태:** Sprint 24 BL-066 정적 분석 결과 Sprint 23 `928fc7c` D3 fix 가 현 코드에 정합 반영됨 (`useInbox(wid, {isProcessed: false})` queryKey 격리 + `invalidate inboxKeys.byWorkspace(wid)` prefix + autoProcessed 그룹 제거 + camelCase param BE alias 정합). Playwright reproduce 는 BL-068 과 동일 인프라 의존.
+
+**목표:** Playwright spec — inbox 항목 dismiss → list 즉시 사라짐 → reload 후에도 보존 verify. 사용자 manual carry-over 또는 BL-068 인프라 도입 후 묶음 진행.
+
+**Risk:** 🟢 낮음 — verify 작업.
+
+**우선순위:** ★★☆☆☆ (P3).
+
+**Sprint 묶음 권고:** Sprint 25+ e2e Clerk infrastructure (BL-068 동반).
+
+**근거:** Sprint 24 BL-066 carry-over.

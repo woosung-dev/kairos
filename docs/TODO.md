@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-05-19 (Sprint 23 cozy-crystal 완료 — PR #98 draft, Codex 6 cycle 11 finding 100% 수락)
+> 마지막 업데이트: 2026-05-19 (Sprint 24 diligent-beaver kickoff — ADR-019 Phase B 사실 verify: 003908a 로 이미 main 적용 완료)
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조 — Completed / Blocked / Questions / Next Actions 4섹션 운영.
 
@@ -16,25 +16,29 @@
 
 ---
 
-## Next Actions (Sprint 24 — ADR-019 Phase B + dogfood verify carry-over)
+## Next Actions (Sprint 24 — diligent-beaver, promote 정합성 보강)
 
-> Sprint 23 cozy-crystal 완료 (2026-05-19, PR #98 draft 19 commits). D1~D4 + F1~F4 8건 통합 + Codex 6 cycle 11 finding 100% 수락. 다음 Sprint 24 = ADR-019 Phase B (Gemini 3.1-flash-lite swap, 2026-05-28 EOL) + Sprint 23 dogfood verify (BL-066).
+> Sprint 23 cozy-crystal merge 완료 (PR #98, `d659c03`). Sprint 24 = **promote 정합성 보강 sprint** (BL-066 dogfood verify + BL-063 ActionItem 자동 복제 + BL-064 Note BG schedule). ADR-019 Phase B 는 **2026-05-15 commit `003908a` (PR #32) 로 이미 main 적용 완료** — Sprint 15 memory 가 stale.
 
-### 🔴 P0 — 데드라인 임박
-- [ ] **ADR-019 Phase B** (2026-05-28 데드라인) — `backend/src/common/prompts.py` 또는 도메인별 6 spots `gemini-2.5-flash` → `gemini-3.1-flash-lite` swap. spike validated 5.76x speedup / 20% cost 절감.
+### ✅ ADR-019 Phase B — closed (003908a, 2026-05-15)
+- [x] `backend/src/services/ai_processing.py:18` `GEMINI_MODEL = "gemini-3.1-flash-lite"` ✓
+- [x] `backend/src/memory/service.py:68` `GEMINI_MODEL = "gemini-3.1-flash-lite"` ✓
+- [x] `backend/tests/services/test_ai_processing.py:69, 84` docstring + assertion ✓
+- [x] `docs/architecture/ai-pipeline.md:23, 151` rule + code sample ✓
+- [x] `.ai/stacks/fastapi/backend.md` Tech Stack ✓ (gitignored, local hub)
+- [x] `docs/architecture/rag-pipeline.md:119, 731` 다이어그램 + 비교 표 ✓
 
-### 🟡 P1 — Sprint 24 권장 포함
-- [ ] **BL-066** Sprint 23 D1/D3 dogfood verify — dev server reproduce 또는 CI e2e job 결과 확인. fix 부족 시 추가 root cause 분석.
-- [ ] **BL-063** ActionItem 도메인 promote source actions 복제 (Sprint 23 D4 CO-15)
-- [ ] **BL-064** Note promote 의 임베딩 재계산 옵션 (Sprint 23 D4 CO-16)
+### 🟡 P1 — Sprint 24 diligent-beaver scope
+- [ ] **BL-066** Sprint 23 D1 (WorkspaceSwitcher) + D3 (Inbox dismiss) dev server / Playwright reproduce → 실 효과 확인. (~2-4h)
+- [ ] **BL-063** Meeting promote 시 source ActionItem rows **자동 복제** (Codex 3차 P3 fix 보강, `action_item_count` 0 reset 제거). (~4-6h)
+- [ ] **BL-064** Note promote chunk 0 case → target ws `embed_note_async` **BG schedule + embedding_status 진행 표시** + polling endpoint. (~5-8h)
 
 ### Sprint 25+ carry-over
 - CO-1~14 (Sprint 22 carry, BACKLOG 등재)
-- CO-15~19 (Sprint 23 carry, BL-063~067 등재)
+- BL-065 Member.last_active_at 필드 (Sprint 23 D2 carry CO-17, P3)
+- BL-067 pyright `_update(...).where(...)` false-positive (Sprint 23 CO-19, P4)
 - BL-024 pg_prewarm Cloud Run cold start
 - BL-026 옵션 A — dev DB export + ground truth (production scale recall)
-- BL-065 Member.last_active_at 필드 (Sprint 23 D2 carry CO-17)
-- BL-067 pyright `_update(...).where(...)` false-positive (Sprint 23 CO-19)
 
 ---
 
