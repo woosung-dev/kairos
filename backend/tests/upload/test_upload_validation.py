@@ -130,3 +130,78 @@ async def test_upload_accepts_valid_audio(authed_client):
 
     assert response.status_code == 201, response.text
     assert response.json()["fileKey"] == expected_file_key
+
+
+# ── Sprint 25 polish (codex + agy review fix) — 5 추가 회귀 가드 ──
+
+
+@pytest.mark.asyncio
+async def test_presigned_url_rejects_unsupported_mime(authed_client):
+    """F1 (agy): /presigned-url 가 unsupported MIME 차단 (이전엔 bypass)."""
+    response = await authed_client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/upload/presigned-url",
+        json={"filename": "photo.png", "contentType": "image/png"},
+    )
+    assert response.status_code == 415, response.text
+
+
+@pytest.mark.asyncio
+async def test_presigned_url_rejects_extension_mismatch(authed_client):
+    """F1 (agy): /presigned-url 확장자/MIME 정합 검증 (이전엔 bypass)."""
+    response = await authed_client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/upload/presigned-url",
+        json={"filename": "audio.png", "contentType": "audio/mp4"},
+    )
+    assert response.status_code == 415, response.text
+
+
+@pytest.mark.asyncio
+async def test_presigned_url_accepts_valid_request(authed_client):
+    """F1 (agy): 정상 filename + MIME → 200 (R2 mock)."""
+    fake_url = "https://r2.example.com/presigned-put"
+    fake_key = f"uploads/{uuid.uuid4()}/meeting.m4a"
+    with patch(
+        "src.upload.router.R2Service.get_presigned_upload_url",
+        new_callable=AsyncMock,
+        return_value={"upload_url": fake_url, "file_key": fake_key, "expires_in": 3600},
+    ):
+        response = await authed_client.post(
+            f"/api/v1/workspaces/{WORKSPACE_ID}/upload/presigned-url",
+            json={"filename": "meeting.m4a", "contentType": "audio/mp4"},
+        )
+    assert response.status_code == 200, response.text
+    assert response.json()["uploadUrl"] == fake_url
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_unknown_binary_signature(authed_client):
+    """F3 (codex+agy): unknown binary signature 는 fail-closed (이전엔 통과).
+
+    declared audio/mp4 + .m4a 확장자지만 ftyp/ID3/RIFF 등 알려진 audio signature
+    가 전혀 없는 random bytes → 415. 이전엔 _is_signature_compatible(None, ...)
+    가 True 였음.
+    """
+    random_bytes = b"\xde\xad\xbe\xef" * 32  # 128 byte, no audio magic
+    response = await authed_client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
+        files={"file": ("noise.m4a", random_bytes, "audio/mp4")},
+    )
+    assert response.status_code == 415, response.text
+
+
+@pytest.mark.asyncio
+async def test_upload_accepts_csv_as_text_plain(authed_client):
+    """F4 (agy): text/* family 는 확장자 자유 (.csv/.json/.rtf 등). 이전엔 415."""
+    csv_bytes = b"name,age\nAlice,30\nBob,25\n"
+    expected_file_key = f"uploads/{uuid.uuid4()}/data.csv"
+    with patch(
+        "src.upload.router.R2Service.upload_file_bytes",
+        new_callable=AsyncMock,
+        return_value=expected_file_key,
+    ):
+        response = await authed_client.post(
+            f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
+            files={"file": ("data.csv", csv_bytes, "text/plain")},
+        )
+    assert response.status_code == 201, response.text
+    assert response.json()["fileKey"] == expected_file_key

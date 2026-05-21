@@ -60,9 +60,15 @@ def _detect_mime_from_signature(head: bytes) -> str | None:
 
 
 def _is_signature_compatible(detected: str | None, declared: str) -> bool:
-    """signature와 declared MIME 호환성. unknown은 허용 (텍스트 등 signature 없는 형식)."""
+    """signature와 declared MIME 호환성.
+
+    F3 fix (Sprint 25 polish, codex+agy review): unknown signature 는 text/* 만
+    허용 (UTF-8 check 가 후속 가드). binary 형식은 fail-closed — random/위장 바이트
+    가 audio/mp4 등으로 통과하는 bypass 차단.
+    """
     if detected is None:
-        return True
+        # binary 형식은 signature 의무. text/* 만 unknown 허용 (UTF-8 후속 검증).
+        return declared.startswith("text/")
     if detected == declared:
         return True
     # audio family 내에서 codec/container variant 허용
@@ -106,25 +112,40 @@ class UploadValidator:
             settings.allowed_upload_mimes
         )
 
-    def validate(self, filename: str, declared_mime: str, data: bytes) -> None:
-        """검증 실패 시 도메인 예외 raise. 성공 시 None."""
-        # 1. size
-        if len(data) == 0:
-            raise EmptyFileError()
-        if len(data) > self.max_bytes:
-            raise FileTooLargeError(len(data), self.max_bytes)
-        # 2. MIME 화이트리스트
+    def validate_pre_upload(self, filename: str, declared_mime: str) -> None:
+        """Pre-upload 검증 (presigned-url 흐름용 — size/signature 제외).
+
+        F1 fix (Sprint 25 polish, agy review): /presigned-url 가 T-SEC-3 검증
+        bypass 던 critical 결손 해소. 파일 미존재 시점 (URL 발급 시) 에 가능한
+        MIME 화이트리스트 + 확장자 정합만 1차 차단. size/signature 는 R2 PUT 이
+        후 별도 검증 필요 (BL carry).
+        """
         if declared_mime not in self.allowed_mimes:
             raise UnsupportedMimeError(declared_mime)
-        # 3. 확장자 정합 (확장자 → 허용 MIME family 매핑)
         ext = _get_extension(filename)
         if ext and ext in _EXT_TO_MIME_FAMILY:
             if declared_mime not in _EXT_TO_MIME_FAMILY[ext]:
                 raise MimeExtensionMismatchError(ext, declared_mime)
         elif ext:
-            # 알 수 없는 확장자 → 거부 (위장 차단)
-            raise MimeExtensionMismatchError(ext, declared_mime)
-        # 4. content signature
+            # F4 fix: text/* family 는 확장자 자유 (.csv/.json/.rtf 등 정당
+            # 텍스트 파일 차단 회피 — signature/UTF-8 가드가 충분).
+            if not declared_mime.startswith("text/"):
+                raise MimeExtensionMismatchError(ext, declared_mime)
+
+    def validate(self, filename: str, declared_mime: str, data: bytes) -> None:
+        """검증 실패 시 도메인 예외 raise. 성공 시 None.
+
+        Proxy upload (`/file`) 흐름용 — pre_upload 검증 + size + signature 까지
+        4 계층 모두 적용.
+        """
+        # 1. size
+        if len(data) == 0:
+            raise EmptyFileError()
+        if len(data) > self.max_bytes:
+            raise FileTooLargeError(len(data), self.max_bytes)
+        # 2+3. MIME 화이트리스트 + 확장자 정합 (pre_upload 와 동일 로직 재사용)
+        self.validate_pre_upload(filename, declared_mime)
+        # 4. content signature (data 의존)
         detected = _detect_mime_from_signature(data[:512])
         if not _is_signature_compatible(detected, declared_mime):
             raise ContentMismatchError(detected or "unknown", declared_mime)
