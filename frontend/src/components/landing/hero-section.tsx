@@ -38,6 +38,20 @@ export function HeroSection() {
         입력 &middot; 정리 &middot; 증류(AI 자동 요약) &middot; 꺼내기(AI 검색)
       </p>
 
+      {/* Eyebrow — 타깃 사용자 명시 */}
+      <p
+        className="mb-3"
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 13,
+          fontWeight: 600,
+          color: "var(--accent)",
+          letterSpacing: "0.01em",
+        }}
+      >
+        한국팀을 위한 세컨드 브레인
+      </p>
+
       {/* 헤드라인 */}
       <h1
         className="mb-5"
@@ -64,8 +78,8 @@ export function HeroSection() {
           lineHeight: 1.8,
         }}
       >
-        팀의 대화, 노트, 자료가 CODE 파이프라인을 거치면 자동으로 구조화된
-        지식이 됩니다. 세컨드 브레인의 가장 어려운 단계를 AI가 완전히
+        한국팀의 회의, 노트, 자료를 CODE 파이프라인이 자동으로 구조화된
+        지식으로 만듭니다. 세컨드 브레인의 가장 어려운 단계를 AI가 완전히
         자동화합니다.
       </p>
 
@@ -102,16 +116,29 @@ export function HeroSection() {
         </a>
       </div>
 
-      {/* 신뢰 라인 */}
+      {/* 신뢰 라인 — 5분 설정 분 단위 분해 */}
       <p
         className="mt-5"
         style={{
           fontFamily: "var(--font-mono)",
           fontSize: 11,
           color: "var(--text-muted)",
+          lineHeight: 1.7,
         }}
       >
-        설정 5분 &middot; 14일 무료 &middot; 신용카드 불필요
+        5분 안에 시작 &middot; 베타 무료 &middot; 신용카드 불필요
+      </p>
+      <p
+        className="mt-1.5"
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 11,
+          color: "var(--text-muted)",
+          letterSpacing: "0.01em",
+          lineHeight: 1.6,
+        }}
+      >
+        1분 워크스페이스 생성 &rarr; 2분 회의 업로드 &rarr; 2분 AI 요약 도착
       </p>
     </section>
   );
