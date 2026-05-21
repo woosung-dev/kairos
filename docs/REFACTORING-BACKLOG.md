@@ -1983,6 +1983,9 @@ function handleConfirm() {
    - `dismissMutation.mutate(item.id, { onError: ... })` 패턴 follow
 2. F-2B 와 동일하게 `confirmed` status 에서도 `↩ 되돌리기` 버튼 평가 (BE classify revert API 부재 가정)
 3. 회귀 spec: e2e/tests/inbox-confirm.spec.ts 신설
+4. **F-2B v3 agy 후속 발견 (Gap A + B 동봉)**:
+   - `confirmed` 상태 카드 컨테이너 `opacity: 0.7` 도 WCAG AA 미달 (dismissed 와 동일 패턴) — F-2B v3 와 동일 fix 적용 (container opacity 제거 + 개별 요소 opacity)
+   - `confirmed` 상태 `↩ 되돌리기` 버튼 도 BE classify wire 후 fake UX 위험 — dismissed 처럼 제거 + 정적 "확정됨" 표시 또는 BE revert API 동시 도입
 
 ### 진입 조건
 - Sprint 25 polish 종료 후 즉시 또는 Sprint 26 inbox UX sprint 진입 시점
