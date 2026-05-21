@@ -40,10 +40,14 @@ def _detect_mime_from_signature(head: bytes) -> str | None:
     # WAV: "RIFF....WAVE"
     if head.startswith(b"RIFF") and len(head) >= 12 and head[8:12] == b"WAVE":
         return "audio/wav"
-    # MP4/M4A: "ftyp" at offset 4-8 (container box)
+    # MP4/M4A/MOV: "ftyp" at offset 4-8 (container box).
+    # F-2A v2 (codex+agy 2차): ftypqt → QuickTime (.mov). 그 외 ftyp 는 mp4 container
+    # (audio-only 또는 video — _is_signature_compatible 에서 declared MIME 과 매칭).
     if len(head) >= 12 and head[4:8] == b"ftyp":
+        if head[8:12] == b"qt  ":
+            return "video/quicktime"
         return "audio/mp4"
-    # WebM/Matroska: EBML header
+    # WebM/Matroska: EBML header (audio-only 또는 video container 공용)
     if head.startswith(b"\x1a\x45\xdf\xa3"):
         return "audio/webm"
     # Ogg: "OggS"
@@ -65,16 +69,33 @@ def _detect_mime_from_signature(head: bytes) -> str | None:
 def _is_signature_compatible(detected: str | None, declared: str) -> bool:
     """signature와 declared MIME 호환성.
 
-    F3 fix (Sprint 25 polish, codex+agy review): unknown signature 는 text/* 만
-    허용 (UTF-8 check 가 후속 가드). binary 형식은 fail-closed — random/위장 바이트
-    가 audio/mp4 등으로 통과하는 bypass 차단.
+    F3 fix (Sprint 25 polish v1): unknown signature 는 text/* 만 허용 (UTF-8 check
+    가 후속 가드). binary 형식은 fail-closed.
+
+    F-2A v2 fix (Sprint 25 polish v2, codex+agy 2차): MP4/WebM container 는
+    audio/video subtype 공용 — signature 가 container 만 식별, audio-only vs
+    video-with-audio 구분 불가. declared MIME 이 같은 container subtype 이면 허용.
     """
     if detected is None:
-        # binary 형식은 signature 의무. text/* 만 unknown 허용 (UTF-8 후속 검증).
         return declared.startswith("text/")
     if detected == declared:
         return True
-    # audio family 내에서 codec/container variant 허용
+    # MP4 container: audio-only 와 video-with-audio 가 동일 ftyp 박스 사용.
+    # FFmpeg STT 가 audio track 만 추출하므로 video/mp4 + video/quicktime 도 허용.
+    if detected == "audio/mp4" and declared in {
+        "audio/mp4",
+        "audio/x-m4a",
+        "video/mp4",
+        "video/quicktime",
+    }:
+        return True
+    # WebM container: audio-only 와 video-with-audio 가 동일 EBML 박스.
+    if detected == "audio/webm" and declared in {"audio/webm", "video/webm"}:
+        return True
+    # QuickTime 시그니처(ftypqt) 가 video/quicktime 외 mp4 family 도 허용
+    if detected == "video/quicktime" and declared in {"video/quicktime", "video/mp4"}:
+        return True
+    # audio family 내에서 codec/container variant 허용 (기존 보존)
     if declared.startswith("audio/") and detected.startswith("audio/"):
         return True
     return False

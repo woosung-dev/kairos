@@ -190,6 +190,61 @@ async def test_upload_rejects_unknown_binary_signature(authed_client):
 
 
 @pytest.mark.asyncio
+async def test_upload_proxy_accepts_valid_video_mp4(authed_client):
+    """F-2A v2 (codex+agy 2차): proxy /file 에 실 video/mp4 bytes (ftyp) → 201.
+
+    1차 polish 가 _is_signature_compatible 미수정으로 detected=audio/mp4 vs
+    declared=video/mp4 ContentMismatchError → 415 였음. v2 보강으로 호환.
+    """
+    # VALID_MP4_BYTES 는 ftyp container — audio/mp4 또는 video/mp4 양쪽 호환
+    expected_file_key = f"uploads/{uuid.uuid4()}/zoom-recording.mp4"
+    with patch(
+        "src.upload.router.R2Service.upload_file_bytes",
+        new_callable=AsyncMock,
+        return_value=expected_file_key,
+    ):
+        response = await authed_client.post(
+            f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
+            files={"file": ("zoom-recording.mp4", VALID_MP4_BYTES, "video/mp4")},
+        )
+    assert response.status_code == 201, response.text
+
+
+@pytest.mark.asyncio
+async def test_upload_proxy_accepts_valid_video_webm(authed_client):
+    """F-2A v2: proxy /file 에 실 video/webm bytes (EBML magic) → 201."""
+    valid_webm_bytes = b"\x1a\x45\xdf\xa3" + b"\x00" * 128
+    expected_file_key = f"uploads/{uuid.uuid4()}/screen.webm"
+    with patch(
+        "src.upload.router.R2Service.upload_file_bytes",
+        new_callable=AsyncMock,
+        return_value=expected_file_key,
+    ):
+        response = await authed_client.post(
+            f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
+            files={"file": ("screen.webm", valid_webm_bytes, "video/webm")},
+        )
+    assert response.status_code == 201, response.text
+
+
+@pytest.mark.asyncio
+async def test_upload_proxy_accepts_valid_mov(authed_client):
+    """F-2A v2: proxy /file 에 .mov (ftypqt) → 201."""
+    valid_mov_bytes = b"\x00\x00\x00\x20ftypqt  \x00\x00\x00\x00qt  \x00\x00\x00\x00" + b"\x00" * 64
+    expected_file_key = f"uploads/{uuid.uuid4()}/iphone-recording.mov"
+    with patch(
+        "src.upload.router.R2Service.upload_file_bytes",
+        new_callable=AsyncMock,
+        return_value=expected_file_key,
+    ):
+        response = await authed_client.post(
+            f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
+            files={"file": ("iphone-recording.mov", valid_mov_bytes, "video/quicktime")},
+        )
+    assert response.status_code == 201, response.text
+
+
+@pytest.mark.asyncio
 async def test_presigned_url_accepts_video_mp4(authed_client):
     """F-2A (codex 2차): 브라우저가 .mp4 비디오 파일을 video/mp4 MIME 으로 전송.
 
