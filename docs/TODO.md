@@ -1,8 +1,19 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-05-20 (Sprint 24 Wave 2 trusty-heron closeout — Multi-Agent QA P0/P1 16 task fix bundle + T-N+1 BL-006 헌법 + T-N+2 composite FK fixture + T-N+4 BL-T2-003 production)
+> 마지막 업데이트: 2026-05-21 (Sprint 25 Multi-Agent QA 직후 — Composite 3축 Security 4.55/Product 4.6/GTM 7.0, P0 2건 + P1 7건. 산출물 `docs/dev-log/2026-05-21-sprint25-multi-agent-qa/`)
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조 — Completed / Blocked / Questions / Next Actions 4섹션 운영.
+
+---
+
+## 🚨 Sprint 25 진입 직전 — 사용자 협력 필요 (정정)
+
+> Multi-Agent QA 결과(2026-05-21) — 사용자가 처리해야 다음 단계 진행 가능한 항목.
+> **정정**: 사용자 Clerk Production 발급 SKIP 결정 반영 → 2번 항목 제거.
+
+1. **production DB 더미 user 정리** — BUG-SENTINEL-005 PoC 잔존. Neon SQL editor에서 `DELETE FROM users WHERE clerk_id='user_QA20260521_sentinel_test_doNotUse'` 실행. Sprint 25 첫 commit 전.
+2. **가격 정책 결정** — Sprint 25 Wave 2 T-GTM-2 의존. 3-tier (Free Beta/Team/Enterprise) 또는 "Pricing coming soon — 베타 무료" 명시.
+3. ~~Clerk Production 인스턴스 발급~~ — **사용자 의도적 SKIP 결정 (2026-05-21, memory `project_gcp_migration_jetaime_dev_done.md`)**. Sprint 25 의존 0. GA launch 시점 별도 sprint.
 
 ---
 
@@ -10,17 +21,42 @@
 
 > 차단(Blocked) 항목은 이유 + 필요한 조치를 함께 기록. AI가 사용자에게 빈번하게 질문하는 대신 본 섹션에 누적 후 자연스러운 타이밍에 일괄 전달.
 
-- [ ] **Clerk Production key 발급** — Sprint 14 부터 carry. `pk_live_*` / `sk_live_*` 발급 후 Vercel env 등록. 효과: dev 배지 제거 + 외부 dogfooding 활성화.
+- ~~Clerk Production key 발급~~ — **2026-05-21 사용자 의도적 SKIP 결정** (memory `project_gcp_migration_jetaime_dev_done.md`). GA launch 시점 별도 sprint. Sprint 25 의존 0.
 - [ ] **Sentry DSN 발급** — Sprint 22 conditional init 활성화. 발급 + Vercel/Cloud Run env 등록 + 알람 verify. Sprint 24 Wave 2 BL-NEW-BE-PERF-COLD-START 진단 선행 조건.
 - [ ] **외부 user 1명 실제 dogfooding** — Sprint 22 spec `docs/dev-log/2026-05-19-sprint22-dogfooding.md` 12분 walkthrough.
 
 ---
 
-## Next Actions (Sprint 25 후보 — Sprint 24 Wave 2 closeout 이후)
+## Next Actions (Sprint 25 진입 계획 — Multi-Agent QA 2026-05-21 결과 반영)
 
-> Sprint 24 diligent-beaver merge 완료 (PR #99, `f46a075`) → Sprint 24 Wave 2 trusty-heron closeout (PR draft, Multi-Agent QA P0/P1 16 task + 헌법/production carry). Sprint 25 = **Power persona + Sentry trace 데이터 수집 후 결정**.
+> Sprint 25 plan → `docs/dev-log/2026-05-21-sprint25-multi-agent-qa/sprint-25-plan.md`. Wave 1 P0 (~6h) → Wave 2 P1 (~28h) → Wave 3 P2 (~12h). 총 ~46h (약 7 영업일).
 
-### 🟡 Sprint 25 candidates (Sprint 24 Wave 2 carry)
+### 🔴 Sprint 25 Wave 1 — P0 (1건, ~1h, 정정)
+- [ ] **T-SEC-1 BUG-SENTINEL-005 (정정)** `POST /api/v1/users/sync` **endpoint 비활성화** (404/410 반환). `backend/src/auth/router.py`에서 `sync_user` handler 제거. `app.include_router(auth_router)` 유지 (다른 `/users/me` 라우트 정상). 회귀 테스트 `backend/tests/test_auth_sync_disabled.py` 신설. (1h)
+- ~~T-SEC-2 Clerk Production~~ → **사용자 SKIP 결정 (2026-05-21)**. 제거됨.
+
+### 🟠 Sprint 25 Wave 2 — P1 (7건, ~28h)
+- [ ] **T-SEC-3 BUG-SENTINEL-003** upload/file 입력 검증 (size limit env + MIME 화이트리스트 + 확장자 + python-magic sniff + R2/DB 트랜잭션 정합). (4h)
+- [ ] **T-GTM-1 ★★★ TRUST** 신뢰 신호 section (베타 로고/인프라 보안 배지/창업자 LinkedIn). (6h)
+- [ ] **T-GTM-2 ★★★ PRICING** `/pricing` 라우트 + 3-tier 윤곽 또는 "Pricing coming soon". "요금" nav 링크 교체. (3h, 가격 정책 결정 필요)
+- [ ] **T-GTM-3 ★★ PRODUCT-SHOT** 실 제품 스크린샷 3장 (Cmd+K / Inbox / Distill L1-L4) + 풀버전 모달 동영상(선택). (5h)
+- [ ] **T-GTM-4 BUG-CASUAL-003** 한글 부연 라벨 (Distill/L1-L4/promote/RAG) + tooltip. (4h)
+- [ ] **T-GTM-5 BUG-CURIOUS-004/005/006** "CODE" 풀어쓰기 + "한국팀을 위한" 명시 + "5분 설정" 분 단위 분해. (4h)
+- [ ] **T-INFRA-1 (정정)** **Dev Clerk key 기반** e2e 인프라 (Playwright + qa-* spec 부활 + Clerk dev test mode + BL-068 + BL-069 verify). (5-7h)
+
+### 🟡 Sprint 25 Wave 3 — P2 (9건, ~13h)
+- [ ] **T-GTM-6 (신규)** UX 완화 — `/sign-up` 직전 "현재 베타 멤버 전용 — Pre-GA" 텍스트 + 안내 모달(선택). Pre-GA dev Clerk 운영 정책 표시. (1h)
+- [ ] **T-A11Y-1** `<main>` 랜드마크 + skip-link + prefers-reduced-motion + 장식 aria-hidden + CTA 박스 대비 보정. (4h)
+- [ ] **T-SEC-4 BUG-SENTINEL-004** `CaptureTextRequest.transcript_text` max_length=200_000 추가. (0.5h)
+- [ ] **T-SEC-5 BL-SNT-CANDIDATE-B** production env `docs_url=None, redoc_url=None` + Cloud Run env 갱신. (0.5h)
+- [ ] **T-SEC-6 BL-SNT-CANDIDATE-A** `/ready` connection pool reuse 또는 `SELECT 1` ping. (2h)
+- [ ] **T-UI-1** 모바일 햄버거 nav + 모바일 17px→16px body. (5h)
+- [ ] **T-AI-1** ADR-019 Phase B post-swap LLM 직접 호출 실증 (Distill/Extract Actions 스키마 정합 + Sprint 16 baseline 비교 + due_date hallucinate 재현). (T-INFRA-1 동반)
+
+### 📋 Pre-Sprint cleanup
+- [ ] **T-CLEANUP-1** production DB Neon SQL editor에서 `DELETE FROM users WHERE clerk_id='user_QA20260521_sentinel_test_doNotUse'` (사용자 작업).
+
+### 🟡 Sprint 25 candidates (Sprint 24 Wave 2 carry — 후순위)
 - [ ] **BL-NEW-RAG-SOURCE-SELECT** RAG source-level selection v1 — Power persona 데이터 후 B path 검토 (Sprint 25+)
 - [ ] **BL-NEW-OBN-DATA-RETRY** Onboarding 재설계 data-driven retry — F4 외부 인터뷰 후 (Sprint 25+)
 - [ ] **BL-NEW-BE-PERF-COLD-START** Cloud Run + Neon cold start 진단 — production Sentry trace 후 (Sprint 25+)
