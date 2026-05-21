@@ -55,11 +55,11 @@ export default async function PricingPage() {
           <span style={{ color: "var(--accent)" }}>베타 기간 무료</span>
         </h1>
 
-        {/* 서브헤드 */}
+        {/* 서브헤드 — T-UI-1 (Sprint 25): 모바일 16px, 데스크톱 17px 반응형 */}
         <p
           className="mx-auto mb-8 max-w-[560px]"
           style={{
-            fontSize: 17,
+            fontSize: "clamp(16px, 2.5vw, 17px)",
             color: "var(--text-secondary)",
             lineHeight: 1.8,
           }}

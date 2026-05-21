@@ -14,15 +14,18 @@ export function LandingPage() {
   return (
     <div style={{ background: "var(--background)" }}>
       <LandingNav />
-      <HeroSection />
-      <ProductShotsSection />
-      <SearchDemoSection />
-      <BeforeAfterSection />
-      <PipelineSection />
-      <EvolutionTimeline />
-      <StatsSection />
-      <TrustSignalsSection />
-      <CtaSection />
+      {/* T-A11Y-1 (Sprint 25): main 랜드마크 — skip-link 타깃. */}
+      <main id="main-content">
+        <HeroSection />
+        <ProductShotsSection />
+        <SearchDemoSection />
+        <BeforeAfterSection />
+        <PipelineSection />
+        <EvolutionTimeline />
+        <StatsSection />
+        <TrustSignalsSection />
+        <CtaSection />
+      </main>
       <Footer />
     </div>
   );

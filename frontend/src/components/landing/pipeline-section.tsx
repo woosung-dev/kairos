@@ -114,8 +114,9 @@ export function PipelineSection() {
                     : "var(--shadow-card)",
                 }}
               >
-                {/* 대형 배경 letter */}
+                {/* 대형 배경 letter — T-A11Y-1: 장식 요소, 스크린리더 무시 */}
                 <span
+                  aria-hidden="true"
                   className="pointer-events-none absolute top-4 right-4 leading-none select-none"
                   style={{
                     fontFamily: "var(--font-display)",

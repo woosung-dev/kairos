@@ -45,6 +45,14 @@ export default function RootLayout({
           />
         </head>
         <body>
+          {/* T-A11Y-1 (Sprint 25): skip-link — 키보드 사용자가 nav 를 건너뛰고
+              main content 로 즉시 이동. focus 시에만 노출 (visual user UX 무영향). */}
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-lg focus:bg-foreground focus:px-4 focus:py-2 focus:text-sm focus:text-background focus:shadow-lg"
+          >
+            본문으로 건너뛰기
+          </a>
           {/* ThemeProvider 는 root layout body 최상위에 위치해야 inline FOUC
               방지 script 가 React component tree 깊은 곳에서 렌더되어 발생하는
               "Encountered a script tag while rendering React component" 경고
