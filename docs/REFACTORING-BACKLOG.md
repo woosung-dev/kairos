@@ -1956,6 +1956,41 @@ Sprint 25 polish 부분 fix (commit `947b778`): `file.size` (multipart 메타) p
 
 ---
 
+## BL-072 — Upload validation 의 ISO-BMFF text/plain bypass (Sprint 25 polish v3 carry, codex 4차 P2)
+
+**상태**: 미시작 (Sprint 25 codex+agy 4차 A/B 결과 — Option B "KEEP v3 + carry" 채택)
+**우선순위**: P3 (production 영향 낮음 — STT 미호출, R2 저장만)
+
+### 배경
+F-2A v3 (commit e2fa23b) 가 video/mp4 disguise bypass 는 막았으나, codex 4차 review 가 **신규 text/plain bypass 경로** 발견:
+
+```
+HEIC/AVIF (ftypheic) + filename=.txt + Content-Type=text/plain
+→ _detect_mime_from_signature 가 disallowed brand 로 None 반환
+→ _is_signature_compatible(None, text/plain) 가 text fail-open True
+→ NUL byte 가 valid UTF-8 (U+0000) 이라 _check_text_content 통과
+→ 201 R2 저장
+```
+
+v2 (audio/mp4 collapse) 였을 때는 text/plain 과 mismatch → 거부였으나, v3 brand allowlist 로 None 전환하면서 새 경로 노출.
+
+### 실제 영향
+- 인증 workspace member 만 가능 (외부 공격 X)
+- text 파일은 STT 파이프라인 미진입 (`isAudioOrVideo` FE 분기) → 처리 안 됨, R2 저장만
+- 자원 낭비 (R2 storage cost)
+- Sprint 25 4차 iteration 깊어짐 + agy 4차 실패 (skill rabbit hole) 로 더 이상 양측 A/B 평가 불가
+
+### 진정한 fix (별도 sprint)
+1. `_detect_mime_from_signature` 가 sentinel 값 반환 ("application/octet-stream-unknown-ftyp") + _is_signature_compatible 에서 text/* 매칭 차단
+2. 또는 real MIME detection library 도입 (`python-magic`, `filetype`) — 시스템 dep 추가
+3. 또는 R2 upload 후 별도 post-validation lambda/event trigger
+
+### 진입 조건
+- Sprint 26+ 또는 GA hardening sprint
+- 실제 자원 낭비 패턴이 Sentry/Cloud Run 메트릭에서 관찰 시 우선순위 상향
+
+---
+
 ## BL-071 — Sync endpoint 재도입 시 Svix 검증 강제 CI guard (Sprint 25 polish carry, agy F9 sub-3)
 
 **상태**: 미시작 (Sprint 25 codex+agy review F9 sub-3 — ADR-022 §"회수 옵션 5단계" 1차 완화 적용 후 carry)
