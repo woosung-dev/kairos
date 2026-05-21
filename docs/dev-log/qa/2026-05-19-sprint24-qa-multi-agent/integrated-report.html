@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Sprint 24 Multi-Agent QA — 통합 보고서</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @media print {
+    body { font-size: 11px; }
+    .no-print { display: none; }
+    .page-break { page-break-after: always; }
+    table { font-size: 9px; }
+  }
+  body { font-family: -apple-system, "SF Pro Korean", "Pretendard", sans-serif; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
+  .bg-crit { background: #dc2626; color: white; }
+  .bg-high { background: #ea580c; color: white; }
+  .bg-med { background: #ca8a04; color: white; }
+  .bg-low { background: #16a34a; color: white; }
+  .bg-pass { background: #16a34a; color: white; }
+  .bg-fail { background: #dc2626; color: white; }
+  .bg-info { background: #2563eb; color: white; }
+  .bg-block { background: #6b7280; color: white; }
+  .heat-pass { background: #dcfce7; }
+  .heat-warn { background: #fef9c3; }
+  .heat-fail { background: #fee2e2; }
+</style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+<header class="bg-white border-b border-gray-200 p-6">
+  <div class="max-w-6xl mx-auto">
+    <div class="flex items-baseline justify-between flex-wrap gap-2">
+      <h1 class="text-3xl font-bold">Kairos Sprint 24 Multi-Agent QA — 통합 보고서</h1>
+      <div class="text-sm text-gray-600">
+        <span class="badge bg-info">2026-05-19 ~ 2026-05-20</span>
+        <span class="badge bg-info ml-2">commit d659c03</span>
+      </div>
+    </div>
+    <p class="mt-2 text-gray-600">5 페르소나 풀스트레치 (QA Sentinel / Curious / Casual / Power / Mobile) Exhaustive depth, codex+gemini 종합 plan v2 기반.</p>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto p-6 space-y-10">
+
+<!-- 1. Executive Summary -->
+<section>
+  <h2 class="text-2xl font-bold mb-4">1. Executive Summary</h2>
+
+  <div class="grid md:grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-lg shadow p-4">
+      <div class="text-xs text-gray-500 uppercase">Composite Health Score</div>
+      <div class="text-4xl font-bold mt-1">5.0 <span class="text-base text-gray-500">/10</span></div>
+      <div class="text-xs mt-1"><span class="badge bg-fail">Sprint 18 baseline 5.9 대비 ↓0.9</span></div>
+      <div class="text-xs mt-2 text-gray-600">QA 0.40 (8.0) + Curious 0.20 (3.5) + Casual 0.20 (4.0) + Power 0.10 (2.5) + Mobile 0.10 (4.0)</div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4">
+      <div class="text-xs text-gray-500 uppercase">결함 (BUG + BL)</div>
+      <div class="text-4xl font-bold mt-1">31 <span class="text-base text-gray-500">건</span></div>
+      <div class="text-xs mt-2">
+        <span class="badge bg-crit">P0×5</span>
+        <span class="badge bg-high ml-1">P1×6</span>
+        <span class="badge bg-med ml-1">P2×9</span>
+        <span class="badge bg-low ml-1">BL×11</span>
+      </div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4">
+      <div class="text-xs text-gray-500 uppercase">도입 결정 (Curious PM)</div>
+      <div class="text-4xl font-bold mt-1">No</div>
+      <div class="text-xs mt-2">"Granola → Kairos" 결정적 이유 <strong>없음</strong>. TTFV 255.5초 / 5초/30초 룰 FAIL.</div>
+    </div>
+  </div>
+
+  <h3 class="text-lg font-semibold mt-6 mb-2">Top 5 결함 (Sprint 24 진입 차단 후보)</h3>
+  <ol class="list-decimal list-inside space-y-2 bg-white rounded-lg shadow p-4">
+    <li><strong class="text-red-700">BUG-CURIOUS-001 (P0 Critical)</strong> — AI 액션 마감일 2024년 hallucinate. PM 신뢰 차단. Fix = prompt에 현재 연도 컨텍스트 (~1.5h)</li>
+    <li><strong class="text-red-700">BUG-POW-005 (P0 Critical)</strong> — RAG MOCK_SELECTABLE_SOURCES 가짜 5건이 신규 사용자 `/search` 노출. "AI 거짓말" 인식 직결. Fix = search-scope.tsx:31 제거 (~1h)</li>
+    <li><strong class="text-orange-700">BUG-CURIOUS-003 (P0 High)</strong> — Onboarding step 1~4 미발화 (Sprint 22 OBN-01~04 정적 PASS / dogfood FAIL = 회귀)</li>
+    <li><strong class="text-orange-700">BL-006 (P0 헌법 위반)</strong> — memory→embeddings cross-domain import 3건 (헌법 §4.2)</li>
+    <li><strong class="text-orange-700">BUG-CASUAL-001 (P1 High)</strong> — `/projects` 라우트 404 (FE list page 미구현, sidebar dead-end)</li>
+  </ol>
+
+  <h3 class="text-lg font-semibold mt-6 mb-2">강점 (PASS 영역)</h3>
+  <ul class="list-disc list-inside space-y-1 bg-white rounded-lg shadow p-4">
+    <li>Tier 1 보안/멀티테넌시 12 시나리오 ALL PASS — RAG cross-tenant / private visibility / IDOR / JWT / Sentry PII 완전 차단</li>
+    <li>Tier 2 회귀 (Sprint 19~23) ALL PASS — composite FK 12 SCN / D1~D4 dogfood fix / Sprint 22 onboarding BE 정적</li>
+    <li>한국어 native RAG + 소스 인용 — Notion AI 대비 검증된 강점 (Curious 7/10)</li>
+    <li>AI 요약 품질 — 3문장 정확 + 액션 3개 + 담당자/마감일/우선순위 (Curious 7/10)</li>
+    <li>Sprint 23 D4 ItemPromoteModal 5 도메인 generic — write 경로 정적 PASS</li>
+  </ul>
+</section>
+
+<!-- 2. 페르소나 매트릭스 (heatmap) -->
+<section class="page-break">
+  <h2 class="text-2xl font-bold mb-4">2. 페르소나 매트릭스 (Heatmap)</h2>
+  <table class="w-full bg-white rounded-lg shadow text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2 text-left">차원</th>
+        <th class="p-2">Sentinel</th>
+        <th class="p-2">Curious</th>
+        <th class="p-2">Casual</th>
+        <th class="p-2">Power</th>
+        <th class="p-2">Mobile</th>
+        <th class="p-2 text-left">교차 결론</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="p-2 font-semibold">보안/멀티테넌시</td>
+        <td class="heat-pass p-2 text-center">8/10</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-xs">Sentinel 단독 — 12 시나리오 ALL PASS, R2 file_key prefix + rate limit middleware는 BL 후보</td>
+      </tr>
+      <tr>
+        <td class="p-2 font-semibold">회귀 안전망</td>
+        <td class="heat-pass p-2 text-center">9/10</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-xs">composite FK 12 + Sprint 19~23 회귀 ALL PASS — Tier 2 6 BL 후보는 acceptable</td>
+      </tr>
+      <tr>
+        <td class="p-2 font-semibold">신규 사용자 acquisition</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="heat-fail p-2 text-center">2/10</td>
+        <td class="heat-warn p-2 text-center">4/10</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-xs"><strong>FAIL</strong> — 5초/30초 룰 모두 FAIL. Landing 단일 viewport. ToS/Privacy 0. Pricing 0. Granola/Notion AI 대비 신뢰 0</td>
+      </tr>
+      <tr>
+        <td class="p-2 font-semibold">AI 신뢰성</td>
+        <td class="heat-pass p-2 text-center">8/10</td>
+        <td class="heat-fail p-2 text-center">3/10</td>
+        <td class="heat-warn p-2 text-center">5/10</td>
+        <td class="heat-fail p-2 text-center">3/10</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-xs">정적 분석 PASS vs dogfood FAIL = AI hallucinate (CURIOUS-001) + RAG MOCK 누출 (POW-005) → "AI 거짓말" 인식</td>
+      </tr>
+      <tr>
+        <td class="p-2 font-semibold">과업 성공률</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="heat-warn p-2 text-center">5/10</td>
+        <td class="heat-warn p-2 text-center">5/10</td>
+        <td class="heat-fail p-2 text-center">2.5/10</td>
+        <td class="p-2 text-center text-gray-400">TBD</td>
+        <td class="p-2 text-xs">Task A/C PASS but Task B (Inbox promote) FAIL (Casual). Power 사이드바 dead-end 다수</td>
+      </tr>
+      <tr>
+        <td class="p-2 font-semibold">UX 라이팅</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="heat-warn p-2 text-center">5/10</td>
+        <td class="heat-fail p-2 text-center">3/10</td>
+        <td class="heat-fail p-2 text-center">3/10</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-xs">용어 해독률 33-60% (promote/Compact mode/Memory). 동일 동작 3종 카피</td>
+      </tr>
+      <tr>
+        <td class="p-2 font-semibold">a11y</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="heat-fail p-2 text-center">3/10</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-center text-gray-400">TBD</td>
+        <td class="p-2 text-xs">axe 8 violations (serious 5 color-contrast + moderate 3) + skip link 부재 + BottomNav 44pt 미달</td>
+      </tr>
+      <tr>
+        <td class="p-2 font-semibold">고급 사용자 / Discoverability</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="heat-fail p-2 text-center">2.5/10</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-xs">단축키 2/10 (가짜 표시) / 벌크 0/10 / Audit 1/10 / API PAT 0</td>
+      </tr>
+      <tr>
+        <td class="p-2 font-semibold">Mobile / Recording stability</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="p-2 text-center text-gray-400">n/a</td>
+        <td class="heat-warn p-2 text-center">4/10</td>
+        <td class="p-2 text-xs">Recording 🟡 PASS w/ caveats (버튼 viewport 밖 스크롤 강요) / BG 업로드 ✅ / <strong>헤더 우측 잘림 P0 (3 viewport 일관)</strong> / BottomNav 44pt 미달 100% 재현 / BE API 3-4s P1 Performance</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="text-xs text-gray-500 mt-2">Heatmap 색: 초록 8-10 PASS / 노랑 4-7 WARN / 빨강 0-3 FAIL.</p>
+</section>
+
+<!-- 3. Critical/High 결함 상세 -->
+<section class="page-break">
+  <h2 class="text-2xl font-bold mb-4">3. Critical/High 결함 상세</h2>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-3">
+    <div class="flex justify-between items-baseline">
+      <h3 class="text-lg font-bold">BUG-CURIOUS-001 <span class="badge bg-crit">P0 Critical</span></h3>
+      <span class="text-xs text-gray-500">발견: Curious / Confidence H</span>
+    </div>
+    <div class="text-sm mt-2 space-y-1">
+      <p><strong>재현</strong>: 회의 본문에 "7월 X일" (연도 없음) 입력 → AI 액션 추출 시 마감일이 2024-07-25/22/12 (현재 2026년 5월)</p>
+      <p><strong>기대</strong>: 현재 연도 또는 가까운 미래 연도 (2026/2027)</p>
+      <p><strong>실제</strong>: 2024년 (2년 과거)</p>
+      <p><strong>Root cause</strong>: LLM prompt에 현재 날짜 컨텍스트 부재 + 시간 추론 안전망 부재</p>
+      <p><strong>Casual cross-verify</strong>: 연도 명시 input → 2026년 정확. 진단 명확.</p>
+      <p><strong>Fix (T-AI-DATE)</strong>: backend/src/common/prompts.py 액션 추출 prompt에 `현재 연도={current_year}` 컨텍스트 + 검증 안전망</p>
+      <p><strong>영향</strong>: PM 신뢰 차단. Curious "도입 No" 핵심 사유 1.</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-3">
+    <div class="flex justify-between items-baseline">
+      <h3 class="text-lg font-bold">BUG-POW-005 <span class="badge bg-crit">P0 Critical</span></h3>
+      <span class="text-xs text-gray-500">발견: Power / Confidence H</span>
+    </div>
+    <div class="text-sm mt-2 space-y-1">
+      <p><strong>재현</strong>: 신규 가입자 `/search` 페이지 → "선택한 소스" 탭 → 가짜 5건 ("Sprint 3 회고 회의" 등) 노출</p>
+      <p><strong>기대</strong>: 실제 사용자 콘텐츠 또는 empty state</p>
+      <p><strong>실제</strong>: MOCK 데이터가 진짜처럼 표시</p>
+      <p><strong>Root cause</strong>: `frontend/src/features/rag/components/search-scope.tsx:31-37` MOCK_SELECTABLE_SOURCES 하드코딩 + API 미연동</p>
+      <p><strong>Fix (T-RAG-MOCK-REMOVE, ~1h)</strong>: MOCK 제거 + 실 API 연동 또는 empty state</p>
+      <p><strong>영향</strong>: "AI 거짓말" 인식 직결. Curious + Casual + Power 모두 신뢰 손상 카테고리.</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-3">
+    <div class="flex justify-between items-baseline">
+      <h3 class="text-lg font-bold">BUG-CURIOUS-003 <span class="badge bg-high">P0 High</span></h3>
+      <span class="text-xs text-gray-500">발견: Curious / Confidence H</span>
+    </div>
+    <div class="text-sm mt-2 space-y-1">
+      <p><strong>재현</strong>: 신규 가입자 dashboard 도달 후 onboarding step 1~4 UI 발화 0</p>
+      <p><strong>기대</strong>: Sprint 22 OBN-01~04에서 추가된 단계별 안내 발화</p>
+      <p><strong>실제</strong>: dashboard로 직진, self-discovery 강요</p>
+      <p><strong>Root cause</strong>: Sprint 22 BE event hook은 있으나 FE UI render 미연동 또는 step 1 자동 전이로 user-visible 0초</p>
+      <p><strong>Fix (T-OBN-05, ~2h)</strong>: FE UI render 검증 + Playwright E2E 추가</p>
+      <p><strong>영향</strong>: Sprint 22 회귀. Curious "신규 가입자 답답함" 핵심 사유 2.</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-3">
+    <div class="flex justify-between items-baseline">
+      <h3 class="text-lg font-bold">BL-006 <span class="badge bg-crit">P0 헌법 §4.2 위반</span></h3>
+      <span class="text-xs text-gray-500">발견: 사전 grep / Confidence H</span>
+    </div>
+    <div class="text-sm mt-2 space-y-1">
+      <p><strong>재현</strong>: `grep -rnE "from src\.embeddings" backend/src/memory/` → 3 매치</p>
+      <ul class="list-disc list-inside ml-4 text-xs">
+        <li>memory/service.py:550 `from src.embeddings.repository import EmbeddingRepository` (lazy)</li>
+        <li>memory/service.py:780 동일</li>
+        <li>memory/repository.py:33 `from src.embeddings.repository import _apply_hnsw_session_params` (I-21 HNSW)</li>
+      </ul>
+      <p><strong>Fix (T-N+1, ~3h)</strong>: pipeline_service 위임 + I-21 helper를 common/db.py로 이전 + ruff custom rule 또는 import-linter</p>
+      <p><strong>영향</strong>: 헌법 §4.2 도메인 경계 위반. atomic update 강제 대상.</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-3">
+    <div class="flex justify-between items-baseline">
+      <h3 class="text-lg font-bold">BUG-CURIOUS-002 <span class="badge bg-high">P1 High</span></h3>
+      <span class="text-xs text-gray-500">발견: Curious + Casual 100% 재현 / Confidence H</span>
+    </div>
+    <div class="text-sm mt-2 space-y-1">
+      <p><strong>재현</strong>: dashboard "최근 회의에서 결정된 사항은?" 추천 질문 직접 클릭 → button active 표시만</p>
+      <p><strong>기대</strong>: ⌘K command palette 와 동일 흐름으로 응답 전송</p>
+      <p><strong>실제</strong>: button active만, 응답 없음 (⌘K 강제)</p>
+      <p><strong>Root cause</strong>: onClick handler가 ⌘K 흐름과 분기 안 됨 (Sprint 23 D2 회귀 가능성)</p>
+      <p><strong>Fix (T-CMD-K-FIX, ~1h)</strong>: onClick → ⌘K 흐름 호출</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-3">
+    <div class="flex justify-between items-baseline">
+      <h3 class="text-lg font-bold">BUG-CASUAL-001 <span class="badge bg-high">P1 High</span></h3>
+      <span class="text-xs text-gray-500">발견: Casual / Confidence H</span>
+    </div>
+    <div class="text-sm mt-2 space-y-1">
+      <p><strong>재현</strong>: sidebar / dashboard "프로젝트" 클릭 → `/projects` 404</p>
+      <p><strong>기대</strong>: 프로젝트 list 페이지</p>
+      <p><strong>실제</strong>: 404. BE `/api/v1/projects` 는 존재.</p>
+      <p><strong>Root cause</strong>: FE `frontend/src/app/(app)/projects/page.tsx` 미구현 (list page)</p>
+      <p><strong>Fix (T-PROJ-LIST, ~2h)</strong>: list page 신설</p>
+      <p><strong>영향</strong>: sidebar dead-end. 신규 사용자 신뢰 손상.</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-3">
+    <div class="flex justify-between items-baseline">
+      <h3 class="text-lg font-bold">BUG-POW-003 <span class="badge bg-high">P1 High</span></h3>
+      <span class="text-xs text-gray-500">발견: Power / Confidence H</span>
+    </div>
+    <div class="text-sm mt-2 space-y-1">
+      <p><strong>재현</strong>: `/notes` 카드 클릭 → URL 변동 0</p>
+      <p><strong>Root cause</strong>: `frontend/src/app/(app)/notes/` 에 `[id]` 폴더 없음 → NoteExportButton 컴포넌트 도달 불가</p>
+      <p><strong>Fix (T-NOTE-DETAIL, ~3h)</strong>: NoteDetail 페이지 구현</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-3">
+    <div class="flex justify-between items-baseline">
+      <h3 class="text-lg font-bold">BUG-POW-006 <span class="badge bg-high">P1 High</span></h3>
+      <span class="text-xs text-gray-500">발견: Power / Confidence M</span>
+    </div>
+    <div class="text-sm mt-2 space-y-1">
+      <p><strong>재현</strong>: RAG `/search` time_range FE 4 옵션 (전체/1m/3m/6m) → 결과 무변동</p>
+      <p><strong>Root cause</strong>: `backend/src/embeddings/repository.py` search() 절에 `time_range` 미사용 (signature 통과만)</p>
+      <p><strong>Fix (T-RAG-TIME-FILTER, ~2h)</strong>: SQL where clause 추가</p>
+      <p><strong>영향</strong>: 약속한 UI 동작 안함 → 신뢰 손상</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-3">
+    <div class="flex justify-between items-baseline">
+      <h3 class="text-lg font-bold">BUG-POW-008 <span class="badge bg-high">P1 High (compliance)</span></h3>
+      <span class="text-xs text-gray-500">발견: Power / Confidence H</span>
+    </div>
+    <div class="text-sm mt-2 space-y-1">
+      <p><strong>재현</strong>: Sprint 23 D4 ItemPromotionAudit write 5도메인 ✅ / read endpoint 0 / Settings audit 탭 0</p>
+      <p><strong>Root cause</strong>: Sprint 23 D4 storage-only 완료. read/list endpoint 누락.</p>
+      <p><strong>Fix (T-AUDIT-VIEW, ~4h)</strong>: read endpoint + Settings audit 탭 (admin only)</p>
+      <p><strong>영향</strong>: 실수 추적 0 (compliance 차단)</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-3">
+    <div class="flex justify-between items-baseline">
+      <h3 class="text-lg font-bold">BL-T2-003 <span class="badge bg-high">P1 High (production)</span></h3>
+      <span class="text-xs text-gray-500">발견: Sentinel Tier 2 / Confidence H</span>
+    </div>
+    <div class="text-sm mt-2 space-y-1">
+      <p><strong>재현</strong>: 60MB+ audio 업로드 → Whisper API 25MB 한계 초과 → 400 error</p>
+      <p><strong>Root cause</strong>: `services/transcription.py` Whisper-1 직접 호출, chunk/split 코드 0건</p>
+      <p><strong>Fix (T-N+4, ~4h)</strong>: ffmpeg duration 분할 + 병렬 Whisper + offset 보존</p>
+      <p><strong>영향</strong>: production 4hr+ recording 사용자 차단</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-3">
+    <div class="flex justify-between items-baseline">
+      <h3 class="text-lg font-bold">BUG-MOBILE-001 <span class="badge bg-high">P0 High UX</span></h3>
+      <span class="text-xs text-gray-500">발견: Mobile / Confidence H</span>
+    </div>
+    <div class="text-sm mt-2 space-y-1">
+      <p><strong>재현</strong>: 375 / 393 / 412 viewport 모두 — U 프로필 버튼 (36x36) x_right=427. viewport 밖 52 / 34 / 15 px 잘림. 검색 버튼도 right=378 → 375에서 3px 잘림.</p>
+      <p><strong>기대</strong>: 모든 viewport에서 헤더 우측 컨트롤 visible</p>
+      <p><strong>실제</strong>: 프로필/로그아웃 도달 불가</p>
+      <p><strong>Root cause</strong>: 잘리는 ancestor `main.flex-1 flex flex-col overflow-hidden`. header가 desktop sidebar 폭 기준 절대 padding 사용, mobile responsive 분기 누락.</p>
+      <p><strong>Fix (T-MOBILE-HEADER, ~0.5-1h)</strong>: header padding을 `lg:pl-X md:pl-0` 식 분기</p>
+      <p><strong>영향</strong>: 모바일 사용자가 로그아웃/프로필 도달 불가 → 신뢰 손상</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-3">
+    <div class="flex justify-between items-baseline">
+      <h3 class="text-lg font-bold">BUG-MOBILE-005 <span class="badge bg-high">P1 High Performance</span></h3>
+      <span class="text-xs text-gray-500">발견: Mobile / Confidence M</span>
+    </div>
+    <div class="text-sm mt-2 space-y-1">
+      <p><strong>재현</strong>: localhost 측정 (네트워크 0ms):</p>
+      <ul class="list-disc list-inside ml-4 text-xs">
+        <li>`/api/v1/workspaces` = 3015 / 3830 ms</li>
+        <li>`/api/v1/workspaces/{id}/members` = 3211 / 3865 ms</li>
+        <li>`/api/v1/workspaces/{id}/meetings/{id}` = 3599 ms</li>
+        <li>`/api/v1/workspaces/{id}/inbox?isProcessed=false` = 3824 ms</li>
+        <li>캐시 후 페이지 reload = 190-350 ms (정상)</li>
+      </ul>
+      <p><strong>Root cause 추정</strong>: Clerk JWT verify + DB lookup 동기 직렬 또는 dashboard fan-out promise.all 미적용</p>
+      <p><strong>Fix (T-BE-PERF, ~4-6h spike)</strong>: sentry/pyinstrument profile + JWT verify cache + concurrent DB query</p>
+      <p><strong>영향</strong>: Slow 3G 환경에서 7-10s 예상 → cancel 임계 초과</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4. TTFV Gap Analysis 강조 -->
+<section class="page-break">
+  <h2 class="text-2xl font-bold mb-4">4. TTFV Gap Analysis (gemini F2 North Star)</h2>
+  <div class="bg-red-50 border-l-4 border-red-600 p-4 mb-4">
+    <p class="font-bold text-red-800">"버그 39개보다, Granola를 쓰는 사용자가 Kairos로 넘어와야 할 '결정적 30초'를 증명하거나 격차를 직면" — gemini F2</p>
+    <p class="text-sm mt-2 text-red-700"><strong>결과: 30초 룰 FAIL. "Granola → Kairos" 결정적 이유 — 없음.</strong></p>
+  </div>
+
+  <table class="w-full bg-white rounded-lg shadow text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2 text-left">도구</th>
+        <th class="p-2">TTFV (초)</th>
+        <th class="p-2">5초 룰</th>
+        <th class="p-2">30초 룰</th>
+        <th class="p-2">1분 룰</th>
+        <th class="p-2">도입 결정 (PM)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="p-2 font-semibold">Kairos</td>
+        <td class="p-2 text-center font-mono">255.5</td>
+        <td class="heat-fail p-2 text-center">FAIL</td>
+        <td class="heat-fail p-2 text-center">FAIL</td>
+        <td class="heat-warn p-2 text-center">Maybe</td>
+        <td class="heat-fail p-2 text-center">Maybe→No</td>
+      </tr>
+      <tr>
+        <td class="p-2 font-semibold">Granola</td>
+        <td class="p-2 text-center text-gray-500">n/a (macOS native)</td>
+        <td class="heat-pass p-2 text-center">PASS</td>
+        <td class="heat-pass p-2 text-center">PASS</td>
+        <td class="heat-pass p-2 text-center">Yes</td>
+        <td class="heat-pass p-2 text-center">Yes</td>
+      </tr>
+      <tr>
+        <td class="p-2 font-semibold">Notion AI</td>
+        <td class="p-2 text-center text-gray-500">n/a (기존 계정)</td>
+        <td class="heat-pass p-2 text-center">PASS</td>
+        <td class="heat-pass p-2 text-center">PASS</td>
+        <td class="heat-pass p-2 text-center">PASS</td>
+        <td class="heat-pass p-2 text-center">Yes (사용 중)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 class="text-lg font-semibold mt-4 mb-2">격차 원인</h3>
+  <ol class="list-decimal list-inside space-y-1 bg-white rounded-lg shadow p-4 text-sm">
+    <li>Landing 단일 viewport — Features/How-it-works/Social proof/Pricing 섹션 0</li>
+    <li>Onboarding step 1~4 미발화 (BUG-CURIOUS-003)</li>
+    <li>핵심 wedge 미증명 — "한국어 회의 RAG + 소스 인용"이 landing에 0 표시</li>
+    <li>신뢰 신호 0 — 가격/약관/SOC2 없음 (Granola Series C / Notion SOC2 대비)</li>
+    <li>AI hallucinate (BUG-CURIOUS-001 + BUG-POW-005 MOCK) — "AI 거짓말" 인식</li>
+  </ol>
+
+  <h3 class="text-lg font-semibold mt-4 mb-2">Kairos의 검증된 강점 (Landing에 보이지 않는)</h3>
+  <ul class="list-disc list-inside space-y-1 bg-white rounded-lg shadow p-4 text-sm">
+    <li><strong>한국어 native</strong> RAG + UI + 답변 (Granola 영어 only, Notion AI 한국어 약함)</li>
+    <li><strong>소스 인용 클릭 가능</strong> — 회의/노트 deep-link, evidence 제공 (Notion AI page link 대비 회의 detail 강함)</li>
+    <li><strong>회의 STT + 화자 분리 + 액션 추출</strong> (Notion AI 미지원, Granola 영어 only)</li>
+  </ul>
+
+  <h3 class="text-lg font-semibold mt-4 mb-2">Sprint 24+ 권고</h3>
+  <ul class="list-disc list-inside space-y-1 bg-white rounded-lg shadow p-4 text-sm">
+    <li>T-LAND-01 Landing wedge headline + RAG demo (4h, 마케팅 sprint 분리 권장)</li>
+    <li>T-LAND-02 Use case 카테고리 + Pricing + ToS (3h)</li>
+    <li>T-OBN-05 Onboarding 발화 fix (2h) — Sprint 24 P0</li>
+    <li>T-AI-DATE + T-RAG-MOCK-REMOVE 신뢰 회복 (2.5h) — Sprint 24 P0</li>
+  </ul>
+</section>
+
+<!-- 5. UX 인상 비교 (Curious vs Casual) -->
+<section class="page-break">
+  <h2 class="text-2xl font-bold mb-4">5. UX 인상 비교 (Curious vs Casual)</h2>
+  <table class="w-full bg-white rounded-lg shadow text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2 text-left">관점</th>
+        <th class="p-2 text-left">Curious (도입 검토 PM)</th>
+        <th class="p-2 text-left">Casual (비기술 일상 사용자)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="p-2 font-semibold">첫인상</td>
+        <td class="p-2">5초/30초 룰 FAIL. 컨셉만 있고 증거 0.</td>
+        <td class="p-2">Task A (회의 업로드→AI 요약) 40초 PASS. 일상 사용 가능.</td>
+      </tr>
+      <tr>
+        <td class="p-2 font-semibold">막힘 지점</td>
+        <td class="p-2">가입 마찰 6/10. ToS/Privacy 부재 -2.</td>
+        <td class="p-2">7건 / 5건 미해결 (포기). Task B (Inbox promote) FAIL.</td>
+      </tr>
+      <tr>
+        <td class="p-2 font-semibold">신뢰</td>
+        <td class="p-2">Granola Series C / Notion SOC2 대비 0. PM evaluation 자동 탈락.</td>
+        <td class="p-2">용어 해독률 33-60%. promote 카피 3종 동시 노출 → 혼란.</td>
+      </tr>
+      <tr>
+        <td class="p-2 font-semibold">AI 인상</td>
+        <td class="p-2">RAG /ask 7/10 (소스 인용 강점) but 액션 마감일 2024년 hallucinate → 신뢰 손상</td>
+        <td class="p-2">cross-verify: 연도 명시 input → 정확 = prompt fix 명확</td>
+      </tr>
+      <tr>
+        <td class="p-2 font-semibold">결정</td>
+        <td class="p-2"><span class="badge bg-fail">Maybe → No</span></td>
+        <td class="p-2"><span class="badge bg-med">사용 가능, 그러나 막힘 다수</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="text-sm mt-4 text-gray-600">두 페르소나 시각 차이 명확 (codex F5 해소): Curious = 도입 결정 차원, Casual = 과업 성공률 + a11y. 같은 화면 보더라도 다른 결론.</p>
+</section>
+
+<!-- 6. 회귀 점검 결과 -->
+<section class="page-break">
+  <h2 class="text-2xl font-bold mb-4">6. 회귀 점검 결과 (Sprint 19~23)</h2>
+  <table class="w-full bg-white rounded-lg shadow text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2 text-left">#</th>
+        <th class="p-2 text-left">Sprint</th>
+        <th class="p-2 text-left">영역</th>
+        <th class="p-2 text-left">시나리오</th>
+        <th class="p-2">결과</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="p-2">R1</td><td class="p-2">19</td><td class="p-2">BUG-C01-EXT</td><td class="p-2">Workspace IDOR 13 endpoint 재검증</td><td class="heat-pass p-2 text-center">✅ PASS (74 pytest)</td></tr>
+      <tr><td class="p-2">R2</td><td class="p-2">19</td><td class="p-2">composite FK</td><td class="p-2">ProjectMember cross-ws 차단</td><td class="heat-pass p-2 text-center">✅ PASS</td></tr>
+      <tr><td class="p-2">R3</td><td class="p-2">20</td><td class="p-2">BL-052/053/054</td><td class="p-2">SQLModel/AsyncSession import 정합</td><td class="heat-pass p-2 text-center">✅ PASS (잔재 0)</td></tr>
+      <tr><td class="p-2">R4</td><td class="p-2">21</td><td class="p-2">BL-050</td><td class="p-2">composite FK 4 entity (SCN-FK-01~12)</td><td class="heat-pass p-2 text-center">✅ 12/12 PASS</td></tr>
+      <tr><td class="p-2">R5</td><td class="p-2">22</td><td class="p-2">OBN-01~04</td><td class="p-2">신규 가입 → lazy personal seed (BE 정적)</td><td class="heat-warn p-2 text-center">🟡 BE PASS / FE 미발화 (BUG-CURIOUS-003)</td></tr>
+      <tr><td class="p-2">R6</td><td class="p-2">22</td><td class="p-2">Sentry</td><td class="p-2">FE+BE conditional init + PII scrub (mock)</td><td class="heat-pass p-2 text-center">✅ PASS (mock)</td></tr>
+      <tr><td class="p-2">R7</td><td class="p-2">23</td><td class="p-2">D1~D4</td><td class="p-2">dogfood fix 정적 분석</td><td class="heat-pass p-2 text-center">✅ 4/4 PASS</td></tr>
+      <tr><td class="p-2">R8</td><td class="p-2">23</td><td class="p-2">F1~F4</td><td class="p-2">Sprint 22 carry-over fix</td><td class="heat-pass p-2 text-center">✅ PASS</td></tr>
+    </tbody>
+  </table>
+  <p class="text-sm mt-4 bg-yellow-50 border-l-4 border-yellow-600 p-3">
+    ⚠️ <strong>R5 회귀</strong>: BE 정적 분석은 PASS but Curious dogfood에서 FE UI 발화 0 발견. <strong>BUG-CURIOUS-003 = Sprint 22 OBN-01~04 회귀</strong>. Sprint 24 T-OBN-05 P0 fix 필수.
+  </p>
+</section>
+
+<!-- 7. 우선순위 매트릭스 -->
+<section class="page-break">
+  <h2 class="text-2xl font-bold mb-4">7. 우선순위 매트릭스 (Impact × Effort)</h2>
+  <table class="w-full bg-white rounded-lg shadow text-sm">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="p-2">우선</th>
+        <th class="p-2 text-left">Task</th>
+        <th class="p-2">BUG/BL</th>
+        <th class="p-2">시간</th>
+        <th class="p-2 text-left">근거</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="bg-red-50">
+        <td class="p-2 text-center"><span class="badge bg-crit">P0</span></td>
+        <td class="p-2"><strong>T-1 Gemini Phase B swap</strong></td>
+        <td class="p-2 text-xs">ADR-019</td>
+        <td class="p-2 text-center">3h</td>
+        <td class="p-2 text-xs">데드라인 2026-05-28</td>
+      </tr>
+      <tr class="bg-red-50">
+        <td class="p-2 text-center"><span class="badge bg-crit">P0</span></td>
+        <td class="p-2"><strong>T-2 Post-Swap Delta 측정</strong></td>
+        <td class="p-2 text-xs">gemini F2</td>
+        <td class="p-2 text-center">2h</td>
+        <td class="p-2 text-xs">5 시나리오 baseline vs post-swap diff</td>
+      </tr>
+      <tr class="bg-red-50">
+        <td class="p-2 text-center"><span class="badge bg-crit">P0</span></td>
+        <td class="p-2"><strong>T-AI-DATE 액션 연도 hallucinate fix</strong></td>
+        <td class="p-2 text-xs">BUG-CURIOUS-001</td>
+        <td class="p-2 text-center">1.5h</td>
+        <td class="p-2 text-xs">PM 신뢰 차단</td>
+      </tr>
+      <tr class="bg-red-50">
+        <td class="p-2 text-center"><span class="badge bg-crit">P0</span></td>
+        <td class="p-2"><strong>T-RAG-MOCK-REMOVE</strong></td>
+        <td class="p-2 text-xs">BUG-POW-005</td>
+        <td class="p-2 text-center">1h</td>
+        <td class="p-2 text-xs">"AI 거짓말" 인식 직결</td>
+      </tr>
+      <tr class="bg-orange-50">
+        <td class="p-2 text-center"><span class="badge bg-high">P0</span></td>
+        <td class="p-2"><strong>T-OBN-05 Onboarding 발화</strong></td>
+        <td class="p-2 text-xs">BUG-CURIOUS-003</td>
+        <td class="p-2 text-center">2h</td>
+        <td class="p-2 text-xs">Sprint 22 회귀</td>
+      </tr>
+      <tr class="bg-orange-50">
+        <td class="p-2 text-center"><span class="badge bg-high">P0</span></td>
+        <td class="p-2"><strong>T-MOBILE-HEADER 헤더 우측 잘림</strong></td>
+        <td class="p-2 text-xs">BUG-MOBILE-001</td>
+        <td class="p-2 text-center">0.5-1h</td>
+        <td class="p-2 text-xs">3 viewport 일관 fail, 프로필/로그아웃 도달 불가</td>
+      </tr>
+      <tr class="bg-orange-50">
+        <td class="p-2 text-center"><span class="badge bg-high">P1</span></td>
+        <td class="p-2"><strong>T-BE-PERF dashboard 첫 진입 spike</strong></td>
+        <td class="p-2 text-xs">BUG-MOBILE-005</td>
+        <td class="p-2 text-center">4-6h</td>
+        <td class="p-2 text-xs">localhost 3-4s → 3G 7-10s cancel 임계</td>
+      </tr>
+      <tr class="bg-orange-50">
+        <td class="p-2 text-center"><span class="badge bg-high">P1</span></td>
+        <td class="p-2"><strong>T-PROJ-LIST</strong></td>
+        <td class="p-2 text-xs">BUG-CASUAL-001</td>
+        <td class="p-2 text-center">2h</td>
+        <td class="p-2 text-xs">sidebar dead-end</td>
+      </tr>
+      <tr class="bg-orange-50">
+        <td class="p-2 text-center"><span class="badge bg-high">P1</span></td>
+        <td class="p-2"><strong>T-NOTE-DETAIL</strong></td>
+        <td class="p-2 text-xs">BUG-POW-003</td>
+        <td class="p-2 text-center">3h</td>
+        <td class="p-2 text-xs">NoteExportButton 100% 도달 불가</td>
+      </tr>
+      <tr class="bg-orange-50">
+        <td class="p-2 text-center"><span class="badge bg-high">P1</span></td>
+        <td class="p-2"><strong>T-CMD-K-FIX</strong></td>
+        <td class="p-2 text-xs">BUG-CURIOUS-002</td>
+        <td class="p-2 text-center">1h</td>
+        <td class="p-2 text-xs">100% 재현 dead-click</td>
+      </tr>
+      <tr class="bg-orange-50">
+        <td class="p-2 text-center"><span class="badge bg-high">P1</span></td>
+        <td class="p-2"><strong>T-RAG-TIME-FILTER</strong></td>
+        <td class="p-2 text-xs">BUG-POW-006</td>
+        <td class="p-2 text-center">2h</td>
+        <td class="p-2 text-xs">약속한 UI 동작 안함</td>
+      </tr>
+      <tr class="bg-orange-50">
+        <td class="p-2 text-center"><span class="badge bg-high">P1</span></td>
+        <td class="p-2"><strong>T-AUDIT-VIEW</strong></td>
+        <td class="p-2 text-xs">BUG-POW-008</td>
+        <td class="p-2 text-center">4h</td>
+        <td class="p-2 text-xs">compliance 차단</td>
+      </tr>
+      <tr class="bg-red-50">
+        <td class="p-2 text-center"><span class="badge bg-crit">P0</span></td>
+        <td class="p-2"><strong>T-N+1 BL-006 헌법</strong></td>
+        <td class="p-2 text-xs">BL-006</td>
+        <td class="p-2 text-center">3h</td>
+        <td class="p-2 text-xs">헌법 §4.2 위반 (cross-domain import)</td>
+      </tr>
+      <tr class="bg-orange-50">
+        <td class="p-2 text-center"><span class="badge bg-high">P1</span></td>
+        <td class="p-2"><strong>T-N+4 BL-T2-003 Whisper chunk</strong></td>
+        <td class="p-2 text-xs">BL-T2-003</td>
+        <td class="p-2 text-center">4h</td>
+        <td class="p-2 text-xs">production 4hr+ 차단</td>
+      </tr>
+      <tr class="bg-orange-50">
+        <td class="p-2 text-center"><span class="badge bg-high">P1</span></td>
+        <td class="p-2"><strong>T-N+2 composite FK fixture</strong></td>
+        <td class="p-2 text-xs">SCN-FK-01~12</td>
+        <td class="p-2 text-center">2h</td>
+        <td class="p-2 text-xs">회귀 안전망</td>
+      </tr>
+      <tr class="bg-gray-50 text-xs">
+        <td class="p-2 text-center"><span class="badge bg-med">P2</span></td>
+        <td class="p-2">T-VOCAB/MOBILE-NAV/A11Y-SKIP/A11Y-CC/CMD-K-SEQ/INBOX-COPY</td>
+        <td class="p-2">CASUAL/POW Medium</td>
+        <td class="p-2 text-center">5.5h</td>
+        <td class="p-2">UX/a11y 폴리시</td>
+      </tr>
+      <tr class="bg-gray-100 text-xs">
+        <td class="p-2 text-center"><span class="badge bg-low">P3 carry</span></td>
+        <td class="p-2">T-INBOX-BULK + T-API-PAT + T-EXPORT-ZIP + BL-T2 5건 + T-LAND-01/02</td>
+        <td class="p-2">Sprint 25</td>
+        <td class="p-2 text-center">~25h</td>
+        <td class="p-2">Sprint 24 데드라인 외</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="text-sm mt-4 font-semibold">총 P0+P1 = 27.5-37.5h (T-BE-PERF spike 4-6h 포함) / 9일 (~36-54h working) = <strong>충분</strong>. T-BE-PERF는 Sprint 25 carry 옵션도 가능. P2/P3는 Sprint 25 carry.</p>
+</section>
+
+<!-- 8. Sprint 24 진입 결론 + Post-Swap Delta Stub -->
+<section class="page-break">
+  <h2 class="text-2xl font-bold mb-4">8. Sprint 24 진입 결론 + Post-Swap Delta Stub</h2>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-4">
+    <h3 class="text-lg font-semibold">진입 결정</h3>
+    <p class="text-sm mt-2"><span class="badge bg-pass">PROCEED</span> Sprint 24 진입 가능. Fail-Fast 게이트 미발동. Critical FAIL이 보안/멀티테넌시 영역에서 0건이므로 베이스라인 안전. dogfood-blocking 결함은 신뢰/UX 영역에 집중 → Sprint 24 T-AI-DATE + T-RAG-MOCK-REMOVE + T-OBN-05 + T-PROJ-LIST + T-NOTE-DETAIL 묶음 우선 fix.</p>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-4">
+    <h3 class="text-lg font-semibold">Phase B Post-Swap Delta 5 시나리오 (gemini F2 stub)</h3>
+    <p class="text-sm mt-2">T-1 swap 직전 baseline 수집 → T-2 swap 직후 동일 입력 재실행 → diff:</p>
+    <ol class="list-decimal list-inside text-sm mt-2">
+      <li>DELTA-1 RAG 답변 품질 (5 질문)</li>
+      <li>DELTA-2 회의 요약 길이/완전성 (5 sample)</li>
+      <li>DELTA-3 액션 아이템 추출 정확도 (5 sample)</li>
+      <li>DELTA-4 한국어 처리 (이모지/존댓말/방언)</li>
+      <li>DELTA-5 Inbox 자동 분류 confidence (5 sample)</li>
+    </ol>
+    <p class="text-sm mt-2 text-gray-600">기준 위반 (DELTA-1 worse 1건 이상 / DELTA-3 precision-recall -10% 초과 / DELTA-2/4/5 ±20% 초과) 시 Phase B 일시 중단 + fallback. 상세 = post-swap-delta-stub.md</p>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-4 mb-4">
+    <h3 class="text-lg font-semibold">Sprint 24 일정 (9일)</h3>
+    <table class="w-full text-sm mt-2">
+      <thead class="bg-gray-100"><tr><th class="p-2 text-left">날짜</th><th class="p-2 text-left">작업</th><th class="p-2">누적 시간</th></tr></thead>
+      <tbody>
+        <tr><td class="p-2">05-20</td><td class="p-2">T-1 Gemini swap (3h)</td><td class="p-2 text-center">3h</td></tr>
+        <tr><td class="p-2">05-21</td><td class="p-2">T-2 Delta + T-AI-DATE + T-RAG-MOCK-REMOVE (4.5h)</td><td class="p-2 text-center">7.5h</td></tr>
+        <tr><td class="p-2">05-22</td><td class="p-2">T-OBN-05 + T-MOBILE-HEADER + T-PROJ-LIST (4.5-5h, P0 High bundle)</td><td class="p-2 text-center">12.5h</td></tr>
+        <tr><td class="p-2">05-23</td><td class="p-2">T-NOTE-DETAIL + T-CMD-K-FIX (4h)</td><td class="p-2 text-center">16.5h</td></tr>
+        <tr><td class="p-2">05-24</td><td class="p-2">T-RAG-TIME-FILTER + T-AUDIT-VIEW (6h)</td><td class="p-2 text-center">22.5h</td></tr>
+        <tr><td class="p-2">05-25</td><td class="p-2">T-BE-PERF spike (4-6h, P1 Performance)</td><td class="p-2 text-center">28.5h</td></tr>
+        <tr><td class="p-2">05-26</td><td class="p-2">T-N+1 BL-006 (3h) + T-N+4 BL-T2-003 시작 (4h)</td><td class="p-2 text-center">35.5h</td></tr>
+        <tr><td class="p-2">05-27</td><td class="p-2">T-N+2 composite FK fixture + dogfood + 통합 테스트</td><td class="p-2 text-center">37.5h</td></tr>
+        <tr class="bg-green-50"><td class="p-2 font-semibold">05-28</td><td class="p-2 font-semibold">PR merge + Phase B 데드라인 ✅</td><td class="p-2 text-center">마무리</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 9. Evidence Matrix 요약 -->
+<section class="page-break">
+  <h2 class="text-2xl font-bold mb-4">9. Evidence Matrix 요약 (codex F7)</h2>
+  <p class="text-sm mb-2">상세는 <code>evidence-matrix.md</code> 참조. 본 섹션은 ID 연결 요약.</p>
+  <ul class="list-disc list-inside text-sm bg-white rounded-lg shadow p-4 space-y-1">
+    <li><strong>SCN-</strong> = 시나리오 ID (총 60+ — Sentinel 63 + Curious 11 + Casual 13 + Power 6 + Mobile TBD)</li>
+    <li><strong>BUG-</strong> = 페르소나 발견 결함 (총 17 = Curious 3 + Casual 6 + Power 8)</li>
+    <li><strong>BL-</strong> = REFACTORING-BACKLOG.md 등재 (총 8 = BL-006 + BL-T2-001~007)</li>
+    <li><strong>T-</strong> = Sprint 24 plan 작업 (총 14 = T-1/T-2 + T-AI-DATE + T-RAG-MOCK-REMOVE + T-OBN-05 + T-PROJ-LIST + T-NOTE-DETAIL + T-CMD-K-FIX + T-RAG-TIME-FILTER + T-AUDIT-VIEW + T-N+1/+2/+4)</li>
+  </ul>
+  <p class="text-sm mt-4">연결 규칙: <strong>1 BUG → 1 SCN + (필요 시) 1 BL + 1 T</strong>. 끊김 없는 추적성.</p>
+</section>
+
+<!-- 10. Appendix -->
+<section class="page-break">
+  <h2 class="text-2xl font-bold mb-4">10. Appendix</h2>
+  <h3 class="text-lg font-semibold mt-4 mb-2">원본 보고서</h3>
+  <ul class="list-disc list-inside text-sm space-y-1">
+    <li><a href="./README.md" class="text-blue-600 underline">README.md</a> — 진입점 + Status</li>
+    <li><a href="./environment.txt" class="text-blue-600 underline">environment.txt</a> — git/runtime/secrets fingerprint</li>
+    <li><a href="./verification.md" class="text-blue-600 underline">verification.md</a> — §7-3/7-4/7-5 + Tier 1/2 + 회귀 + 페르소나 결과 매트릭스</li>
+    <li><a href="./evidence-matrix.md" class="text-blue-600 underline">evidence-matrix.md</a> — SCN-/BUG-/BL-/T- 연결</li>
+    <li><a href="./ttfv-gap-analysis.md" class="text-blue-600 underline">ttfv-gap-analysis.md</a> — Kairos vs Granola vs Notion AI (gemini F2 North Star)</li>
+    <li><a href="./post-swap-delta-stub.md" class="text-blue-600 underline">post-swap-delta-stub.md</a> — Phase B 5 시나리오 baseline</li>
+    <li><a href="./sprint-24-plan.md" class="text-blue-600 underline">sprint-24-plan.md</a> — T-N 작업 분해 + 일정 + 위험</li>
+    <li><a href="./qa-sentinel/MISSION.md" class="text-blue-600 underline">qa-sentinel/MISSION.md</a> + MISSION-tier2.md</li>
+    <li><a href="./curious/report.md" class="text-blue-600 underline">curious/report.md</a> + ttfv-measurement.md + competitor-granola.md + competitor-notion-ai.md</li>
+    <li><a href="./casual/report.md" class="text-blue-600 underline">casual/report.md</a> + axe-results.json</li>
+    <li>power/report.md (sub-agent 결과 본 통합 보고서에 흡수)</li>
+    <li>mobile/report.md (sub-agent 결과 도착 시 보강)</li>
+  </ul>
+  <h3 class="text-lg font-semibold mt-4 mb-2">관련 문서</h3>
+  <ul class="list-disc list-inside text-sm space-y-1">
+    <li><code>~/.claude/plans/reactive-meandering-dragonfly.md</code> — Plan v2 FINAL (codex+gemini 종합)</li>
+    <li><code>docs/dev-log/qa/2026-05-17-multi-agent-qa-sprint18/qa-report.md</code> — Sprint 18 baseline (Health 5.9/10)</li>
+    <li><code>docs/dev-log/sprints/2026-05-19-sprint22-result-report.html</code> — Sprint 22 dogfood</li>
+    <li><code>docs/REFACTORING-BACKLOG.md</code> — BL 등재 위치</li>
+    <li><code>CONTEXT-MAP.md</code> — 헌법 §4.2 도메인 경계</li>
+  </ul>
+</section>
+
+</main>
+
+<footer class="bg-white border-t border-gray-200 p-6 mt-10">
+  <div class="max-w-6xl mx-auto text-center text-sm text-gray-500">
+    Generated 2026-05-20 KST · Worktree <code>sprint-24/multi-agent-qa-mongoose-orbit</code> · Commit <code>d659c03</code><br>
+    Sprint 24 Multi-Agent QA · 5 페르소나 풀스트레치 · codex+gemini 리뷰 종합 plan v2
+  </div>
+</footer>
+
+</body>
+</html>

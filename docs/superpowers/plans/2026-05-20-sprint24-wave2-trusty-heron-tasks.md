@@ -68,8 +68,8 @@
 | `docs/architecture/ai-pipeline.md` | patch | T-AI-DATE + T-N+4 |
 | `docs/architecture/rag-pipeline.md` Layer 3 | patch | T-RAG-TIME-FILTER |
 | `docs/api/endpoints.md` | patch | T-AUDIT-VIEW |
-| `docs/dev-log/2026-05-19-sprint22-result-report.html` | patch (deprecated 라벨) | T-OBN-05 |
-| `docs/dev-log/2026-05-19-sprint22-dogfooding.md` | patch (deprecated 라벨) | T-OBN-05 |
+| `docs/dev-log/sprints/2026-05-19-sprint22-result-report.html` | patch (deprecated 라벨) | T-OBN-05 |
+| `docs/dev-log/sprints/2026-05-19-sprint22-dogfooding.md` | patch (deprecated 라벨) | T-OBN-05 |
 | `docs/superpowers/specs/2026-05-19-sprint22-onboarding-e2e-obs.md` | patch (deprecated 라벨) | T-OBN-05 |
 | `docs/superpowers/plans/2026-05-19-sprint22-tasks.md` | patch (deprecated 라벨) | T-OBN-05 |
 | `docs/REFACTORING-BACKLOG.md` | patch (BL-006 closed + BL-NEW-RAG-SOURCE-SELECT + BL-NEW-OBN-DATA-RETRY) | Phase 2 + 7 |
@@ -81,7 +81,7 @@
 
 **Files:**
 - Create: `backend/scripts/sprint24_wave2_delta.py`
-- Create: `docs/dev-log/2026-05-20-sprint24-wave2/post-swap-delta-report.md`
+- Create: `docs/dev-log/sprints/2026-05-20-sprint24-wave2/post-swap-delta-report.md`
 - Create: `backend/tests/llm/fixtures/sample_transcripts.py` (5 시나리오 fixture)
 
 **핵심**: `gemini-2.5-flash` (`003908a^`) baseline 직접 캡쳐 불가 (main 이미 swap 됨). **alternative**: temp branch checkout 후 동일 fixture 호출 + 결과 JSON 캡쳐 → 현재 main fixture 호출 결과와 비교.
@@ -188,7 +188,7 @@ async def measure_current() -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", default="docs/dev-log/2026-05-20-sprint24-wave2/post-swap-delta-result.json")
+    parser.add_argument("--output", default="docs/dev-log/sprints/2026-05-20-sprint24-wave2/post-swap-delta-result.json")
     args = parser.parse_args()
     result = asyncio.run(measure_current())
     output = Path(args.output)
@@ -208,7 +208,7 @@ Run:
 cd backend && uv run python -m scripts.sprint24_wave2_delta
 ```
 
-Expected: `docs/dev-log/2026-05-20-sprint24-wave2/post-swap-delta-result.json` 생성. 5 시나리오 JSON 응답 캡쳐.
+Expected: `docs/dev-log/sprints/2026-05-20-sprint24-wave2/post-swap-delta-result.json` 생성. 5 시나리오 JSON 응답 캡쳐.
 
 ### Task 3: baseline 캡쳐 (003908a^ checkout)
 
@@ -228,7 +228,7 @@ cd backend && uv run python -m scripts.sprint24_wave2_delta --output /tmp/baseli
 
 - [ ] **Step 6: baseline + current 비교 보고서 작성**
 
-Create `docs/dev-log/2026-05-20-sprint24-wave2/post-swap-delta-report.md`:
+Create `docs/dev-log/sprints/2026-05-20-sprint24-wave2/post-swap-delta-report.md`:
 
 ```markdown
 # Sprint 24 Wave 2 T-2 Post-Swap Delta Report (Phase B Gemini swap 003908a)
@@ -282,7 +282,7 @@ Gate FAIL → 즉시 사용자 보고. revert PR 옵션 또는 prompt tuning 검
 
 ```bash
 cd /Users/woosung/project/agy-project/kairos-sprint-24-wave2
-git add backend/scripts/sprint24_wave2_delta.py backend/tests/llm/fixtures/sample_transcripts.py docs/dev-log/2026-05-20-sprint24-wave2/
+git add backend/scripts/sprint24_wave2_delta.py backend/tests/llm/fixtures/sample_transcripts.py docs/dev-log/sprints/2026-05-20-sprint24-wave2/
 git commit -m "feat(spike): Sprint 24 Wave 2 Phase 1 — T-2 Post-Swap Delta 측정 (gemini swap 003908a 품질 검증 PASS/FAIL)"
 ```
 
@@ -863,7 +863,7 @@ Modify `frontend/e2e/tests/mobile-responsive.spec.ts`:
 
 - [ ] **Step 36: 4 문서 헤더에 deprecated 라벨 추가**
 
-Modify `docs/dev-log/2026-05-19-sprint22-result-report.html` 최상단:
+Modify `docs/dev-log/sprints/2026-05-19-sprint22-result-report.html` 최상단:
 ```html
 <!-- Sprint 24 Wave 2 T-OBN-05 D 옵션 (2026-05-20): OnboardingBanner FE 폐기 결정.
      상세: docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md §T-OBN-05 -->
@@ -872,7 +872,7 @@ Modify `docs/dev-log/2026-05-19-sprint22-result-report.html` 최상단:
 </div>
 ```
 
-Modify `docs/dev-log/2026-05-19-sprint22-dogfooding.md`:
+Modify `docs/dev-log/sprints/2026-05-19-sprint22-dogfooding.md`:
 ```markdown
 > ⚠️ **Sprint 24 Wave 2 부분 deprecated** (2026-05-20): OnboardingBanner FE 부분은 폐기됨 (D 옵션). 
 > 상세: `docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md` §T-OBN-05
@@ -980,8 +980,8 @@ git add frontend/src/components/ui/tooltip.tsx frontend/src/components/ui/popove
   frontend/e2e/tests/home.spec.ts \
   frontend/e2e/tests/first-project.spec.ts \
   frontend/e2e/tests/mobile-responsive.spec.ts \
-  docs/dev-log/2026-05-19-sprint22-result-report.html \
-  docs/dev-log/2026-05-19-sprint22-dogfooding.md \
+  docs/dev-log/sprints/2026-05-19-sprint22-result-report.html \
+  docs/dev-log/sprints/2026-05-19-sprint22-dogfooding.md \
   docs/superpowers/specs/2026-05-19-sprint22-onboarding-e2e-obs.md \
   docs/superpowers/plans/2026-05-19-sprint22-tasks.md \
   docs/REFACTORING-BACKLOG.md \
@@ -1818,7 +1818,7 @@ EOF
 
 **Files:**
 - Create: `backend/scripts/sprint24_wave2_perf_spike.py`
-- Create: `docs/dev-log/2026-05-20-sprint24-wave2/be-perf-spike.md`
+- Create: `docs/dev-log/sprints/2026-05-20-sprint24-wave2/be-perf-spike.md`
 - (Top 1 fix 대상에 따라) Modify: `backend/src/auth/dependencies.py` 또는 다른 hot path
 
 ### Task 24: T-BE-PERF spike (sub-agent dispatch 후보)
@@ -1903,7 +1903,7 @@ if __name__ == "__main__":
 cd backend && uv run python -m scripts.sprint24_wave2_perf_spike > /tmp/perf-spike.txt
 ```
 
-Create `docs/dev-log/2026-05-20-sprint24-wave2/be-perf-spike.md`:
+Create `docs/dev-log/sprints/2026-05-20-sprint24-wave2/be-perf-spike.md`:
 
 ```markdown
 # Sprint 24 Wave 2 T-BE-PERF Spike Report
@@ -1981,12 +1981,12 @@ Expected: pytest 회귀 0 + spike 결과 개선 (Top 1 영역).
 - [ ] **Step 70: Phase 6 commit**
 
 ```bash
-git add backend/scripts/sprint24_wave2_perf_spike.py docs/dev-log/2026-05-20-sprint24-wave2/be-perf-spike.md backend/src/auth/dependencies.py
+git add backend/scripts/sprint24_wave2_perf_spike.py docs/dev-log/sprints/2026-05-20-sprint24-wave2/be-perf-spike.md backend/src/auth/dependencies.py
 git commit -m "perf(p1): Sprint 24 Wave 2 Phase 6 — T-BE-PERF spike + Top 1 fix (BUG-MOBILE-005)
 
 - Spike: SQLAlchemy event listener + cProfile (dashboard 4 API 첫 진입)
 - Top 1 fix: (profiling 결과에 따라 결정)
-- 측정 report: docs/dev-log/2026-05-20-sprint24-wave2/be-perf-spike.md
+- 측정 report: docs/dev-log/sprints/2026-05-20-sprint24-wave2/be-perf-spike.md
 
 Tests: 397 회귀 0
 

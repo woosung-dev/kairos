@@ -22,7 +22,7 @@
 | `backend/src/embeddings/models.py` | modify (EmbeddingChunk + SemanticCache 각 `__table_args__` 신설 + import) | Task 2.3 |
 | `backend/alembic/versions/<rev>_bl050_simple4_composite_fk.py` | create | Task 3 |
 | `docs/REFACTORING-BACKLOG.md` | modify (BL-050 § Simple 4 ✅ mark) | Task 4.1 |
-| `docs/dev-log/2026-05-18-bl050-simple4-composite-fk.md` | create | Task 4.2 |
+| `docs/dev-log/notes/2026-05-18-bl050-simple4-composite-fk.md` | create | Task 4.2 |
 | `docs/architecture/erd.md` | modify (4 composite FK relationship 갱신) | Task 4.3 |
 
 ---
@@ -748,7 +748,7 @@ EOF
 
 ### Step 4.2: dev-log 신설
 
-- [ ] **Create `docs/dev-log/2026-05-18-bl050-simple4-composite-fk.md` (Nygard 포맷)**
+- [ ] **Create `docs/dev-log/notes/2026-05-18-bl050-simple4-composite-fk.md` (Nygard 포맷)**
 
 ```markdown
 # BL-050 Simple 4 — Cross-workspace Composite FK Hardening (Sprint 21)
@@ -848,13 +848,13 @@ verdict = APPROVE 권장. REVISE 시 finding 100% 수락 → patch 추가 commit
 
 ```bash
 cd /Users/woosung/project/agy-project/kairos-sprint-21
-git add docs/REFACTORING-BACKLOG.md docs/dev-log/2026-05-18-bl050-simple4-composite-fk.md docs/architecture/erd.md
+git add docs/REFACTORING-BACKLOG.md docs/dev-log/notes/2026-05-18-bl050-simple4-composite-fk.md docs/architecture/erd.md
 git commit -m "$(cat <<'EOF'
 docs(bl-050): D4 closeout — BACKLOG 🟡 PARTIAL mark + dev-log + ERD 갱신
 
 Sprint 21 BL-050 Simple 4 closeout:
 - docs/REFACTORING-BACKLOG.md BL-050 § 🟡 PARTIAL mark + Simple 4 ✅ + Sprint 22 carry-over
-- docs/dev-log/2026-05-18-bl050-simple4-composite-fk.md (Nygard 포맷, PR #NN reference)
+- docs/dev-log/notes/2026-05-18-bl050-simple4-composite-fk.md (Nygard 포맷, PR #NN reference)
 - docs/architecture/erd.md composite FK 4 relationship 갱신
 
 Atomic Update §4 매트릭스 준수 (model 변경 + alembic + ERD 동시 commit).
@@ -935,8 +935,8 @@ EOF
 
 ```bash
 gh pr view --json number
-# 출력된 번호로 docs/REFACTORING-BACKLOG.md 와 docs/dev-log/2026-05-18-bl050-simple4-composite-fk.md 의 "#NN" 일괄 치환
-git add docs/REFACTORING-BACKLOG.md docs/dev-log/2026-05-18-bl050-simple4-composite-fk.md
+# 출력된 번호로 docs/REFACTORING-BACKLOG.md 와 docs/dev-log/notes/2026-05-18-bl050-simple4-composite-fk.md 의 "#NN" 일괄 치환
+git add docs/REFACTORING-BACKLOG.md docs/dev-log/notes/2026-05-18-bl050-simple4-composite-fk.md
 git commit -m "docs(bl-050): PR 번호 #<N> 확정 갱신"
 git push
 ```
@@ -999,7 +999,7 @@ git branch -D sprint-21/bl-050-composite-fk-simple4
 - `backend/src/{actions,inbox,embeddings}/models.py` (D2)
 - `backend/alembic/versions/<rev>_bl050_simple4_composite_fk.py` (D3 신설)
 - `docs/REFACTORING-BACKLOG.md` (D4)
-- `docs/dev-log/2026-05-18-bl050-simple4-composite-fk.md` (D4 신설)
+- `docs/dev-log/notes/2026-05-18-bl050-simple4-composite-fk.md` (D4 신설)
 - `docs/architecture/erd.md` (D4)
 
 ---

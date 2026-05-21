@@ -43,7 +43,7 @@
 
 **도구:** `/plan-eng-review` + 직접 문서 작성
 
-1. 기술 스택 결정 → `docs/dev-log/001-tech-stack.md` (ADR)
+1. 기술 스택 결정 → `docs/dev-log/adr/001-tech-stack.md` (ADR)
 2. 데이터 모델 설계 → `docs/architecture/erd.md` (전체 Phase 고려)
 3. API 경계 설계 → `docs/api/endpoints.md` (FE mock API와 1:1 대응)
 4. 파이프라인 설계 → `docs/architecture/` (데이터 흐름, 비동기 패턴)

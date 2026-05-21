@@ -165,7 +165,7 @@ Sprint 23 D4 promote sprint (`d659c03`) 가 4 도메인 (meetings/notes/inbox/ac
 
 | 파일 | 역할 | 변경 |
 |---|---|---|
-| `docs/dev-log/2026-05-19-sprint24-bl-066-verify.md` | dogfood 진단 결과 보고서 (D1 + D3 screenshot + 검증 포인트) | NEW |
+| `docs/dev-log/sprints/2026-05-19-sprint24-bl-066-verify.md` | dogfood 진단 결과 보고서 (D1 + D3 screenshot + 검증 포인트) | NEW |
 | `frontend/tests/e2e/specs/workspace-switch.spec.ts` | skip 가드 제거 + dashboard data assertion (효과 충분 시) | MOD |
 | `frontend/tests/e2e/specs/inbox-dismiss.spec.ts` | dismiss → list disappear → reload 후 보존 | NEW (선택) |
 
@@ -354,7 +354,7 @@ Playwright MCP browser_navigate/click/snapshot 결과로 D1/D3 실 효과 확인
 ### 내부
 - plan: `~/.claude/plans/sprint-24-adr-019-distributed-dolphin.md` (codename diligent-beaver로 결정됨)
 - Sprint 23 closeout memory: `~/.claude/projects/-Users-woosung-project-agy-project-kairos/memory/project_sprint23_cozy_crystal_done.md`
-- ADR-019 Phase B 결과: `docs/dev-log/019-gemini-eol-migration.md` §Implementation Phase B (DONE 2026-05-15)
+- ADR-019 Phase B 결과: `docs/dev-log/adr/019-gemini-eol-migration.md` §Implementation Phase B (DONE 2026-05-15)
 - 이전 sprint spec/plan 패턴: `docs/superpowers/specs/2026-05-19-sprint23-cozy-crystal-design.md` + `docs/superpowers/plans/2026-05-19-sprint23-cozy-crystal-tasks.md`
 
 ### 코드 참조 (Sprint 23 학습)

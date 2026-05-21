@@ -17,7 +17,7 @@
  *     --no-deps --workers=1 --reporter=list --project=chromium
  *
  * 산출:
- *   docs/dev-log/2026-05-17-multi-agent-qa-sprint18/sentinel-p0-results.json
+ *   docs/dev-log/qa/2026-05-17-multi-agent-qa-sprint18/sentinel-p0-results.json
  *
  * Plan: ~/.claude/plans/wise-hugging-newell.md
  */
@@ -37,11 +37,11 @@ const SENTINEL_B_EMAIL = "wkddntjd3429-0@naver.com";
 const API_URL = process.env.E2E_API_URL ?? "http://localhost:8000";
 const FIXTURES_PATH = path.resolve(
   __dirname,
-  "../../../docs/dev-log/2026-05-17-multi-agent-qa-sprint18/seed-fixtures.json",
+  "../../../docs/dev-log/qa/2026-05-17-multi-agent-qa-sprint18/seed-fixtures.json",
 );
 const RESULTS_PATH = path.resolve(
   __dirname,
-  "../../../docs/dev-log/2026-05-17-multi-agent-qa-sprint18/sentinel-p0-results.json",
+  "../../../docs/dev-log/qa/2026-05-17-multi-agent-qa-sprint18/sentinel-p0-results.json",
 );
 
 test.use({ storageState: { cookies: [], origins: [] } });

@@ -23,7 +23,7 @@
 
 - ~~Clerk Production key 발급~~ — **2026-05-21 사용자 의도적 SKIP 결정** (memory `project_gcp_migration_jetaime_dev_done.md`). GA launch 시점 별도 sprint. Sprint 25 의존 0.
 - [ ] **Sentry DSN 발급** — Sprint 22 conditional init 활성화. 발급 + Vercel/Cloud Run env 등록 + 알람 verify. Sprint 24 Wave 2 BL-NEW-BE-PERF-COLD-START 진단 선행 조건.
-- [ ] **외부 user 1명 실제 dogfooding** — Sprint 22 spec `docs/dev-log/2026-05-19-sprint22-dogfooding.md` 12분 walkthrough.
+- [ ] **외부 user 1명 실제 dogfooding** — Sprint 22 spec `docs/dev-log/sprints/2026-05-19-sprint22-dogfooding.md` 12분 walkthrough.
 
 ---
 
@@ -84,7 +84,7 @@
   - [x] **Wave 3 P2** T-AI-1 ADR-019 Phase B post-swap LLM 계약 13 case (model lock-in + prompt contract + post-processing guards + Pydantic schema)
   - [x] **Phase 4** Atomic docs sync — upload/CONTEXT.md 신설 + endpoints.md sync + ADR-022 신설 + auth/CONTEXT.md ADR cross-link
   - [x] **Phase 5** 검증 — backend pytest **452 passed + 1 skipped** (baseline 427 + 25 신규) / FE typecheck 0 / vitest 56 / build 12/12 OK / production BE smoke
-  - 산출물: PR pending (push 사용자 승인 대기) + ADR-022 (`docs/dev-log/022-clerk-webhook-skip.md`)
+  - 산출물: PR pending (push 사용자 승인 대기) + ADR-022 (`docs/dev-log/adr/022-clerk-webhook-skip.md`)
   - 잔여 사용자 작업: production DB cleanup (T-CLEANUP-1) + PR ready review + post-merge 배포 verify
 
 ---
@@ -136,7 +136,7 @@
   - [x] Playwright NEW 3 (G2/G7/G8) + G1 보강 + e2e baseline fix 4 commit.
   - [x] Codex 1차 (REVISE 7 finding plan v2 patch) + 1.5차 (Schema APPROVE) + 2차 (REVISE 3 P2 polish 수락) 3-cycle 100% 수락.
   - 검증: pytest **352 passed + 1 skipped** (baseline 325 + 27 신규) / pyright 신규 0 / FE typecheck 0 / FE build 12/12 OK.
-  - 산출물: `docs/dev-log/2026-05-19-sprint22-result-report.html` + `docs/dev-log/2026-05-19-sprint22-dogfooding.md`.
+  - 산출물: `docs/dev-log/sprints/2026-05-19-sprint22-result-report.html` + `docs/dev-log/sprints/2026-05-19-sprint22-dogfooding.md`.
 
 ## Recently Completed (2026-05-18 Sprint 20/21 cleanup PR)
 
@@ -160,7 +160,7 @@
   - [x] 통합 HTML + Sprint 19 plan 초안 (4축: 캐리오버 BL + QA 후속 + Mobile + 온보딩)
   - [x] Secret 격리 (~/.kairos-qa-secrets/) + .gitignore + spec PASSWORD ENV화
   - [x] QA harness (seed_qa_fixtures.py 489 LOC + founder guard) + Playwright spec 2개
-  - 산출물: `docs/dev-log/2026-05-17-multi-agent-qa-sprint18/integrated-report.html` + `docs/dev-log/sprint-19-plan.md`
+  - 산출물: `docs/dev-log/qa/2026-05-17-multi-agent-qa-sprint18/integrated-report.html` + `docs/dev-log/sprints/sprint-19-plan.md`
 
 > Sprint 18 본 작업(BL-029/031/041~045 + RBAC 매트릭스 + CI vitest + R2 cleanup + observability) 은 2e426c2 머지에서 closeout.
 
@@ -174,7 +174,7 @@
   - [x] 보안 3-layer 정합 (pipeline / vector_search / find_similar_cache + max_visibility fast path)
   - [x] 회귀 0 — typecheck / pytest 108+ / lint baseline 동등
   - [x] qa-fix 통합 브랜치 + sub-branch /loop 워크플로우 검증 완료
-  - 산출물: `docs/dev-log/2026-05-16-sprint17-closeout.md` 참조
+  - 산출물: `docs/dev-log/sprints/2026-05-16-sprint17-closeout.md` 참조
 
 - [x] Sprint 17 Exhaustive QA + 3 atomic fix (2026-05-15)
   - [x] ISSUE-005 fix (P1): /notes mock 데이터 제거, BE API 연결 (`6791783`)
@@ -184,7 +184,7 @@
   - [x] BL-034~039 등재 (asyncpg pool · workspace 중복 · sidebar perf · Satoshi FOIT · invite cache · settings 403 UX)
   - [x] 성공 조건 C1~C6 PASS (C2 음성 full e2e / C.3b RAG private deep 은 후속)
   - [x] 회귀 0 — typecheck clean / pytest 108 pass / lint baseline 동등
-  - 산출물: `docs/dev-log/2026-05-15-sprint17-qa-verification.md` · `.gstack/qa-reports/qa-report-kairos-sprint17-2026-05-15.md`
+  - 산출물: `docs/dev-log/sprints/2026-05-15-sprint17-qa-verification.md` · `.gstack/qa-reports/qa-report-kairos-sprint17-2026-05-15.md`
 - [x] Sprint 18: CLAUDE.md 10원칙 정렬 리팩토링 (머지 2026-05-15, PR #34, 18 commits)
   - [x] PR-A: 헌법/규칙 위반 4건 fix (embeddings AsyncSession · workspaces wrapper · CONTEXT-MAP §9 · ADR gap log)
   - [x] PR-B: docs 정리 (superpowers revert · L0~L4 single source · README/TODO 갱신 · stale 2건 git rm)
@@ -230,11 +230,11 @@
 
 ## Recently Completed — Multi-Agent QA (3 페르소나 통합 검증, 2026-05-13)
 
-- [x] **Sentinel (시니어 QA, 27분)** — 적대적 검증. Critical 1 / High 4 / Medium 6 / Low 2 = 13 결함. Health 6.8/10. Sprint 4-13 핵심 회귀 모두 PASS (CORS / RBAC / 멀티테넌시 / 오디오 / RAG 배치화). 산출: `docs/dev-log/2026-05-13-multi-agent-qa/qa-report.md`.
-- [x] **Curious (32세 PM, 35분)** — 잠재 고객 도입 결정 시뮬레이션. 5/30/1분 룰 PASS, TTFV 측정 불가 (Blocker), **도입 결정 Maybe** (Dev 배지 + 404 + 카운트 불일치 + 가격 부재). 산출: `docs/dev-log/2026-05-13-multi-agent-qa/interested-user-report.md`.
-- [x] **Casual (28세 직장인, 32분)** — 데스크톱 + 모바일 (375x667) UX. 막힘 12건, 용어 해독률 37.5%, 모바일 UX 5/10. Top 1 권고: "RAG" → "AI 검색" 카피 일괄 치환. 산출: `docs/dev-log/2026-05-13-multi-agent-qa/general-user-report.md`.
-- [x] **통합 HTML 보고서** — 3 페르소나 매트릭스 + Critical/High 결함 + 우선순위 매트릭스. `docs/dev-log/2026-05-13-multi-agent-qa/integrated-report.html`.
-- [x] **Sprint 14 계획 작성** — `docs/dev-log/sprint-14-plan.md` (T-1~T-11, ~28시간). AD-36~39 자의 결정 라벨.
+- [x] **Sentinel (시니어 QA, 27분)** — 적대적 검증. Critical 1 / High 4 / Medium 6 / Low 2 = 13 결함. Health 6.8/10. Sprint 4-13 핵심 회귀 모두 PASS (CORS / RBAC / 멀티테넌시 / 오디오 / RAG 배치화). 산출: `docs/dev-log/qa/2026-05-13-multi-agent-qa/qa-report.md`.
+- [x] **Curious (32세 PM, 35분)** — 잠재 고객 도입 결정 시뮬레이션. 5/30/1분 룰 PASS, TTFV 측정 불가 (Blocker), **도입 결정 Maybe** (Dev 배지 + 404 + 카운트 불일치 + 가격 부재). 산출: `docs/dev-log/qa/2026-05-13-multi-agent-qa/interested-user-report.md`.
+- [x] **Casual (28세 직장인, 32분)** — 데스크톱 + 모바일 (375x667) UX. 막힘 12건, 용어 해독률 37.5%, 모바일 UX 5/10. Top 1 권고: "RAG" → "AI 검색" 카피 일괄 치환. 산출: `docs/dev-log/qa/2026-05-13-multi-agent-qa/general-user-report.md`.
+- [x] **통합 HTML 보고서** — 3 페르소나 매트릭스 + Critical/High 결함 + 우선순위 매트릭스. `docs/dev-log/qa/2026-05-13-multi-agent-qa/integrated-report.html`.
+- [x] **Sprint 14 계획 작성** — `docs/dev-log/sprints/sprint-14-plan.md` (T-1~T-11, ~28시간). AD-36~39 자의 결정 라벨.
 
 ## Recently Completed — E2E password 전환 + 마이크 녹음 TODO 정리 (2026-05-13)
 
@@ -280,7 +280,7 @@
 
 ## Recently Completed — Sprint 6 Dogfooding + Critical 회귀 fix (2026-05-11, PR #14)
 
-- [x] **Sprint 6 dogfooding 자동 검증** — Playwright MCP + BE API 직접 호출. owner 1 user 세션으로 8 케이스 자동 통과 (1G/1H/2A/3A/3B/3G + SETUP). 결과는 `docs/dev-log/sprint-6-dogfooding-matrix.md`.
+- [x] **Sprint 6 dogfooding 자동 검증** — Playwright MCP + BE API 직접 호출. owner 1 user 세션으로 8 케이스 자동 통과 (1G/1H/2A/3A/3B/3G + SETUP). 결과는 `docs/dev-log/notes/sprint-6-dogfooding-matrix.md`.
 - [x] **PR #14 fix(workspaces): timezone-naive 통일** — dogfooding에서 발견한 Critical 회귀 patch. `datetime.now(UTC)` → `datetime.utcnow()` (workspaces 모듈 3 파일). 회귀 시점 `da33af54` (2026-04-04, Sprint 4/5, **Sprint 6 무관**). 다른 도메인 모듈 패턴과 통일. 신규 사용자 가입 직후 워크스페이스 생성 정상화.
 
 ## Recently Completed — Sprint 6 멤버십 + Private 프로젝트 (2026-05-11, PR #12 머지)
@@ -295,7 +295,7 @@
   - [x] FE-T1/T2a/T2b/T3/T5 visibility 배지 + 변경 모달 + 초대 default visibility (commit 575c613, 시안 1A+1C / 3A)
   - [x] FE-T4 Project 멤버 관리 패널 (commit 9a975e7, 시안 2A inline 단순화)
   - [x] FE-T7 RAG 검색 Private 자동 제외 안내 (commit 6e3f87f)
-  - [x] **ADR-014 신설** (`docs/dev-log/014-service-boundary.md`) — service-to-service 경계 정책 (commit 038fe37, PR #11)
+  - [x] **ADR-014 신설** (`docs/dev-log/adr/014-service-boundary.md`) — service-to-service 경계 정책 (commit 038fe37, PR #11)
   - [x] **F10 closeout patch** — ADR-011 §1을 PERSONA- 접두사 권위 출처로 확정 (commit 589a1aa, PR #10)
   - [x] **docs Atomic Update retrofit** (commit b1b24a4) — Critical 5 + High 3 = 8 문서 동기화 (per-context CONTEXT.md + ERD + endpoints + cross-domain-pipeline + rag-pipeline + directory-map)
 
@@ -312,9 +312,9 @@
 ## Recently Completed — Phase B Stage 1 retrofit (2026-05-11)
 
 - [x] **Phase B Stage 1 — 메타 retrofit** — 워크플로우 `.ai/templates/workflow.md` 정식 Stage 1 (`/office-hours` → `/autoplan`) 누락분 retrofit 완료. 6 forcing question 결과 + product-first demand 시그널 정의 + thesis lock-in. **코드 변경 없음**.
-  - [x] **ADR-010** Future-Fit Thesis (`docs/dev-log/010-future-fit-thesis.md`) — 9.2/10 PASS (Round 3). 3-year vision · 3 위협(ChatGPT/Notion AI/Granola) · 4 moat(M1~M4) · L4 timeline risk · AD-5~9 자의 라벨.
-  - [x] **ADR-011** Persona Definition (`docs/dev-log/011-persona-definition.md`) — 9.25+/10 PASS (Round 2 + 라벨 동기화). 상태 라벨 4단계(interview-confirmed/self-confirmed/[가설]/deprecated) · 필수 필드 7개 · Wedge W1~W4 · 폐기 기준 a/b/c · AD-10~12 자의 라벨.
-  - [x] **ADR-009** Stage 1 Retrofit 총괄 (`docs/dev-log/009-stage1-retrofit.md`) — 9.0/10 PASS + 3건 정정 = 9.5+. 6 Q 결과 매핑 · S1~S6 demand 시그널 + 60% 통일 · D-2/D-3 보류(AD-15) · 후속 F1~F10.
+  - [x] **ADR-010** Future-Fit Thesis (`docs/dev-log/adr/010-future-fit-thesis.md`) — 9.2/10 PASS (Round 3). 3-year vision · 3 위협(ChatGPT/Notion AI/Granola) · 4 moat(M1~M4) · L4 timeline risk · AD-5~9 자의 라벨.
+  - [x] **ADR-011** Persona Definition (`docs/dev-log/adr/011-persona-definition.md`) — 9.25+/10 PASS (Round 2 + 라벨 동기화). 상태 라벨 4단계(interview-confirmed/self-confirmed/[가설]/deprecated) · 필수 필드 7개 · Wedge W1~W4 · 폐기 기준 a/b/c · AD-10~12 자의 라벨.
+  - [x] **ADR-009** Stage 1 Retrofit 총괄 (`docs/dev-log/adr/009-stage1-retrofit.md`) — 9.0/10 PASS + 3건 정정 = 9.5+. 6 Q 결과 매핑 · S1~S6 demand 시그널 + 60% 통일 · D-2/D-3 보류(AD-15) · 후속 F1~F10.
   - [x] **personas.md** (`docs/requirements/personas.md`) — 9.33/10 PASS + 4건 정정 = 9.5+. PERSONA-001 self-confirmed + PERSONA-002~003 `[가설]` + Wedge 매트릭스 분화 점검 + 후속 인터뷰 패치 절차.
   - [x] **competitive-analysis.md** (`docs/requirements/competitive-analysis.md`) — 9.3/10 PASS + 5건 정정 = 9.5+. 5개 경쟁자(Otter/Granola/Reflect/Mem/Tana) 4차원 비교 · ADR-010 moat 정렬 · AD-16~18.
   - [x] **PRD 4개 섹션 batch PATCH** (`docs/requirements/prd.md`) — 9.5/10 PASS + 4건 정정 = 9.7+. §2 Persona 보강 + §2.5 Competitive Analysis + §3.5 Future-Fit Thesis + §7.5 Demand Signal Definition.
@@ -379,8 +379,8 @@
 
 ### Sprint 14 — 가입 첫 5분 신뢰 회복 + RAG 안정화 (2026-05-14 완료, PR 대기)
 
-> 입력: Multi-Agent QA 통합 보고서 (`docs/dev-log/2026-05-13-multi-agent-qa/integrated-report.html`)
-> 상세: `docs/dev-log/sprint-14-plan.md` · 검증: `docs/dev-log/2026-05-13-multi-agent-qa/sprint-14-verification.md`
+> 입력: Multi-Agent QA 통합 보고서 (`docs/dev-log/qa/2026-05-13-multi-agent-qa/integrated-report.html`)
+> 상세: `docs/dev-log/sprints/sprint-14-plan.md` · 검증: `docs/dev-log/qa/2026-05-13-multi-agent-qa/sprint-14-verification.md`
 > 브랜치: `sprint-14/trust-stabilize` (origin/main off)
 
 **P0 (Critical) — 4건 ✅**
@@ -413,7 +413,7 @@
 > **상태**: 단일 draft PR https://github.com/woosung-dev/kairos/pull/29 (52 commits, 76 files, +12570/-20). R8 14일 stagger 결과 후 main 머지.
 > **Stage 5 진행**: 5-1~5-7 완료. 5-8/5-9 머지 후.
 > **R8 미시작**: PR 본문 §"R8 외부 검증 결과" TBD placeholder. retro fill-in 후 PR 댓글로 결과 추가.
-> **Sprint 16 진입 조건**: R8 결과 → Best/Medium/Min 분기 (`docs/dev-log/2026-05-14-sprint16-plan-draft.md §3`).
+> **Sprint 16 진입 조건**: R8 결과 → Best/Medium/Min 분기 (`docs/dev-log/sprints/2026-05-14-sprint16-plan-draft.md §3`).
 
 ### Sprint 15 후보 — Personal Workspace + IA 확장 (2026-05-14 PRD v3.0 lock-in)
 
@@ -437,8 +437,8 @@
 
 > 코드네임: `karrot-eager-marshmallow` (Stage 0~4) + `pure-clover` (Stage 5/6)
 > 워크트리: `~/project/agy-project/kairos-pgvector-opt` (`sprint-16/pgvector-optimization` 브랜치)
-> ADR-020 Accepted — `docs/dev-log/020-pgvector-hnsw-halfvec.md`
-> Verification — `docs/dev-log/sprint-16-pgvector-verification.md`
+> ADR-020 Accepted — `docs/dev-log/adr/020-pgvector-hnsw-halfvec.md`
+> Verification — `docs/dev-log/sprints/sprint-16-pgvector-verification.md`
 
 - [x] Stage 0~6 풀워크플로우 + Atomic Update 매트릭스 강제
 - [x] HNSW + halfvec + iterative_scan 전환 (alembic b2c3d4e5f6a7)
@@ -487,7 +487,7 @@
 - [x] **AD-33** ProjectMember 추가 cross-workspace 차단 — **Sprint 7 완료** (BE-T1~T3 + T12 + T13). FK violation 500 → 의도된 403으로 전환. TestContainers 통합 테스트 검증.
 - [ ] **AD-34** FE RBAC 정밀 분기 — visibility 변경 버튼이 모든 멤버에 활성 + BE-T15 403 위임 (1차). useUser+useMembers 매칭으로 정밀화 = sprint 7+ design-review. dogfooding scope 외, sprint 7+ design-review 보류 **확정**.
 - [ ] **AD-35** Playwright E2E (V-T2) + schemathesis (V-T4) + RAG 권한 누설 E2E (V-T5) — sprint 7+ devex-review와 묶음. **2026-05-11 dogfooding으로 1A~1F viewer/member 읽기 + 2D Private RAG 누설 + 2E/2F member/viewer visibility 변경 시도 + CORS-1 (BE 5xx CORS 헤더 누락) + SCHEMA-1 (Project `title` vs ERD `name` 정합성) 추가 묶음**.
-- [x] **사용자 수동 dogfooding** — Playwright MCP 자동화로 진행 (8 케이스 자동 통과 + Critical TZ-1 회귀 발견 PR #14). 결과 `docs/dev-log/sprint-6-dogfooding-matrix.md`.
+- [x] **사용자 수동 dogfooding** — Playwright MCP 자동화로 진행 (8 케이스 자동 통과 + Critical TZ-1 회귀 발견 PR #14). 결과 `docs/dev-log/notes/sprint-6-dogfooding-matrix.md`.
 
 ### Sprint 6 후속 docs (Medium 보류 4개 중 1개 완료)
 
@@ -500,11 +500,11 @@
 
 - [ ] **F2** Demand 시그널 S1~S4 측정 (Sprint 6 완료 후 1개월) — usage analytics 도입 + S1(DAU)/S2(회의 빈도)/S3(RAG 만족도)/S4(Inbox 수용률) 실측. 결과물: demand 시그널 1차 보고서.
 - [x] **F3** 외부 인터뷰 가이드 작성 — `docs/requirements/interview-guide.md` Sprint 7 T-DOC-1 완료 (c2e5198).
-- [ ] **F4** 외부 인터뷰 5-10명 + S5/S6 측정 (진행 중, 2026-05-12 착수) — ADR-010 AD-8 60% + ADR-011 §4-b 60% + ADR-009 S5/S6. 결과물: `docs/requirements/interview-results.md`, ADR: `docs/dev-log/015-f4-demand-signals.md`.
+- [ ] **F4** 외부 인터뷰 5-10명 + S5/S6 측정 (진행 중, 2026-05-12 착수) — ADR-010 AD-8 60% + ADR-011 §4-b 60% + ADR-009 S5/S6. 결과물: `docs/requirements/interview-results.md`, ADR: `docs/dev-log/adr/015-f4-demand-signals.md`.
 - [ ] **F5** 5분 사용자 세션 관찰 도입 (Sprint 7+, Q5) — 도그푸딩 사용자 1-3명 세션 녹화. 결과물: `docs/requirements/observation-notes.md`.
-- [ ] **F6** Wedge 선정 ADR 신규 (Sprint 6 완료 + F2/F4 결과 후) — 페르소나-Wedge 매트릭스 + S5/S6. 결과물: `docs/dev-log/012-wedge-selection.md`.
-- [ ] **F7** L4 우선화 검토 ADR 신규 (Sprint 6 완료 + F4 결과 후) — ADR-010 §4 O1/O2/O3 옵션 선택 + ADR-007 Phase 4 진입 결정. 결과물: `docs/dev-log/013-l4-prioritization.md`.
-- [ ] **F8** 부채 D-2/D-3 처리 ADR 신규 (Sprint 6 킥오프 시 결정 — 진입 직전 vs 완료 후) — service-to-service 경계 정책. 결과물: `docs/dev-log/014-service-boundary.md`.
+- [ ] **F6** Wedge 선정 ADR 신규 (Sprint 6 완료 + F2/F4 결과 후) — 페르소나-Wedge 매트릭스 + S5/S6. 결과물: `docs/dev-log/adr/012-wedge-selection.md`.
+- [ ] **F7** L4 우선화 검토 ADR 신규 (Sprint 6 완료 + F4 결과 후) — ADR-010 §4 O1/O2/O3 옵션 선택 + ADR-007 Phase 4 진입 결정. 결과물: `docs/dev-log/adr/013-l4-prioritization.md`.
+- [ ] **F8** 부채 D-2/D-3 처리 ADR 신규 (Sprint 6 킥오프 시 결정 — 진입 직전 vs 완료 후) — service-to-service 경계 정책. 결과물: `docs/dev-log/adr/014-service-boundary.md`.
 - [ ] **F9** ADR-009 본 ADR 갱신 검토 (Sprint 7+ 외부 인터뷰 완료 후) — S1~S6 실측 결과로 임계값 재조정.
 - [x] **F10** `.ai/common/global.md` §2 ID 체계 표 갱신 — `PERSONA-` 접두사 추가. Sprint 10 확인 (global.md line 47에 이미 존재, git-ignored 로컬 파일).
 

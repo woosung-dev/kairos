@@ -13,7 +13,7 @@
  *     --no-deps --workers=1 --reporter=list
  *
  * 산출:
- *   docs/dev-log/2026-05-17-multi-agent-qa-sprint18/seed-credentials.env
+ *   docs/dev-log/qa/2026-05-17-multi-agent-qa-sprint18/seed-credentials.env
  *   (QA_<PERSONA>_CLERK_USER_ID + JWT + JWT_EXPIRES_AT 5개 채워짐)
  *
  * 주의:
@@ -45,7 +45,7 @@ const PERSONAS = [
 
 const ENV_PATH = path.resolve(
   __dirname,
-  "../../../docs/dev-log/2026-05-17-multi-agent-qa-sprint18/seed-credentials.env",
+  "../../../docs/dev-log/qa/2026-05-17-multi-agent-qa-sprint18/seed-credentials.env",
 );
 const API_URL = process.env.E2E_API_URL ?? "http://localhost:8000";
 // JWT template name (Clerk dashboard > JWT Templates 에서 생성, TTL 3600+ 권장).

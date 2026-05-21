@@ -1,7 +1,7 @@
 # pgvector HNSW + halfvec 전환 마이그레이션 (Sprint 16 ADR-020)
 """pgvector HNSW + halfvec 전환 (Sprint 16 ADR-020)
 
-ADR-020 (docs/dev-log/020-pgvector-hnsw-halfvec.md) — ivfflat → HNSW + Vector → Halfvec.
+ADR-020 (docs/dev-log/adr/020-pgvector-hnsw-halfvec.md) — ivfflat → HNSW + Vector → Halfvec.
 당근(Karrot) DB 밋업 1회 (백은빈) pgvector 최적화 노하우 적용.
 
 작업 순서:

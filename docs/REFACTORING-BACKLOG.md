@@ -39,7 +39,7 @@ async def _report_progress(meeting_id, step, **meta): ...
 
 **Sprint 묶음 권고:** 단독 (Sprint 11+, F4 외부 인터뷰 완료 후)
 
-**근거:** deepen-modules audit 2026-05-12 (docs/dev-log/2026-05-12-meetings-deepen.md)
+**근거:** deepen-modules audit 2026-05-12 (docs/dev-log/notes/2026-05-12-meetings-deepen.md)
 
 ---
 
@@ -84,7 +84,7 @@ class MeetingPipelineService:
 
 **Sprint 묶음 권고:** BL-001과 묶어서 (Sprint 11+)
 
-**근거:** deepen-modules audit 2026-05-12 (docs/dev-log/2026-05-12-meetings-deepen.md)
+**근거:** deepen-modules audit 2026-05-12 (docs/dev-log/notes/2026-05-12-meetings-deepen.md)
 
 ---
 
@@ -134,7 +134,7 @@ enriched = [
 
 **Sprint 묶음 권고:** 단독 (Sprint 12+). BL-001 meetings 상태 commit 단일화와 독립적. 저위험·고가치라 조기 처리 적합.
 
-**근거:** deepen-modules audit 2026-05-12 Round 1 (docs/dev-log/2026-05-12-rag-deepen.md)
+**근거:** deepen-modules audit 2026-05-12 Round 1 (docs/dev-log/notes/2026-05-12-rag-deepen.md)
 
 ---
 
@@ -189,7 +189,7 @@ async def extract_actions_and_link(self, ...) -> dict:
 
 **Sprint 묶음 권고:** BL-003과 묶어서 (Sprint 12+). 둘 다 서비스 레이어 안전성 강화 방향으로 묶을 수 있음.
 
-**근거:** deepen-modules audit 2026-05-12 Round 2 co-change 분석 (docs/dev-log/2026-05-12-services-deepen.md)
+**근거:** deepen-modules audit 2026-05-12 Round 2 co-change 분석 (docs/dev-log/notes/2026-05-12-services-deepen.md)
 
 ---
 
@@ -1757,7 +1757,7 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 
 **현 상태**: **[해소 2026-05-20] Sprint 24 Wave 2 T-N+4**. 4시간+ recording production 처리 차단 해소.
 
-**원본 발견**: Sprint 24 Multi-Agent QA Day 1 Sentinel Tier 2 (`docs/dev-log/2026-05-19-sprint24-qa-multi-agent/verification.md:272`).
+**원본 발견**: Sprint 24 Multi-Agent QA Day 1 Sentinel Tier 2 (`docs/dev-log/qa/2026-05-19-sprint24-qa-multi-agent/verification.md:272`).
 
 **문제**:
 - `transcription.py:TranscriptionService.transcribe()` 가 Whisper API 단일 호출.
@@ -1824,7 +1824,7 @@ Phase 2 T-AI-DATE 완료 후 n=20 으로 확장 재측정해 P/R 회복 confirma
 
 **예상 시간:** 1-2h (fixture 확장 1h + 측정 + 비교 1h).
 
-**근거:** `docs/dev-log/2026-05-20-sprint24-wave2/post-swap-delta-report.md` §4 + §7 + §9 — Phase 2 진입 conditional 조건 명시 + Gate FAIL revert 미발동 사유 의존.
+**근거:** `docs/dev-log/sprints/2026-05-20-sprint24-wave2/post-swap-delta-report.md` §4 + §7 + §9 — Phase 2 진입 conditional 조건 명시 + Gate FAIL revert 미발동 사유 의존.
 
 ---
 

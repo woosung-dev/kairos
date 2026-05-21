@@ -176,7 +176,7 @@ class PromoteIn(BaseModel):
 |---|---|---|
 | F1 | `docs/TODO.md` + `docs/REFACTORING-BACKLOG.md` | Sprint 19/20/21/22 closeout + CO-1~14 등재 + Next Actions Sprint 23 갱신 |
 | F2 | `~/.claude/projects/.../memory/project_sprint22_done.md` | merge SHA `22da49b` 반영 + 6 follow-up commit 등재 |
-| F3 | `docs/dev-log/2026-05-19-sprint22-result-report.html` | Codex 2차 APPROVE 반영 + CI final result |
+| F3 | `docs/dev-log/sprints/2026-05-19-sprint22-result-report.html` | Codex 2차 APPROVE 반영 + CI final result |
 | F4 | `frontend/e2e/tests/auth-relogin.spec.ts` | storageState key 정정 + skip 가드 제거 |
 
 ---

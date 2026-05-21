@@ -12,7 +12,7 @@ All notable changes to Kairos are documented here.
 - **`/projects/[id]` ErrorBoundary 발동** (ISSUE-009) — `ProjectDashboard` 가 `projectLoading` early return 한 뒤 `useRecentItems` 호출. React hooks 규칙 위반 ("Rendered more hooks than during the previous render"). `useRecentItems` 와 데이터 풀기를 early return 이전으로 이동.
 
 ### Documentation
-- `docs/dev-log/2026-05-15-sprint17-qa-verification.md` 신설 — Sprint 17 Exhaustive QA 결과 + 성공 조건 C1~C6 표 + Fix 결과.
+- `docs/dev-log/sprints/2026-05-15-sprint17-qa-verification.md` 신설 — Sprint 17 Exhaustive QA 결과 + 성공 조건 C1~C6 표 + Fix 결과.
 - `docs/REFACTORING-BACKLOG.md` — BL-034 ~ BL-039 등재 (asyncpg pool · workspace 중복 · sidebar perf · Satoshi FOIT · invite cache · settings 403 UX).
 - `docs/TODO.md` — Sprint 17 Completed + Next Actions.
 

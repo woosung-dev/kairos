@@ -2,8 +2,8 @@
 
 # Kairos Personas — PERSONA-001~003
 
-> **출처:** `docs/dev-log/011-persona-definition.md` (ADR-011 정의 정책)
-> **상위:** `docs/dev-log/009-stage1-retrofit.md` (ADR-009 Stage 1 retrofit 총괄)
+> **출처:** `docs/dev-log/adr/011-persona-definition.md` (ADR-011 정의 정책)
+> **상위:** `docs/dev-log/adr/009-stage1-retrofit.md` (ADR-009 Stage 1 retrofit 총괄)
 > **헌법:** `CONTEXT-MAP.md` §2 도메인 용어·§3 CODE 가치 흐름·§7 D-1 부채
 > **최종 수정:** 2026-05-11
 > **상태:** 1차 (외부 인터뷰 미진행, Sprint 7+ 후속 패치)
