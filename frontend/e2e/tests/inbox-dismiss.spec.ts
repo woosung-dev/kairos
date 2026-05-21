@@ -41,13 +41,18 @@ test.describe("D3+BL-069 — Inbox dismiss 영속 (Sprint 23/25)", () => {
       return;
     }
 
-    // dismiss 클릭
+    // dismiss 클릭 + BE persist 응답 대기 (race 방지)
+    const dismissResponsePromise = page.waitForResponse(
+      (resp) => resp.url().includes("/inbox/") && resp.url().endsWith("/dismiss"),
+      { timeout: 5_000 },
+    );
     await dismissButton.click();
+    await dismissResponsePromise;
 
-    // "되돌리기" 버튼이 표시되는 dismissed 축약 UI 로 전환되거나
-    // 또는 BE 호출 후 list 에서 제거됨 (둘 다 통과 — UI 상태 + BE 무효화).
+    // F-2B v2 (codex+agy A/B): button 제거 + 정적 "무시되었습니다" 표시.
+    // 어설션 selector 도 동시 갱신 ([[feedback_e2e_selector_atomic_update]] follow).
     await expect(
-      page.getByRole("button", { name: /되돌리기|↩/ }).first(),
+      page.getByText("무시되었습니다").first(),
     ).toBeVisible({ timeout: 5_000 });
 
     // reload 후에도 첫 카드 title 이 list 에 없어야 함 (BE persist 확인)
