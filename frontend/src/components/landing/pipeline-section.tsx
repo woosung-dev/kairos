@@ -5,6 +5,7 @@ import { useReveal } from "@/hooks/use-reveal";
 interface PipelineCard {
   letter: string;
   title: string;
+  subtitle: string;
   description: string;
   detail: string;
   isCore: boolean;
@@ -14,6 +15,7 @@ const PIPELINE_CARDS: PipelineCard[] = [
   {
     letter: "C",
     title: "Capture",
+    subtitle: "입력",
     description: "마찰 없는 입력. 녹음, 노트, 문서를 드래그 앤 드롭으로.",
     detail: "Whisper API · 화자 분리",
     isCore: false,
@@ -21,22 +23,26 @@ const PIPELINE_CARDS: PipelineCard[] = [
   {
     letter: "O",
     title: "Organize",
+    subtitle: "정리",
     description: "AI가 프로젝트에 자동 연결하고 태그를 부여합니다.",
-    detail: "자동 매핑 · Inbox",
+    detail: "자동 매핑 · Inbox(받은함)",
     isCore: false,
   },
   {
     letter: "D",
     title: "Distill",
-    description: "4단계 자동 증류. 개별 요약에서 조직 인사이트까지.",
-    detail: "L1→L2→L3→L4",
+    subtitle: "증류 · AI 자동 요약",
+    description:
+      "4단계 자동 증류. 개별 회의 요약에서 조직 전체 인사이트까지.",
+    detail: "L1→L2→L3→L4 (요약 레벨)",
     isCore: true,
   },
   {
     letter: "E",
     title: "Express",
-    description: "축적된 지식을 AI Q&A로 즉시 꺼냅니다.",
-    detail: "소스 명시 · 신뢰도",
+    subtitle: "꺼내기 · AI 검색",
+    description: "축적된 지식을 AI 검색(Q&A)으로 즉시 꺼냅니다.",
+    detail: "출처 명시 · 신뢰도",
     isCore: false,
   },
 ];
@@ -108,8 +114,9 @@ export function PipelineSection() {
                     : "var(--shadow-card)",
                 }}
               >
-                {/* 대형 배경 letter */}
+                {/* 대형 배경 letter — T-A11Y-1: 장식 요소, 스크린리더 무시 */}
                 <span
+                  aria-hidden="true"
                   className="pointer-events-none absolute top-4 right-4 leading-none select-none"
                   style={{
                     fontFamily: "var(--font-display)",
@@ -123,7 +130,7 @@ export function PipelineSection() {
                 </span>
 
                 <h3
-                  className="mb-1.5"
+                  className="mb-0.5 flex flex-wrap items-baseline gap-1.5"
                   style={{
                     fontSize: 16,
                     fontWeight: 700,
@@ -131,9 +138,20 @@ export function PipelineSection() {
                     color: "var(--text-primary)",
                   }}
                 >
-                  {card.title}
+                  <span>{card.title}</span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-sans, inherit)",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    · {card.subtitle}
+                  </span>
                 </h3>
                 <p
+                  className="mt-1.5"
                   style={{
                     fontSize: 13,
                     color: "var(--text-secondary)",
@@ -195,7 +213,7 @@ export function PipelineSection() {
               letterSpacing: "0.04em",
             }}
           >
-            DISTILL 4-LEVEL
+            DISTILL 4-LEVEL · 요약 레벨
           </span>
 
           <div className="flex flex-wrap justify-center gap-2">

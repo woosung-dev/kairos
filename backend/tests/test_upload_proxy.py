@@ -22,6 +22,10 @@ from src.workspaces.models import WorkspaceMember
 ALLOWED_ORIGIN = "http://localhost:3000"
 WORKSPACE_ID = uuid.uuid4()
 
+# Sprint 25 polish (F3 fix): T-SEC-3 binary signature fail-closed 로 인해
+# fake bytes 는 415. 정합 ftyp 헤더 (audio/mp4 magic) 로 교체.
+VALID_MP4_BYTES = b"\x00\x00\x00\x20ftypM4A \x00\x00\x00\x00M4A mp42isom\x00\x00\x00\x00" + b"\x00" * 64
+
 
 @pytest_asyncio.fixture
 async def authed_client():
@@ -52,7 +56,7 @@ async def test_upload_file_proxy_endpoint_exists(authed_client):
     ):
         response = await authed_client.post(
             f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
-            files={"file": ("test.m4a", b"fake audio content", "audio/mp4")},
+            files={"file": ("test.m4a", VALID_MP4_BYTES, "audio/mp4")},
             headers={"Origin": ALLOWED_ORIGIN},
         )
 
@@ -77,7 +81,7 @@ async def test_upload_file_proxy_returns_file_key(authed_client):
     ):
         response = await authed_client.post(
             f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
-            files={"file": ("meeting.m4a", b"fake audio data", "audio/mp4")},
+            files={"file": ("meeting.m4a", VALID_MP4_BYTES, "audio/mp4")},
         )
 
     assert response.status_code == 201

@@ -39,8 +39,8 @@ export function LandingNav() {
         >
           기능
         </a>
-        <a
-          href="#cta"
+        <Link
+          href="/pricing"
           className="hidden cursor-pointer transition-colors sm:block"
           style={{
             fontSize: 13,
@@ -48,7 +48,7 @@ export function LandingNav() {
           }}
         >
           요금
-        </a>
+        </Link>
         <Link
           href="/sign-in"
           className="cursor-pointer transition-colors"

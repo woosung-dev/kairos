@@ -1,4 +1,4 @@
-# backend/src/auth/service.py
+# Clerk 사용자를 조회·생성하고 응답 dict로 직렬화하는 도메인 서비스
 """Auth 서비스 — AsyncSession import 금지."""
 from src.auth.models import User
 from src.auth.repository import UserRepository
@@ -26,30 +26,6 @@ class AuthService:
             )
             user = await self.repo.save(user)
             await self.repo.commit()
-        return user
-
-    async def sync_user(
-        self,
-        clerk_id: str,
-        email: str,
-        display_name: str,
-        avatar_url: str | None = None,
-    ) -> User:
-        """Webhook으로 사용자 동기화 (생성 또는 업데이트)."""
-        user = await self.repo.find_by_clerk_id(clerk_id)
-        if user is None:
-            user = User(
-                clerk_id=clerk_id,
-                email=email,
-                display_name=display_name,
-                avatar_url=avatar_url,
-            )
-        else:
-            user.email = email
-            user.display_name = display_name
-            user.avatar_url = avatar_url
-        user = await self.repo.save(user)
-        await self.repo.commit()
         return user
 
     @staticmethod

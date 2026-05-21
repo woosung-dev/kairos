@@ -1932,6 +1932,125 @@ T-BE-PERF spike 결론 = production 3-4s 의 main bottleneck = Cloud Run cold st
 
 ---
 
+## BL-070 — Upload full streaming refactor (Sprint 25 polish carry, agy F2)
+
+**상태**: 미시작 (Sprint 25 codex+agy review 결과 진입 시점 carry — 본 sprint 는 부분 fix 만)
+**우선순위**: P2 (DoS 완화는 됐으나 streaming 이 진정한 fix)
+
+### 배경
+agy adversarial review (2026-05-21, Sprint 25 polish) F2 — `backend/src/upload/router.py:upload_file_proxy` 가 `await file.read()` 로 전체 파일을 RAM 적재 후 검증. 500MB × 4 concurrent = 2GB → Cloud Run 2GB instance OOM 위험.
+
+Sprint 25 polish 부분 fix (commit `947b778`): `file.size` (multipart 메타) pre-read 차단 — 정상 client 의 oversize 페이로드는 RAM 적재 전 413. 그러나:
+- `file.size = None` 인 client 는 여전히 fallback `await file.read()` → 전체 메모리 적재
+- 정상 size 인 정상 파일도 read 시점에 메모리 폭발 가능 (concurrent N → N × file_size RAM)
+
+### 진정한 fix (별도 sprint)
+- `async for chunk in file:` streaming read
+- 첫 512 byte signature 검증 후 stream-audit 으로 R2 putObject 직접 전달
+- `UploadValidator` API refactor — `bytes` 인자 → `AsyncIterator[bytes]` 인자 또는 incremental validation
+- aioboto3 multipart upload 활용 (Cloudflare R2 호환 확인 필요)
+
+### 진입 조건
+- 트래픽 증가 + Sentry trace 에서 OOM 또는 높은 메모리 사용 패턴 관찰
+- 또는 GA launch 전 production hardening sprint
+
+---
+
+## BL-073 — Inbox handleConfirm 이 BE classify 미연결 (Sprint 25 polish carry, agy F-2B v2 검토 발견)
+
+**상태**: 미시작 (agy F-2B v2 review 가 새로 발견 — F-2B 가 fix 한 dismiss 와 동일한 fake UX 패턴)
+**우선순위**: P3 (사용자 발생 가능성 medium — "확정" 클릭 후 새로고침 시 회귀)
+
+### 배경
+agy F-2B v2 A/B review (Gap 1) — `SmartInboxItemCard.handleConfirm` 이 setStatus 만 호출, BE `useClassifyInbox` mutation 미연결.
+
+```typescript
+function handleConfirm() {
+  setStatus("confirmed");  // local state 만
+  // useClassifyInbox mutation 호출 X → BE 변경 0
+}
+```
+
+`useClassifyInbox` 훅은 `hooks.ts:38-58` 에 정의되어 있고 BE `classify_inbox_item` API 와 연결돼있으나 `inbox-item-card.tsx` 에서 호출처 0.
+
+증상: 사용자가 ✅ 확정 버튼 클릭 → UI "확정됨" 표시 → 페이지 새로고침 → 카드 다시 idle 상태로 복구 (BE persist 0).
+
+이전 F-2B (dismiss) 와 동일한 패턴 — Sprint 25 polish v1 (commit 1caf99d) 이 dismiss 만 wire 하고 confirm 은 미처리.
+
+### 작업
+1. `inbox-item-card.tsx:handleConfirm`:
+   - `useClassifyInbox` 훅 import + mutation 호출 추가
+   - `dismissMutation.mutate(item.id, { onError: ... })` 패턴 follow
+2. F-2B 와 동일하게 `confirmed` status 에서도 `↩ 되돌리기` 버튼 평가 (BE classify revert API 부재 가정)
+3. 회귀 spec: e2e/tests/inbox-confirm.spec.ts 신설
+4. **F-2B v3 agy 후속 발견 (Gap A + B 동봉)**:
+   - `confirmed` 상태 카드 컨테이너 `opacity: 0.7` 도 WCAG AA 미달 (dismissed 와 동일 패턴) — F-2B v3 와 동일 fix 적용 (container opacity 제거 + 개별 요소 opacity)
+   - `confirmed` 상태 `↩ 되돌리기` 버튼 도 BE classify wire 후 fake UX 위험 — dismissed 처럼 제거 + 정적 "확정됨" 표시 또는 BE revert API 동시 도입
+
+### 진입 조건
+- Sprint 25 polish 종료 후 즉시 또는 Sprint 26 inbox UX sprint 진입 시점
+- F-2B v3 pattern 그대로 적용 가능
+
+---
+
+## BL-072 — Upload validation 의 ISO-BMFF text/plain bypass (Sprint 25 polish v3 carry, codex 4차 P2)
+
+**상태**: 미시작 (Sprint 25 codex+agy 4차 A/B 결과 — Option B "KEEP v3 + carry" 채택)
+**우선순위**: P3 (production 영향 낮음 — STT 미호출, R2 저장만)
+
+### 배경
+F-2A v3 (commit e2fa23b) 가 video/mp4 disguise bypass 는 막았으나, codex 4차 review 가 **신규 text/plain bypass 경로** 발견:
+
+```
+HEIC/AVIF (ftypheic) + filename=.txt + Content-Type=text/plain
+→ _detect_mime_from_signature 가 disallowed brand 로 None 반환
+→ _is_signature_compatible(None, text/plain) 가 text fail-open True
+→ NUL byte 가 valid UTF-8 (U+0000) 이라 _check_text_content 통과
+→ 201 R2 저장
+```
+
+v2 (audio/mp4 collapse) 였을 때는 text/plain 과 mismatch → 거부였으나, v3 brand allowlist 로 None 전환하면서 새 경로 노출.
+
+### 실제 영향
+- 인증 workspace member 만 가능 (외부 공격 X)
+- text 파일은 STT 파이프라인 미진입 (`isAudioOrVideo` FE 분기) → 처리 안 됨, R2 저장만
+- 자원 낭비 (R2 storage cost)
+- Sprint 25 4차 iteration 깊어짐 + agy 4차 실패 (skill rabbit hole) 로 더 이상 양측 A/B 평가 불가
+
+### 진정한 fix (별도 sprint)
+1. `_detect_mime_from_signature` 가 sentinel 값 반환 ("application/octet-stream-unknown-ftyp") + _is_signature_compatible 에서 text/* 매칭 차단
+2. 또는 real MIME detection library 도입 (`python-magic`, `filetype`) — 시스템 dep 추가
+3. 또는 R2 upload 후 별도 post-validation lambda/event trigger
+
+### 진입 조건
+- Sprint 26+ 또는 GA hardening sprint
+- 실제 자원 낭비 패턴이 Sentry/Cloud Run 메트릭에서 관찰 시 우선순위 상향
+
+---
+
+## BL-071 — Sync endpoint 재도입 시 Svix 검증 강제 CI guard (Sprint 25 polish carry, agy F9 sub-3)
+
+**상태**: 미시작 (Sprint 25 codex+agy review F9 sub-3 — ADR-022 §"회수 옵션 5단계" 1차 완화 적용 후 carry)
+**우선순위**: P3 (사용자 발생 가능성 낮음 — 단일 작성자 + ADR-022 lock-in)
+
+### 배경
+agy F9 sub-3 — `/api/v1/users/sync` endpoint 재도입 시 Svix 서명 검증 누락 위험. 현재 lock-in:
+- ADR-022 §"회수 옵션 5단계" 에 Svix 검증 의무 명시
+- `backend/tests/auth/test_auth_sync_disabled.py` 가 "404 응답" verify (재도입 시 fail → 작성자가 의식)
+
+리스크: 재도입 commit 에서 회귀 테스트도 같이 제거 + Svix 추가 누락 → IDOR 회귀.
+
+### 작업
+- pre-commit hook 또는 CI lint:
+  - `backend/src/auth/router.py` 에 `@router.post("/sync"` 또는 `@router.post("/users/sync")` 패턴 등장 시
+  - 동일 파일에 `svix` 또는 `webhook_signature` 또는 `Webhook(` 임포트 부재면 block
+- 또는 ADR-022 §"회수 옵션" 5단계 를 git commit message template 으로 강제 (작성자 의식 유도)
+
+### 진입 조건
+- GA launch 가 가시화되어 Clerk Production 발급 + sync 재도입이 실 작업이 될 때
+
+---
+
 ## BL-NEW-DUE-DATE-LOG-TRACEABILITY — _validate_action_dates 로그 추적성 강화 (Sprint 25+)
 
 **상태**: 미시작 (carry-over from Sprint 24 Wave 2 Gemini 2차 Low finding)

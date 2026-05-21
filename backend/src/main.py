@@ -65,11 +65,22 @@ if settings.sentry_dsn:
 # 허용 Origin 목록 (쉼표 구분 문자열에서 파싱)
 ALLOWED_ORIGINS = [o.strip() for o in settings.cors_origins.split(",")]
 
+# T-SEC-5 (Sprint 25, BL-SNT-CANDIDATE-B): production 환경에서 docs/openapi 노출 차단.
+# 공격면 축소 — 스키마 introspection 으로 endpoint enumeration / payload 추론 방지.
+# F7 fix (Sprint 25 polish, agy review): app_env 와 environment 두 env var 가
+# 공존 (전자=앱 자체, 후자=Sentry). 배포 파이프라인이 ENVIRONMENT=production 만
+# 설정해도 docs 차단되도록 OR 분기 + 대소문자 무관.
+_is_production = (
+    settings.app_env.lower() == "production"
+    or settings.environment.lower() == "production"
+)
+
 app = FastAPI(
     title="Kairos API",
     version="0.1.0",
-    docs_url="/api/v1/docs",
-    openapi_url="/api/v1/openapi.json",
+    docs_url=None if _is_production else "/api/v1/docs",
+    redoc_url=None if _is_production else "/api/v1/redoc",
+    openapi_url=None if _is_production else "/api/v1/openapi.json",
     lifespan=lifespan,
 )
 

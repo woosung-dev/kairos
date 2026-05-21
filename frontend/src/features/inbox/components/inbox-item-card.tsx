@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import { useDismissInbox } from "../hooks";
 import type { InboxItem } from "../types";
 
 /* ── 라벨/아이콘 맵 ── */
@@ -32,6 +33,9 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
   const [status, setStatus] = useState<"idle" | "confirmed" | "dismissed" | "editing">("idle");
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  // Sprint 25 BL-069 fix: dismiss 가 BE persist 되도록 mutation wire.
+  // 기존 setStatus 만 호출 → 새로고침 시 dismissed 항목 재출현 회귀. 사용자 결정 손실.
+  const dismissMutation = useDismissInbox(activeWorkspaceId ?? undefined);
 
   /* aiConfidence가 null일 때 0으로 폴백 */
   const confidencePercent = item.aiConfidence !== null
@@ -47,6 +51,12 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
 
   function handleDismiss() {
     setStatus("dismissed");
+    // BL-069: BE 호출. onSuccess 에서 useInbox cache 무효화 → reload 후에도 보존.
+    // F5 (Sprint 25 polish, agy review): mutation 실패 시 optimistic 'dismissed' UI 롤백
+    // → 사용자에게 거짓 상태 노출 차단. 토스트는 useDismissInbox onError 가 이미 처리.
+    dismissMutation.mutate(item.id, {
+      onError: () => setStatus("idle"),
+    });
   }
 
   function handleEdit() {
@@ -94,6 +104,17 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
   }
 
   if (status === "dismissed") {
+    // F-2B v1 (codex 2차 P2): handleDismiss BE persist 후 거짓 '되돌리기'
+    // affordance 제거 → 정적 "무시되었습니다" 표시.
+    //
+    // F-2B v3 (codex+agy 2차 A/B fix):
+    // - WCAG: container opacity 제거 → 텍스트 가독성 회복 (이전 v2 0.7 이
+    //   페이지 배경과 블렌딩되어 실 대비 3.32:1 / 2.91:1 → AA 4.5:1 미달).
+    //   대신 🗑 emoji 와 line-through title 에만 개별 opacity 적용으로 시각
+    //   de-emphasis 유지.
+    // - a11y: role="status" + aria-live 제거 — useDismissInbox onSuccess 의
+    //   sonner toast 가 이미 "항목을 무시했습니다" announce → double 중복
+    //   회피 + refetch unmount 시 음성 끊김 회피.
     return (
       <div
         className="px-4 py-3 rounded-lg border flex items-center gap-3"
@@ -101,26 +122,24 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
           background: "var(--surface)",
           borderColor: "var(--border-subtle)",
           borderRadius: "var(--radius-lg)",
-          opacity: 0.5,
         }}
       >
-        <span className="text-sm">🗑</span>
-        <span className="text-sm flex-1 line-through" style={{ color: "var(--text-muted)" }}>
+        <span className="text-sm" aria-hidden="true" style={{ opacity: 0.6 }}>🗑</span>
+        <span
+          className="text-sm flex-1 line-through"
+          style={{ color: "var(--text-muted)", opacity: 0.7 }}
+        >
           {item.title}
         </span>
-        <button
-          onClick={handleRevert}
-          className="text-xs px-2 py-1 rounded border transition-colors"
+        <span
+          className="text-xs px-2"
           style={{
-            borderColor: "var(--border)",
-            color: "var(--text-muted)",
-            borderRadius: "var(--radius-sm)",
-            cursor: "pointer",
-            minHeight: "44px",
+            color: "var(--text-secondary)",
+            fontFamily: "var(--font-mono)",
           }}
         >
-          ↩ 되돌리기
-        </button>
+          무시되었습니다
+        </span>
       </div>
     );
   }
@@ -257,7 +276,8 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
           </button>
           <button
             onClick={handleDismiss}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
+            disabled={dismissMutation.isPending}
+            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               borderColor: "var(--border)",
               color: "var(--text-muted)",
@@ -287,7 +307,8 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
           </button>
           <button
             onClick={handleDismiss}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
+            disabled={dismissMutation.isPending}
+            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               borderColor: "var(--border)",
               color: "var(--text-muted)",

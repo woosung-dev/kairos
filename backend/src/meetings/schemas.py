@@ -27,7 +27,11 @@ class MeetingStatusResponse(BaseModel):
 
 class CaptureTextRequest(BaseModel):
     title: str
-    transcript_text: str = Field(alias="transcriptText", min_length=50)
+    # T-SEC-4 (Sprint 25, BUG-SENTINEL-004): 200K 자 상한 — 4시간 분량 텍스트 = ~120K 자.
+    # 상한 부재 시 DoS 벡터 (페이로드 폭발 + 다운스트림 embedding/LLM 토큰 비용 폭발).
+    transcript_text: str = Field(
+        alias="transcriptText", min_length=50, max_length=200_000
+    )
 
     model_config = {"populate_by_name": True}
 

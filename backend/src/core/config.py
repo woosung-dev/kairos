@@ -43,6 +43,19 @@ class Settings(BaseSettings):
     sentry_traces_sample_rate: float = 0.1
     environment: str = "development"
 
+    # Upload validation (Sprint 25 T-SEC-3 — BUG-SENTINEL-003)
+    # 500MB 기본 한도. 음성 4시간 = ~120MB(64kbps mp3) ~ 480MB(128kbps wav) 커버.
+    max_upload_bytes: int = 500 * 1024 * 1024
+    # 화이트리스트 MIME (쉼표 구분). audio/* + video/* (container 추출) + application/pdf + text/*.
+    # F-2A fix (Sprint 25 polish v2, codex 2차): 브라우저가 .mp4/.webm/.mov 파일을
+    # video/mp4·video/webm·video/quicktime MIME 으로 전송 (audio/* 가 아님). FE 가
+    # source-add-modal 과 new/page 에서 video/* accept → 실 사용자 워크플로우 회복.
+    allowed_upload_mimes: str = (
+        "audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/x-wav,audio/webm,audio/ogg,"
+        "video/mp4,video/webm,video/quicktime,"
+        "application/pdf,text/plain,text/markdown"
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
