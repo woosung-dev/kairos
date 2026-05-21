@@ -80,7 +80,7 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 |:-:|:------:|--------|------|------|
 | 1 | 1 | `GET` | `/api/v1/health` | 헬스체크 |
 | 2 | 1 | `GET` | `/api/v1/users/me` | 현재 사용자 정보 (Clerk JWT) |
-| 3 | 1 | `POST` | `/api/v1/users/sync` | Clerk webhook 사용자 동기화 |
+| ~~3~~ | ~~1~~ | ~~`POST`~~ | ~~`/api/v1/users/sync`~~ | ~~Clerk webhook 사용자 동기화~~ — Sprint 25 T-SEC-1로 제거 (BUG-SENTINEL-005) |
 | 4 | 1 | `POST` | `/api/v1/workspaces` | 워크스페이스 생성 |
 | 5 | 1 | `GET` | `/api/v1/workspaces` | 내 워크스페이스 목록 |
 | 6 | 1 | `GET` | `/api/v1/workspaces/{id}` | 워크스페이스 상세 |
@@ -205,34 +205,15 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 
 ---
 
-#### `POST /api/v1/users/sync`
+#### ~~`POST /api/v1/users/sync`~~ — Sprint 25 T-SEC-1로 제거 (ADR-022)
 
-Clerk webhook으로 사용자 정보를 동기화한다. 인증 불필요 (Svix 서명 검증).
-
-**Request:**
-
-| 항목 | 값 |
-|------|-----|
-| Headers | `svix-id`, `svix-timestamp`, `svix-signature` |
-| Body | Clerk Webhook Payload |
-
-**Response:**
-
-```
-200 OK
-```
-
-```json
-{
-  "synced": true
-}
-```
-
-**에러:**
-
-| 상태 | 응답 |
-|:----:|------|
-| 400 | `{ "detail": "잘못된 webhook 요청" }` |
+**삭제됨** (Sprint 25, BUG-SENTINEL-005, ADR-022). 2026-05-21 사용자 결정으로
+Clerk Production 인스턴스 미발급 + Clerk webhook SKIP lock-in
+(memory `project_gcp_migration_jetaime_dev_done.md`, ADR-022 archeology).
+이전 핸들러는 인증/Svix 서명 검증 부재로 임의 user row 생성·덮어쓰기
+가능 PoC 실측 (Multi-Agent QA 2026-05-21 Sentinel P0). 현재 POST
+요청 시 404/405 반환. GA launch 시 Svix 검증 추가 + 재도입은 별도
+sprint. 회귀 가드: `backend/tests/auth/test_auth_sync_disabled.py`.
 
 ---
 
@@ -361,6 +342,12 @@ Clerk webhook으로 사용자 정보를 동기화한다. 인증 불필요 (Svix 
 ---
 
 ### Storage
+
+> **Validation (Sprint 25 T-SEC-3, BUG-SENTINEL-003)**: `POST .../upload/file`
+> 프록시 업로드 endpoint 에 4계층 검증 적용 — size (env `MAX_UPLOAD_BYTES`,
+> 기본 500MB) / MIME 화이트리스트 (env `ALLOWED_UPLOAD_MIMES`, audio/* +
+> application/pdf + text/*) / 확장자 정합 / content signature sniff. 위반 시
+> 400/413/415 응답. 회귀 가드: `backend/tests/upload/test_upload_validation.py`.
 
 #### `POST /api/v1/upload/presigned-url`
 

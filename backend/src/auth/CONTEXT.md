@@ -52,7 +52,7 @@
 - User 부재 시 `get_current_user` 가 lazy seed 1회 (Sprint 15)
 - Personal Workspace 부재 시 lazy seed 1회 (race-safe: `uq_workspaces_owner_personal` partial unique index)
 - `onboarding_step` 은 단조 증가 (downgrade 없음) — Sprint 22 OBN-02
-- **Clerk webhook endpoint 부재** (Sprint 25 T-SEC-1 / BUG-SENTINEL-005) — `POST /api/v1/users/sync` 핸들러 + `AuthService.sync_user` 메서드 제거됨. 2026-05-21 사용자 결정: Clerk Production 인스턴스 미발급 + Clerk webhook SKIP (memory `project_gcp_migration_jetaime_dev_done.md` lock-in). GA launch 시 Svix 검증 추가 + 재도입 별도 sprint.
+- **Clerk webhook endpoint 부재** (Sprint 25 T-SEC-1 / BUG-SENTINEL-005, ADR-022 lock-in) — `POST /api/v1/users/sync` 핸들러 + `AuthService.sync_user` 메서드 제거됨. 2026-05-21 사용자 결정: Clerk Production 인스턴스 미발급 + Clerk webhook SKIP (memory `project_gcp_migration_jetaime_dev_done.md` lock-in, ADR-022 archeology). GA launch 시 Svix 검증 추가 + 재도입 별도 sprint.
 
 ---
 
