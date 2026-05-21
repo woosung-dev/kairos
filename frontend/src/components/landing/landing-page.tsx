@@ -5,6 +5,7 @@ import { BeforeAfterSection } from "./before-after-section";
 import { PipelineSection } from "./pipeline-section";
 import { EvolutionTimeline } from "./evolution-timeline";
 import { StatsSection } from "./stats-section";
+import { TrustSignalsSection } from "./trust-signals-section";
 import { CtaSection } from "./cta-section";
 import { Footer } from "./footer";
 
@@ -18,6 +19,7 @@ export function LandingPage() {
       <PipelineSection />
       <EvolutionTimeline />
       <StatsSection />
+      <TrustSignalsSection />
       <CtaSection />
       <Footer />
     </div>
