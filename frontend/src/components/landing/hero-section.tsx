@@ -14,7 +14,7 @@ export function HeroSection() {
     >
       {/* 배지 — CODE 파이프라인 */}
       <div
-        className="mb-7 inline-block rounded-full px-3.5 py-1.5"
+        className="mb-3 inline-block rounded-full px-3.5 py-1.5"
         style={{
           fontFamily: "var(--font-mono)",
           fontSize: 12,
@@ -25,6 +25,18 @@ export function HeroSection() {
       >
         Capture &rarr; Organize &rarr; Distill &rarr; Express
       </div>
+      {/* 한국어 부연 */}
+      <p
+        className="mb-7"
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 11,
+          color: "var(--text-muted)",
+          letterSpacing: "0.02em",
+        }}
+      >
+        입력 &middot; 정리 &middot; 증류(AI 자동 요약) &middot; 꺼내기(AI 검색)
+      </p>
 
       {/* 헤드라인 */}
       <h1
