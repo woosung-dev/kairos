@@ -1932,6 +1932,53 @@ T-BE-PERF spike 결론 = production 3-4s 의 main bottleneck = Cloud Run cold st
 
 ---
 
+## BL-070 — Upload full streaming refactor (Sprint 25 polish carry, agy F2)
+
+**상태**: 미시작 (Sprint 25 codex+agy review 결과 진입 시점 carry — 본 sprint 는 부분 fix 만)
+**우선순위**: P2 (DoS 완화는 됐으나 streaming 이 진정한 fix)
+
+### 배경
+agy adversarial review (2026-05-21, Sprint 25 polish) F2 — `backend/src/upload/router.py:upload_file_proxy` 가 `await file.read()` 로 전체 파일을 RAM 적재 후 검증. 500MB × 4 concurrent = 2GB → Cloud Run 2GB instance OOM 위험.
+
+Sprint 25 polish 부분 fix (commit `947b778`): `file.size` (multipart 메타) pre-read 차단 — 정상 client 의 oversize 페이로드는 RAM 적재 전 413. 그러나:
+- `file.size = None` 인 client 는 여전히 fallback `await file.read()` → 전체 메모리 적재
+- 정상 size 인 정상 파일도 read 시점에 메모리 폭발 가능 (concurrent N → N × file_size RAM)
+
+### 진정한 fix (별도 sprint)
+- `async for chunk in file:` streaming read
+- 첫 512 byte signature 검증 후 stream-audit 으로 R2 putObject 직접 전달
+- `UploadValidator` API refactor — `bytes` 인자 → `AsyncIterator[bytes]` 인자 또는 incremental validation
+- aioboto3 multipart upload 활용 (Cloudflare R2 호환 확인 필요)
+
+### 진입 조건
+- 트래픽 증가 + Sentry trace 에서 OOM 또는 높은 메모리 사용 패턴 관찰
+- 또는 GA launch 전 production hardening sprint
+
+---
+
+## BL-071 — Sync endpoint 재도입 시 Svix 검증 강제 CI guard (Sprint 25 polish carry, agy F9 sub-3)
+
+**상태**: 미시작 (Sprint 25 codex+agy review F9 sub-3 — ADR-022 §"회수 옵션 5단계" 1차 완화 적용 후 carry)
+**우선순위**: P3 (사용자 발생 가능성 낮음 — 단일 작성자 + ADR-022 lock-in)
+
+### 배경
+agy F9 sub-3 — `/api/v1/users/sync` endpoint 재도입 시 Svix 서명 검증 누락 위험. 현재 lock-in:
+- ADR-022 §"회수 옵션 5단계" 에 Svix 검증 의무 명시
+- `backend/tests/auth/test_auth_sync_disabled.py` 가 "404 응답" verify (재도입 시 fail → 작성자가 의식)
+
+리스크: 재도입 commit 에서 회귀 테스트도 같이 제거 + Svix 추가 누락 → IDOR 회귀.
+
+### 작업
+- pre-commit hook 또는 CI lint:
+  - `backend/src/auth/router.py` 에 `@router.post("/sync"` 또는 `@router.post("/users/sync")` 패턴 등장 시
+  - 동일 파일에 `svix` 또는 `webhook_signature` 또는 `Webhook(` 임포트 부재면 block
+- 또는 ADR-022 §"회수 옵션" 5단계 를 git commit message template 으로 강제 (작성자 의식 유도)
+
+### 진입 조건
+- GA launch 가 가시화되어 Clerk Production 발급 + sync 재도입이 실 작업이 될 때
+
+---
+
 ## BL-NEW-DUE-DATE-LOG-TRACEABILITY — _validate_action_dates 로그 추적성 강화 (Sprint 25+)
 
 **상태**: 미시작 (carry-over from Sprint 24 Wave 2 Gemini 2차 Low finding)
