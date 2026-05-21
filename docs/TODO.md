@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 업데이트: 2026-05-21 (Sprint 25 Multi-Agent QA 직후 — Composite 3축 Security 4.55/Product 4.6/GTM 7.0, P0 2건 + P1 7건. 산출물 `docs/dev-log/2026-05-21-sprint25-multi-agent-qa/`)
+> 마지막 업데이트: 2026-05-21 (Sprint 25 moonlit-sutton closeout — Wave 1+2+3 단일 PR. 17 task 완료, backend pytest 452 PASS / FE typecheck 0 / vitest 56 / build 12/12)
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
 > 형식 규칙: `.ai/common/global.md` §2 참조 — Completed / Blocked / Questions / Next Actions 4섹션 운영.
 
@@ -27,34 +27,21 @@
 
 ---
 
-## Next Actions (Sprint 25 진입 계획 — Multi-Agent QA 2026-05-21 결과 반영)
+## Next Actions
 
-> Sprint 25 plan → `docs/dev-log/2026-05-21-sprint25-multi-agent-qa/sprint-25-plan.md`. Wave 1 P0 (~6h) → Wave 2 P1 (~28h) → Wave 3 P2 (~12h). 총 ~46h (약 7 영업일).
+> Sprint 25 moonlit-sutton 완료 — PR draft 진입 (2026-05-21). 다음 Sprint 진입 계획은 Recently Completed 섹션 참조.
 
-### 🔴 Sprint 25 Wave 1 — P0 (1건, ~1h, 정정)
-- [ ] **T-SEC-1 BUG-SENTINEL-005 (정정)** `POST /api/v1/users/sync` **endpoint 비활성화** (404/410 반환). `backend/src/auth/router.py`에서 `sync_user` handler 제거. `app.include_router(auth_router)` 유지 (다른 `/users/me` 라우트 정상). 회귀 테스트 `backend/tests/test_auth_sync_disabled.py` 신설. (1h)
-- ~~T-SEC-2 Clerk Production~~ → **사용자 SKIP 결정 (2026-05-21)**. 제거됨.
+### 📋 사용자 작업 대기
+- [ ] **T-CLEANUP-1** production DB Neon SQL editor에서 `DELETE FROM users WHERE clerk_id='user_QA20260521_sentinel_test_doNotUse'` (Sprint 25 PoC 잔존 정리)
+- [ ] **PR #102 (Sprint 25 moonlit-sutton) ready review + squash merge** — 사용자 승인 후 main 머지
+- [ ] **post-merge 배포 verify** — Cloud Run rollout 후 `POST /api/v1/users/sync` 404 응답 + `/health` 200 + `/dashboard` 회귀 0건
 
-### 🟠 Sprint 25 Wave 2 — P1 (7건, ~28h)
-- [ ] **T-SEC-3 BUG-SENTINEL-003** upload/file 입력 검증 (size limit env + MIME 화이트리스트 + 확장자 + python-magic sniff + R2/DB 트랜잭션 정합). (4h)
-- [ ] **T-GTM-1 ★★★ TRUST** 신뢰 신호 section (베타 로고/인프라 보안 배지/창업자 LinkedIn). (6h)
-- [ ] **T-GTM-2 ★★★ PRICING** `/pricing` 라우트 + 3-tier 윤곽 또는 "Pricing coming soon". "요금" nav 링크 교체. (3h, 가격 정책 결정 필요)
-- [ ] **T-GTM-3 ★★ PRODUCT-SHOT** 실 제품 스크린샷 3장 (Cmd+K / Inbox / Distill L1-L4) + 풀버전 모달 동영상(선택). (5h)
-- [ ] **T-GTM-4 BUG-CASUAL-003** 한글 부연 라벨 (Distill/L1-L4/promote/RAG) + tooltip. (4h)
-- [ ] **T-GTM-5 BUG-CURIOUS-004/005/006** "CODE" 풀어쓰기 + "한국팀을 위한" 명시 + "5분 설정" 분 단위 분해. (4h)
-- [ ] **T-INFRA-1 (정정)** **Dev Clerk key 기반** e2e 인프라 (Playwright + qa-* spec 부활 + Clerk dev test mode + BL-068 + BL-069 verify). (5-7h)
-
-### 🟡 Sprint 25 Wave 3 — P2 (9건, ~13h)
-- [ ] **T-GTM-6 (신규)** UX 완화 — `/sign-up` 직전 "현재 베타 멤버 전용 — Pre-GA" 텍스트 + 안내 모달(선택). Pre-GA dev Clerk 운영 정책 표시. (1h)
-- [ ] **T-A11Y-1** `<main>` 랜드마크 + skip-link + prefers-reduced-motion + 장식 aria-hidden + CTA 박스 대비 보정. (4h)
-- [ ] **T-SEC-4 BUG-SENTINEL-004** `CaptureTextRequest.transcript_text` max_length=200_000 추가. (0.5h)
-- [ ] **T-SEC-5 BL-SNT-CANDIDATE-B** production env `docs_url=None, redoc_url=None` + Cloud Run env 갱신. (0.5h)
-- [ ] **T-SEC-6 BL-SNT-CANDIDATE-A** `/ready` connection pool reuse 또는 `SELECT 1` ping. (2h)
-- [ ] **T-UI-1** 모바일 햄버거 nav + 모바일 17px→16px body. (5h)
-- [ ] **T-AI-1** ADR-019 Phase B post-swap LLM 직접 호출 실증 (Distill/Extract Actions 스키마 정합 + Sprint 16 baseline 비교 + due_date hallucinate 재현). (T-INFRA-1 동반)
-
-### 📋 Pre-Sprint cleanup
-- [ ] **T-CLEANUP-1** production DB Neon SQL editor에서 `DELETE FROM users WHERE clerk_id='user_QA20260521_sentinel_test_doNotUse'` (사용자 작업).
+### Sprint 25 carry-over (Sprint 26+ 권고)
+- [ ] **T-UI-1 모바일 햄버거 nav** — 본 sprint 폰트 반응형(17→16) 만 완료, 햄버거 nav 는 모바일 dev 환경 + manual QA 필요로 carry. 현재 LandingNav 가 "로그인" + "시작하기" 는 mobile 노출, "기능" + "요금" 만 sm:block 으로 숨김 (기본 기능 손실 0).
+- [ ] **T-INFRA-1 qa-*.spec.ts CI 게이트 부활** — 5계정 Clerk dev fixture 사용자 작업 의존. Owner/Viewer dual storageState 도 같은 fixture 도입 후 묶음 진행.
+- [ ] **BL-NEW-DELTA3-REMEASURE** Phase B swap DELTA-3 P/R n=20 재측정 — Cloud Run trace + Sentry + 실 API 비용 필요 (Sprint 24 carry, T-AI-1 contract 가드만 lock-in)
+- [ ] **T-GTM-1 창업자 LinkedIn 링크** — 외부 URL 미수령으로 본 sprint 는 text-only 인프라 transparency 로 대체. URL 수령 시 별도 patch (~30min)
+- [ ] **agy CLI hang BL 등재** — 시스템 외부 도구 이슈, Multi-Agent QA cross-check 자동화 차단
 
 ### 🟡 Sprint 25 candidates (Sprint 24 Wave 2 carry — 후순위)
 - [ ] **BL-NEW-RAG-SOURCE-SELECT** RAG source-level selection v1 — Power persona 데이터 후 B path 검토 (Sprint 25+)
@@ -77,6 +64,28 @@
 - BL-067 pyright `_update(...).where(...)` false-positive (Sprint 23 CO-19, P4)
 - BL-024 pg_prewarm Cloud Run cold start
 - BL-026 옵션 A — dev DB export + ground truth (production scale recall)
+
+---
+
+## Recently Completed (2026-05-21 Sprint 25 — moonlit-sutton, PR draft)
+
+- [x] **Sprint 25 — moonlit-sutton Multi-Agent QA P0/P1/P2 17 task fix bundle (2026-05-21, PR pending, 11 commits + 2 docs pre-commits)**
+  - [x] **Pre-PR (commit A+B)** branch + 산출물 정리 + Wave 1 코드/docs 2 commit 분리
+  - [x] **Wave 1 P0** T-SEC-1 BUG-SENTINEL-005 `/api/v1/users/sync` endpoint 비활성화 (handler + service 제거 + auth/CONTEXT.md §5/§6 + 회귀 4 case)
+  - [x] **Wave 2 P1** T-SEC-3 upload validation 4계층 (size/MIME/확장자/signature, upload 도메인 service/exceptions/dependencies 신설, 회귀 6 case)
+  - [x] **Wave 2 P1** T-GTM-2 ★★★ PRICING `/pricing` 라우트 신설 ("Pricing coming soon — 베타 무료") + LandingNav 요금 링크 교체
+  - [x] **Wave 2 P1** T-GTM-1 ★★★ TRUST TrustSignals 섹션 (인프라/데이터 정책/베타 솔직성 3카드 + Built with 마이크로카피)
+  - [x] **Wave 2 P1** T-GTM-3 ★★ PRODUCT-SHOT 실 제품 스크린샷 3장 (QA evidence 재활용 — RAG/요약/대시보드)
+  - [x] **Wave 2 P1** T-GTM-4 BUG-CASUAL-003 한국어 부연 라벨 inline (PipelineSection + Hero 배지)
+  - [x] **Wave 2 P1** T-GTM-5 BUG-CURIOUS-004/005/006 Hero "한국팀을 위한" + "5분 설정 분 단위 분해"
+  - [x] **Wave 2 P1** T-INFRA-1 BL-069 Inbox dismiss API wire + Playwright spec (BL-068 spec 기존 확인)
+  - [x] **Wave 3 P2** T-SEC-4/5 + T-GTM-6 batch (transcript max_length / prod docs_url None / sign-up Pre-GA 텍스트 + 회귀 6 case)
+  - [x] **Wave 3 P2** T-A11Y-1 + T-UI-1 partial (skip-link + main 랜드마크 + aria-hidden + CTA 대비 + 반응형 폰트)
+  - [x] **Wave 3 P2** T-AI-1 ADR-019 Phase B post-swap LLM 계약 13 case (model lock-in + prompt contract + post-processing guards + Pydantic schema)
+  - [x] **Phase 4** Atomic docs sync — upload/CONTEXT.md 신설 + endpoints.md sync + ADR-022 신설 + auth/CONTEXT.md ADR cross-link
+  - [x] **Phase 5** 검증 — backend pytest **452 passed + 1 skipped** (baseline 427 + 25 신규) / FE typecheck 0 / vitest 56 / build 12/12 OK / production BE smoke
+  - 산출물: PR pending (push 사용자 승인 대기) + ADR-022 (`docs/dev-log/022-clerk-webhook-skip.md`)
+  - 잔여 사용자 작업: production DB cleanup (T-CLEANUP-1) + PR ready review + post-merge 배포 verify
 
 ---
 
