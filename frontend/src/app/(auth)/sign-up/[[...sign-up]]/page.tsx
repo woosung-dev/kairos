@@ -2,7 +2,8 @@ import { SignUp } from "@clerk/nextjs";
 
 export default function SignUpPage() {
   return (
-    <div
+    <main
+      id="main-content"
       className="flex flex-col items-center justify-center min-h-screen gap-4 px-4 py-12"
       style={{ background: "var(--background)" }}
     >
@@ -42,6 +43,6 @@ export default function SignUpPage() {
       </div>
 
       <SignUp forceRedirectUrl="/dashboard" signInForceRedirectUrl="/dashboard" />
-    </div>
+    </main>
   );
 }

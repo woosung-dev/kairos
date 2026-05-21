@@ -52,7 +52,11 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
   function handleDismiss() {
     setStatus("dismissed");
     // BL-069: BE 호출. onSuccess 에서 useInbox cache 무효화 → reload 후에도 보존.
-    dismissMutation.mutate(item.id);
+    // F5 (Sprint 25 polish, agy review): mutation 실패 시 optimistic 'dismissed' UI 롤백
+    // → 사용자에게 거짓 상태 노출 차단. 토스트는 useDismissInbox onError 가 이미 처리.
+    dismissMutation.mutate(item.id, {
+      onError: () => setStatus("idle"),
+    });
   }
 
   function handleEdit() {
@@ -263,7 +267,8 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
           </button>
           <button
             onClick={handleDismiss}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
+            disabled={dismissMutation.isPending}
+            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               borderColor: "var(--border)",
               color: "var(--text-muted)",
@@ -293,7 +298,8 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
           </button>
           <button
             onClick={handleDismiss}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
+            disabled={dismissMutation.isPending}
+            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               borderColor: "var(--border)",
               color: "var(--text-muted)",

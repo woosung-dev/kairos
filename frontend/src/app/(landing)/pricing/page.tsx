@@ -21,6 +21,7 @@ export default async function PricingPage() {
       <LandingNav />
 
       <main
+        id="main-content"
         className="mx-auto max-w-[760px] px-6 pt-[152px] pb-16 text-center md:px-6"
         style={{ paddingTop: 152 }}
       >
