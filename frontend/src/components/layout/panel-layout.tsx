@@ -61,8 +61,11 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
       {/* 좌측 사이드바: 모바일 숨김, compact면 아이콘 모드 */}
       {!isMobile && sidebarOpen && <Sidebar collapsed={isCompact} />}
 
-      {/* 중앙 콘텐츠 (넓은 메인) */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      {/* 중앙 콘텐츠 (넓은 메인) — F-2C fix (Sprint 25 polish v2, codex 2차 P3):
+          skip-link 타깃. layout.tsx 의 '본문으로 건너뛰기' 가 #main-content 로
+          jump → (app) 라우트 (dashboard/inbox/search/settings 등) 모두 본
+          panel-layout 공유 → 단일 위치 fix 로 전체 (app) 라우트 커버. */}
+      <main id="main-content" className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <div
           className="flex-1 overflow-y-auto"
