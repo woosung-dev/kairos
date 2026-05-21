@@ -1,5 +1,6 @@
 import { LandingNav } from "./landing-nav";
 import { HeroSection } from "./hero-section";
+import { ProductShotsSection } from "./product-shots-section";
 import { SearchDemoSection } from "./search-demo-section";
 import { BeforeAfterSection } from "./before-after-section";
 import { PipelineSection } from "./pipeline-section";
@@ -14,6 +15,7 @@ export function LandingPage() {
     <div style={{ background: "var(--background)" }}>
       <LandingNav />
       <HeroSection />
+      <ProductShotsSection />
       <SearchDemoSection />
       <BeforeAfterSection />
       <PipelineSection />
