@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import { useDismissInbox } from "../hooks";
 import type { InboxItem } from "../types";
 
 /* ── 라벨/아이콘 맵 ── */
@@ -32,6 +33,9 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
   const [status, setStatus] = useState<"idle" | "confirmed" | "dismissed" | "editing">("idle");
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  // Sprint 25 BL-069 fix: dismiss 가 BE persist 되도록 mutation wire.
+  // 기존 setStatus 만 호출 → 새로고침 시 dismissed 항목 재출현 회귀. 사용자 결정 손실.
+  const dismissMutation = useDismissInbox(activeWorkspaceId ?? undefined);
 
   /* aiConfidence가 null일 때 0으로 폴백 */
   const confidencePercent = item.aiConfidence !== null
@@ -47,6 +51,8 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
 
   function handleDismiss() {
     setStatus("dismissed");
+    // BL-069: BE 호출. onSuccess 에서 useInbox cache 무효화 → reload 후에도 보존.
+    dismissMutation.mutate(item.id);
   }
 
   function handleEdit() {
