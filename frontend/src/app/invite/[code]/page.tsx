@@ -32,9 +32,11 @@ export default function InvitePage({
   };
 
   // 로딩 상태
+  // F-2C v2 (Sprint 25 polish, agy 발견): skip-link 타깃 누락. 외각 div → main.
   if (isLoading) {
     return (
-      <div
+      <main
+        id="main-content"
         className="min-h-dvh flex items-center justify-center"
         style={{ background: "var(--background)" }}
       >
@@ -42,12 +44,13 @@ export default function InvitePage({
           className="w-6 h-6 animate-spin"
           style={{ color: "var(--text-muted)" }}
         />
-      </div>
+      </main>
     );
   }
 
   return (
-    <div
+    <main
+      id="main-content"
       className="min-h-dvh flex items-center justify-center px-4"
       style={{ background: "var(--background)" }}
     >
@@ -162,6 +165,6 @@ export default function InvitePage({
           )}
         </CardContent>
       </Card>
-    </div>
+    </main>
   );
 }

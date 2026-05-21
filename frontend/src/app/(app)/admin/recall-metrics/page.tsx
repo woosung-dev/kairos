@@ -38,22 +38,24 @@ export default function RecallMetricsPage() {
     refetchInterval: 30_000,
   });
 
-  if (!isLoaded) return <main className="p-8">로딩 중…</main>;
+  // F-2C v2 (Sprint 25 polish, agy 3차 발견): panel-layout 의 <main id="main-content"> 안에
+  // 자체 <main> nest → HTML5 spec 위반 (페이지당 main 1개). section 으로 교체.
+  if (!isLoaded) return <section className="p-8">로딩 중…</section>;
   if (!isFounder) {
     return (
-      <main className="p-8 max-w-2xl">
+      <section className="p-8 max-w-2xl">
         <h1 className="text-2xl font-semibold mb-2">접근 권한 없음</h1>
         <p className="text-sm text-muted-foreground">
           이 페이지는 founder 전용입니다. `NEXT_PUBLIC_FOUNDER_CLERK_ID`로 식별되는 사용자만 진입할 수 있어요.
         </p>
-      </main>
+      </section>
     );
   }
 
   const data = metrics.data;
 
   return (
-    <main className="p-8 max-w-3xl">
+    <section className="p-8 max-w-3xl">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold">메모리 메트릭</h1>
         <p className="text-sm text-muted-foreground">
@@ -90,6 +92,6 @@ export default function RecallMetricsPage() {
           </div>
         </dl>
       )}
-    </main>
+    </section>
   );
 }

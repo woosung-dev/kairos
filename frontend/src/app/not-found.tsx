@@ -1,6 +1,8 @@
 export default function NotFound() {
+  // F-2C v2 (Sprint 25 polish, agy 발견): skip-link 타깃 누락. 외각 div → main.
   return (
-    <div
+    <main
+      id="main-content"
       className="flex items-center justify-center min-h-screen"
       style={{ background: "var(--background)" }}
     >
@@ -20,6 +22,6 @@ export default function NotFound() {
           홈으로 돌아가기
         </a>
       </div>
-    </div>
+    </main>
   );
 }
