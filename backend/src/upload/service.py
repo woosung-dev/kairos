@@ -13,9 +13,12 @@ from src.upload.exceptions import (
 _EXT_TO_MIME_FAMILY: dict[str, set[str]] = {
     "mp3": {"audio/mpeg"},
     "m4a": {"audio/mp4", "audio/x-m4a"},
-    "mp4": {"audio/mp4"},  # 비디오 mp4는 audio-only 추출용으로 허용
+    # F-2A fix (Sprint 25 polish v2, codex 2차): 브라우저가 video container 파일을
+    # video/* MIME 으로 전송. STT 파이프라인은 audio track 만 추출. accept.
+    "mp4": {"audio/mp4", "video/mp4"},
+    "mov": {"video/quicktime"},
     "wav": {"audio/wav", "audio/x-wav"},
-    "webm": {"audio/webm"},
+    "webm": {"audio/webm", "video/webm"},
     "ogg": {"audio/ogg"},
     "pdf": {"application/pdf"},
     "txt": {"text/plain"},

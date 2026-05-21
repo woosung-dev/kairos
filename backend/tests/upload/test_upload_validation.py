@@ -190,6 +190,43 @@ async def test_upload_rejects_unknown_binary_signature(authed_client):
 
 
 @pytest.mark.asyncio
+async def test_presigned_url_accepts_video_mp4(authed_client):
+    """F-2A (codex 2차): 브라우저가 .mp4 비디오 파일을 video/mp4 MIME 으로 전송.
+
+    FE source-add-modal + new/page 가 video/* accept → 사용자 실 워크플로우
+    회복. 이전 polish v1 에서 audio/* 만 화이트리스트 → 415 regression.
+    """
+    fake_url = "https://r2.example.com/presigned-video"
+    fake_key = f"uploads/{uuid.uuid4()}/zoom-recording.mp4"
+    with patch(
+        "src.upload.router.R2Service.get_presigned_upload_url",
+        new_callable=AsyncMock,
+        return_value={"upload_url": fake_url, "file_key": fake_key, "expires_in": 3600},
+    ):
+        response = await authed_client.post(
+            f"/api/v1/workspaces/{WORKSPACE_ID}/upload/presigned-url",
+            json={"filename": "zoom-recording.mp4", "contentType": "video/mp4"},
+        )
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
+async def test_presigned_url_accepts_video_webm(authed_client):
+    """F-2A (codex 2차): .webm 파일은 video/webm 으로 종종 전송."""
+    fake_key = f"uploads/{uuid.uuid4()}/screen.webm"
+    with patch(
+        "src.upload.router.R2Service.get_presigned_upload_url",
+        new_callable=AsyncMock,
+        return_value={"upload_url": "https://r2/x", "file_key": fake_key, "expires_in": 3600},
+    ):
+        response = await authed_client.post(
+            f"/api/v1/workspaces/{WORKSPACE_ID}/upload/presigned-url",
+            json={"filename": "screen.webm", "contentType": "video/webm"},
+        )
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
 async def test_upload_accepts_csv_as_text_plain(authed_client):
     """F4 (agy): text/* family 는 확장자 자유 (.csv/.json/.rtf 등). 이전엔 415."""
     csv_bytes = b"name,age\nAlice,30\nBob,25\n"
