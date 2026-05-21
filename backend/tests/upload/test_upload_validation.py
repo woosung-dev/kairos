@@ -282,6 +282,35 @@ async def test_presigned_url_accepts_video_webm(authed_client):
 
 
 @pytest.mark.asyncio
+async def test_upload_rejects_heic_renamed_as_video_mp4(authed_client):
+    """F-2A v3 (codex 3차 P2 fix): HEIC 이미지 (ftypheic) 가 .mp4 + video/mp4 로
+    위장해도 brand allowlist 가 차단 (이전 v2 는 통과 bypass).
+
+    HEIC 는 ftyp 박스 공유 (ISO-BMFF). v2 의 collapse 가 모든 non-qt ftyp 를
+    audio/mp4 로 mapping → audio/mp4 ↔ video/mp4 container parity 통과 → bypass.
+    v3 는 MP4 brand allowlist 로 image brand (heic/heix/mif1/avif/avis 등) 제외.
+    """
+    # HEIC 매직: ftypheic + mif1heic compatible brands
+    heic_bytes = b"\x00\x00\x00\x20ftypheic\x00\x00\x00\x00mif1heic\x00\x00\x00\x00" + b"\x00" * 64
+    response = await authed_client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
+        files={"file": ("photo.mp4", heic_bytes, "video/mp4")},
+    )
+    assert response.status_code == 415, response.text
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_avif_renamed_as_video_mp4(authed_client):
+    """F-2A v3: AVIF (ftypavif) 도 동일 차단."""
+    avif_bytes = b"\x00\x00\x00\x20ftypavif\x00\x00\x00\x00avifmif1\x00\x00\x00\x00" + b"\x00" * 64
+    response = await authed_client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
+        files={"file": ("photo.mp4", avif_bytes, "video/mp4")},
+    )
+    assert response.status_code == 415, response.text
+
+
+@pytest.mark.asyncio
 async def test_upload_accepts_csv_as_text_plain(authed_client):
     """F4 (agy): text/* family 는 확장자 자유 (.csv/.json/.rtf 등). 이전엔 415."""
     csv_bytes = b"name,age\nAlice,30\nBob,25\n"

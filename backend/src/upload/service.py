@@ -9,6 +9,30 @@ from src.upload.exceptions import (
     UnsupportedMimeError,
 )
 
+# F-2A v3 (codex 3차 P2): ISO-BMFF ftyp brand allowlist.
+# HEIC/AVIF/heif 등 image brand (heic/heix/mif1/avif/avis/hevc 등) 는 누락 →
+# `_detect_mime_from_signature` 에서 None 반환 → binary fail-closed.
+# 출처: ISO/IEC 14496-12 + Apple QuickTime spec + Apple HEIC FAQ.
+_MP4_BRANDS: set[bytes] = {
+    b"isom",  # ISO Base Media File Format
+    b"iso2",
+    b"iso3",
+    b"iso4",
+    b"iso5",
+    b"iso6",
+    b"mp41",  # MP4 v1
+    b"mp42",  # MP4 v2
+    b"mp71",  # MPEG-7
+    b"avc1",  # AVC (H.264)
+    b"MSNV",  # MSN Video
+    b"M4A ",  # iTunes audio (note trailing space)
+    b"M4B ",  # iTunes audiobook
+    b"M4P ",  # iTunes protected
+    b"M4V ",  # iTunes video
+    b"f4v ",  # Flash video
+    b"dash",  # MPEG-DASH segment
+}
+
 # 확장자 → 허용 MIME family 매핑 (검증 양방향)
 _EXT_TO_MIME_FAMILY: dict[str, set[str]] = {
     "mp3": {"audio/mpeg"},
@@ -41,12 +65,17 @@ def _detect_mime_from_signature(head: bytes) -> str | None:
     if head.startswith(b"RIFF") and len(head) >= 12 and head[8:12] == b"WAVE":
         return "audio/wav"
     # MP4/M4A/MOV: "ftyp" at offset 4-8 (container box).
-    # F-2A v2 (codex+agy 2차): ftypqt → QuickTime (.mov). 그 외 ftyp 는 mp4 container
-    # (audio-only 또는 video — _is_signature_compatible 에서 declared MIME 과 매칭).
+    # F-2A v3 (codex 3차 P2 fix): ftyp brand (offset 8-12) 기반 allowlist —
+    # ISO-BMFF image (HEIC/AVIF/heif) 도 ftyp 사용 → 무차별 audio/mp4 매핑이
+    # bypass 위험 (image renamed to .mp4 + declared video/mp4 통과). 알려진
+    # mp4/m4a/mov brand 만 허용, 그 외 (image brand 포함) → None (fail-closed).
     if len(head) >= 12 and head[4:8] == b"ftyp":
-        if head[8:12] == b"qt  ":
+        brand = head[8:12]
+        if brand == b"qt  ":
             return "video/quicktime"
-        return "audio/mp4"
+        if brand in _MP4_BRANDS:
+            return "audio/mp4"
+        return None
     # WebM/Matroska: EBML header (audio-only 또는 video container 공용)
     if head.startswith(b"\x1a\x45\xdf\xa3"):
         return "audio/webm"
