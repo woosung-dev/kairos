@@ -104,6 +104,10 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
   }
 
   if (status === "dismissed") {
+    // F-2B fix (codex 2차 P2): handleDismiss 가 BE persist 후 cache invalidate →
+    // 되돌리기 버튼은 local setState 만 → 사용자에게 거짓 UX (BE 복원 API 부재).
+    // 정적 "무시되었습니다" 표시로 변경 — 되돌리기 affordance 제거 (다음 fetch 시
+    // 어차피 list 에서 사라짐).
     return (
       <div
         className="px-4 py-3 rounded-lg border flex items-center gap-3"
@@ -118,19 +122,15 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
         <span className="text-sm flex-1 line-through" style={{ color: "var(--text-muted)" }}>
           {item.title}
         </span>
-        <button
-          onClick={handleRevert}
-          className="text-xs px-2 py-1 rounded border transition-colors"
+        <span
+          className="text-xs px-2"
           style={{
-            borderColor: "var(--border)",
             color: "var(--text-muted)",
-            borderRadius: "var(--radius-sm)",
-            cursor: "pointer",
-            minHeight: "44px",
+            fontFamily: "var(--font-mono)",
           }}
         >
-          ↩ 되돌리기
-        </button>
+          무시되었습니다
+        </span>
       </div>
     );
   }
