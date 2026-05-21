@@ -1,0 +1,132 @@
+# T-SEC-3 BUG-SENTINEL-003 upload validation 회귀 테스트
+"""
+Sprint 25 T-SEC-3 — upload 입력 검증.
+
+배경: Multi-Agent QA 2026-05-21 Sentinel은 upload endpoint에 size/MIME/확장자
+검증 부재를 P1로 등재. 사용자/디스크/R2 자원 남용 + 위장 MIME으로 인한
+다운스트림 STT/AI 파이프라인 오작동 가능성.
+
+검증 매트릭스:
+  - test_upload_rejects_empty_file       → 400 (빈 파일)
+  - test_upload_rejects_oversize         → 413 (size 초과)
+  - test_upload_rejects_unsupported_mime → 415 (image/png 등 비허용)
+  - test_upload_rejects_extension_mismatch → 415 (확장자/MIME 불일치)
+  - test_upload_rejects_content_mismatch → 415 (선언 MIME과 실 signature 불일치)
+  - test_upload_accepts_valid_audio      → 201 (정상 audio/mp4 + .m4a + ftyp)
+"""
+import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+
+from src.auth.dependencies import get_current_user
+from src.auth.models import User
+from src.auth.rbac import require_member
+from src.common.database import get_async_session
+from src.main import app
+from src.upload.dependencies import get_upload_validator
+from src.upload.service import UploadValidator
+from src.workspaces.models import WorkspaceMember
+
+WORKSPACE_ID = uuid.uuid4()
+
+# 1KB 한도 — 테스트용 작은 상한
+TEST_MAX_BYTES = 1024
+
+# 정상 audio/mp4 signature (offset 4-8 == "ftyp")
+VALID_MP4_BYTES = b"\x00\x00\x00\x20ftypM4A \x00\x00\x00\x00M4A mp42isom\x00\x00\x00\x00" + b"\x00" * 64
+
+
+@pytest_asyncio.fixture
+async def authed_client():
+    """인증 + RBAC mock 클라이언트. 검증기는 TEST_MAX_BYTES로 강제."""
+    mock_session = AsyncMock()
+    mock_user = MagicMock(spec=User)
+    mock_user.id = uuid.uuid4()
+    mock_member = MagicMock(spec=WorkspaceMember)
+    mock_member.role = "member"
+    app.dependency_overrides[get_async_session] = lambda: mock_session
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[require_member] = lambda: mock_member
+    app.dependency_overrides[get_upload_validator] = lambda: UploadValidator(
+        max_bytes=TEST_MAX_BYTES,
+    )
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_empty_file(authed_client):
+    """빈 파일(0byte) → 400."""
+    response = await authed_client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
+        files={"file": ("empty.m4a", b"", "audio/mp4")},
+    )
+    assert response.status_code == 400, response.text
+    assert "빈" in response.json().get("detail", "") or "empty" in response.json().get("detail", "").lower()
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_oversize(authed_client):
+    """size 초과 → 413."""
+    oversized = b"\x00" * (TEST_MAX_BYTES + 1)
+    response = await authed_client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
+        files={"file": ("big.m4a", oversized, "audio/mp4")},
+    )
+    assert response.status_code == 413, response.text
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_unsupported_mime(authed_client):
+    """비허용 MIME (image/png) → 415."""
+    png_bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32  # PNG magic
+    response = await authed_client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
+        files={"file": ("photo.png", png_bytes, "image/png")},
+    )
+    assert response.status_code == 415, response.text
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_extension_mismatch(authed_client):
+    """확장자(.png)와 declared MIME(audio/mp4) 불일치 → 415."""
+    # MP4 signature를 가졌어도 확장자가 .png면 reject (사용자 혼동/위장 방지)
+    response = await authed_client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
+        files={"file": ("audio.png", VALID_MP4_BYTES, "audio/mp4")},
+    )
+    assert response.status_code == 415, response.text
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_content_mismatch(authed_client):
+    """declared MIME(audio/mp4) 인데 실 content는 PDF magic → 415."""
+    pdf_bytes = b"%PDF-1.4\n%fake binary data\n" + b"\x00" * 64
+    response = await authed_client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
+        files={"file": ("audio.m4a", pdf_bytes, "audio/mp4")},
+    )
+    assert response.status_code == 415, response.text
+
+
+@pytest.mark.asyncio
+async def test_upload_accepts_valid_audio(authed_client):
+    """정상 audio/mp4 + .m4a 확장자 + ftyp signature → 201."""
+    expected_file_key = f"uploads/{uuid.uuid4()}/meeting.m4a"
+    with patch(
+        "src.upload.router.R2Service.upload_file_bytes",
+        new_callable=AsyncMock,
+        return_value=expected_file_key,
+    ):
+        response = await authed_client.post(
+            f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
+            files={"file": ("meeting.m4a", VALID_MP4_BYTES, "audio/mp4")},
+        )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["fileKey"] == expected_file_key

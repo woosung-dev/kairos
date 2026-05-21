@@ -43,6 +43,15 @@ class Settings(BaseSettings):
     sentry_traces_sample_rate: float = 0.1
     environment: str = "development"
 
+    # Upload validation (Sprint 25 T-SEC-3 — BUG-SENTINEL-003)
+    # 500MB 기본 한도. 음성 4시간 = ~120MB(64kbps mp3) ~ 480MB(128kbps wav) 커버.
+    max_upload_bytes: int = 500 * 1024 * 1024
+    # 화이트리스트 MIME (쉼표 구분). audio/* + application/pdf + text/* 패밀리.
+    allowed_upload_mimes: str = (
+        "audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/x-wav,audio/webm,audio/ogg,"
+        "application/pdf,text/plain,text/markdown"
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

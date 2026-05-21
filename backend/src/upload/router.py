@@ -1,12 +1,21 @@
-# backend/src/upload/router.py
-"""Upload 라우터 — R2 presigned URL 발급 + 프록시 업로드 (CORS 우회)."""
+# Upload 라우터 — R2 presigned URL 발급 + 프록시 업로드 (size/MIME/확장자/signature 검증)
+"""Sprint 25 T-SEC-3 (BUG-SENTINEL-003) — UploadValidator wire. HTTP 4xx 매핑만."""
 import uuid
 
-from fastapi import APIRouter, Depends, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from src.auth.rbac import require_member
 from src.common.r2 import R2Service
+from src.upload.dependencies import get_upload_validator
+from src.upload.exceptions import (
+    ContentMismatchError,
+    EmptyFileError,
+    FileTooLargeError,
+    MimeExtensionMismatchError,
+    UnsupportedMimeError,
+)
+from src.upload.service import UploadValidator
 from src.workspaces.models import WorkspaceMember
 
 router = APIRouter(
@@ -44,13 +53,25 @@ async def upload_file_proxy(
     workspace_id: uuid.UUID,
     file: UploadFile = File(...),
     member: WorkspaceMember = Depends(require_member),
+    validator: UploadValidator = Depends(get_upload_validator),
 ):
     """브라우저 CORS 우회용 백엔드 프록시 업로드.
 
-    FE → BE → R2 경로로 업로드하여 R2 직접 PUT의 CORS 문제를 해결한다.
+    FE → BE → R2 경로. T-SEC-3로 size/MIME/확장자/content signature 4계층 검증 추가.
     """
     content_type = file.content_type or "application/octet-stream"
     file_bytes = await file.read()
+    filename = file.filename or "upload"
+
+    try:
+        validator.validate(filename, content_type, file_bytes)
+    except EmptyFileError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except FileTooLargeError as e:
+        raise HTTPException(status_code=413, detail=str(e))
+    except (UnsupportedMimeError, MimeExtensionMismatchError, ContentMismatchError) as e:
+        raise HTTPException(status_code=415, detail=str(e))
+
     r2 = R2Service()
-    file_key = await r2.upload_file_bytes(file.filename or "upload", content_type, file_bytes)
+    file_key = await r2.upload_file_bytes(filename, content_type, file_bytes)
     return {"fileKey": file_key}
