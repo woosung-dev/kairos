@@ -41,19 +41,18 @@ test.describe("D3+BL-069 — Inbox dismiss 영속 (Sprint 23/25)", () => {
       return;
     }
 
-    // dismiss 클릭 + BE persist 응답 대기 (race 방지)
+    // F-2B v3 (codex+agy 2차 A/B race fix): refetch unmount 전에 동기 UI 먼저 검증.
+    // 이전 v2 는 await response 후 어설션 → cache invalidate refetch 가 transient
+    // 카드를 제거하여 어설션 fail 가능 (CI flake).
     const dismissResponsePromise = page.waitForResponse(
       (resp) => resp.url().includes("/inbox/") && resp.url().endsWith("/dismiss"),
       { timeout: 5_000 },
     );
     await dismissButton.click();
+    // 1) setStatus 동기 → "무시되었습니다" 즉시 표시 (refetch 이전).
+    await expect(page.getByText("무시되었습니다").first()).toBeVisible();
+    // 2) BE persist 응답 대기 (이후 reload race 차단).
     await dismissResponsePromise;
-
-    // F-2B v2 (codex+agy A/B): button 제거 + 정적 "무시되었습니다" 표시.
-    // 어설션 selector 도 동시 갱신 ([[feedback_e2e_selector_atomic_update]] follow).
-    await expect(
-      page.getByText("무시되었습니다").first(),
-    ).toBeVisible({ timeout: 5_000 });
 
     // reload 후에도 첫 카드 title 이 list 에 없어야 함 (BE persist 확인)
     await page.reload();

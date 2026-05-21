@@ -104,30 +104,31 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
   }
 
   if (status === "dismissed") {
-    // F-2B fix (codex 2차 P2): handleDismiss 가 BE persist 후 cache invalidate →
-    // 되돌리기 버튼은 local setState 만 → 사용자에게 거짓 UX (BE 복원 API 부재).
-    // 정적 "무시되었습니다" 표시로 변경 — 되돌리기 affordance 제거 (다음 fetch 시
-    // 어차피 list 에서 사라짐).
+    // F-2B v1 (codex 2차 P2): handleDismiss BE persist 후 거짓 '되돌리기'
+    // affordance 제거 → 정적 "무시되었습니다" 표시.
     //
-    // F-2B v2 (agy A/B): a11y 보강
-    // - role="status" + aria-live="polite" → 스크린리더 dismissed 결과 통지
-    // - opacity 0.5 → 0.7 (WCAG AA 대비 4.5:1 회복 — title line-through 시각
-    //   de-emphasis 유지하면서 status text 가독성 확보)
-    // - status text color: text-muted → text-secondary (full opacity 환경 보장)
+    // F-2B v3 (codex+agy 2차 A/B fix):
+    // - WCAG: container opacity 제거 → 텍스트 가독성 회복 (이전 v2 0.7 이
+    //   페이지 배경과 블렌딩되어 실 대비 3.32:1 / 2.91:1 → AA 4.5:1 미달).
+    //   대신 🗑 emoji 와 line-through title 에만 개별 opacity 적용으로 시각
+    //   de-emphasis 유지.
+    // - a11y: role="status" + aria-live 제거 — useDismissInbox onSuccess 의
+    //   sonner toast 가 이미 "항목을 무시했습니다" announce → double 중복
+    //   회피 + refetch unmount 시 음성 끊김 회피.
     return (
       <div
         className="px-4 py-3 rounded-lg border flex items-center gap-3"
-        role="status"
-        aria-live="polite"
         style={{
           background: "var(--surface)",
           borderColor: "var(--border-subtle)",
           borderRadius: "var(--radius-lg)",
-          opacity: 0.7,
         }}
       >
-        <span className="text-sm" aria-hidden="true">🗑</span>
-        <span className="text-sm flex-1 line-through" style={{ color: "var(--text-muted)" }}>
+        <span className="text-sm" aria-hidden="true" style={{ opacity: 0.6 }}>🗑</span>
+        <span
+          className="text-sm flex-1 line-through"
+          style={{ color: "var(--text-muted)", opacity: 0.7 }}
+        >
           {item.title}
         </span>
         <span

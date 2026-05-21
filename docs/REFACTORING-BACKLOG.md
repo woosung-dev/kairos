@@ -1956,6 +1956,40 @@ Sprint 25 polish 부분 fix (commit `947b778`): `file.size` (multipart 메타) p
 
 ---
 
+## BL-073 — Inbox handleConfirm 이 BE classify 미연결 (Sprint 25 polish carry, agy F-2B v2 검토 발견)
+
+**상태**: 미시작 (agy F-2B v2 review 가 새로 발견 — F-2B 가 fix 한 dismiss 와 동일한 fake UX 패턴)
+**우선순위**: P3 (사용자 발생 가능성 medium — "확정" 클릭 후 새로고침 시 회귀)
+
+### 배경
+agy F-2B v2 A/B review (Gap 1) — `SmartInboxItemCard.handleConfirm` 이 setStatus 만 호출, BE `useClassifyInbox` mutation 미연결.
+
+```typescript
+function handleConfirm() {
+  setStatus("confirmed");  // local state 만
+  // useClassifyInbox mutation 호출 X → BE 변경 0
+}
+```
+
+`useClassifyInbox` 훅은 `hooks.ts:38-58` 에 정의되어 있고 BE `classify_inbox_item` API 와 연결돼있으나 `inbox-item-card.tsx` 에서 호출처 0.
+
+증상: 사용자가 ✅ 확정 버튼 클릭 → UI "확정됨" 표시 → 페이지 새로고침 → 카드 다시 idle 상태로 복구 (BE persist 0).
+
+이전 F-2B (dismiss) 와 동일한 패턴 — Sprint 25 polish v1 (commit 1caf99d) 이 dismiss 만 wire 하고 confirm 은 미처리.
+
+### 작업
+1. `inbox-item-card.tsx:handleConfirm`:
+   - `useClassifyInbox` 훅 import + mutation 호출 추가
+   - `dismissMutation.mutate(item.id, { onError: ... })` 패턴 follow
+2. F-2B 와 동일하게 `confirmed` status 에서도 `↩ 되돌리기` 버튼 평가 (BE classify revert API 부재 가정)
+3. 회귀 spec: e2e/tests/inbox-confirm.spec.ts 신설
+
+### 진입 조건
+- Sprint 25 polish 종료 후 즉시 또는 Sprint 26 inbox UX sprint 진입 시점
+- F-2B v3 pattern 그대로 적용 가능
+
+---
+
 ## BL-072 — Upload validation 의 ISO-BMFF text/plain bypass (Sprint 25 polish v3 carry, codex 4차 P2)
 
 **상태**: 미시작 (Sprint 25 codex+agy 4차 A/B 결과 — Option B "KEEP v3 + carry" 채택)
