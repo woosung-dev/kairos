@@ -123,9 +123,72 @@
 
 ---
 
+## 부록 A — 측정 SQL (Founder admin 직접 query)
+
+Sprint 15 Stage 4 R7 metrics (`memory_events` 테이블) + Sprint 6 D-1 visibility
+(personal workspace) 조합으로 5명 × 14일 측정 가능. dashboard page 신설 없이
+PostgreSQL 직접 query 로 갈음 (Sprint 28 진입 분기 결정 시점).
+
+### Day 7 활성 query
+
+```sql
+SELECT
+  w.owner_id           AS dogfooder_user_id,
+  u.email              AS email,
+  COUNT(*) FILTER (WHERE e.event_type = 'capture') AS captures_7d,
+  COUNT(*) FILTER (WHERE e.event_type = 'recall')  AS recalls_7d,
+  COUNT(*) FILTER (WHERE e.event_type = 'promote') AS promotes_7d
+FROM memory_events e
+JOIN workspaces w ON e.workspace_id = w.id
+JOIN users      u ON w.owner_id = u.id
+WHERE w.type = 'personal'
+  AND e.created_at > NOW() - INTERVAL '7 days'
+  AND w.owner_id IN (<dogfooder_user_id_1>, <2>, <3>, <4>, <5>)
+GROUP BY 1, 2
+ORDER BY 1;
+```
+
+### Day 14 활성 + 임계 충족 분기
+
+```sql
+WITH metrics AS (
+  SELECT
+    w.owner_id AS uid,
+    COUNT(*) FILTER (WHERE e.event_type = 'capture') AS cap,
+    COUNT(*) FILTER (WHERE e.event_type = 'recall')  AS rec
+  FROM memory_events e
+  JOIN workspaces w ON e.workspace_id = w.id
+  WHERE w.type = 'personal'
+    AND e.created_at > NOW() - INTERVAL '14 days'
+    AND w.owner_id IN (<5명 uid>)
+  GROUP BY w.owner_id
+)
+SELECT
+  uid,
+  cap, rec,
+  (cap >= 5 AND rec >= 3) AS is_active_14d
+FROM metrics
+ORDER BY is_active_14d DESC, cap DESC;
+```
+
+`is_active_14d = true` row 가 3건 이상이면 ADR-024 §"회수 옵션" 1번 (paid customer
+onboarding) 분기 진입. 1~2건이면 onboarding UX 개선 + 재시도. 0건이면 product
+pivot (PRD v3.1 office-hours).
+
+### 신규 method 추가는 X
+
+`backend/src/memory/repository.py:97 get_metrics_counts` 가 workspace 별
+capture/recall/promote count 제공 (Sprint 15 C7). rolling window 필터는 SQL 직접
+query 로 충분 — 본 sprint 에서는 admin dashboard page 신설 SKIP (Sprint 28 결정
+시점에 5명 결과 보고 신설 여부 판단).
+
+---
+
 ## 참조
 
 - ADR-024 (`docs/adr/024-ga-readiness.md`) — GA readiness + 종료 기준 + 회수 옵션
 - Sprint 27b plan (`docs/plans/active/sprint-27b-ga-launch.md`) — Wave 1~3
 - Sprint 22 ADR-021 — Sentry 활성화 (외부 5명 운영 중 error 추적)
+- Sprint 15 R7 metrics (`backend/src/memory/models.py:79 MemoryEvent`) — capture/recall/promote 이벤트 스키마
+- Sprint 15 C7 (`backend/src/memory/repository.py:97 get_metrics_counts`) — workspace 별 count 함수
 - memory `project_sprint15_stage4_done` — R8 outreach 80 채널
