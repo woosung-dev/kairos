@@ -80,7 +80,7 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 |:-:|:------:|--------|------|------|
 | 1 | 1 | `GET` | `/api/v1/health` | 헬스체크 |
 | 2 | 1 | `GET` | `/api/v1/users/me` | 현재 사용자 정보 (Clerk JWT) |
-| ~~3~~ | ~~1~~ | ~~`POST`~~ | ~~`/api/v1/users/sync`~~ | ~~Clerk webhook 사용자 동기화~~ — Sprint 25 T-SEC-1로 제거 (BUG-SENTINEL-005) |
+| 3 | 1 | `POST` | `/api/v1/users/sync` | Clerk webhook 사용자 동기화 (Svix 서명 검증 강제, Sprint 27b ADR-024) |
 | 4 | 1 | `POST` | `/api/v1/workspaces` | 워크스페이스 생성 |
 | 5 | 1 | `GET` | `/api/v1/workspaces` | 내 워크스페이스 목록 |
 | 6 | 1 | `GET` | `/api/v1/workspaces/{id}` | 워크스페이스 상세 |
@@ -205,15 +205,45 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 
 ---
 
-#### ~~`POST /api/v1/users/sync`~~ — Sprint 25 T-SEC-1로 제거 (ADR-022)
+#### `POST /api/v1/users/sync` — Clerk webhook 사용자 동기화 (Svix 검증 강제)
 
-**삭제됨** (Sprint 25, BUG-SENTINEL-005, ADR-022). 2026-05-21 사용자 결정으로
-Clerk Production 인스턴스 미발급 + Clerk webhook SKIP lock-in
-(memory `project_gcp_migration_jetaime_dev_done.md`, ADR-022 archeology).
-이전 핸들러는 인증/Svix 서명 검증 부재로 임의 user row 생성·덮어쓰기
-가능 PoC 실측 (Multi-Agent QA 2026-05-21 Sentinel P0). 현재 POST
-요청 시 404/405 반환. GA launch 시 Svix 검증 추가 + 재도입은 별도
-sprint. 회귀 가드: `backend/tests/auth/test_auth_sync_disabled.py`.
+**Sprint 27b 회복** (ADR-024 supersedes ADR-022). Sprint 25 BUG-SENTINEL-005 로
+비활성화된 endpoint 를 Svix 서명 검증 강제와 함께 재도입. Clerk Production
+인스턴스 + Svix webhook 등록 + `CLERK_WEBHOOK_SECRET` 환경변수 필요 (사용자
+액션 5건 중 §1~3).
+
+**헤더 (필수)**:
+
+| 헤더 | 설명 |
+|------|------|
+| `svix-id` | 메시지 ID (Clerk dashboard 제공) |
+| `svix-timestamp` | unix timestamp (5분 tolerance) |
+| `svix-signature` | `v1,<base64>` HMAC SHA256 서명 |
+
+**본문 (Clerk user.created / user.updated event)**:
+
+```json
+{
+  "type": "user.created",
+  "data": {
+    "id": "user_xxx",
+    "email_addresses": [{"email_address": "user@example.com"}],
+    "first_name": "이름",
+    "last_name": "성",
+    "image_url": "https://..." | null
+  }
+}
+```
+
+**응답**:
+
+| 상태 | 응답 |
+|:----:|------|
+| 200 | `{ "synced": true }` |
+| 401 | `{ "detail": "INVALID_SIGNATURE" }` — 헤더 누락 / HMAC 불일치 / base64 형식 오류 |
+| 401 | `{ "detail": "STALE_TIMESTAMP" }` — timestamp drift > 5분 |
+
+회귀 가드: `backend/tests/auth/test_user_sync.py` (4 case — created/updated/bad-sig/stale).
 
 ---
 

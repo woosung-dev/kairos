@@ -117,3 +117,35 @@ Sentinel 페르소나의 적대적 검증에서 BUG-SENTINEL-005 (Critical):
 - memory `project_gcp_migration_jetaime_dev_done.md` (사용자 결정 lock-in)
 - ADR-014 Service Boundary (auth 도메인 책임)
 - `backend/src/auth/CONTEXT.md` §5 (불변식) + §6 (노출 엔드포인트)
+
+---
+
+## Superseded (2026-05-23, Sprint 27b 실행)
+
+본 ADR 의 SKIP 결정은 ADR-024 GA readiness 채택으로 reverse 됨. Sprint 27b
+에서 회수 옵션 5단계 모두 실행 완료:
+
+1. ✅ `sync_user` handler + `AuthService.sync_user` 복원 (commit `42a0e79`,
+   2026-05-23) — Sprint 1 `7f4ac5a` 구조 + Sprint 25 `d614214` 삭제 부분 revert
+2. ✅ Svix 서명 검증 의무 — `backend/src/auth/svix_verify.py`
+   `verify_svix_signature` Depends (commit `443ad7c`). 3 헤더 필수 + HMAC + 5분
+   timestamp tolerance + 검증 실패 401
+3. ✅ Sentinel test 회복 — `tests/auth/test_user_sync.py` 4 case (created /
+   updated / bad-sig / stale). 옛 `test_auth_sync_disabled.py` 삭제 (obsolete)
+4. ✅ ADR + canonical doc atomic update — endpoints.md `/api/v1/users/sync`
+   row 복원 (strikethrough 제거 + Svix 헤더/응답 표 신설) + auth/CONTEXT.md
+   §5 불변식 / §6 endpoint 갱신
+5. ⏳ Clerk Production 발급 + dashboard webhook 등록 + GCP/Vercel
+   `CLERK_WEBHOOK_SECRET` 갱신 — **사용자 액션 (AI 작업 외)**, ADR-024 §"사용자
+   액션" 참조
+
+### 회귀 가드 (Sprint 27b 신규)
+
+`backend/tests/auth/test_user_sync.py` 의 4 case 가 ADR-022 의 옛 4 case 를
+대체. 위조 서명 / stale timestamp case 는 DB write 차단을 직접 verify
+(`mock_service.sync_user.assert_not_awaited()`).
+
+### 후속 결정
+
+- Sprint 27b 결과 (외부 5명 dogfooding) 측정 → Sprint 28 분기 (ADR-024 §"회수
+  옵션")
