@@ -29,6 +29,7 @@
 3. `DESIGN.md` (디자인 시스템)
 4. 작업 도메인의 `backend/src/<domain>/CONTEXT.md`
 5. `docs/TODO.md`
+6. 디렉토리 구조 필요 시: `docs/architecture/directory-map.md` (BE 13 모듈 + FE 11 features)
 
 ### Plan Before Code
 코드 전 "어떤 doc 을 참고했고 어떤 방향으로 수정할지" 1-2줄 브리핑.
@@ -55,6 +56,11 @@
 ## 4. 개발 워크플로우
 
 `.ai/templates/workflow.md` — **Plan → Code → Test** 3단계. 위험도 기반 분류 (Lite / Standard / Heavy) + MUST/MUST NOT 거기 참조.
+
+**검증 증거 표준** (Test 단계 완료 주장 시 PR/commit body 에 포함):
+- FE: 스크린샷 1장 + `console.error` 0건 로그
+- BE: pytest 결과 요약 + alembic dry-run output
+- API 시그니처 변경: schemathesis contract test + Playwright E2E smoke (한쪽만 통과 시 PR 차단)
 
 ## 5. 문서화 + 코딩 스타일
 
