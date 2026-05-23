@@ -34,6 +34,8 @@ _MP4_BRANDS: set[bytes] = {
 }
 
 # 확장자 → 허용 MIME family 매핑 (검증 양방향)
+# BUG-S27d-3 fix (Sprint 27d): 이전엔 매핑에 없는 확장자라도 declared text/* 면 자유 통과
+# (.exe + text/plain 우회 경로). 정당 텍스트 확장자를 명시 매핑으로 흡수하고 free-pass 제거.
 _EXT_TO_MIME_FAMILY: dict[str, set[str]] = {
     "mp3": {"audio/mpeg"},
     "m4a": {"audio/mp4", "audio/x-m4a"},
@@ -47,6 +49,11 @@ _EXT_TO_MIME_FAMILY: dict[str, set[str]] = {
     "pdf": {"application/pdf"},
     "txt": {"text/plain"},
     "md": {"text/markdown", "text/plain"},
+    # 정당 텍스트 family — declared MIME text/plain 로 전송되는 일반 형식
+    "csv": {"text/plain"},
+    "json": {"text/plain"},
+    "log": {"text/plain"},
+    "rtf": {"text/plain"},
 }
 
 
@@ -176,14 +183,15 @@ class UploadValidator:
         if declared_mime not in self.allowed_mimes:
             raise UnsupportedMimeError(declared_mime)
         ext = _get_extension(filename)
+        # BUG-S27d-3 fix (Sprint 27d opus follow-up): 이전엔 ext 가 매핑에 없을 때
+        # declared MIME text/* 만으로 통과 → `evil.exe` + `text/plain` 우회 (signature 가
+        # None 이고 text/* 면 _is_signature_compatible 도 통과). 정당 텍스트 형식은
+        # `_EXT_TO_MIME_FAMILY` 에 명시 추가 (csv/json/log/rtf), 매핑 외 확장자는 항상 reject.
         if ext and ext in _EXT_TO_MIME_FAMILY:
             if declared_mime not in _EXT_TO_MIME_FAMILY[ext]:
                 raise MimeExtensionMismatchError(ext, declared_mime)
         elif ext:
-            # F4 fix: text/* family 는 확장자 자유 (.csv/.json/.rtf 등 정당
-            # 텍스트 파일 차단 회피 — signature/UTF-8 가드가 충분).
-            if not declared_mime.startswith("text/"):
-                raise MimeExtensionMismatchError(ext, declared_mime)
+            raise MimeExtensionMismatchError(ext, declared_mime)
 
     def validate(self, filename: str, declared_mime: str, data: bytes) -> None:
         """검증 실패 시 도메인 예외 raise. 성공 시 None.

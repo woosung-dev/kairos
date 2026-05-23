@@ -115,7 +115,12 @@ export function OnboardingTooltip({
           F-6: display:contents 는 bounding rect 0 → Popover positioning 깨짐. wrapper 필수.
           F-16: inline-block 은 shrink-wrap → 자식 w-full / block 컨트롤 (search button, Cmd-K) 가 collapse.
           해결: block + w-full + min-w-0 — 자식의 full-width 보존, 부모 flex container 에서도 안전. */}
+      {/* BUG-S27d-1 fix (Sprint 27d opus follow-up): Base UI PopoverTrigger 의 default
+          nativeButton={true} 가 <button> 렌더링을 기대 → render prop 의 <div> 와 충돌해
+          a11y console.error. nativeButton={false} 로 div trigger 허용 (children 이
+          button 인 경우 button-in-button 회피). */}
       <PopoverTrigger
+        nativeButton={false}
         render={(props) => (
           <div {...props} className="block w-full min-w-0">
             {children}

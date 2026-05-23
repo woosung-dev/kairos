@@ -326,3 +326,30 @@ async def test_upload_accepts_csv_as_text_plain(authed_client):
         )
     assert response.status_code == 201, response.text
     assert response.json()["fileKey"] == expected_file_key
+
+
+# ── Sprint 27d opus follow-up (BUG-S27d-3) ──
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_exe_disguised_as_text_plain(authed_client):
+    """BUG-S27d-3: `evil.exe` + `text/plain` 우회 차단 (이전엔 201).
+
+    Sprint 27d opus 1차 audit (agent-2 QA-EdgeCase) 가 발견한 우회 경로.
+    `_EXT_TO_MIME_FAMILY` 에 매핑되지 않은 확장자는 declared MIME 과 무관하게 415.
+    """
+    response = await authed_client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
+        files={"file": ("evil.exe", b"x", "text/plain")},
+    )
+    assert response.status_code == 415, response.text
+
+
+@pytest.mark.asyncio
+async def test_presigned_url_rejects_exe_disguised_as_text_plain(authed_client):
+    """BUG-S27d-3: presigned-url 경로도 동일 차단."""
+    response = await authed_client.post(
+        f"/api/v1/workspaces/{WORKSPACE_ID}/upload/presigned-url",
+        json={"filename": "evil.exe", "contentType": "text/plain"},
+    )
+    assert response.status_code == 415, response.text

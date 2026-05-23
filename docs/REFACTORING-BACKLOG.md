@@ -127,6 +127,36 @@
 
 ---
 
+## BL-S27e-1 — RAG latency p95 < 5s 목표 + 모니터링 (Sprint 27d carry) ★ (P3)
+
+**현 상태**: Sprint 27d opus audit (agent-3 CTO) localhost dev 5 sample 평균 10.6s. Gemini `gemini-3.1-flash-lite` API 응답 시간이 지배적. 캐시 hit 률 / cold path 분포 미관측.
+
+**목표**: p95 < 5s. Sentry performance monitoring 도입 시 자동 추적 (ADR-021). 캐시 hit 률 + cold path 분포 모니터링.
+
+**근거**: Sprint 27d opus audit BUG-S27d-6 (P3). 외부 dogfooding 시 UX 임계 임박.
+
+---
+
+## BL-S27e-2 — 사이드바 nav flicker 디버깅 (Sprint 27d carry) ★ (P3)
+
+**현 상태**: Sprint 27d opus audit (agent-5 일반사용자) `/notes` 진입 시 사이드바 일부 nav link 가 일시 미표시 → 곧 정상 복원. useEffect dependency 또는 SWR cache hydration 타이밍 이슈 추정.
+
+**목표**: render order 분석 + initial render 시 nav skeleton 또는 SSR-hydration 동기화.
+
+**근거**: Sprint 27d opus audit BUG-S27d-7 (P3). 기능 손실 0, 시각 잡음.
+
+---
+
+## BL-S27e-3 — CSP 정책 도입 (Sprint 27d carry) ★ (P3)
+
+**현 상태**: Sprint 27d 보안 헤더 fix (BUG-S27d-4) 에서 X-Frame-Options / X-Content-Type-Options / Referrer-Policy / Permissions-Policy 4종은 추가됐으나 CSP 는 의도적 SKIP. Next.js + Clerk + R2 + Sentry 등 다수 도메인의 정책 정리 미완.
+
+**목표**: 외부 도메인 inventory 정리 → `strict-dynamic` + nonce 기반 CSP 적용. Clerk SDK 의 inline script 정책 호환 확인.
+
+**근거**: Sprint 27d opus audit BUG-S27d-4 fix 시 CSP 분리. agent-3 CTO 권고.
+
+---
+
 ## BL-S27-1 — WorkspaceMember.is_active soft delete (D-6.1 후속) ★
 
 **현 상태**: WorkspaceMember 는 hard delete. 퇴사 사용자의 creator_id reference 가 orphan 표시.
