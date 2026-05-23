@@ -104,6 +104,8 @@ docs: 문서 / chore: 빌드·설정 / test: 테스트
 
 Capture (녹음/노트/자료) → Organize (STT + AI 구조화) → Distill (Inbox + 자동 확정 + L1~L4 인사이트) → Express (벡터 임베딩 + RAG 검색 + 프로액티브)
 
+**핵심 도메인 5**: 팀 세컨드 브레인 (CODE) · Inbox 자동 분류 · 콘텐츠 파이프라인 (Upload→STT→AI→Inbox→임베딩) · RAG 6-Layer (Cache→Query→Search→Re-rank→Generation→Store) · 오케스트레이터 패턴 (`pipeline_service.py` 만 cross-domain, 직접 import 금지). 도메인 경계 상세: `CONTEXT-MAP.md` §4.
+
 상세: `docs/architecture/ai-pipeline.md`, `docs/architecture/cross-domain-pipeline.md`, `docs/architecture/rag-pipeline.md`
 
 ## 핵심 엔티티
