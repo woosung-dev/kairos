@@ -102,3 +102,55 @@ git commit -m "docs: Sprint 27d pre-GA multi-perspective audit (6 agents)"
 
 4개 모두 충족 → **외부 5명 진입 GO**.
 미달 → `docs/REFACTORING-BACKLOG.md` BL-S27d-* 등재 → Sprint 27d 진입.
+
+---
+
+## 🔁 후속 세션 (opus 1차 audit 종료 후, 같은 브랜치 이어서)
+
+opus 가 1차 audit 끝낸 후 (PR #108, commit `6d70eb2`) **같은 브랜치 `sprint-27d/pre-ga-audit-prompts` 에서 이어서** agy → codex 순차 진행.
+
+| 순서 | 세션 | 프롬프트 파일 | 목적 |
+|------|------|--------------|------|
+| 1 | opus | ✅ 완료 (이 directory 의 SCOPE + agent-1~6 + report.html) | 1차 audit |
+| 2 | **agy** | `agent-followup-agy.md` | cross-check + DEFERRED 3건 보강 |
+| 3 | **codex** | `agent-followup-codex.md` | 3-세션 통합 + 최종 GO/NO-GO + adversarial |
+
+### 진입 절차 (각 세션 공통)
+
+1. 로컬 서버 기동 확인 (FE :3000 / BE :8000)
+2. 브랜치 fetch + checkout: `git checkout sprint-27d/pre-ga-audit-prompts && git pull`
+3. 해당 CLI (agy 또는 codex) 새 세션 시작
+4. **followup 프롬프트 본문 통째로 복붙**
+5. **goal 등록** — Stop hook 자동 보장 (각 프롬프트 §"새 세션 진입 절차" §4 의 goal condition 사용)
+6. 세션이 alle 작업 자동 진행 → PR #108 push 까지
+
+### 산출물 디렉토리
+
+```
+docs/sprints/sprint-27d-pre-ga-audit/
+├── (opus 산출물 — 이미 commit)
+├── agy/             ← agy 세션 산출물
+│   ├── agy-cross-check.md
+│   ├── agy-deferred-scenarios.md
+│   ├── agy-integrated-report.md
+│   ├── agy-report.html
+│   └── screenshots/
+├── codex/           ← codex 세션 산출물
+│   ├── codex-cross-check.md
+│   ├── codex-adversarial.md
+│   ├── codex-final-report.md
+│   ├── codex-final-report.html
+│   └── screenshots/
+├── final-integrated-report.md  ← 3-세션 통합 (codex 작성)
+└── final-report.html           ← 3-세션 통합 HTML (codex 작성)
+```
+
+### 결함 prefix 컨벤션
+
+| 세션 | prefix | 예 |
+|------|--------|-----|
+| opus | `BUG-S27d-*` | BUG-S27d-1 ~ BUG-S27d-7 |
+| agy | `BUG-S27d-AGY-*` | BUG-S27d-AGY-1 ... |
+| codex | `BUG-S27d-CODEX-*` | BUG-S27d-CODEX-1 ... |
+
+→ 3 세션 결함 모두 prefix 로 출처 추적 가능.
