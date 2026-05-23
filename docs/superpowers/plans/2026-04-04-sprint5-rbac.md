@@ -1249,7 +1249,7 @@ git commit -m "feat: 초대 수락 공개 페이지"
 **Files:**
 - Modify: `docs/TODO.md`
 - Modify: `docs/requirements/prd.md`
-- Create: `docs/dev-log/adr/007-rbac-pricing-decision.md` (ADR-007)
+- Create: `docs/adr/007-rbac-pricing-decision.md` (ADR-007)
 
 - [ ] **Step 1: ADR-007 작성**
 

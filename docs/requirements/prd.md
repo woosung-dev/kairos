@@ -75,7 +75,7 @@ Kairos는 **개인이 혼자 가치를 얻은 뒤 팀으로 확장**하는 IA를
 
 ### 페르소나 명세 (1차, Sprint 7+ 인터뷰 후 갱신)
 
-상세는 `docs/requirements/personas.md` 참조. 정의 정책은 ADR-011 (`docs/dev-log/adr/011-persona-definition.md`).
+상세는 `docs/requirements/personas.md` 참조. 정의 정책은 ADR-011 (`docs/adr/011-persona-definition.md`).
 
 | ID | 이름 (가명) | 역할 | 상태 | 1순위 wedge |
 |---|---|---|---|---|
@@ -150,7 +150,7 @@ T+30일  팀 RAG Q&A에서 신규 합류자 질문 "왜 freemium 채택?"
 
 ## 3.5. Future-Fit Thesis (3-year vision)
 
-상세는 ADR-010 (`docs/dev-log/adr/010-future-fit-thesis.md`) 참조.
+상세는 ADR-010 (`docs/adr/010-future-fit-thesis.md`) 참조.
 
 ### Thesis (1줄, v3.0 갱신)
 
@@ -272,7 +272,7 @@ T+30일  팀 RAG Q&A에서 신규 합류자 질문 "왜 freemium 채택?"
 
 ### 4.1 RAG 성능 KPI (Sprint 16 ADR-020 신설)
 
-> 당근(Karrot) DB 밋업 pgvector 최적화 노하우 적용 — `docs/dev-log/adr/020-pgvector-hnsw-halfvec.md`. Layer 3 (Hybrid Search) 기준 측정.
+> 당근(Karrot) DB 밋업 pgvector 최적화 노하우 적용 — `docs/adr/020-pgvector-hnsw-halfvec.md`. Layer 3 (Hybrid Search) 기준 측정.
 
 | KPI | Baseline (ivfflat) | 목표 (HNSW + halfvec) | 합격선 |
 |---|---|---|---|
@@ -293,7 +293,7 @@ T+30일  팀 RAG Q&A에서 신규 합류자 질문 "왜 freemium 채택?"
 ## 5. Phase 로드맵
 
 > **실행 전략:** Vertical Slice Sprint — Phase 순차 진행 대신 핵심 가치 흐름을 FE+BE 관통.
-> 의사결정 근거: `docs/dev-log/adr/002-execution-strategy.md`
+> 의사결정 근거: `docs/adr/002-execution-strategy.md`
 
 ---
 
@@ -533,7 +533,7 @@ T+30일  팀 RAG Q&A에서 신규 합류자 질문 "왜 freemium 채택?"
 
 ## 7.5. Demand Signal Definition (Sprint 6+ 계획)
 
-상세는 ADR-009 §3 (`docs/dev-log/adr/009-stage1-retrofit.md`) 참조. Q1(Demand) product-first 결정 + Sprint 6+ 후 demand 검증 정합.
+상세는 ADR-009 §3 (`docs/adr/009-stage1-retrofit.md`) 참조. Q1(Demand) product-first 결정 + Sprint 6+ 후 demand 검증 정합.
 
 ### Product-first 결정
 

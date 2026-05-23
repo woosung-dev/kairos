@@ -43,7 +43,7 @@
 
 **도구:** `/plan-eng-review` + 직접 문서 작성
 
-1. 기술 스택 결정 → `docs/dev-log/adr/001-tech-stack.md` (ADR)
+1. 기술 스택 결정 → `docs/adr/001-tech-stack.md` (ADR)
 2. 데이터 모델 설계 → `docs/architecture/erd.md` (전체 Phase 고려)
 3. API 경계 설계 → `docs/api/endpoints.md` (FE mock API와 1:1 대응)
 4. 파이프라인 설계 → `docs/architecture/` (데이터 흐름, 비동기 패턴)
@@ -222,7 +222,7 @@ Stage 8 완료 후 Stage 4로 돌아갈 때:
 
 ```
 □ AGENTS.md 프로젝트 컨텍스트 채우기
-□ .ai/rules/ 심링크 설정 (스택에 맞게 교체)
+□ .ai/common/ + .ai/stacks/ 규칙 파일 확인 (Sprint 26 부터 .ai/rules/ 심링크 폐지)
 □ /office-hours → 디자인 문서 생성
 □ docs/ 구조 생성 (00_project/, 01_requirements/, 04_architecture/ 등 global.md 참조)
 □ ADR-001: 기술 스택 결정

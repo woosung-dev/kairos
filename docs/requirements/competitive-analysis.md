@@ -2,8 +2,8 @@
 
 # Kairos Competitive Analysis — Otter / Granola / Reflect / Mem / Tana
 
-> **출처:** `docs/dev-log/adr/010-future-fit-thesis.md` (ADR-010 §"비용/리스크" 인용 — "Mem/Reflect/Tana 등 소형 경쟁자는 competitive-analysis.md에서 별도 다룸")
-> **상위:** `docs/dev-log/adr/009-stage1-retrofit.md` (ADR-009 §2 Q2 status quo 보강)
+> **출처:** `docs/adr/010-future-fit-thesis.md` (ADR-010 §"비용/리스크" 인용 — "Mem/Reflect/Tana 등 소형 경쟁자는 competitive-analysis.md에서 별도 다룸")
+> **상위:** `docs/adr/009-stage1-retrofit.md` (ADR-009 §2 Q2 status quo 보강)
 > **헌법:** `CONTEXT-MAP.md` §1·§3 CODE 가치 흐름·§6 핵심 불변식
 > **페르소나 cross-link:** `docs/requirements/personas.md` (Wedge 우선순위 매트릭스)
 > **최종 수정:** 2026-05-11
@@ -143,7 +143,7 @@ ChatGPT memory + Notion AI는 본 분석에 별도 등장 X — 위협 시나리
 |---|---|---|---|
 | B1 | 본인 직접 사용 경험 보강 — Otter/Granola/Mem 중 ≥1개 1주 사용 후 §2 라벨 해제 | Sprint 6 진입 전 (선택) | 본 문서 patch + `[본인 경험 — YYYY-MM-DD]` 라벨 |
 | B2 | 각 사 공식 문서 WebFetch — 5개 서비스 가격·기능 라벨 해제 | Sprint 6 진입 전 (필수) | 본 문서 patch + `[공식 — URL]` 라벨 |
-| B3 | ADR-009 F6 wedge 선정 ADR 입력 — 본 §4.3 wedge별 차별 anchor 사용 | Sprint 6 완료 + F4 외부 인터뷰 결과 후 | `docs/dev-log/adr/012-wedge-selection.md` (예정) |
+| B3 | ADR-009 F6 wedge 선정 ADR 입력 — 본 §4.3 wedge별 차별 anchor 사용 | Sprint 6 완료 + F4 외부 인터뷰 결과 후 | `docs/adr/012-wedge-selection.md` (예정) |
 | B4 | ADR-010 thesis 갱신 — 본 §4.1~4.2 분석으로 moat 강도 재평가 (M1/M2/M3 中 유지 vs 강 상향?) | Sprint 7+ 외부 인터뷰 + L4 구현 진입 시점 | ADR-010 supersedes 또는 갱신 PR |
 | B5 | competitive analysis 정기 갱신 사이클 — **매 Sprint 종료(경량 갱신)** + **분기 1회(풀 리뷰)** 분리. Sprint 주기는 ADR-009 F1~F10 기준 currently 미명시 — Sprint 6 킥오프 시 주기 lock-in 후 본 항목 정합 갱신. | 매 Sprint 종료 + 분기 1회 | 본 문서 patch |
 

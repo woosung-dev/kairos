@@ -354,7 +354,7 @@ Playwright MCP browser_navigate/click/snapshot 결과로 D1/D3 실 효과 확인
 ### 내부
 - plan: `~/.claude/plans/sprint-24-adr-019-distributed-dolphin.md` (codename diligent-beaver로 결정됨)
 - Sprint 23 closeout memory: `~/.claude/projects/-Users-woosung-project-agy-project-kairos/memory/project_sprint23_cozy_crystal_done.md`
-- ADR-019 Phase B 결과: `docs/dev-log/adr/019-gemini-eol-migration.md` §Implementation Phase B (DONE 2026-05-15)
+- ADR-019 Phase B 결과: `docs/adr/019-gemini-eol-migration.md` §Implementation Phase B (DONE 2026-05-15)
 - 이전 sprint spec/plan 패턴: `docs/superpowers/specs/2026-05-19-sprint23-cozy-crystal-design.md` + `docs/superpowers/plans/2026-05-19-sprint23-cozy-crystal-tasks.md`
 
 ### 코드 참조 (Sprint 23 학습)

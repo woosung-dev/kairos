@@ -5,6 +5,58 @@
 
 ---
 
+## 다음 Sprint 진입점 (Sprint 27+)
+
+**Sprint 26 (glittery-tulip) 부터 sprint-별 handoff/closeout/verification/kickoff/final-summary 파일을 작성하지 않는다.** 지속 정보는 (1) git log + 머지된 PR body, (2) 이 백로그의 BL 항목, (3) `.claude/projects/.../memory/MEMORY.md` (선택). 다음 sprint 첫 commit 의도는 마지막 머지된 PR 의 "다음 sprint 진입점" 섹션에 1-3줄로 남긴다.
+
+**현재 다음 픽업** (2026-05-23, Sprint 26 진행 중): Sprint 26 PR open 직후 3대 도구 통합 검증 → 사용자 머지 → Sprint 27 첫 작업 = 4 정량신호 재측정 (Atomic Update 실패 0회 확인) + `MEMORY.md` 휘발성화 vs 폐지 결정 (P2).
+
+---
+
+## BL-S26-1 — 필수 규칙 토큰 ≤ 3,000 추가 cut (Sprint 26 carry-over) ★★
+
+**현 상태:** 2026-05-23 Sprint 26 측정 = 2,845 words → 추정 3,698 tokens (목표 ≤ 3,000, 23% 초과).
+
+**대상:** `AGENTS.md` (135줄) + `CONTEXT-MAP.md` (106줄) + `.ai/common/global.md` (71줄) + `.ai/templates/workflow.md` (80줄) = 392줄.
+
+**후보 cut:** CONTEXT-MAP I-9 멀티테넌시 격리 한 줄 (11항 압축 가능) · I-14 SQLModel typed query allowlist 5 카테고리 → 표 1줄 · §2 핵심 엔티티 21개 → ERD 링크 + 핵심 12개 · §6 불변식 21개 중 일부 ADR 분리. AGENTS.md 신규 검증 증거 표준 5줄 → 워크플로우 참조 1줄.
+
+**근거:** Sprint 26 메타-sprint 가 강행 cut 금지 정책 (plan risk mitigation §3) — 정보 보존 우선, 추가 cut 은 별도 BL.
+
+**참조:** Sprint 26 verification 4회차 + memory `project_governance_lightening_decision` 4 신호.
+
+---
+
+## BL-S26-2 — docs/*.md ≤ 30 추가 cut (Sprint 26 carry-over) ★★
+
+**현 상태:** 2026-05-23 측정 = 47 파일 (superpowers 제외, maxdepth 2). 목표 ≤ 30 (57% 초과).
+
+**카테고리:** `docs/adr/` 19 + `docs/architecture/` 7 + `docs/requirements/` 8 + `docs/guides/` 8 + `docs/api/` 1 + `docs/plans/active/` 1 + root 3 (README/REFACTORING-BACKLOG/TODO).
+
+**후보 cut:** (A) `docs/adr/` 19건 중 superseded 식별 → `docs/adr/archive/` 분리 + 카운트 제외 · (B) `docs/requirements/` 8건 중 interview-results/competitive-analysis archive · (C) `docs/architecture/` 7건 통합 (data-flow-example → ai-pipeline 흡수 등) · (D) `docs/guides/` 8건 중 r2-cleanup-cron + prompt-env-docs 통합.
+
+**근거:** Sprint 26 plan G2 결정 (dev-log/qa+notes 전부 폐지) 적용 후에도 초과 → 추가 cut 별도 BL.
+
+**참조:** Sprint 26 verification 4회차.
+
+---
+
+## BL-S26-3 — historical reference dead link cleanup (Sprint 26 carry-over) ★
+
+**현 상태:** Sprint 26 P0-3 dev-log/sprints+qa+notes 폐지 후 `docs/TODO.md` + `docs/REFACTORING-BACKLOG.md` 본문 (L50/95/145/200/1768/1835 등) 에 historical reference 다수 잔존. agy 검증 3회차 REVISE 지적.
+
+**후보:** (A) sed 일괄 — `docs/dev-log/{sprints,qa,notes}/...` 참조를 "(Sprint NN 산출물, git history 참조)" 로 inline replace · (B) TODO.md 통째 슬림 (518줄 → 100줄 미만).
+
+**의도:** historical reference 는 context 보존 가치 vs dead link risk trade-off. agy = "신규 AI 가 폐지 경로 읽으려 시도할 수 있음" 권고 → cleanup.
+
+**제외:** `docs/superpowers/plans/` + `docs/superpowers/specs/` (G1 = historical archive 보존).
+
+**참조:** Sprint 26 verification 3회차 agy REVISE.
+
+---
+
+---
+
 ## BL-001 — meetings 파이프라인 status commit 단일화 (D-9 장기 개선)
 
 **현 상태:**
@@ -1439,7 +1491,7 @@ E1    2482456 refactor(bl-053): E1 entry — AsyncSession SM 양분 import + cla
 ### BL-054 carry-over (PR #93)
 
 - 모든 repository 의 `session.execute(stmt).scalars().all()` / `.scalar_one_or_none()` / `.scalar_one()` 패턴을 SQLModel typed `session.exec(stmt).all()` / `.one_or_none()` / `.one()` 으로 migration
-- 헌법 patch 동반 (CONTEXT-MAP I-14 + backend/CONTEXT.md B-10 + .ai/rules/backend.md)
+- 헌법 patch 동반 (CONTEXT-MAP I-14 + backend/CONTEXT.md B-10 + .ai/stacks/fastapi/backend.md)
 - execute allowlist manifest (G1~G5) 작성 후 진행
 
 **근거**: Sprint 19 PR #2 D9 + BL-052 cleanup PR (#91) Plan agent verdict + Codex 1차/2차 review.

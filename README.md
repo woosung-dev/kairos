@@ -5,7 +5,7 @@
 
 **프로덕션:** [kairos-zeta-ebon.vercel.app](https://kairos-zeta-ebon.vercel.app) · BE: [Cloud Run](https://kairos-api-467254555861.asia-northeast3.run.app/api/v1/docs)
 
-**현재 상태:** Sprint 17 종결 (2026-05-16) — C1~C6 8/8 PASS, 보안 3-layer (ADR-014 정합), 회귀 가드 21건. 자세히는 [`docs/dev-log/sprints/2026-05-16-sprint17-closeout.md`](docs/dev-log/sprints/2026-05-16-sprint17-closeout.md).
+**현재 상태:** Sprint 26 (glittery-tulip, 2026-05-23) — docs 거버넌스 경량화 진행. ~Sprint 25 (moonlit-sutton) 까지 Multi-Agent QA P0~P2 + 보안 3-layer + 회귀 가드 완료. 상세: `git log` + `docs/REFACTORING-BACKLOG.md` "다음 Sprint 진입점".
 
 ---
 
