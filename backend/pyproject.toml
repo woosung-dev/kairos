@@ -21,6 +21,7 @@ dependencies = [
     "testcontainers>=4.14.2",
     "python-multipart>=0.0.28",
     "sentry-sdk[fastapi]>=2.60.0",
+    "svix>=1.94.0",
 ]
 
 [dependency-groups]
