@@ -28,6 +28,33 @@ class AuthService:
             await self.repo.commit()
         return user
 
+    async def sync_user(
+        self,
+        clerk_id: str,
+        email: str,
+        display_name: str,
+        avatar_url: str | None = None,
+    ) -> User:
+        """Webhook으로 사용자 동기화 (생성 또는 업데이트).
+
+        Sprint 27b ADR-024 회수 — Svix 검증된 payload 만 도달 (router 의 Depends 가 강제).
+        """
+        user = await self.repo.find_by_clerk_id(clerk_id)
+        if user is None:
+            user = User(
+                clerk_id=clerk_id,
+                email=email,
+                display_name=display_name,
+                avatar_url=avatar_url,
+            )
+        else:
+            user.email = email
+            user.display_name = display_name
+            user.avatar_url = avatar_url
+        user = await self.repo.save(user)
+        await self.repo.commit()
+        return user
+
     @staticmethod
     def to_response(user: User) -> dict:
         """User → camelCase 응답 dict."""
