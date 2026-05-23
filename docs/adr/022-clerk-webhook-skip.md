@@ -130,8 +130,9 @@ Sentinel 페르소나의 적대적 검증에서 BUG-SENTINEL-005 (Critical):
 2. ✅ Svix 서명 검증 의무 — `backend/src/auth/svix_verify.py`
    `verify_svix_signature` Depends (commit `443ad7c`). 3 헤더 필수 + HMAC + 5분
    timestamp tolerance + 검증 실패 401
-3. ✅ Sentinel test 회복 — `tests/auth/test_user_sync.py` 4 case (created /
-   updated / bad-sig / stale). 옛 `test_auth_sync_disabled.py` 삭제 (obsolete)
+3. ✅ Sentinel test 회복 — `tests/auth/test_user_sync.py` 6 case (created /
+   updated / bad-sig / stale + Codex P2 후속 deleted-ignored / missing-data-id).
+   옛 `test_auth_sync_disabled.py` 삭제 (obsolete)
 4. ✅ ADR + canonical doc atomic update — endpoints.md `/api/v1/users/sync`
    row 복원 (strikethrough 제거 + Svix 헤더/응답 표 신설) + auth/CONTEXT.md
    §5 불변식 / §6 endpoint 갱신
@@ -141,9 +142,22 @@ Sentinel 페르소나의 적대적 검증에서 BUG-SENTINEL-005 (Critical):
 
 ### 회귀 가드 (Sprint 27b 신규)
 
-`backend/tests/auth/test_user_sync.py` 의 4 case 가 ADR-022 의 옛 4 case 를
-대체. 위조 서명 / stale timestamp case 는 DB write 차단을 직접 verify
-(`mock_service.sync_user.assert_not_awaited()`).
+`backend/tests/auth/test_user_sync.py` 의 6 case 가 ADR-022 의 옛 4 case 를
+대체:
+
+| # | Case | 검증 |
+|---|---|---|
+| 1 | user.created + 정상 서명 | 200 + sync_user 호출 + 인자 검증 |
+| 2 | user.updated + 정상 서명 | 200 + sync_user 호출 (race-safe upsert) |
+| 3 | 위조 서명 | 401 INVALID_SIGNATURE + `assert_not_awaited()` (DB write 차단) |
+| 4 | stale timestamp (1시간 전) | 401 STALE_TIMESTAMP + `assert_not_awaited()` |
+| 5 | user.deleted event (비지원) | 200 `{synced: False, reason}` + `assert_not_awaited()` (Codex P2-1) |
+| 6 | data.id 누락 (user.created) | 422 MISSING_USER_ID + `assert_not_awaited()` (Codex P2-1) |
+
+Wave 1 게이트 1차 review (codex P2 2건 + agy REVISE 1건) 100% 수락 후 case 5/6
+추가 (commit `d9f1970`). race-safe upsert (`repository.upsert_by_clerk_id`,
+ON CONFLICT DO UPDATE) 는 unit test 가 아닌 integration test 별도 BL — Sprint 28
+또는 production 운영 중 실 race 발생 시 evidence-base 로 추가.
 
 ### 후속 결정
 

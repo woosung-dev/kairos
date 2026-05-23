@@ -239,11 +239,13 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 
 | 상태 | 응답 |
 |:----:|------|
-| 200 | `{ "synced": true }` |
+| 200 | `{ "synced": true }` — `user.created` / `user.updated` 정상 처리 (race-safe upsert) |
+| 200 | `{ "synced": false, "reason": "event_type=<type>_ignored" }` — 비지원 event (`user.deleted`, `organization.*` 등). Clerk 재시도 무한루프 회피 위해 2xx |
 | 401 | `{ "detail": "INVALID_SIGNATURE" }` — 헤더 누락 / HMAC 불일치 / base64 형식 오류 |
-| 401 | `{ "detail": "STALE_TIMESTAMP" }` — timestamp drift > 5분 |
+| 401 | `{ "detail": "STALE_TIMESTAMP" }` — timestamp drift > 5분 (Svix SDK 기본) |
+| 422 | `{ "detail": "MISSING_USER_ID" }` — Svix 검증 통과 + 지원 event 인데 `data.id` 누락 (defensive) |
 
-회귀 가드: `backend/tests/auth/test_user_sync.py` (4 case — created/updated/bad-sig/stale).
+회귀 가드: `backend/tests/auth/test_user_sync.py` (6 case — created / updated / bad-sig / stale + Codex P2 후속 deleted-ignored / missing-data-id).
 
 ---
 
