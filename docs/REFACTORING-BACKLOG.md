@@ -2116,24 +2116,21 @@ v2 (audio/mp4 collapse) 였을 때는 text/plain 과 mismatch → 거부였으�
 
 ## BL-071 — Sync endpoint 재도입 시 Svix 검증 강제 CI guard (Sprint 25 polish carry, agy F9 sub-3)
 
-**상태**: 미시작 (Sprint 25 codex+agy review F9 sub-3 — ADR-022 §"회수 옵션 5단계" 1차 완화 적용 후 carry)
-**우선순위**: P3 (사용자 발생 가능성 낮음 — 단일 작성자 + ADR-022 lock-in)
+**상태**: **CLOSED** (Sprint 27b Wave 1 게이트, 2026-05-23, agy REVISE-1) — endpoint 회복 + Svix 검증 동시 commit 으로 본 BL 의 의도 (재도입 시 누락 방지) 가 자연스럽게 충족. 인용한 트립선 `test_auth_sync_disabled.py` 가 삭제되어 본 BL 의 가드 자체 무효화.
+**우선순위**: P3 (closed)
 
-### 배경
+### 배경 (historical)
 agy F9 sub-3 — `/api/v1/users/sync` endpoint 재도입 시 Svix 서명 검증 누락 위험. 현재 lock-in:
 - ADR-022 §"회수 옵션 5단계" 에 Svix 검증 의무 명시
 - `backend/tests/auth/test_auth_sync_disabled.py` 가 "404 응답" verify (재도입 시 fail → 작성자가 의식)
 
 리스크: 재도입 commit 에서 회귀 테스트도 같이 제거 + Svix 추가 누락 → IDOR 회귀.
 
-### 작업
-- pre-commit hook 또는 CI lint:
-  - `backend/src/auth/router.py` 에 `@router.post("/sync"` 또는 `@router.post("/users/sync")` 패턴 등장 시
-  - 동일 파일에 `svix` 또는 `webhook_signature` 또는 `Webhook(` 임포트 부재면 block
-- 또는 ADR-022 §"회수 옵션" 5단계 를 git commit message template 으로 강제 (작성자 의식 유도)
-
-### 진입 조건
-- GA launch 가 가시화되어 Clerk Production 발급 + sync 재도입이 실 작업이 될 때
+### 해소 (Sprint 27b Wave 1)
+- commit `443ad7c` (Task 1.2): `backend/src/auth/svix_verify.py` 신규 — Svix Depends 강제
+- commit `42a0e79` (Task 1.1+1.5): router 의 `@router.post("/sync")` 가 `Depends(verify_svix_signature)` 동시 적용 (분리 commit 회피 → 누락 가능성 0)
+- `test_user_sync.py` 4 case (created/updated/bad-sig/stale) + Codex P2 fix 후속 2 case (deleted ignored / missing id) → 검증 부재 회귀 시 즉시 fail
+- CI lint / pre-commit hook 미구현은 NIT (단일 작성자 + ADR-022 supersede 의 강한 archeology lock-in 으로 회귀 위험 낮음)
 
 ---
 

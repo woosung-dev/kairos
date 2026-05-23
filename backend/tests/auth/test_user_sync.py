@@ -141,3 +141,45 @@ async def test_sync_user_stale_timestamp_blocked(client, mock_service):
     assert response.status_code == 401
     assert response.json()["detail"] == "STALE_TIMESTAMP"
     mock_service.sync_user.assert_not_awaited()
+
+
+# Codex P2 fix 후속 회귀 case (Wave 1 게이트 1차 review 수락)
+
+
+@pytest.mark.asyncio
+async def test_sync_user_unsupported_event_type_ignored(client, mock_service):
+    """Case 5 (Codex P2-1) — user.deleted 처럼 비지원 event 는 200 + synced=False + 서비스 미호출.
+
+    Clerk dashboard 에서 webhook subscription 이 user.* 전체로 잡혀 user.deleted /
+    user.banned 등이 도착해도 valid Svix 서명이므로 router 까지 들어옴. 본 endpoint 가
+    blindly sync 하면 user row 가 빈값으로 덮어써질 위험. 화이트리스트로 차단.
+    """
+    payload = {
+        "type": "user.deleted",
+        "data": {"id": "user_to_be_deleted", "deleted": True},
+    }
+    body, headers = _sign_payload(payload)
+    response = await client.post("/api/v1/users/sync", content=body, headers=headers)
+    assert response.status_code == 200, response.text
+    body_json = response.json()
+    assert body_json["synced"] is False
+    assert "user.deleted" in body_json["reason"]
+    mock_service.sync_user.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_sync_user_missing_data_id_rejected(client, mock_service):
+    """Case 6 (Codex P2-1) — data.id 누락 → 422 MISSING_USER_ID + 서비스 미호출.
+
+    user.created 인데 data.id 없는 비정상 payload — Clerk 가 절대 보내지 않지만
+    defensive. 422 로 Clerk dashboard 가 fail event 인지 가능.
+    """
+    payload = {
+        "type": "user.created",
+        "data": {"first_name": "이름만", "email_addresses": []},
+    }
+    body, headers = _sign_payload(payload)
+    response = await client.post("/api/v1/users/sync", content=body, headers=headers)
+    assert response.status_code == 422
+    assert response.json()["detail"] == "MISSING_USER_ID"
+    mock_service.sync_user.assert_not_awaited()
