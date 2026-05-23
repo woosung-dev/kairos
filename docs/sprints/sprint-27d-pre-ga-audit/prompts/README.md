@@ -109,11 +109,13 @@ git commit -m "docs: Sprint 27d pre-GA multi-perspective audit (6 agents)"
 
 opus 가 1차 audit 끝낸 후 (PR #108, commit `6d70eb2`) **같은 브랜치 `sprint-27d/pre-ga-audit-prompts` 에서 이어서** agy → codex 순차 진행.
 
-| 순서 | 세션 | 프롬프트 파일 | 목적 |
-|------|------|--------------|------|
-| 1 | opus | ✅ 완료 (이 directory 의 SCOPE + agent-1~6 + report.html) | 1차 audit |
-| 2 | **agy** | `agent-followup-agy.md` | cross-check + DEFERRED 3건 보강 |
-| 3 | **codex** | `agent-followup-codex.md` | 3-세션 통합 + 최종 GO/NO-GO + adversarial |
+> **CLI 종류 정정**: agy = **Antigravity CLI** (codex CLI 와 비슷한 자동 에이전트 종). Claude Code 의 gstack 과 무관.
+
+| 순서 | 세션 (CLI) | 프롬프트 파일 | 목적 |
+|------|-----------|--------------|------|
+| 1 | opus (Claude Code) | ✅ 완료 (이 directory 의 SCOPE + agent-1~6 + report.html) | 1차 audit (composite 7.53/10 GO, 결함 7건 발견) |
+| 2 | **agy (Antigravity CLI)** | `agent-followup-agy.md` | **결함 4건 fix** (BUG-S27d-1/2/3/4) + 검증 루프 + cross-check + DEFERRED 3건 보강 |
+| 3 | **codex (OpenAI Codex CLI)** | `agent-followup-codex.md` | **agy fix 회귀 가드** + adversarial + 3-세션 통합 + 최종 GO/NO-GO |
 
 ### 진입 절차 (각 세션 공통)
 
