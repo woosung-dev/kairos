@@ -1,6 +1,8 @@
 # 외부 dogfooder 5명 1:1 미팅 walkthrough (12분)
 
-> Sprint 27b GA dogfooding sprint. ADR-024 종료 기준 = 5명 중 3명+ 2주 활성 + 1명+ 지불 의사. founder 본인 1:1 진행 sheet.
+> **활용 시점**: 운영 sprint 진입 (Clerk Production 발급 + 외부 5명 모집 신호 후). Sprint 27b 코드 회수 단계에서는 본 가이드 미사용 — Sprint 27b 의 sync_user endpoint + Svix 검증 + race-safe upsert 코드 회수 완료 후 운영 진입 시점에 활용.
+>
+> 종료 기준 (운영 sprint) = 5명 중 3명+ 2주 활성 + 1명+ 지불 의사 (codex 권고, ADR-024 deferred 섹션). founder 본인 1:1 진행 sheet.
 
 ---
 
@@ -8,8 +10,6 @@
 
 | 체크 | 항목 |
 |---|---|
-| ☐ | Clerk Production 인스턴스 활성화 — `pk_live_*` / `sk_live_*` GCP+Vercel 갱신 완료 |
-| ☐ | Svix webhook URL 등록 — `https://kairos-api-imrsiyibaa-du.a.run.app/api/v1/users/sync` |
 | ☐ | dogfooder 이름 + 회사 + 도메인 1줄 사전 인지 (어떤 회의를 자주 하는지) |
 | ☐ | Zoom/Meet 화면 공유 가능 환경 (브라우저 1 + Kairos 1 + Slack 1) |
 | ☐ | 12분 타이머 (스마트폰) — 정량 진행 강제, 만나면 추가 토크 시간은 별도 |
@@ -116,10 +116,10 @@
 
 | 진입 차단 항목 | 진입 신호 |
 |---|---|
-| Clerk Production 발급 | dashboard 의 production mode toggle ON 확인 |
-| Svix webhook 등록 | dashboard webhooks 에 `https://<api>/api/v1/users/sync` 목록에 보임 |
-| GCP/Vercel 환경변수 | `CLERK_SECRET_KEY` / `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_WEBHOOK_SECRET` 갱신 deploy 완료 |
 | 5명 모집 | Sprint 15 R8 outreach 80 채널 응답 + 일정 잡힘 |
+| 인증/webhook/Sentry 인프라 결정 | 운영 sprint 의 ADR (별도 lock-in) 선행 완료 |
+
+> 위 두 항목은 본 가이드 (운영 sprint) 진입 차단. Sprint 27b 의 코드 회수만으로는 운영 진입 불가 — 운영 sprint 에서 Clerk Production 발급 / Svix webhook 등록 / 환경변수 갱신 / Sentry DSN 설정 등 인프라 결정 후 본 가이드 활용.
 
 ---
 
@@ -186,9 +186,8 @@ query 로 충분 — 본 sprint 에서는 admin dashboard page 신설 SKIP (Spri
 
 ## 참조
 
-- ADR-024 (`docs/adr/024-ga-readiness.md`) — GA readiness + 종료 기준 + 회수 옵션
-- Sprint 27b plan (`docs/plans/active/sprint-27b-ga-launch.md`) — Wave 1~3
-- Sprint 22 ADR-021 — Sentry 활성화 (외부 5명 운영 중 error 추적)
+- ADR-024 (`docs/adr/024-ga-readiness.md`) — 코드 회수 scope (Sprint 27b 완료) + 운영 진입 (deferred)
+- Sprint 27b plan (`docs/plans/active/sprint-27b-ga-launch.md`) — 코드 회수 closeout + 운영 진입 deferred 매트릭스
 - Sprint 15 R7 metrics (`backend/src/memory/models.py:79 MemoryEvent`) — capture/recall/promote 이벤트 스키마
 - Sprint 15 C7 (`backend/src/memory/repository.py:97 get_metrics_counts`) — workspace 별 count 함수
-- memory `project_sprint15_stage4_done` — R8 outreach 80 채널
+- memory `project_sprint15_stage4_done` — R8 outreach 80 채널 (운영 진입 시 활용)

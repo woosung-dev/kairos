@@ -136,9 +136,11 @@ Sentinel 페르소나의 적대적 검증에서 BUG-SENTINEL-005 (Critical):
 4. ✅ ADR + canonical doc atomic update — endpoints.md `/api/v1/users/sync`
    row 복원 (strikethrough 제거 + Svix 헤더/응답 표 신설) + auth/CONTEXT.md
    §5 불변식 / §6 endpoint 갱신
-5. ⏳ Clerk Production 발급 + dashboard webhook 등록 + GCP/Vercel
-   `CLERK_WEBHOOK_SECRET` 갱신 — **사용자 액션 (AI 작업 외)**, ADR-024 §"사용자
-   액션" 참조
+5. **deferred (운영 진입 시점)**: Clerk Production 발급 + dashboard webhook 등록 +
+   GCP/Vercel `CLERK_WEBHOOK_SECRET` + Sentry DSN 갱신. 본 sprint scope 외
+   (ADR-024 Scope 재정의 2026-05-23). 운영 sprint 신호 후 별도 ADR 또는 ADR-024
+   §"운영 진입 (deferred)" 부록에서 lock-in. 본 sprint 의 코드 부분 (1~4) 은 운영
+   진입 시 즉시 사용 가능한 codebase 정합 보장.
 
 ### 회귀 가드 (Sprint 27b 신규)
 
