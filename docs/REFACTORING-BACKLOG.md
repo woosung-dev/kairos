@@ -5,6 +5,14 @@
 
 ---
 
+## 다음 Sprint 진입점 (Sprint 27+)
+
+**Sprint 26 (glittery-tulip) 부터 sprint-별 handoff/closeout/verification/kickoff/final-summary 파일을 작성하지 않는다.** 지속 정보는 (1) git log + 머지된 PR body, (2) 이 백로그의 BL 항목, (3) `.claude/projects/.../memory/MEMORY.md` (선택). 다음 sprint 첫 commit 의도는 마지막 머지된 PR 의 "다음 sprint 진입점" 섹션에 1-3줄로 남긴다.
+
+**현재 다음 픽업** (2026-05-23, Sprint 26 진행 중): Sprint 26 PR open 직후 3대 도구 통합 검증 → 사용자 머지 → Sprint 27 첫 작업 = 4 정량신호 재측정 (Atomic Update 실패 0회 확인) + `MEMORY.md` 휘발성화 vs 폐지 결정 (P2).
+
+---
+
 ## BL-001 — meetings 파이프라인 status commit 단일화 (D-9 장기 개선)
 
 **현 상태:**
