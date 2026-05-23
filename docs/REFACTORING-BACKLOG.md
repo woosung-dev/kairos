@@ -1447,7 +1447,7 @@ E1    2482456 refactor(bl-053): E1 entry — AsyncSession SM 양분 import + cla
 ### BL-054 carry-over (PR #93)
 
 - 모든 repository 의 `session.execute(stmt).scalars().all()` / `.scalar_one_or_none()` / `.scalar_one()` 패턴을 SQLModel typed `session.exec(stmt).all()` / `.one_or_none()` / `.one()` 으로 migration
-- 헌법 patch 동반 (CONTEXT-MAP I-14 + backend/CONTEXT.md B-10 + .ai/rules/backend.md)
+- 헌법 patch 동반 (CONTEXT-MAP I-14 + backend/CONTEXT.md B-10 + .ai/stacks/fastapi/backend.md)
 - execute allowlist manifest (G1~G5) 작성 후 진행
 
 **근거**: Sprint 19 PR #2 D9 + BL-052 cleanup PR (#91) Plan agent verdict + Codex 1차/2차 review.

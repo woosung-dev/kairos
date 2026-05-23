@@ -222,7 +222,7 @@ Stage 8 완료 후 Stage 4로 돌아갈 때:
 
 ```
 □ AGENTS.md 프로젝트 컨텍스트 채우기
-□ .ai/rules/ 심링크 설정 (스택에 맞게 교체)
+□ .ai/common/ + .ai/stacks/ 규칙 파일 확인 (Sprint 26 부터 .ai/rules/ 심링크 폐지)
 □ /office-hours → 디자인 문서 생성
 □ docs/ 구조 생성 (00_project/, 01_requirements/, 04_architecture/ 등 global.md 참조)
 □ ADR-001: 기술 스택 결정
