@@ -153,7 +153,8 @@ export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
         {!isCreateOpen ? (
           <DropdownMenuItem
             className="px-3 py-2 cursor-pointer"
-            onSelect={(e) => {
+            closeOnClick={false}
+            onClick={(e) => {
               e.preventDefault();
               setIsCreateOpen(true);
             }}
