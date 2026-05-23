@@ -1,7 +1,7 @@
 # ADR-022: Clerk webhook SKIP + `/api/v1/users/sync` endpoint 비활성화 (Pre-GA 운영 정책)
 
 > **날짜:** 2026-05-21
-> **상태:** Accepted (2026-05-21 Sprint 25 T-SEC-1 commit `d614214` 적용 완료)
+> **상태:** Superseded by [ADR-024](024-ga-readiness.md) (2026-05-23, Sprint 27a 결정 — GA dogfooding 진입). 원 SKIP 결정은 Sprint 25 T-SEC-1 (Pre-GA 운영 정책) 으로 적용됨.
 > **작성자:** Claude Opus 4.7 (1M context) + 사용자 (정책 결정)
 > **관련:** Sprint 25 plan `docs/dev-log/qa/2026-05-21-sprint25-multi-agent-qa/sprint-25-plan.md` · memory `project_gcp_migration_jetaime_dev_done.md` (2026-05-21 GCP 이전 + 사용자 SKIP 결정 lock-in) · `backend/src/auth/router.py` (sync handler 제거) · `backend/src/auth/service.py` (sync_user 메서드 제거) · `backend/src/auth/CONTEXT.md` §5/§6 · 회귀 가드 `backend/tests/auth/test_auth_sync_disabled.py` · ADR-014 Service Boundary
 > **워크플로우:** `.ai/templates/workflow.md` Stage 4 (코드) — Stage 1 ADR 산출은 본 ADR 자체
