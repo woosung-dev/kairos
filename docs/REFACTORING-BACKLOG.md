@@ -15,6 +15,118 @@
 
 ---
 
+## BL-S27c-1 — `get_current_user` lazy seed race condition fix ★★★ (P0)
+
+**현 상태**: `backend/src/auth/dependencies.py:160-169` 의 User INSERT 가 race-unsafe. Dashboard 첫 진입 시 FE 가 5+ API 동시 호출 → 각 transaction 이 `find_by_clerk_id`=None → 동시 INSERT → 1개 성공 + 나머지 IntegrityError `duplicate key value violates unique constraint "ix_users_clerk_id"` → 500.
+
+**증상 verified** (Sprint 27c audit, Account #3 c@e.com localhost 재현): `GET /workspaces` 500 + `/workspaces/{id}/members` 500 + `/workspaces/{id}/projects` 500 + `/workspaces/{id}/inbox` 403 (lazy fallback). production 의 동일 증상도 같은 race condition 추정 (deploy stale 가설 무효).
+
+**목표**: User INSERT 에 `ON CONFLICT (clerk_id) DO NOTHING` 추가 (같은 file line 175-184 의 workspace INSERT 패턴 정합). 또는 try/except IntegrityError + retry find_by_clerk_id fallback.
+
+**근거**: Sprint 27c audit, `docs/audits/2026-05-23-sprint27c-audit/ROOT-CAUSE-CORRECTION.md`.
+
+**영향**: 외부 5명 진입 60-80% 첫 dashboard 진입 시 500 가능성. dogfooding prerequisite.
+
+---
+
+## BL-S27c-2 — GEMINI_API_KEY 재발급 ★★★ (P0)
+
+**현 상태**: `backend/.env` 의 `GEMINI_API_KEY` invalid. BE log `google.genai.errors.ClientError: 400 API_KEY_INVALID`. 회의 업로드 → AI pipeline 전체 실패 (status="실패").
+
+**목표**: Google AI Studio (`https://aistudio.google.com`) 에서 새 API key 발급 + local `.env` + Cloud Run secret 동기화.
+
+**근거**: Sprint 27c audit, `docs/audits/2026-05-23-sprint27c-audit/qa-function.md` P0-AI-PIPELINE.
+
+**영향**: Kairos 핵심 가치 (AI 자동 요약) 0. ADR-019 Phase B (gemini-3.1-flash-lite) 동작 prerequisite.
+
+---
+
+## BL-S27c-3 — Landing screenshot 3건 400 fix ★★ (P1)
+
+**현 상태**: `/landing/screenshots/screenshot-dashboard.png` / `meeting-summary.png` / `rag-answer.png` 모두 Next.js Image optimizer 400. 파일 disk 존재 (`frontend/public/landing/screenshots/`). source code bug (localhost + production 동일 400).
+
+**목표**: Next.js Image config / format / dimension issue 원인 진단 + fix. 또는 직접 `<img>` 태그 fallback.
+
+**근거**: Sprint 27c audit `ceo-perspective.md` P1-S27c-1. "이미 동작하는 제품입니다" 섹션 trust 직격타.
+
+---
+
+## BL-S27c-4 — Meeting 실패 후 retry UI ★ (P2)
+
+**현 상태**: meeting status="실패" 표시되나 retry 버튼 없음. R2 storage 의 stale audio 도 정리 안 됨.
+
+**근거**: Sprint 27c audit `qa-function.md` P2-FAIL-NO-RETRY.
+
+---
+
+## BL-S27c-5 — Failed meeting copy mismatch ★ (P2)
+
+**현 상태**: status=`실패` 인데 요약 탭 "AI 분석이 **완료되면** 요약이 자동으로 생성됩니다" 표시. 사용자 오해.
+
+**목표**: status별 동적 copy ("실패" 시 "AI 분석 중단됨 / retry 권고" 등).
+
+---
+
+## BL-S27c-6 — Inbox `/inbox` empty state UI ★ (P2)
+
+**현 상태**: 신규 가입 직후 `/inbox` 진입 시 헤더만 표시. empty state ("아직 항목이 없어요" 등) 부재. Memory + Projects page 와 일관성 불일치.
+
+---
+
+## BL-S27c-7 — `/actions` route 404 또는 진입점 부재 ★ (P2)
+
+**현 상태**: `/actions` URL 직접 진입 시 404. dashboard 빠른 접근 카드에도 진입점 없음. CONTEXT-MAP §4.3 FE features 에 `actions` 명시.
+
+**목표**: dedicated route 또는 meeting detail 내 action items 진입점 명시.
+
+---
+
+## BL-S27c-8 — A11Y PopoverTrigger nativeButton 3 page 공통 ★ (P1)
+
+**현 상태**: Dashboard / Projects / CmdK 진입 시 console error `Base UI: A component that acts as a button expected a native <button> because the nativeButton prop is true`. OnboardingTooltip 의 PopoverTrigger render prop 에 non-button.
+
+**목표**: PopoverTrigger 의 `nativeButton` prop=false 또는 render slot 에 native `<button>` 전달.
+
+---
+
+## BL-S27c-9 — Production health check + Cloud Run min instance 1 ★ (P1)
+
+**현 상태**: production BE `/api/v1/health` 응답이 200 (~65ms) ↔ timeout (10s+) 반복. Cloud Run cold start aggressive scaling 추정. 외부 5명 동시 진입 시 SLA risk.
+
+**목표**: Cloud Run min instance 1 권고 (USD ~$10-15/month) 또는 CDN 헬스체크 + alert 설정.
+
+**근거**: Sprint 27c audit `cto-perspective.md` 운영 readiness 3/10 BLOCK 한계.
+
+---
+
+## BL-S27c-10 — Cloud Run secret rotation 정책 ★ (P2)
+
+**현 상태**: GEMINI_API_KEY invalid 가 secret 관리 process 의 첫 실패 case. rotation 정책 (auto-renewal / alert / staging verify) 부재.
+
+**근거**: Sprint 27c audit `cto-perspective.md` 보안 baseline.
+
+---
+
+## BL-S27c-12 — logout 시 `localStorage.kairos-workspace` clear ★★ (P1, Wave 4 발견)
+
+**현 상태**: Clerk `signOut()` 후에도 `localStorage.kairos-workspace.activeWorkspaceId` 가 이전 user 의 workspace_id 잔존. 다른 user login 시 stale ID 사용 → cross-tenant API 호출 → 403 → UI 에 "워크스페이스 멤버가 아닙니다" 표시.
+
+**증상**: Sprint 27c Wave 4 verify 중 재현 — Account #3 logout → Account #1 login 후 /new 페이지 진입 시 `1fcb8cf6-...` (Account #3 workspace) 호출 → 403. dashboard 는 graceful fallback (`/workspaces` list 후 retry) 동작, 다른 페이지는 fallback X.
+
+**Fix 후보**: (a) Clerk `<SignOutButton onSignOutComplete>` hook 에 `localStorage.removeItem('kairos-workspace')` (b) Zustand persist onRehydrate 에 user_id verification 가드 (c) `kairos-workspace` 의 user_id 도 함께 저장 + activeWorkspaceId 와 비교.
+
+**근거**: Sprint 27c Wave 4 audit `WAVE-4-VERIFIED.md`.
+
+---
+
+## BL-S27c-11 — Real IDOR + edge case 회귀 가드 강화 ★ (P2)
+
+**현 상태**: Sprint 27c audit 에서 real cross-tenant IDOR verified (Account #1 → Account #2 workspace, 5 endpoint 403). 단 `backend/tests/integration/` 의 동일 시나리오 회귀 가드 명시 필요. Sprint 19 BUG-C01-EXT 의 후속 안정화.
+
+**근거**: Sprint 27c audit `qa-edgecase.md` real verify 통과 + 헌법 I-9 정합 verified.
+
+---
+
 ## BL-S27-1 — WorkspaceMember.is_active soft delete (D-6.1 후속) ★
 
 **현 상태**: WorkspaceMember 는 hard delete. 퇴사 사용자의 creator_id reference 가 orphan 표시.

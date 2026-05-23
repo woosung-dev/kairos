@@ -8,6 +8,7 @@ const isPublicRoute = createRouteMatcher([
   "/invite(.*)",
   "/_next(.*)",
   "/favicon.ico",
+  "/landing(.*)",
   "/api(.*)",
 ]);
 

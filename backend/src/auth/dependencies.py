@@ -159,14 +159,28 @@ async def get_current_user(
     user = await repo.find_by_clerk_id(claims["sub"])
     is_new_user = user is None
     if user is None:
-        # 첫 로그인: 자동 생성
-        user = User(
-            clerk_id=claims["sub"],
-            display_name=claims.get("name", "사용자"),
-            email=claims.get("email", ""),
+        # 첫 로그인: race-safe lazy seed (ON CONFLICT, workspace INSERT 패턴 정합)
+        # FE 가 dashboard 첫 진입 시 5+ API 동시 호출 → 각 transaction 의 User INSERT 동시 시도
+        # → UniqueViolation `ix_users_clerk_id` race → 500. Sprint 27c audit P0-S27c-1 fix.
+        await session.execute(
+            _text(
+                """
+                INSERT INTO users (id, clerk_id, display_name, email, created_at, updated_at, onboarding_step)
+                VALUES (gen_random_uuid(), :clerk_id, :name, :email, now(), now(), 0)
+                ON CONFLICT (clerk_id) DO NOTHING
+                """
+            ),
+            {
+                "clerk_id": claims["sub"],
+                "name": claims.get("name", "사용자"),
+                "email": claims.get("email", ""),
+            },
         )
-        user = await repo.save(user)
-        await repo.commit()
+        # Re-fetch after race-safe INSERT — one row guaranteed (this tx or concurrent winner)
+        user = await repo.find_by_clerk_id(claims["sub"])
+        if user is None:
+            # 극단적 DB 일관성 issue — race 모두 fail. graceful 401 으로 사용자 재시도 유도
+            raise HTTPException(status_code=500, detail="사용자 초기화에 실패했습니다")
 
     # Personal workspace lazy seed — 신규 user / 기존 user backfill 안전망
     # ON CONFLICT는 partial unique index `uq_workspaces_owner_personal` 사용
