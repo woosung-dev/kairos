@@ -46,6 +46,9 @@ cp frontend/.env.example frontend/.env.local  # Next.js: .env.local 표준
 | `R2_BUCKET_NAME` | ✅ | ➖ fake | GitHub Secret | Cloudflare R2 버킷 이름 |
 | `GEMINI_API_KEY` 🔒 | ✅ | ➖ fake | GitHub Secret | [Google AI Studio](https://aistudio.google.com) → Get API key |
 | `OPENAI_API_KEY` 🔒 | ✅ | ➖ fake | GitHub Secret | [OpenAI Platform](https://platform.openai.com/api-keys) |
+| `SENTRY_DSN` 🔒 | ➖ | ➖ | GitHub Secret | [Sentry 대시보드](https://sentry.io) → Project Settings → Client Keys (DSN) — Sprint 22 ADR-021 |
+| `SENTRY_TRACES_SAMPLE_RATE` | ➖ (`0.1`) | ➖ | Cloud Run env | 직접 입력 (0.0~1.0, 기본 `0.1`) |
+| `ENVIRONMENT` | ➖ (`development`) | ➖ | Cloud Run env (`production`) | 직접 입력 — Sentry 환경 라벨 + `app_env` 와 OR 분기 (T-SEC-5 docs 차단) |
 
 ---
 
@@ -56,6 +59,7 @@ cp frontend/.env.example frontend/.env.local  # Next.js: .env.local 표준
 | `NEXT_PUBLIC_API_URL` | ✅ `http://localhost:8000` | ➖ fake | Vercel 환경변수 | Cloud Run 배포 URL |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | ✅ | ➖ fake | Vercel 환경변수 | Clerk 대시보드 → API Keys |
 | `CLERK_SECRET_KEY` 🔒 | ✅ | ➖ fake | Vercel 환경변수 | Clerk 대시보드 → API Keys |
+| `NEXT_PUBLIC_SENTRY_DSN` 🔒 | ➖ | ➖ | Vercel 환경변수 | Sentry 대시보드 — FE DSN (BE 와 별도 프로젝트 권장) — Sprint 22 ADR-021 |
 
 ---
 
@@ -86,6 +90,8 @@ cp frontend/.env.example frontend/.env.local  # Next.js: .env.local 표준
 | `R2_BUCKET_NAME` | `backend/.env` |
 | `GEMINI_API_KEY` 🔒 | `backend/.env` |
 | `OPENAI_API_KEY` 🔒 | `backend/.env` |
+| `SENTRY_DSN` 🔒 | Sentry 대시보드 (BE 프로젝트) |
+| `NEXT_PUBLIC_SENTRY_DSN` 🔒 | Sentry 대시보드 (FE 프로젝트, Vercel 환경변수에도 직접 set) |
 
 > **이미지 (GAR)**: `kairos-deployer` SA의 `roles/artifactregistry.writer` 권한으로 push. 별도 시크릿 불필요.
 > **AWS 이동 시**: `GCP_WIF_PROVIDER` + `GCP_DEPLOYER_SA` → `AWS_ROLE_ARN`으로만 교체. 앱 시크릿 9개는 변경 없음.
