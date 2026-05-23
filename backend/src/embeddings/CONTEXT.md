@@ -99,4 +99,4 @@
 3. `repository.py` (`_apply_hnsw_session_params` + vector_search + find_similar_cache)
 4. `service.py` (create_chunk 진입 + I-9 4-C assertion)
 5. `docs/architecture/rag-pipeline.md` Layer 1/3 (호출자 관점)
-6. `docs/dev-log/adr/020-pgvector-hnsw-halfvec.md` (Sprint 16 ADR-020 — 본 도메인 인덱스/타입 전략)
+6. `docs/adr/020-pgvector-hnsw-halfvec.md` (Sprint 16 ADR-020 — 본 도메인 인덱스/타입 전략)

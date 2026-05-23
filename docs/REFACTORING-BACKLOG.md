@@ -13,6 +13,50 @@
 
 ---
 
+## BL-S26-1 — 필수 규칙 토큰 ≤ 3,000 추가 cut (Sprint 26 carry-over) ★★
+
+**현 상태:** 2026-05-23 Sprint 26 측정 = 2,845 words → 추정 3,698 tokens (목표 ≤ 3,000, 23% 초과).
+
+**대상:** `AGENTS.md` (135줄) + `CONTEXT-MAP.md` (106줄) + `.ai/common/global.md` (71줄) + `.ai/templates/workflow.md` (80줄) = 392줄.
+
+**후보 cut:** CONTEXT-MAP I-9 멀티테넌시 격리 한 줄 (11항 압축 가능) · I-14 SQLModel typed query allowlist 5 카테고리 → 표 1줄 · §2 핵심 엔티티 21개 → ERD 링크 + 핵심 12개 · §6 불변식 21개 중 일부 ADR 분리. AGENTS.md 신규 검증 증거 표준 5줄 → 워크플로우 참조 1줄.
+
+**근거:** Sprint 26 메타-sprint 가 강행 cut 금지 정책 (plan risk mitigation §3) — 정보 보존 우선, 추가 cut 은 별도 BL.
+
+**참조:** Sprint 26 verification 4회차 + memory `project_governance_lightening_decision` 4 신호.
+
+---
+
+## BL-S26-2 — docs/*.md ≤ 30 추가 cut (Sprint 26 carry-over) ★★
+
+**현 상태:** 2026-05-23 측정 = 47 파일 (superpowers 제외, maxdepth 2). 목표 ≤ 30 (57% 초과).
+
+**카테고리:** `docs/adr/` 19 + `docs/architecture/` 7 + `docs/requirements/` 8 + `docs/guides/` 8 + `docs/api/` 1 + `docs/plans/active/` 1 + root 3 (README/REFACTORING-BACKLOG/TODO).
+
+**후보 cut:** (A) `docs/adr/` 19건 중 superseded 식별 → `docs/adr/archive/` 분리 + 카운트 제외 · (B) `docs/requirements/` 8건 중 interview-results/competitive-analysis archive · (C) `docs/architecture/` 7건 통합 (data-flow-example → ai-pipeline 흡수 등) · (D) `docs/guides/` 8건 중 r2-cleanup-cron + prompt-env-docs 통합.
+
+**근거:** Sprint 26 plan G2 결정 (dev-log/qa+notes 전부 폐지) 적용 후에도 초과 → 추가 cut 별도 BL.
+
+**참조:** Sprint 26 verification 4회차.
+
+---
+
+## BL-S26-3 — historical reference dead link cleanup (Sprint 26 carry-over) ★
+
+**현 상태:** Sprint 26 P0-3 dev-log/sprints+qa+notes 폐지 후 `docs/TODO.md` + `docs/REFACTORING-BACKLOG.md` 본문 (L50/95/145/200/1768/1835 등) 에 historical reference 다수 잔존. agy 검증 3회차 REVISE 지적.
+
+**후보:** (A) sed 일괄 — `docs/dev-log/{sprints,qa,notes}/...` 참조를 "(Sprint NN 산출물, git history 참조)" 로 inline replace · (B) TODO.md 통째 슬림 (518줄 → 100줄 미만).
+
+**의도:** historical reference 는 context 보존 가치 vs dead link risk trade-off. agy = "신규 AI 가 폐지 경로 읽으려 시도할 수 있음" 권고 → cleanup.
+
+**제외:** `docs/superpowers/plans/` + `docs/superpowers/specs/` (G1 = historical archive 보존).
+
+**참조:** Sprint 26 verification 3회차 agy REVISE.
+
+---
+
+---
+
 ## BL-001 — meetings 파이프라인 status commit 단일화 (D-9 장기 개선)
 
 **현 상태:**
