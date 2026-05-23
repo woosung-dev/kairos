@@ -1,261 +1,106 @@
-<!-- Kairos 도메인 헌법 — 도메인 경계, 핵심 불변식, per-context 색인 -->
+<!-- Kairos 도메인 헌법 — 도메인 경계, 핵심 불변식 -->
 
 # Kairos CONTEXT-MAP
 
-> 이 문서는 프로젝트의 **헌법**이다. 모든 코드/문서/명명은 여기에 우선한다. 충돌 시 즉시 멈추고 헌법을 정렬한다.
->
-> 워크플로우 Stage 0 산출물 (`.ai/templates/workflow.md`).
-> 도메인별 상세는 각 모듈의 `CONTEXT.md` 참조 (§5 색인).
+> 이 문서는 프로젝트의 **헌법**이다. 모든 코드/문서/명명이 여기에 우선. 충돌 시 즉시 멈추고 헌법 정렬.
 
 ---
 
 ## 1. 한 문장 정의
 
-**Kairos는 팀의 세컨드 브레인이다.** 회의·노트·자료를 Capture하면 AI가 자동으로 Organize·Distill하고, RAG로 Express(검색·인사이트)한다. 핵심 차별점은 Distill의 자동화.
+**Kairos는 팀의 세컨드 브레인이다.** 회의·노트·자료를 Capture 하면 AI 가 자동 Organize·Distill, RAG 로 Express. 핵심 차별점은 Distill 자동화.
 
-### Distill 도메인 매핑
+Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트+요약 (meetings) · L2 결정+액션 (meetings/actions) · L3 프로젝트 인사이트 (projects 부분) · L4 조직 인사이트 (Phase 4, ADR-007).
 
-| Level | 의미 | 책임 도메인 |
-|---|---|---|
-| L0 | 원본 (음성, 자료 파일, 노트 텍스트) | upload, meetings, notes |
-| L1 | 트랜스크립트 + 요약 | meetings (TranscriptSegment, MeetingSummary) |
-| L2 | 결정사항 + 액션 아이템 | meetings (key_decisions), actions (ActionItem) |
-| L3 | 프로젝트 인사이트 (주간/월간) | projects (현재 부분 구현) |
-| L4 | 조직 인사이트 (크로스 프로젝트) | (미구현 — Phase 4, ADR-007) |
+## 2. 핵심 엔티티
 
----
+상세 ERD: `docs/architecture/erd.md`. 본 문서는 코드 사실 우선.
 
-## 2. 핵심 엔티티 (19개)
+**Workspace**(type=personal/team, inbox_threshold=0.9) · **WorkspaceMember**(role) · **WorkspaceInvite**(nanoid code) · **Project**(visibility public/draft/private) · **ProjectMember** · **InboxItem** · **Meeting**(status uploading→transcribing→analyzing→completed/failed) · **TranscriptSegment** · **MeetingSummary** · **MeetingProjectLink**(workspace_id composite FK) · **ActionItem**(nullable project/meeting/assignee) · **Note**(Tiptap) · **MemoryItem**(text/voice, R7 wedge, Sprint 15) · **PromoteAudit**(memory 도메인) · **ItemPromotionAudit**(4 도메인 cross-workspace, Sprint 23 D4) · **MemoryAiCall** · **MemoryQueryEmbeddingCache**(halfvec 1536d) · **MemoryEvent** · **EmbeddingChunk**(halfvec 1536d, L1/L2) · **SemanticCache**(halfvec, TTL 7d, ≥0.93) · **User**(clerk_id, onboarding_step 0~4).
 
-> ERD 원본: `docs/architecture/erd.md`. 본 문서가 코드 사실 기준 — ERD와 충돌 시 본 문서 우선.
+### 별칭 금지 (도메인 용어 위반 감지)
 
-| 엔티티 | 소유 도메인 | 정의 | 식별 |
-|---|---|---|---|
-| **Workspace** | workspaces | 멀티테넌시 격리 단위. 모든 콘텐츠의 루트. `type`: `personal` / `team` (Sprint 15 신설) | UUID, `inbox_threshold: float = 0.9` 보유 |
-| **WorkspaceMember** | workspaces | role: `owner` / `admin` / `member` / `viewer` | (workspace_id, user_id) 유일 |
-| **WorkspaceInvite** | workspaces | 초대 링크 (nanoid 12자리 code + role + max_uses + expires_at) | code 유일 |
-| **Project** | projects | 작업 단위 (PARA Replace). status: `active` / `completed` / `archived` | workspace 내 |
-| **InboxItem** | inbox | 콘텐츠의 1차 진입점 | source_type + source_id |
-| **Meeting** | meetings | 회의 음성 + 처리 결과. status: `uploading` / `transcribing` / `analyzing` / `completed` / `failed` | workspace 범위 |
-| **TranscriptSegment** | meetings | 화자별 문장 (시간 구간). `speaker` 기본값 `"Speaker"` (Sprint 1 화자 분리 없음) | (meeting_id, start_sec) |
-| **MeetingSummary** | meetings | 회의당 1:1 AI 요약 | meeting_id 유일 |
-| **MeetingProjectLink** | projects | Meeting↔Project N:M | (meeting_id, project_id) 유일 |
-| **ActionItem** | actions | status: `todo` / `in_progress` / `done` / `cancelled`. `project_id` / `meeting_id` / `assignee_id` / `due_date` 모두 **nullable** | workspace 범위 |
-| **Note** | notes | Tiptap JSON 콘텐츠 (Project 종속) | project 내 |
-| **MemoryItem** | memory | Recall-first wedge. `type`: `text` / `voice`. status: `processing` / `transcription_pending` / `embedding_pending` / `embedding_failed` / `active` / `archived`. `r2_audio_key` (voice, 30일 TTL) + `distilled_json` (Gemini 출력) | (workspace_id, id). Sprint 15 신설 |
-| **PromoteAudit** | memory | Promote (복제 + tombstone) 감사 row. `memory_id` (source) + `target_workspace_id` + `new_memory_id` + `promoted_by_user_id`. **I-18 강제** (memory 도메인 한정) | (memory_id, new_memory_id). Sprint 15 신설 |
-| **ItemPromotionAudit** | common | 4 도메인 (meeting / note / inbox / action) cross-workspace promote 감사 row. `item_type` literal CHECK + `source_item_id` + `new_item_id` + `source_workspace_id` + `target_workspace_id` + `promoted_by_user_id` + `embedding_status`. **I-18 강제** (4 도메인 적용 확장, Sprint 23 D4). source_item_id 는 도메인별 soft FK (item_type generic 으로 composite FK 강제 불가, BL-050 적용 도메인 model 만) | id 단일 PK + 5 index. Sprint 23 신설 |
-| **MemoryAiCall** | memory | distill / embedding / transcribe 호출 cost+latency 로그. `model_id` + `tokens_in/out` + `cost_usd` + `elapsed_ms` | memory_id 범위. Sprint 15 신설 |
-| **MemoryQueryEmbeddingCache** | memory | Recall query 임베딩 캐시 (C3 fix). 1536d **halfvec** (Sprint 16 ADR-020 — embedding_chunks JOIN 타입 정합). normalized_query + workspace_id 복합 키 | (workspace_id, normalized_query). Sprint 15 신설 |
-| **MemoryEvent** | memory | R7 metrics 원천 (capture / recall / promote count + recall latency). Cloud Run stateless 정합. memory_id 가 nullable (recall 이벤트는 memory FK 없음) | (workspace_id, event_type, created_at). Sprint 15 신설 |
-| **EmbeddingChunk** | embeddings | 1536d **halfvec** 벡터 (Sprint 16 ADR-020 — fp16, 4B→2B) + 계층 (L1/L2 사용, L0 미사용). MemoryItem도 source_type=`memory`로 적재 | source_type + source_id + chunk_index |
-| **SemanticCache** | embeddings | TTL 7일, 유사도 ≥0.93 히트. 1536d **halfvec** 벡터 (Sprint 16 ADR-020). RAG는 호출자(read/write) | PK `id`. 의미적 식별 (workspace_id, project_id, question_embedding) — DB unique constraint 없음 |
-| **User** | auth | Clerk 인증 외부 ID 매핑 + 서버 측 영속 onboarding 단계 (`onboarding_step` 0~4: 0=NOT_STARTED, 1=WORKSPACE_CREATED, 2=FIRST_PROJECT, 3=FIRST_MEETING, 4=FIRST_RAG) + `onboarded_at` (step=4 도달 시 set). Sprint 22 OBN-02 | clerk_id 유일 |
-
-### 별칭 금지 (도메인 용어 위반 감지 대상)
-
-| 정식 용어 | 사용 금지 별칭 |
+| 정식 | 금지 별칭 |
 |---|---|
 | Workspace | Team, Tenant, Org, Organization |
-| WorkspaceMember | User-Role, Membership, Participant |
 | Project | Area, Folder, Category, PARA Area |
-| InboxItem | Note (Note는 Tiptap 노트 전용), Capture, Item |
 | Meeting | Recording, Session, Audio |
-| TranscriptSegment | Sentence, Caption, Subtitle, Line |
-| MeetingSummary | Summary (단독 — 항상 Meeting 접두) |
 | ActionItem | Task, Todo, Issue |
-| Note | Memo, Doc, Document |
-| MemoryItem | Memory (단수 단독 금지), Capture (Capture는 동사), QuickNote, Snippet |
-| PromoteAudit | Promotion Log, AuditLog (단독 금지) |
-| MemoryAiCall | AI Log, Distill Log |
-| MemoryQueryEmbeddingCache | Query Cache (SemanticCache와 충돌), Recall Cache |
-| MemoryEvent | Memory Log, Activity Log |
-| EmbeddingChunk | Vector, Embedding (단수형 금지 — 계층 강조) |
-| SemanticCache | Query Cache, RAG Cache, Answer Cache |
-| User | Account, Member (Member는 WorkspaceMember 전용) |
+| MemoryItem | Memory (단독), Capture (Capture 는 동사), Snippet |
 
----
+> 그 외 (TranscriptSegment / MeetingSummary / EmbeddingChunk / SemanticCache / Note / User) 의 별칭 금지는 `backend/src/<domain>/CONTEXT.md` 에 도메인별 명시.
 
-## 3. CODE 메서드 — 가치 흐름
-
-> 원본: `docs/requirements/second-brain.md`
+## 3. CODE 메서드
 
 ```
-[Capture]   회의 녹음 / 노트 / 자료 → InboxItem
-   ↓
-[Organize]  AI: 프로젝트 자동 연결 + 태그
-   ↓
-[Distill]   AI Distillation L0~L4 (§1 매핑 참조)
-   ↓
-[Express]   RAG 6-Layer 검색 + Q&A (스트리밍 SSE) + 프로액티브 인사이트
+[Capture] InboxItem → [Organize] AI 분류 → [Distill] L0~L4 → [Express] RAG 6-Layer + SSE
 ```
 
-**현재 구현 위치**: L0~L2 완성. L3는 부분, L4는 Phase 4 예정 (ADR-007).
-
----
+현재 구현: L0~L2 완성, L3 부분, L4 미구현 (Phase 4).
 
 ## 4. 도메인 경계
 
-### 4.1 백엔드 도메인 모듈 (13개)
+### 4.1 백엔드 모듈 (13)
 
-```
-backend/src/
-├── auth/          Clerk JWT 검증 (User 매핑)
-├── workspaces/    Workspace (type=personal/team) + WorkspaceMember + WorkspaceInvite + inbox_threshold
-├── projects/      Project CRUD + MeetingProjectLink + 태그
-├── inbox/         Inbox 적재 + AI 분류 추천
-├── meetings/      Meeting 인제스트, STT, 파이프라인
-├── notes/         Tiptap Note
-├── actions/       ActionItem (nullable project/meeting/assignee)
-├── memory/        Sprint 15 Recall-first wedge — MemoryItem capture (text+voice) / Distill / Recall (vector+keyword fallback) / Promote (복제+tombstone, I-18). Sprint 24 Wave 2 BL-006 closed (2026-05-20) — `pipeline_service.py` 분리 완료 (embeddings 호출은 `MemoryPipelineService.save_memory_chunk` 위임, 헌법 §4.2 정합). 잔여: BL-005 (promote workspace_repo) 는 Sprint 19 PR #1 C10 에서 이미 해소
-├── upload/        Cloudflare R2 업로드 (presigned URL)
-├── embeddings/    EmbeddingChunk + SemanticCache 저장/검색 (pgvector). source_type 추가: `memory`
-├── rag/           RAG 6-Layer + Gemini 답변 (SSE 스트리밍)
-├── common/        database / r2 / pagination / exceptions / prompts
-├── core/          config (pydantic-settings)
-└── services/      외부 API wrapper (transcription, ai_processing)
-```
+`auth · workspaces · projects · inbox · meetings · notes · actions · memory · upload · embeddings · rag · common · core · services`. 폴더 표준: `router/service/repository/schemas/models/dependencies/exceptions.py`. 상세: `docs/architecture/directory-map.md`.
 
-각 도메인 폴더 표준 구성: `router.py` / `service.py` / `repository.py` / `schemas.py` / `models.py` / `dependencies.py` / `exceptions.py`
+### 4.2 의존 규칙 (헌법 결정 #1, ADR-014)
 
-### 4.2 의존 방향 (허용/금지)
+| 케이스 | 정책 |
+|---|---|
+| 도메인 A → 도메인 B `.repository` (read) | ✅ 허용 (workspace 검증 필수) |
+| 도메인 service.py 끼리 직접 호출 | ❌ 금지 |
+| cross-domain shared service (`embeddings` / `ai_processing` / `transcription`) | orchestrator (`<domain>/pipeline_service.py` 또는 `services/`) 경계 내부만 |
+| 3+ 모듈 + commit 트랜잭션 | orchestrator 필수 |
 
-```mermaid
-graph TD
-  auth[auth] --> workspaces
-  workspaces --> projects
-  projects --> notes
-  projects --> actions
-  projects --> meetings
-  meetings --> actions
-  actions --> projects
-  actions --> workspaces
-  inbox -.AI 추천.-> projects
-  rag --> embeddings
-  rag --> projects
-  notes -. orchestrator only .-> embeddings
-  rag -. orchestrator only .-> embeddings
-  meetings -. orchestrator only .-> inbox
-  meetings -. orchestrator only .-> embeddings
-  memory -. orchestrator only .-> embeddings
-  memory -. orchestrator only .-> services_ai
-  memory -. orchestrator only .-> services_stt
-```
-
-| 케이스 | 허용 | 강제 위치 |
-|---|---|---|
-| `inbox → projects.repository` (AI 추천 후보 조회) | ✅ Repository 레벨까지 | inbox/service.py:현존 |
-| `meetings → actions.repository` (액션 저장) | ✅ Repository 레벨까지 | meetings/service.py:현존 |
-| `actions → projects.repository`, `actions → workspaces.repository` | ✅ Repository 레벨까지 | actions/service.py:현존 |
-| `embeddings.service` 호출 (cross-domain shared service) | ✅ orchestrator(`*/pipeline_service.py` 또는 `services/`) 내부에서만 (ADR-014) | code review + architecture gate `backend/tests/architecture/test_no_memory_to_embeddings_lazy_import.py` (Sprint 24 Wave 2 BL-006 회귀 방지) |
-| 도메인 service.py 끼리 직접 호출 (Repository 우회) | ❌ 금지 | code review |
-| 크로스 도메인 트랜잭션 (3개 이상 모듈 + commit) | ❌ orchestrator 필수 | `<domain>/pipeline_service.py` 또는 `services/` |
-
-> **헌법 결정 #1**: Repository는 다른 도메인에서 직접 의존해도 OK (read-only 조회 한정). Service-to-Service는 오케스트레이터 경유 필수. **embeddings·ai_processing·transcription은 cross-domain shared service**로 분류 — 직접 호출은 orchestrator 경계(`*/pipeline_service.py` 또는 `services/`) 내부에서만 허용 (ADR-014).
+강제: code review + `backend/tests/architecture/test_no_memory_to_embeddings_lazy_import.py` (Sprint 24 Wave 2 BL-006 회귀 방지).
 
 ### 4.3 프론트엔드 features (FSD)
 
-```
-frontend/src/features/  — 실제 11개
-├── inbox/        InboxItem CRUD + 분류 다이얼로그
-├── projects/     Project CRUD + 디테일
-├── meetings/     Meeting 업로드 + 디테일 + 트랜스크립트
-├── actions/      ActionItem 보드
-├── notes/        Tiptap Note CRUD + TiptapEditor (note-editor.tsx)
-├── rag/          RAG 검색 + Q&A (SSE)
-├── members/      워크스페이스 멤버 + 초대
-├── workspaces/   워크스페이스 스위처
-├── upload/       업로드 드롭존
-├── sources/      소스(자료) 목록
-└── home/         대시보드 위젯
-```
+`inbox · projects · meetings · actions · notes · rag · members · workspaces · upload · sources · home` (11). shadcn `components/ui/` 수정 금지 (DESIGN.md). TiptapEditor 는 `features/notes/components/note-editor.tsx`.
 
-shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
+## 5. visibility 도메인 용어 (ADR-014)
 
-> **TiptapEditor는 별도 feature 폴더가 아니다.** `frontend/src/features/notes/components/note-editor.tsx`에 위치.
+`Project.visibility = public / draft / private`. public = workspace 전체. draft = ProjectMember 만. private = ProjectMember 만 + RAG 검색 자동 제외. 별칭 금지: hidden / secret / closed.
 
----
+`WorkspaceInvite.default_project_visibility` = 초대 가입 사용자 기본값.
 
-## 5. per-context CONTEXT.md 색인
-
-| 경로 | 범위 |
-|---|---|
-| `frontend/CONTEXT.md` | Next.js 16 + RSC + FSD + 시안→컴포넌트 흐름 |
-| `backend/CONTEXT.md` | FastAPI 전역 (Router/Service/Repo, AsyncSession, BackgroundTasks, SSE, prompts) |
-| `backend/src/meetings/CONTEXT.md` | STT + 화자 분리 + 요약 파이프라인 |
-| `backend/src/inbox/CONTEXT.md` | AI 자동 확정 vs 사용자 조정 |
-| `backend/src/rag/CONTEXT.md` | RAG 6-Layer + SSE 스트리밍 |
-| `backend/src/projects/CONTEXT.md` | 인사이트 L1~L4 + 멤버십 (Sprint 6 예정) |
-| `backend/src/actions/CONTEXT.md` | 액션 추출/추적 (nullable 부모) |
-| `backend/src/memory/CONTEXT.md` | Recall-first wedge — Capture(text+voice)/Distill/Recall/Promote. Sprint 24 Wave 2 BL-006 closed — `pipeline_service.py` (`MemoryPipelineService.save_memory_chunk`) 가 embeddings 호출 격리 (헌법 §4.2). |
-| 그 외 (auth, embeddings, notes, upload, workspaces) | `backend/CONTEXT.md` 안 짧은 섹션 |
-
----
-
-## 6. 핵심 불변식 (위반 시 즉시 중단)
-
-> 코드/문서로 검증된 사실. 별도 증빙 없이 어겨선 안 됨.
+## 6. 핵심 불변식 (위반 즉시 중단)
 
 | # | 불변식 | 강제 위치 |
 |---|---|---|
-| I-1 | **AsyncSession은 Repository만 보유** — Service에 `from sqlalchemy.ext.asyncio import AsyncSession` 금지 | `backend/src/<domain>/service.py` |
-| I-2 | **크로스 도메인 트랜잭션은 orchestrator 경유** — 같은 session 공유, 마지막 1회 commit 원칙. **예외: 장기 파이프라인 진행 보고용 status commit 허용** — BackgroundTask에서 클라이언트 polling을 지원하려면 status 전이마다 commit이 필요. 이 경우 부분 커밋 상태 모델이 생성됨: `transcribing`(세그먼트 없음) / `analyzing`(세그먼트 있음) / `completed`(요약+임베딩 있음) / `failed`(error_message 있음). | `<domain>/pipeline_service.py` 또는 `services/` |
-| I-3 | **AI 모델 고정**: Gemini `gemini-3.1-flash-lite` (ADR-019 Phase B, 2026-05-15 swap. 이전: `gemini-2.5-flash` EOL 2026-06-17) | `core/config.py` |
-| I-4 | **프롬프트 중앙 관리**: `common/prompts.py` 상수만, 인라인 프롬프트 금지 | code review |
-| I-5 | **장기 작업**: `BackgroundTasks` + `202 Accepted` + `GET .../status` polling | meetings 패턴 |
-| I-6 | **임베딩 모델 고정**: OpenAI `text-embedding-3-small`, 1536d | `embeddings/service.py` |
-| I-7 | **임베딩 검색 대상은 chunk_level = 2 만**. L0(document)은 코드 미사용, L1은 부모 참조용 | `embeddings/repository.py` |
-| I-8 | **SemanticCache TTL 7일, threshold 0.93** | `embeddings/` (rag는 호출자) |
-| I-9 | **멀티테넌시 격리** (Sprint 19 PR #1 BUG-C01-EXT v3 정밀화, 2026-05-18, Codex 1차/2차 PASS / Sprint 19 PR #2 BUG-C01-EXT-FK DB-level hardening, 2026-05-18, Codex 1차 BLOCK→PASS + 2차 REVISE→PASS): **(1) find 시그니처 강제** — 모든 Repository 의 `find_by_*` 메서드는 `workspace_id` 파라미터 + WHERE workspace_id 절. **(2) mutation 도 강제** — `update_*` / `delete_*` / `remove_*` / `deactivate_*` / `increment_*` 등 mutation 도 (resource_id, workspace_id) WHERE 절 (Codex F-5). **(3) secondary FK fail-closed** — service 의 `_verify_secondary_fks` helper (project_id / meeting_id / user_id / target_workspace_id 등) cross-workspace 거부. repo 미주입 시 `RuntimeError("xxx_repo 필수")` (silent skip 금지). **(4) 404 lock-in** — cross-tenant resource → `ProjectNotFoundError` / `MeetingNotFoundError` 등 404 통일 (silent return / 204 dim 금지, 정보 누설 방지). admin/owner 도 tenant 검증 우회 불가 (Codex F-2 — visibility 검증만 admin/owner 우회). **(5) pipeline 진입점** — `BackgroundTasks.add_task` 인자도 workspace_id 명시 전달. **(6) cross-domain cascade** — projects/repository 시그니처 변경 시 호출자 (meetings/inbox/notes/actions/rag) 전수 patch. inbox.classify 의 source_id (meeting_id) 도 검증 (Codex 2차 F-1, C13a). **(7) 신규 EmbeddingChunk insert** — `workspace_id` 매칭 (Sprint 18 PR-A). **(8) 검증** — `backend/tests/integration/test_workspace_idor_matrix.py` 45 endpoint signature anchor + endpoint forward + `test_workspace_idor_real_db.py` 5 도메인 cross-tenant + `test_workspace_integrity_audit.py` 4 SQL audit (action_items / notes / meeting_project_links / project_members) + **(PR #2) `test_workspace_fk_cross_tenant_block.py` 7 case** (composite FK 효력 검증, nullable MATCH SIMPLE 면제 2건 포함) + **`test_alembic_upgrade.py` schema drift detection** (alembic.compare_metadata + PR #2 constraint allowlist). **(9) DB-level composite FK hardening (PR #2, alembic e5f6g7h8i9ja)** — action_items / notes / meeting_project_links 의 `(workspace_id, secondary_id)` composite FK 로 PostgreSQL 가 cross-workspace insert 자체를 거부. SQLModel `__table_args__` ForeignKeyConstraint + alembic revision 동시 patch. **service-level (1)~(4) 와 중복 = defense-in-depth 의도** — DB constraint violation 은 500 = 정보 누설 → service-level 404 가드 영구 유지 (필수, 제거 금지). **(10) MeetingProjectLink workspace_id (PR #2 신설)** — backfill = audit `test_meeting_project_links_workspace_match` 0 row 보장 전제. composite FK 2개: `(workspace_id, project_id) → projects` + `(workspace_id, meeting_id) → meetings`. alembic preflight `DO $$ ... RAISE EXCEPTION` 4 entity mismatch 검사 + backfill 후 NULL 검사 (fail-fast). **(11) scope clarify (PR #2)** — 본 PR scope = **project_id only hardening**. action_items.meeting_id / inbox.ai_suggested_project_id / embeddings.project_id / semantic_cache.project_id / memory_items.embedding_chunk_id / memory_ai_calls.memory_id / promotion_audit 의 cross-workspace 검증은 audit 미수행 → **BL-046 Sprint 20 carry-over**. | `<domain>/repository.py` WHERE workspace_id + service `_verify_secondary_fks` + dependencies.py 동반 주입 + matrix anchor + real DB integration + composite FK `__table_args__` + alembic preflight |
-| I-10 | **Inbox confidence 임계값**: 워크스페이스별 `workspaces.inbox_threshold` (기본 0.9). PATCH 가능 | `workspaces/models.py:15`, `meetings/pipeline_service.py:67` |
-| I-11 | **shadcn `components/ui/` 수정 금지** | `frontend/src/components/ui/` |
-| I-12 | **언어 정책**: 사고/문서/주석 한국어, 코드/네이밍 영어 | AGENTS.md §1 |
-| I-13 | **API workspace prefix 강제**: `/api/v1/workspaces/{workspace_id}/<resource>` (단 `auth`는 예외 — `/api/v1/users`) | `<domain>/router.py` |
-| I-14 | **Pydantic V2 + 100% async + SQLModel typed query (Sprint 20 BL-054 갱신, 2026-05-18)**: `.dict()` 대신 `.model_dump()`, `BaseSettings`는 `pydantic_settings`에서 import. **session.exec / execute allowlist** (manifest `docs/dev-log/notes/2026-05-18-bl054-execute-manifest.md`): (G1) typed scalar select → `session.exec(stmt).all() / .first() / .one_or_none() / .one()` 강제. (G2/G4) raw text() / multi-column tuple result → `session.execute()` 유지 (SM exec 가 text/dialect 미수용). (G3-convert) DML w/o rowcount → `session.exec()` 변환. (G3-keep) DML w/ `.rowcount` 사용 → `session.execute()` 유지 (rowcount contract preservation). (G3-keep-dialect) `pg_insert(...).on_conflict_do_nothing()` 등 SA dialect insert → `session.execute()` 영구 유지 (SQLModel 미 re-export). | code review |
-| I-15 | **Secret은 `SecretStr`**: 사용 시 `.get_secret_value()` | `core/config.py` |
-| I-16 | **DB snake_case ↔ API camelCase**: Pydantic alias로 변환 | `<domain>/schemas.py` |
-| I-17 | **cross-workspace ProjectMember 추가 차단 = ProjectService 책임**: `ProjectService.add_member`는 반드시 `WorkspaceRepository.find_member(workspace_id, user_id)`를 호출하여 대상 user가 동일 워크스페이스 멤버임을 검증한다. None이면 `CrossWorkspaceMemberError(403)`. I-9(Repository read 필터)와 레이어 분리: I-9는 read 필터, I-17은 write 검증. | `backend/src/projects/service.py:add_member` |
-| I-18 | **Promotion은 항상 복제 + tombstone, 이동 금지** (Sprint 15 ADR-016 AD-41 + ADR-016 reframe note + Sprint 23 D4 적용 도메인 확장). 적용 도메인 5 (memory / meeting / note / inbox / action) 모두 source 보존 + target workspace 에 새 row 복제 + audit row 강제. **audit table**: memory 도메인 = `PromoteAudit` (`memory_id` FK 강제, Sprint 15 신설). 그 외 4 도메인 = `ItemPromotionAudit` (Sprint 23 D4 신설, `item_type` literal CHECK + soft FK). 도메인별 audit 분리 사유: memory.PromotionAudit 가 memory_id FK 강제로 generic 재사용 불가 → Option B (공통 별도 테이블) lock-in. **4 도메인 공통 헬퍼 (Sprint 23)**: `backend/src/common/promote_helpers.py` 의 `validate_promote_target` (target 검증) + `build_item_promotion_audit` (audit row 빌더). abstract base 대신 utility 패턴 (도메인 service 가 명시적 호출, 의존 명확). | `backend/src/memory/service.py:promote` (memory) + `backend/src/common/promote_helpers.py` (4 도메인 utility, Sprint 23) |
-| I-19 | **Personal workspace는 1인 격리**: `Workspace.type=='personal'`인 워크스페이스는 항상 1명 owner. 팀 초대 불가 (`WorkspaceInvite` 발급 금지). BE schema 제약 + service 검증 양쪽 강제. ProjectMember도 1명 (R5 invariant). | `backend/src/workspaces/service.py` + `backend/src/projects/service.py` (personal_project_invariants) |
-| I-20 | **벡터 컬럼 타입 `halfvec(1536)` 고정** (Sprint 16 ADR-020). `EmbeddingChunk.embedding` + `SemanticCache.question_embedding` 양쪽. `Vector(1536)` 직접 사용 금지. 인덱스는 **HNSW**(`m=16, ef_construction=64`)만, ivfflat 신규 사용 금지. cosine 거리 연산자 `<=>` 유지 (`halfvec_cosine_ops`). 당근 DB 밋업 1회 운영 기본값 채택. | `backend/src/embeddings/models.py`, `backend/alembic/versions/<pgvector_hnsw_halfvec>.py` |
-| I-21 | **벡터 검색 쿼리 세션 변수 강제** (Sprint 16 ADR-020). 벡터 검색(`vector_search` / `find_similar_cache`) 트랜잭션 진입 시 `SET LOCAL hnsw.ef_search = 40` + `SET LOCAL hnsw.iterative_scan = 'relaxed_order'` + `SET LOCAL hnsw.max_scan_tuples = 20000` 강제. `_apply_hnsw_session_params(session)` 헬퍼 위임. **pgvector 서버 확장** ≥0.8 의존 (`iterative_scan` 지원). Python 패키지(`pgvector`)는 ≥0.4.2면 HALFVEC import 가능. RBAC/visibility 포스트필터 결과 부족 해소. | `backend/src/embeddings/repository.py:_apply_hnsw_session_params` |
+| I-1 | AsyncSession 은 Repository 만 보유 (service 에서 `from sqlalchemy.ext.asyncio import AsyncSession` 금지) | `<domain>/service.py` |
+| I-2 | 크로스 도메인 트랜잭션은 orchestrator 경유 (마지막 1회 commit 원칙). 예외: BackgroundTask polling 위해 status 전이별 commit 허용 — 부분 커밋 상태(`transcribing`/`analyzing`/`completed`/`failed`) 모델 인정 | `<domain>/pipeline_service.py` |
+| I-3 | AI 모델 고정: Gemini `gemini-3.1-flash-lite` (ADR-019 Phase B, 2026-05-15 swap) | `core/config.py` |
+| I-4 | 프롬프트 중앙 관리: `common/prompts.py` 상수 (인라인 금지) | code review |
+| I-5 | 장기 작업: BackgroundTasks + 202 Accepted + GET status polling | meetings 패턴 |
+| I-6 | 임베딩 모델 고정: OpenAI `text-embedding-3-small` 1536d | `embeddings/service.py` |
+| I-7 | 임베딩 검색 대상은 chunk_level=2 만 (L0 미사용, L1 부모 참조) | `embeddings/repository.py` |
+| I-8 | SemanticCache TTL 7일, threshold 0.93 | `embeddings/` |
+| I-9 | **멀티테넌시 격리** (Sprint 19 PR #1·#2 lock-in): (1) Repository `find_by_*`/`update_*`/`delete_*` 모두 `workspace_id` WHERE 강제 (2) service `_verify_secondary_fks` (project/meeting/user/target_workspace) cross-workspace 거부, repo 미주입 시 RuntimeError (silent skip 금지) (3) cross-tenant → 404 (`ProjectNotFoundError` 등), admin/owner 도 우회 불가 (4) DB-level composite FK `(workspace_id, secondary_id)` (action_items/notes/meeting_project_links) defense-in-depth (5) alembic preflight + drift detection. 검증: `tests/integration/test_workspace_idor_*` + `test_workspace_fk_cross_tenant_block.py` + `test_alembic_upgrade.py`. scope: project_id only — meeting_id/embedding/memory promotion 은 BL-046 (Sprint 20 carry) | repository + service + tests |
+| I-10 | Inbox confidence 임계값: 워크스페이스별 `workspaces.inbox_threshold` (기본 0.9), PATCH 가능 | `workspaces/models.py`, `meetings/pipeline_service.py` |
+| I-11 | shadcn `components/ui/` 수정 금지 | `frontend/src/components/ui/` |
+| I-12 | 언어 정책: 사고/문서/주석 한국어, 코드/네이밍 영어 | AGENTS.md §1 |
+| I-13 | API workspace prefix: `/api/v1/workspaces/{workspace_id}/<resource>` (auth 예외 `/api/v1/users`) | `<domain>/router.py` |
+| I-14 | Pydantic V2 + 100% async + SQLModel typed query (Sprint 20 BL-054): `.model_dump()`, `BaseSettings`는 `pydantic_settings`. session.exec/execute allowlist — typed scalar select → `session.exec()`, raw text/multi-column → `session.execute()`, DML w/o rowcount → `session.exec()`, `pg_insert(...).on_conflict_do_nothing()` 등 dialect → `session.execute()` 영구 | code review |
+| I-15 | Secret 은 `SecretStr`, 사용 시 `.get_secret_value()` | `core/config.py` |
+| I-16 | DB snake_case ↔ API camelCase: Pydantic alias 변환 | `<domain>/schemas.py` |
+| I-17 | cross-workspace ProjectMember 추가 차단 = ProjectService 책임. `ProjectService.add_member` → `WorkspaceRepository.find_member(workspace_id, user_id)` 검증, None 시 `CrossWorkspaceMemberError(403)`. I-9(read) 와 레이어 분리 (write 검증) | `projects/service.py:add_member` |
+| I-18 | Promotion = 복제 + tombstone, 이동 금지 (ADR-016, Sprint 23 D4 확장). 적용 5 도메인 (memory/meeting/note/inbox/action) source 보존 + target 복제 + audit row. memory 도메인 = `PromoteAudit` (FK 강제), 4 도메인 = `ItemPromotionAudit` (`item_type` literal + soft FK). 공통 헬퍼: `common/promote_helpers.py` (utility 패턴) | `memory/service.py:promote` + `common/promote_helpers.py` |
+| I-19 | Personal workspace = 1인 격리. `Workspace.type='personal'` → 1 owner, `WorkspaceInvite` 발급 금지, ProjectMember 1명 (R5) | `workspaces/service.py` + `projects/service.py` |
+| I-20 | 벡터 컬럼 `halfvec(1536)` 고정 (ADR-020). `EmbeddingChunk.embedding` + `SemanticCache.question_embedding`. `Vector(1536)` 금지. 인덱스 = HNSW (m=16, ef_construction=64), ivfflat 금지. cosine `<=>` 유지 | `embeddings/models.py` + alembic |
+| I-21 | 벡터 검색 세션 변수 강제 (ADR-020): `SET LOCAL hnsw.ef_search=40 + iterative_scan='relaxed_order' + max_scan_tuples=20000`. `_apply_hnsw_session_params(session)` 헬퍼. pgvector ≥0.8 서버 + Python ≥0.4.2 | `embeddings/repository.py:_apply_hnsw_session_params` |
 
----
+## 7. 현재 부채
 
-## 7. 현재 부채 (헌법과 코드 갭)
+활성 D-6 (second-brain §8 5건 미해결) · D-7 (actions dedupe 부재) · D-8 (회의 R2 hash 중복 미검출) · D-9 (meetings 8회 commit, BL-001) · D-10 (orphan ActionItem 분류 UI) · D-11 (MeetingSummary 타입 어노테이션 오류). 상세: `docs/REFACTORING-BACKLOG.md` BL-NNN.
 
-> retrofit 시점에 식별. ADR-009+ 후보로 Phase B `/autoplan`에서 우선순위 결정.
+해소 (~Sprint 24): D-1 (visibility) · D-2/D-3 (notes/rag pipeline 분리) · D-5 (inbox threshold).
 
-| # | 부채 | 발견 근거 | 후속 |
-|---|---|---|---|
-| ~~D-1~~ | ~~Project `visibility` 미구현~~ | **[해소 2026-05-11]** Sprint 6 BE-T1~T3 (commit e779541) — `backend/src/projects/models.py:18` visibility 컬럼 + alembic c4c5709a4ab4 마이그레이션 | — |
-| ~~D-2~~ | ~~`notes/service.py → embeddings.service` 직접 의존~~ | **[해소 2026-05-11]** Sprint 6 BE-T9~T11 (commit 8096314) — NotePipelineService 도입, NoteService 순수화. ADR-014 옵션 A 적용 | — |
-| ~~D-3~~ | ~~`rag/service.py → embeddings.{models, repository, service}` 직접 의존~~ | **[해소 1차 2026-05-11]** Sprint 6 BE-T12~T14 (commit 8096314) — RagPipelineService 도입 (visibility 검증 + RagService.ask 위임). RagService 내부 embedding 호출은 다음 sprint+ 완전 분리 검토 (ADR-014 §"비용/리스크" R-3) | ADR-014 §"후속" F8.4 |
-| D-4 | EmbeddingChunk L0(document) 미사용 — 코드는 L1/L2만 저장 | `embeddings/service.py:117,140,191,209` | ERD에서 L0 제거 또는 L0 활용 결정 |
-| ~~D-5~~ | ~~Inbox confidence 0.9 임계값 미구현~~ | **[해소]** `workspaces.inbox_threshold` 완전 구현 (`workspaces/models.py:15`, `meetings/pipeline_service.py:67`, PATCH endpoint, FE 설정 UI) — retrofit 사실 오류였음 | — |
-| D-6 | second-brain.md §8 미해결 5건 | 개인↔팀 경계, RAG 검색 범위 UX, 회의 소속, CEO/관리자 접근, 지식 생명주기 | Phase B `/autoplan` 우선순위 |
-| D-7 | actions 텍스트 유사도 dedupe 부재 — 같은 회의 중복 추출 가능 | `actions/CONTEXT.md §7` | 텍스트 임계값 기반 dedupe |
-| D-8 | 회의 R2 hash 중복 검출 부재 — 같은 파일 재업로드 시 새 Meeting 생성 | `meetings/CONTEXT.md §8` | upload 단계에서 hash 비교 |
-| D-9 | meetings 파이프라인 commit 8회 (process_meeting 4회 + capture_text 4회) — I-2 예외 조항으로 **현 상태 허용 결정 (Sprint 10 deepen-modules)**. 장기 개선: status progress를 별도 테이블로 분리하면 단일 commit 가능 (Sprint 11+ BL-001). | `meetings/pipeline_service.py` (process_meeting + capture_text 동일 패턴) | BL-001 등재 (Sprint 11+) |
-| D-10 | orphan ActionItem 분류 워크플로우 부재 — `project_id=null`로 생성 가능하지만 UI/분류 흐름 미정 | `actions/models.py:15` + `pipeline_service.py:114-132` | Sprint 6+ |
-| D-11 | meetings `MeetingSummary.key_decisions`/`topics` 타입 어노테이션과 default 불일치 — 둘 다 `dict = Field(default_factory=list, ...)`. 런타임은 list로 동작하지만 타입 힌트는 dict | `meetings/models.py:46-47` | 타입 어노테이션을 `list`로 정정 (코드 2줄) |
+## 8. 진입점
 
----
-
-## 8. 진입점 — 새 세션이 알아야 할 순서
-
-1. 이 문서 (`CONTEXT-MAP.md`)
-2. `AGENTS.md` (개인 개발 원칙)
-3. `DESIGN.md` (디자인 시스템)
-4. 작업 도메인의 `CONTEXT.md` (§5 색인)
-5. `docs/TODO.md` (현재 상태)
-6. `docs/requirements/prd.md` (PRD)
-7. `docs/architecture/*` (상세 설계)
-
----
+순서: `CONTEXT-MAP.md` → `AGENTS.md` → `DESIGN.md` → 작업 도메인 `backend/src/<domain>/CONTEXT.md` → `docs/TODO.md`. 상세: `docs/README.md`.
 
 ## 9. 문서 갱신 원칙
 
-코드 변경 시 관련 canonical doc 1개를 같은 PR 에 포함. 상세는 [`.ai/common/global.md` §2](.ai/common/global.md). (Sprint 26, 2026-05-23 — 옛 Atomic Update 2단 매트릭스 폐지)
-
-**역사**: 2026-05-11 Sprint 5/6 2회 위반 + 2026-05-14 Sprint 15 3회째 위반 (Stage 0 grill → CONTEXT-MAP 누락) 후 `.ai/common/global.md` §2 로 승격. 2026-05-15 Sprint 18 PR-A 에서 헌법 진입점 link 추가 (grep 가능성 보장).
+코드 변경 시 관련 canonical doc 1개를 같은 PR 에 포함. 상세 라우팅 표: [`.ai/common/global.md` §2](.ai/common/global.md). (Sprint 26, 2026-05-23 — 옛 Atomic Update 2단 매트릭스 폐지)
