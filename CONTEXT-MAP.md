@@ -254,17 +254,8 @@ shadcn `components/ui/`는 수정 금지 (DESIGN.md §토큰 규칙).
 
 ---
 
-## 9. Atomic Update 강제
+## 9. 문서 갱신 원칙
 
-코드/모델/엔드포인트/Stage 산출물 commit은 같은 PR 안에 관련 docs commit이 함께 들어가야 한다. 동일 commit 권장, 최소 동일 PR 강제.
-
-**Single source — 매트릭스 본문은 [`.ai/common/global.md` §2](.ai/common/global.md) 에만 둔다.** 본 §은 헌법 진입점에서 grep 가능하도록 한 link 만 유지한다 (중복 금지).
-
-**핵심 규칙 (요약)**:
-- Stage 0 grill 결과는 `CONTEXT-MAP.md` §2/§4/§6 patch 와 같은 commit/PR.
-- 코드 변경(`models.py` / `router.py` / `pipeline_service.py` 등)은 대응 `CONTEXT.md` / `docs/architecture/*` patch 와 같은 PR.
-- ADR 신설은 cross-link patch 와 같은 commit.
-
-**검증 절차**: PR 본문에 "Docs sync" 섹션 필수. `git diff --stat docs/ backend/**/CONTEXT.md CONTEXT-MAP.md` 결과를 첨부. 누락 시 stop & retrofit.
+코드 변경 시 관련 canonical doc 1개를 같은 PR 에 포함. 상세는 [`.ai/common/global.md` §2](.ai/common/global.md). (Sprint 26, 2026-05-23 — 옛 Atomic Update 2단 매트릭스 폐지)
 
 **역사**: 2026-05-11 Sprint 5/6 2회 위반 + 2026-05-14 Sprint 15 3회째 위반 (Stage 0 grill → CONTEXT-MAP 누락) 후 `.ai/common/global.md` §2 로 승격. 2026-05-15 Sprint 18 PR-A 에서 헌법 진입점 link 추가 (grep 가능성 보장).
