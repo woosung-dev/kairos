@@ -183,3 +183,62 @@ async def test_sync_user_missing_data_id_rejected(client, mock_service):
     assert response.status_code == 422
     assert response.json()["detail"] == "MISSING_USER_ID"
     mock_service.sync_user.assert_not_awaited()
+
+
+# Codex 2차 P2 후속 — primary email + nullable name
+
+
+@pytest.mark.asyncio
+async def test_sync_user_picks_primary_email(client, mock_service):
+    """Case 7 (Codex 2차 P2) — multi-email user 는 primary_email_address_id 매칭으로 primary 선택.
+
+    Clerk multi-email user 가 secondary 를 먼저 등록한 경우 index 0 = secondary.
+    primary_email_address_id 와 id 매칭하는 row 의 email_address 를 service 로 전달.
+    """
+    payload = {
+        "type": "user.created",
+        "data": {
+            "id": "user_multi_email",
+            "primary_email_address_id": "ea_primary",
+            "email_addresses": [
+                {"id": "ea_secondary", "email_address": "secondary@kairos.test"},
+                {"id": "ea_primary", "email_address": "primary@kairos.test"},
+                {"id": "ea_old", "email_address": "old@kairos.test"},
+            ],
+            "first_name": "프라",
+            "last_name": "이머리",
+        },
+    }
+    body, headers = _sign_payload(payload)
+    response = await client.post("/api/v1/users/sync", content=body, headers=headers)
+    assert response.status_code == 200
+    call_kwargs = mock_service.sync_user.await_args.kwargs
+    assert call_kwargs["email"] == "primary@kairos.test", (
+        f"primary email selection 실패 — index 0 (secondary) 가 잘못 사용됨: {call_kwargs['email']}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_sync_user_nullable_name_fallback(client, mock_service):
+    """Case 8 (Codex 2차 P2) — Clerk payload 의 first_name/last_name=null 시 '사용자' fallback.
+
+    `dict.get(k, '')` 는 key 가 있으면서 value=null 일 때 None 반환 → f-string 이
+    'None None' 으로 변환 (옛 코드). `(x or '')` + 빈 fallback '사용자' 로 정규화.
+    """
+    payload = {
+        "type": "user.created",
+        "data": {
+            "id": "user_email_only",
+            "primary_email_address_id": None,
+            "email_addresses": [{"id": "ea", "email_address": "noname@kairos.test"}],
+            "first_name": None,
+            "last_name": None,
+        },
+    }
+    body, headers = _sign_payload(payload)
+    response = await client.post("/api/v1/users/sync", content=body, headers=headers)
+    assert response.status_code == 200
+    call_kwargs = mock_service.sync_user.await_args.kwargs
+    assert call_kwargs["display_name"] == "사용자", (
+        f"null name fallback 실패 — display_name={call_kwargs['display_name']!r} (옛 'None None' 회귀 가능성)"
+    )

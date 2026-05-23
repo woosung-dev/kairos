@@ -153,20 +153,34 @@ async def get_current_user(
     UNIQUE partial index `uq_workspaces_owner_personal` (postgresql_where=`type='personal'`)는
     R2 migration에서 사전 생성됨.
     """
+    from sqlalchemy.exc import IntegrityError
     from sqlmodel import text as _text
 
     repo = UserRepository(session)
     user = await repo.find_by_clerk_id(claims["sub"])
     is_new_user = user is None
     if user is None:
-        # 첫 로그인: 자동 생성
-        user = User(
-            clerk_id=claims["sub"],
-            display_name=claims.get("name", "사용자"),
-            email=claims.get("email", ""),
-        )
-        user = await repo.save(user)
-        await repo.commit()
+        # 첫 로그인: 자동 생성. Codex 2차 P1 fix (Sprint 27b Wave 1 게이트 2차):
+        # sync_user webhook 이 같은 clerk_id 로 동시 도착하면 webhook 측 ON CONFLICT
+        # 가 먼저 commit → 본 INSERT 가 unique constraint 위반 → IntegrityError → 500.
+        # try/except 로 race 시만 fallback (hot path 영향 0 — 일반 경로 변경 X).
+        try:
+            user = User(
+                clerk_id=claims["sub"],
+                display_name=claims.get("name", "사용자"),
+                email=claims.get("email", ""),
+            )
+            user = await repo.save(user)
+            await repo.commit()
+        except IntegrityError:
+            await session.rollback()
+            # webhook 측이 row 를 먼저 생성 — re-fetch
+            user = await repo.find_by_clerk_id(claims["sub"])
+            if user is None:
+                # 거의 불가능 — rollback 직후 다른 transaction 이 row 를 다시 delete.
+                # 안전망: 401 raise (다음 request 가 lazy seed 재시도).
+                raise HTTPException(status_code=401, detail="USER_SEED_RACE_RETRY")
+            is_new_user = False  # race fallback path 는 신규 아님
 
     # Personal workspace lazy seed — 신규 user / 기존 user backfill 안전망
     # ON CONFLICT는 partial unique index `uq_workspaces_owner_personal` 사용

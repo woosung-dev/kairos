@@ -151,13 +151,18 @@ Sentinel 페르소나의 적대적 검증에서 BUG-SENTINEL-005 (Critical):
 | 2 | user.updated + 정상 서명 | 200 + sync_user 호출 (race-safe upsert) |
 | 3 | 위조 서명 | 401 INVALID_SIGNATURE + `assert_not_awaited()` (DB write 차단) |
 | 4 | stale timestamp (1시간 전) | 401 STALE_TIMESTAMP + `assert_not_awaited()` |
-| 5 | user.deleted event (비지원) | 200 `{synced: False, reason}` + `assert_not_awaited()` (Codex P2-1) |
-| 6 | data.id 누락 (user.created) | 422 MISSING_USER_ID + `assert_not_awaited()` (Codex P2-1) |
+| 5 | user.deleted event (비지원) | 200 `{synced: False, reason}` + `assert_not_awaited()` (Codex 1차 P2-1) |
+| 6 | data.id 누락 (user.created) | 422 MISSING_USER_ID + `assert_not_awaited()` (Codex 1차 P2-1) |
+| 7 | multi-email + primary_email_address_id | service.email == primary 매칭 row (Codex 2차 P2 — index 0 contract 아님) |
+| 8 | first_name=null AND last_name=null | service.display_name == "사용자" fallback (Codex 2차 P2 — `or ""` null 정규화) |
 
-Wave 1 게이트 1차 review (codex P2 2건 + agy REVISE 1건) 100% 수락 후 case 5/6
-추가 (commit `d9f1970`). race-safe upsert (`repository.upsert_by_clerk_id`,
-ON CONFLICT DO UPDATE) 는 unit test 가 아닌 integration test 별도 BL — Sprint 28
-또는 production 운영 중 실 race 발생 시 evidence-base 로 추가.
+Wave 1 게이트 review 2차례 100% 수락:
+- 1차 (commit `d9f1970`): codex P2 2건 (event whitelist, race-safe upsert) + agy REVISE-1 (BL-071 closed) — case 5/6 추가
+- 2차 (commit 본 sprint 끝): codex P1 1건 (lazy seed race) + P2 2건 (primary email, nullable name) — case 7/8 추가 + dependencies.py lazy seed try/except IntegrityError fallback
+
+race-safe upsert (`repository.upsert_by_clerk_id`, ON CONFLICT DO UPDATE) + lazy
+seed try/except IntegrityError 는 unit test 가 아닌 integration test 별도 BL —
+Sprint 28 또는 production 운영 중 실 race 발생 시 evidence-base 로 추가.
 
 ### 후속 결정
 

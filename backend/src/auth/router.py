@@ -43,12 +43,28 @@ async def sync_user(
         # data.id 누락 — invalid Clerk payload. 422 → Clerk dashboard 에서 인지 가능.
         raise HTTPException(status_code=422, detail="MISSING_USER_ID")
 
+    # Codex 2차 P2 fix (primary email): Clerk 의 multi-email user 는 index 0 가
+    # primary 아님. primary_email_address_id 와 id 매칭하는 row 사용 + fallback index 0.
     email = ""
-    email_addresses = data.get("email_addresses", [])
+    email_addresses = data.get("email_addresses", []) or []
+    primary_email_id = data.get("primary_email_address_id")
     if email_addresses:
-        email = email_addresses[0].get("email_address", "")
+        if primary_email_id:
+            primary = next(
+                (e for e in email_addresses if e.get("id") == primary_email_id),
+                None,
+            )
+            if primary:
+                email = primary.get("email_address", "") or ""
+        if not email:
+            email = email_addresses[0].get("email_address", "") or ""
 
-    display_name = f"{data.get('first_name', '')} {data.get('last_name', '')}".strip()
+    # Codex 2차 P2 fix (nullable name): Clerk payload 가 first_name/last_name=None 보낼 수
+    # 있음. `dict.get(k, "")` 는 key 가 있으면서 value=None 일 때 None 반환 → f-string
+    # 이 'None None' 으로 변환. `(x or "")` 패턴으로 null 정규화 + 빈 fallback "사용자".
+    first = (data.get("first_name") or "").strip()
+    last = (data.get("last_name") or "").strip()
+    display_name = " ".join(p for p in (first, last) if p).strip() or "사용자"
     avatar_url = data.get("image_url")
 
     await service.sync_user(
