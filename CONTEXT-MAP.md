@@ -16,7 +16,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 상세 ERD: `docs/architecture/erd.md`. 본 문서는 코드 사실 우선.
 
-**Workspace**(type=personal/team, inbox_threshold=0.9) · **WorkspaceMember**(role) · **WorkspaceInvite**(nanoid code) · **Project**(visibility public/draft/private) · **ProjectMember** · **InboxItem** · **Meeting**(status uploading→transcribing→analyzing→completed/failed) · **TranscriptSegment** · **MeetingSummary** · **MeetingProjectLink**(workspace_id composite FK) · **ActionItem**(nullable project/meeting/assignee) · **Note**(Tiptap) · **MemoryItem**(text/voice, R7 wedge, Sprint 15) · **PromoteAudit**(memory 도메인) · **ItemPromotionAudit**(4 도메인 cross-workspace, Sprint 23 D4) · **MemoryAiCall** · **MemoryQueryEmbeddingCache**(halfvec 1536d) · **MemoryEvent** · **EmbeddingChunk**(halfvec 1536d, L1/L2) · **SemanticCache**(halfvec, TTL 7d, ≥0.93) · **User**(clerk_id, onboarding_step 0~4).
+**격리**: Workspace(personal/team) · WorkspaceMember · Project(public/draft/private) · ProjectMember · User(clerk_id, onboarding 0~4). **콘텐츠**: InboxItem · Meeting+TranscriptSegment+MeetingSummary+MeetingProjectLink · ActionItem(nullable parents) · Note(Tiptap) · MemoryItem(text/voice). **audit**: PromoteAudit(memory) · ItemPromotionAudit(4 도메인) · MemoryAiCall · MemoryEvent. **벡터**: EmbeddingChunk(halfvec 1536d L1/L2) · SemanticCache(TTL 7d ≥0.93) · MemoryQueryEmbeddingCache.
 
 ### 별칭 금지 (도메인 용어 위반 감지)
 
@@ -70,32 +70,32 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 | # | 불변식 | 강제 위치 |
 |---|---|---|
 | I-1 | AsyncSession 은 Repository 만 보유 (service 에서 `from sqlalchemy.ext.asyncio import AsyncSession` 금지) | `<domain>/service.py` |
-| I-2 | 크로스 도메인 트랜잭션은 orchestrator 경유 (마지막 1회 commit 원칙). 예외: BackgroundTask polling 위해 status 전이별 commit 허용 — 부분 커밋 상태(`transcribing`/`analyzing`/`completed`/`failed`) 모델 인정 | `<domain>/pipeline_service.py` |
+| I-2 | 크로스 도메인 트랜잭션은 orchestrator 경유 (1회 commit). 예외: BackgroundTask polling status 전이별 commit (부분 커밋 모델 인정) | `<domain>/pipeline_service.py` |
 | I-3 | AI 모델 고정: Gemini `gemini-3.1-flash-lite` (ADR-019 Phase B, 2026-05-15 swap) | `core/config.py` |
 | I-4 | 프롬프트 중앙 관리: `common/prompts.py` 상수 (인라인 금지) | code review |
 | I-5 | 장기 작업: BackgroundTasks + 202 Accepted + GET status polling | meetings 패턴 |
 | I-6 | 임베딩 모델 고정: OpenAI `text-embedding-3-small` 1536d | `embeddings/service.py` |
 | I-7 | 임베딩 검색 대상은 chunk_level=2 만 (L0 미사용, L1 부모 참조) | `embeddings/repository.py` |
 | I-8 | SemanticCache TTL 7일, threshold 0.93 | `embeddings/` |
-| I-9 | **멀티테넌시 격리** (Sprint 19 PR #1·#2 lock-in): (1) Repository `find_by_*`/`update_*`/`delete_*` 모두 `workspace_id` WHERE 강제 (2) service `_verify_secondary_fks` (project/meeting/user/target_workspace) cross-workspace 거부, repo 미주입 시 RuntimeError (silent skip 금지) (3) cross-tenant → 404 (`ProjectNotFoundError` 등), admin/owner 도 우회 불가 (4) DB-level composite FK `(workspace_id, secondary_id)` (action_items/notes/meeting_project_links) defense-in-depth (5) alembic preflight + drift detection. 검증: `tests/integration/test_workspace_idor_*` + `test_workspace_fk_cross_tenant_block.py` + `test_alembic_upgrade.py`. scope: project_id only — meeting_id/embedding/memory promotion 은 BL-046 (Sprint 20 carry) | repository + service + tests |
+| I-9 | **멀티테넌시 격리** (Sprint 19 PR #1·#2): Repository find/update/delete `workspace_id` WHERE 강제 + service `_verify_secondary_fks` (cross-workspace 거부) + cross-tenant 404 (admin 도 우회 불가) + DB composite FK `(workspace_id, secondary_id)` defense-in-depth. scope = project_id only, BL-046 carry | repository + service + composite FK + integration tests |
 | I-10 | Inbox confidence 임계값: 워크스페이스별 `workspaces.inbox_threshold` (기본 0.9), PATCH 가능 | `workspaces/models.py`, `meetings/pipeline_service.py` |
 | I-11 | shadcn `components/ui/` 수정 금지 | `frontend/src/components/ui/` |
 | I-12 | 언어 정책: 사고/문서/주석 한국어, 코드/네이밍 영어 | AGENTS.md §1 |
 | I-13 | API workspace prefix: `/api/v1/workspaces/{workspace_id}/<resource>` (auth 예외 `/api/v1/users`) | `<domain>/router.py` |
-| I-14 | Pydantic V2 + 100% async + SQLModel typed query (Sprint 20 BL-054): `.model_dump()`, `BaseSettings`는 `pydantic_settings`. session.exec/execute allowlist — typed scalar select → `session.exec()`, raw text/multi-column → `session.execute()`, DML w/o rowcount → `session.exec()`, `pg_insert(...).on_conflict_do_nothing()` 등 dialect → `session.execute()` 영구 | code review |
+| I-14 | Pydantic V2 + 100% async + SQLModel typed query (Sprint 20 BL-054): 상세 allowlist (G1~G3-keep-dialect 5 카테고리) `backend/CONTEXT.md` B-10 | code review |
 | I-15 | Secret 은 `SecretStr`, 사용 시 `.get_secret_value()` | `core/config.py` |
 | I-16 | DB snake_case ↔ API camelCase: Pydantic alias 변환 | `<domain>/schemas.py` |
-| I-17 | cross-workspace ProjectMember 추가 차단 = ProjectService 책임. `ProjectService.add_member` → `WorkspaceRepository.find_member(workspace_id, user_id)` 검증, None 시 `CrossWorkspaceMemberError(403)`. I-9(read) 와 레이어 분리 (write 검증) | `projects/service.py:add_member` |
-| I-18 | Promotion = 복제 + tombstone, 이동 금지 (ADR-016, Sprint 23 D4 확장). 적용 5 도메인 (memory/meeting/note/inbox/action) source 보존 + target 복제 + audit row. memory 도메인 = `PromoteAudit` (FK 강제), 4 도메인 = `ItemPromotionAudit` (`item_type` literal + soft FK). 공통 헬퍼: `common/promote_helpers.py` (utility 패턴) | `memory/service.py:promote` + `common/promote_helpers.py` |
+| I-17 | cross-workspace ProjectMember 추가 차단 = ProjectService. add_member 시 WorkspaceRepository.find_member 검증, None → `CrossWorkspaceMemberError(403)`. I-9(read)와 분리된 write 검증 | `projects/service.py:add_member` |
+| I-18 | Promotion = 복제 + tombstone (ADR-016 + Sprint 23 D4). 5 도메인 (memory/meeting/note/inbox/action) source 보존 + target 복제 + audit row. memory = `PromoteAudit`, 4 도메인 = `ItemPromotionAudit`. 공통 헬퍼 `common/promote_helpers.py` | `memory/service.py:promote` + helpers |
 | I-19 | Personal workspace = 1인 격리. `Workspace.type='personal'` → 1 owner, `WorkspaceInvite` 발급 금지, ProjectMember 1명 (R5) | `workspaces/service.py` + `projects/service.py` |
 | I-20 | 벡터 컬럼 `halfvec(1536)` 고정 (ADR-020). `EmbeddingChunk.embedding` + `SemanticCache.question_embedding`. `Vector(1536)` 금지. 인덱스 = HNSW (m=16, ef_construction=64), ivfflat 금지. cosine `<=>` 유지 | `embeddings/models.py` + alembic |
 | I-21 | 벡터 검색 세션 변수 강제 (ADR-020): `SET LOCAL hnsw.ef_search=40 + iterative_scan='relaxed_order' + max_scan_tuples=20000`. `_apply_hnsw_session_params(session)` 헬퍼. pgvector ≥0.8 서버 + Python ≥0.4.2 | `embeddings/repository.py:_apply_hnsw_session_params` |
 
 ## 7. 현재 부채
 
-활성 D-6 (second-brain §8 5건 미해결) · D-7 (actions dedupe 부재) · D-8 (회의 R2 hash 중복 미검출) · D-9 (meetings 8회 commit, BL-001) · D-10 (orphan ActionItem 분류 UI) · D-11 (MeetingSummary 타입 어노테이션 오류). 상세: `docs/REFACTORING-BACKLOG.md` BL-NNN.
+활성 D-7 (actions dedupe 부재) · D-8 (회의 R2 hash 중복 미검출) · D-9 (meetings 8회 commit, BL-001) · D-10 (orphan ActionItem 분류 UI) · D-11 (MeetingSummary 타입 어노테이션 오류). 상세: `docs/REFACTORING-BACKLOG.md` BL-NNN.
 
-해소 (~Sprint 24): D-1 (visibility) · D-2/D-3 (notes/rag pipeline 분리) · D-5 (inbox threshold).
+해소: D-1 (visibility, Sprint 6) · D-2/D-3 (notes/rag pipeline 분리, Sprint 6) · D-5 (inbox threshold, Sprint 6) · D-6 (second-brain §8 5건 — Sprint 27a, ADR-023, 후속 BL-S27-1/2/3).
 
 ## 8. 진입점
 

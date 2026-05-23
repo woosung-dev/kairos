@@ -81,57 +81,14 @@ docs: 문서 / chore: 빌드·설정 / test: 테스트
 
 # Kairos 컨텍스트
 
-- **이름**: Kairos (καιρός — 결정적 순간)
-- **한 줄**: 팀의 세컨드 브레인 — 회의/노트/자료 → AI Distillation → 프로젝트 구조화 → RAG 인사이트
-- **상세**: `docs/requirements/prd.md`
+**한 줄**: 팀의 세컨드 브레인 — 회의/노트/자료 → AI Distillation → 프로젝트 구조화 → RAG 인사이트. PERSONA-001 1인 풀스택 founder (`docs/adr/011-persona-definition.md`). 상세: `docs/requirements/prd.md`.
 
-## 기술 스택
+**기술 스택**: Next.js 16 + React 19 + Tailwind v4 + shadcn/ui v4 (FE) / FastAPI + SQLModel + asyncpg (BE) / PostgreSQL Neon + pgvector HNSW halfvec (ADR-020) / Clerk OAuth (webhook SKIP, ADR-022) / R2 / Whisper + pyannote / Gemini `gemini-3.1-flash-lite` 고정 (ADR-019 Phase B) / OpenAI text-embedding-3-small 1536d / Vercel + GCP Cloud Run (`jetaime-dev`) / Sentry (ADR-021).
 
-| 레이어 | 기술 |
-|---|---|
-| Frontend | Next.js 16 + React 19 + Tailwind v4 + shadcn/ui v4 |
-| Backend | FastAPI + SQLModel + asyncpg |
-| Database | PostgreSQL (Neon) + pgvector HNSW halfvec (ADR-020) |
-| Auth | Clerk (Google OAuth, webhook SKIP — ADR-022) |
-| Storage | Cloudflare R2 |
-| STT | Whisper API + pyannote-audio |
-| AI | Gemini `gemini-3.1-flash-lite` (고정, ADR-019 Phase B) |
-| Embedding | OpenAI text-embedding-3-small (1536d) |
-| Deploy | Vercel (FE) + GCP Cloud Run (BE) — `jetaime-dev` |
-| Observability | Sentry (FE + BE, ADR-021) |
+**도메인 / 엔티티 / visibility / 파이프라인**: `CONTEXT-MAP.md` (헌법). 상세 architecture: `docs/architecture/{ai,rag,cross-domain}-pipeline.md`.
 
-## 핵심 파이프라인 (CODE)
+**AI 제약**: 모델 고정 (ADR-019) · 프롬프트 중앙 `backend/src/common/prompts.py` (인라인 금지) · cross-domain = `pipeline_service.py` orchestrator 만 · 장기 작업 = BackgroundTasks + 202 + polling.
 
-Capture (녹음/노트/자료) → Organize (STT + AI 구조화) → Distill (Inbox + 자동 확정 + L1~L4 인사이트) → Express (벡터 임베딩 + RAG 검색 + 프로액티브)
+**Design System**: `DESIGN.md` 가 시각·UI source. 사용자 승인 없이 일탈 금지.
 
-**핵심 도메인 5**: 팀 세컨드 브레인 (CODE) · Inbox 자동 분류 · 콘텐츠 파이프라인 (Upload→STT→AI→Inbox→임베딩) · RAG 6-Layer (Cache→Query→Search→Re-rank→Generation→Store) · 오케스트레이터 패턴 (`pipeline_service.py` 만 cross-domain, 직접 import 금지). 도메인 경계 상세: `CONTEXT-MAP.md` §4.
-
-상세: `docs/architecture/ai-pipeline.md`, `docs/architecture/cross-domain-pipeline.md`, `docs/architecture/rag-pipeline.md`
-
-## 핵심 엔티티
-
-Workspace, WorkspaceMember, WorkspaceInvite, User, Project (visibility public/draft/private), ProjectMember, InboxItem, Meeting, MeetingSummary, TranscriptSegment, MeetingProjectLink, ActionItem, Note, EmbeddingChunk (계층적), SemanticCache → `docs/architecture/erd.md`
-
-## visibility 도메인 용어 (ADR-014)
-
-- `public` — Workspace 내 모든 멤버 조회
-- `draft` — ProjectMember만 조회
-- `private` — ProjectMember만 조회 + RAG 검색 자동 제외
-- 별칭 금지: hidden / secret / closed → 모두 `private`
-
-## AI 제약
-
-- Gemini 모델 고정 (ADR-019)
-- 프롬프트 중앙 관리: `backend/src/common/prompts.py` 상수 (인라인 금지)
-- 크로스 도메인: `pipeline_service.py` 오케스트레이터만 (직접 import 금지)
-- 장기 작업: BackgroundTasks + 202 Accepted + polling
-
-## Design System
-
-`DESIGN.md` 가 모든 시각·UI 결정의 source. 폰트/색/spacing/aesthetic 거기 정의. 명시적 사용자 승인 없이 일탈 금지.
-
-## Skill routing
-
-요청이 skill 과 매치되면 **첫 액션으로 Skill tool 호출**. 직접 답변 / 다른 tool 우선 금지.
-
-주요 라우팅: 제품 아이디어/브레인스토밍 → `office-hours` · 버그/500/why broken → `investigate` · ship/deploy/PR → `ship` · QA/find bugs → `qa` · 코드 리뷰 → `review` · ship 후 docs → `document-release` · 회고 → `retro` · 디자인 시스템 → `design-consultation` · 디자인 polish → `design-review` · 아키텍처 review → `plan-eng-review`
+**Skill routing**: 매치 시 **첫 액션 = Skill tool**. 라우팅 — 제품 아이디어 = `office-hours` · 버그/why broken = `investigate` · ship/PR = `ship` · QA = `qa` · 코드 리뷰 = `review` · ship 후 docs = `document-release` · 회고 = `retro` · 디자인 = `design-consultation`/`design-review` · 아키텍처 = `plan-eng-review`

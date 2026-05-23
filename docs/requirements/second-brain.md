@@ -183,12 +183,15 @@ Layer 2: 팀 지식 베이스 (프로젝트)
 
 ---
 
-## 8. 미결정 사항
+## 8. 결정 사항 (Sprint 27a, ADR-023)
 
-| 항목 | 상태 | 참고 |
-|------|------|------|
-| 개인↔팀 경계 상세 (승격 시 복사 vs 링크, 퇴사 처리) | [확인 필요] | ADR-004 |
-| RAG 검색 범위 UX (기본 범위, 전환 방식) | [확인 필요] | ADR-004 |
-| 회의의 소속 (팀 자동 vs 개인 자동 vs 선택) | [확인 필요] | ADR-004 |
-| CEO/관리자 접근 모델 (레이어드 공개 검토) | Sprint 4+ | ADR-004 |
-| 지식 생명주기 (오래된 지식 처리, 버전 관리) | Sprint 3+ | ADR-004 |
+| 항목 | 결정 | 후속 BL |
+|------|------|---------|
+| 개인↔팀 경계 (승격) | I-18 복제 + tombstone (4 도메인 ItemPromotionAudit), 사용자 명시 액션 | — |
+| 개인↔팀 경계 (퇴사) | WorkspaceMember 삭제 시 creator_id reference 유지, FE fallback "삭제된 사용자" | BL-S27-1 is_active soft delete |
+| RAG 검색 범위 UX | 기본 = 워크스페이스 전체. Cmd+K 프로젝트 범위 드롭다운 (Sprint 3 구현) | BL-S27-2 신선도 라벨 |
+| 회의 소속 | Workspace 직속, MeetingProjectLink N:M 옵션 (AI 자동 + 사용자 선택) | — |
+| CEO/관리자 접근 | admin/owner = visibility bypass (현 코드). 운영 가시성 위해 audit log 후속 | BL-S27-3 AdminAccessAudit |
+| 지식 생명주기 | audio R2 30일 TTL (구현). 텍스트 무기한. Project archive = AI 인사이트 자동 추출 | BL-S27-2 신선도 라벨 + 6개월 stale 알림 |
+
+상세 trade-off + 회수 옵션: `docs/adr/023-second-brain-context-boundaries.md`.
