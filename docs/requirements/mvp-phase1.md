@@ -1,7 +1,7 @@
 # MVP Phase 1 기능 명세
 
 > **방향 전환:** ADR-004에 의해 PARA → 팀 세컨드 브레인(CODE)으로 전환됨.
-> 상세: `docs/requirements/second-brain.md`, `docs/dev-log/adr/004-second-brain-pivot.md`
+> 상세: `docs/requirements/second-brain.md`, `docs/adr/004-second-brain-pivot.md`
 
 ## 개요
 

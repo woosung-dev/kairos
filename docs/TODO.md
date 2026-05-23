@@ -84,7 +84,7 @@
   - [x] **Wave 3 P2** T-AI-1 ADR-019 Phase B post-swap LLM 계약 13 case (model lock-in + prompt contract + post-processing guards + Pydantic schema)
   - [x] **Phase 4** Atomic docs sync — upload/CONTEXT.md 신설 + endpoints.md sync + ADR-022 신설 + auth/CONTEXT.md ADR cross-link
   - [x] **Phase 5** 검증 — backend pytest **452 passed + 1 skipped** (baseline 427 + 25 신규) / FE typecheck 0 / vitest 56 / build 12/12 OK / production BE smoke
-  - 산출물: PR pending (push 사용자 승인 대기) + ADR-022 (`docs/dev-log/adr/022-clerk-webhook-skip.md`)
+  - 산출물: PR pending (push 사용자 승인 대기) + ADR-022 (`docs/adr/022-clerk-webhook-skip.md`)
   - 잔여 사용자 작업: production DB cleanup (T-CLEANUP-1) + PR ready review + post-merge 배포 verify
 
 ---
@@ -295,7 +295,7 @@
   - [x] FE-T1/T2a/T2b/T3/T5 visibility 배지 + 변경 모달 + 초대 default visibility (commit 575c613, 시안 1A+1C / 3A)
   - [x] FE-T4 Project 멤버 관리 패널 (commit 9a975e7, 시안 2A inline 단순화)
   - [x] FE-T7 RAG 검색 Private 자동 제외 안내 (commit 6e3f87f)
-  - [x] **ADR-014 신설** (`docs/dev-log/adr/014-service-boundary.md`) — service-to-service 경계 정책 (commit 038fe37, PR #11)
+  - [x] **ADR-014 신설** (`docs/adr/014-service-boundary.md`) — service-to-service 경계 정책 (commit 038fe37, PR #11)
   - [x] **F10 closeout patch** — ADR-011 §1을 PERSONA- 접두사 권위 출처로 확정 (commit 589a1aa, PR #10)
   - [x] **docs Atomic Update retrofit** (commit b1b24a4) — Critical 5 + High 3 = 8 문서 동기화 (per-context CONTEXT.md + ERD + endpoints + cross-domain-pipeline + rag-pipeline + directory-map)
 
@@ -312,9 +312,9 @@
 ## Recently Completed — Phase B Stage 1 retrofit (2026-05-11)
 
 - [x] **Phase B Stage 1 — 메타 retrofit** — 워크플로우 `.ai/templates/workflow.md` 정식 Stage 1 (`/office-hours` → `/autoplan`) 누락분 retrofit 완료. 6 forcing question 결과 + product-first demand 시그널 정의 + thesis lock-in. **코드 변경 없음**.
-  - [x] **ADR-010** Future-Fit Thesis (`docs/dev-log/adr/010-future-fit-thesis.md`) — 9.2/10 PASS (Round 3). 3-year vision · 3 위협(ChatGPT/Notion AI/Granola) · 4 moat(M1~M4) · L4 timeline risk · AD-5~9 자의 라벨.
-  - [x] **ADR-011** Persona Definition (`docs/dev-log/adr/011-persona-definition.md`) — 9.25+/10 PASS (Round 2 + 라벨 동기화). 상태 라벨 4단계(interview-confirmed/self-confirmed/[가설]/deprecated) · 필수 필드 7개 · Wedge W1~W4 · 폐기 기준 a/b/c · AD-10~12 자의 라벨.
-  - [x] **ADR-009** Stage 1 Retrofit 총괄 (`docs/dev-log/adr/009-stage1-retrofit.md`) — 9.0/10 PASS + 3건 정정 = 9.5+. 6 Q 결과 매핑 · S1~S6 demand 시그널 + 60% 통일 · D-2/D-3 보류(AD-15) · 후속 F1~F10.
+  - [x] **ADR-010** Future-Fit Thesis (`docs/adr/010-future-fit-thesis.md`) — 9.2/10 PASS (Round 3). 3-year vision · 3 위협(ChatGPT/Notion AI/Granola) · 4 moat(M1~M4) · L4 timeline risk · AD-5~9 자의 라벨.
+  - [x] **ADR-011** Persona Definition (`docs/adr/011-persona-definition.md`) — 9.25+/10 PASS (Round 2 + 라벨 동기화). 상태 라벨 4단계(interview-confirmed/self-confirmed/[가설]/deprecated) · 필수 필드 7개 · Wedge W1~W4 · 폐기 기준 a/b/c · AD-10~12 자의 라벨.
+  - [x] **ADR-009** Stage 1 Retrofit 총괄 (`docs/adr/009-stage1-retrofit.md`) — 9.0/10 PASS + 3건 정정 = 9.5+. 6 Q 결과 매핑 · S1~S6 demand 시그널 + 60% 통일 · D-2/D-3 보류(AD-15) · 후속 F1~F10.
   - [x] **personas.md** (`docs/requirements/personas.md`) — 9.33/10 PASS + 4건 정정 = 9.5+. PERSONA-001 self-confirmed + PERSONA-002~003 `[가설]` + Wedge 매트릭스 분화 점검 + 후속 인터뷰 패치 절차.
   - [x] **competitive-analysis.md** (`docs/requirements/competitive-analysis.md`) — 9.3/10 PASS + 5건 정정 = 9.5+. 5개 경쟁자(Otter/Granola/Reflect/Mem/Tana) 4차원 비교 · ADR-010 moat 정렬 · AD-16~18.
   - [x] **PRD 4개 섹션 batch PATCH** (`docs/requirements/prd.md`) — 9.5/10 PASS + 4건 정정 = 9.7+. §2 Persona 보강 + §2.5 Competitive Analysis + §3.5 Future-Fit Thesis + §7.5 Demand Signal Definition.
@@ -437,7 +437,7 @@
 
 > 코드네임: `karrot-eager-marshmallow` (Stage 0~4) + `pure-clover` (Stage 5/6)
 > 워크트리: `~/project/agy-project/kairos-pgvector-opt` (`sprint-16/pgvector-optimization` 브랜치)
-> ADR-020 Accepted — `docs/dev-log/adr/020-pgvector-hnsw-halfvec.md`
+> ADR-020 Accepted — `docs/adr/020-pgvector-hnsw-halfvec.md`
 > Verification — `docs/dev-log/sprints/sprint-16-pgvector-verification.md`
 
 - [x] Stage 0~6 풀워크플로우 + Atomic Update 매트릭스 강제
@@ -500,11 +500,11 @@
 
 - [ ] **F2** Demand 시그널 S1~S4 측정 (Sprint 6 완료 후 1개월) — usage analytics 도입 + S1(DAU)/S2(회의 빈도)/S3(RAG 만족도)/S4(Inbox 수용률) 실측. 결과물: demand 시그널 1차 보고서.
 - [x] **F3** 외부 인터뷰 가이드 작성 — `docs/requirements/interview-guide.md` Sprint 7 T-DOC-1 완료 (c2e5198).
-- [ ] **F4** 외부 인터뷰 5-10명 + S5/S6 측정 (진행 중, 2026-05-12 착수) — ADR-010 AD-8 60% + ADR-011 §4-b 60% + ADR-009 S5/S6. 결과물: `docs/requirements/interview-results.md`, ADR: `docs/dev-log/adr/015-f4-demand-signals.md`.
+- [ ] **F4** 외부 인터뷰 5-10명 + S5/S6 측정 (진행 중, 2026-05-12 착수) — ADR-010 AD-8 60% + ADR-011 §4-b 60% + ADR-009 S5/S6. 결과물: `docs/requirements/interview-results.md`, ADR: `docs/adr/015-f4-demand-signals.md`.
 - [ ] **F5** 5분 사용자 세션 관찰 도입 (Sprint 7+, Q5) — 도그푸딩 사용자 1-3명 세션 녹화. 결과물: `docs/requirements/observation-notes.md`.
-- [ ] **F6** Wedge 선정 ADR 신규 (Sprint 6 완료 + F2/F4 결과 후) — 페르소나-Wedge 매트릭스 + S5/S6. 결과물: `docs/dev-log/adr/012-wedge-selection.md`.
-- [ ] **F7** L4 우선화 검토 ADR 신규 (Sprint 6 완료 + F4 결과 후) — ADR-010 §4 O1/O2/O3 옵션 선택 + ADR-007 Phase 4 진입 결정. 결과물: `docs/dev-log/adr/013-l4-prioritization.md`.
-- [ ] **F8** 부채 D-2/D-3 처리 ADR 신규 (Sprint 6 킥오프 시 결정 — 진입 직전 vs 완료 후) — service-to-service 경계 정책. 결과물: `docs/dev-log/adr/014-service-boundary.md`.
+- [ ] **F6** Wedge 선정 ADR 신규 (Sprint 6 완료 + F2/F4 결과 후) — 페르소나-Wedge 매트릭스 + S5/S6. 결과물: `docs/adr/012-wedge-selection.md`.
+- [ ] **F7** L4 우선화 검토 ADR 신규 (Sprint 6 완료 + F4 결과 후) — ADR-010 §4 O1/O2/O3 옵션 선택 + ADR-007 Phase 4 진입 결정. 결과물: `docs/adr/013-l4-prioritization.md`.
+- [ ] **F8** 부채 D-2/D-3 처리 ADR 신규 (Sprint 6 킥오프 시 결정 — 진입 직전 vs 완료 후) — service-to-service 경계 정책. 결과물: `docs/adr/014-service-boundary.md`.
 - [ ] **F9** ADR-009 본 ADR 갱신 검토 (Sprint 7+ 외부 인터뷰 완료 후) — S1~S6 실측 결과로 임계값 재조정.
 - [x] **F10** `.ai/common/global.md` §2 ID 체계 표 갱신 — `PERSONA-` 접두사 추가. Sprint 10 확인 (global.md line 47에 이미 존재, git-ignored 로컬 파일).
 

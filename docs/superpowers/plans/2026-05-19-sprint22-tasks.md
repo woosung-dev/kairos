@@ -70,7 +70,7 @@
 | `frontend/instrumentation.ts` | create | Task 7.2 |
 | `frontend/next.config.ts` | modify (withSentryConfig wrapper) | Task 7.2 |
 | `.env.example` | modify (SENTRY_DSN + NEXT_PUBLIC_SENTRY_DSN) | Task 7.3 |
-| `docs/dev-log/adr/021-sentry-observability.md` | create (ADR Nygard) | Task 7.3 |
+| `docs/adr/021-sentry-observability.md` | create (ADR Nygard) | Task 7.3 |
 | `frontend/e2e/tests/rag-citation.spec.ts` | modify (G4 skip 해제) | Task 8.1 |
 | `frontend/e2e/tests/first-project.spec.ts` | create (G2) | Task 8.2 |
 | `frontend/e2e/tests/auth-relogin.spec.ts` | create (G7) | Task 8.3 |
@@ -1873,7 +1873,7 @@ git commit -m "feat(obs): Sentry FE wire (@sentry/nextjs + instrumentation) (Spr
 
 **Files:**
 - Modify: `.env.example`
-- Create: `docs/dev-log/adr/021-sentry-observability.md`
+- Create: `docs/adr/021-sentry-observability.md`
 
 - [ ] **Step 7.3.1: .env.example 갱신**
 
@@ -1890,12 +1890,12 @@ SENTRY_PROJECT=kairos-fe
 
 - [ ] **Step 7.3.2: ADR 작성**
 
-`docs/dev-log/adr/021-sentry-observability.md` — Nygard 4-section (Context / Decision / Status / Consequences). Sentry FE+BE 도입 근거 + PII scrub 정책 + sample rate + carry-over (OpenTelemetry CO-1).
+`docs/adr/021-sentry-observability.md` — Nygard 4-section (Context / Decision / Status / Consequences). Sentry FE+BE 도입 근거 + PII scrub 정책 + sample rate + carry-over (OpenTelemetry CO-1).
 
 - [ ] **Step 7.3.3: commit (E24)**
 
 ```bash
-git add .env.example backend/.env.example frontend/.env.example docs/dev-log/adr/021-sentry-observability.md
+git add .env.example backend/.env.example frontend/.env.example docs/adr/021-sentry-observability.md
 git commit -m "docs: Sentry env + ADR-021 observability (Sprint 22)"
 ```
 
@@ -2261,7 +2261,7 @@ gh pr create --draft --base main --head sprint-22/onboarding-e2e-obs \
 - `backend/CONTEXT.md` §4 — 도메인 표
 - `docs/architecture/directory-map.md` — backend 트리
 - `docs/api/endpoints.md` — `GET /api/v1/users/me/onboarding`
-- `docs/dev-log/adr/021-sentry-observability.md` (신설 ADR)
+- `docs/adr/021-sentry-observability.md` (신설 ADR)
 
 ## Verification
 

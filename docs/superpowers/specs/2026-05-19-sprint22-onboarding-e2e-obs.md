@@ -404,7 +404,7 @@ pnpm exec playwright test                   # 8/8 PASS, 0 skip
 | `backend/src/services/pipeline_service.py` (step=3 hook) | `docs/architecture/cross-domain-pipeline.md` + 해당 도메인 CONTEXT.md §5 의존 |
 | `backend/src/rag/service.py` (step=4 hook) | `backend/src/rag/CONTEXT.md` §의존 |
 | `frontend/src/features/onboarding/` 신설 | (FE CONTEXT.md 미존재 — skip 또는 자유 형식 등재) |
-| Sentry 도입 | `docs/dev-log/adr/021-sentry-observability.md` (신설 ADR Nygard 포맷) + `.env.example` `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` |
+| Sentry 도입 | `docs/adr/021-sentry-observability.md` (신설 ADR Nygard 포맷) + `.env.example` `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` |
 
 검증: PR 본문에 "Docs sync" 별도 섹션 + `git diff --stat docs/ backend/**/CONTEXT.md CONTEXT-MAP.md` 결과 첨부
 

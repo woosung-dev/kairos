@@ -60,7 +60,7 @@ AIDA+α 프레임워크 7섹션 구조. `data-theme="landing"` + `prefers-color-
 - `frontend/src/components/landing/evolution-timeline.tsx`
 - `frontend/src/components/landing/stats-section.tsx`
 - `frontend/src/components/landing/cta-section.tsx`
-- `docs/dev-log/adr/005-landing-redesign-aida.md` (본 문서)
+- `docs/adr/005-landing-redesign-aida.md` (본 문서)
 
 ### 수정 (5개)
 - `frontend/src/app/globals.css` — `[data-theme="landing"]` + 애니메이션 + 접근성

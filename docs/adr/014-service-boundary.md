@@ -178,10 +178,10 @@ Sprint 6 D-1 visibility (Public/Draft/Private) 추가 시 Router decorator (work
 
 각 항목은 머지 후 측정 가능. PASS 임계는 모든 명령이 0 exit code 또는 명시된 기대값 일치.
 
-- [ ] **C-1 본 ADR §"결과" 표 ↔ Sprint 6 plan §4.4 일치**: `grep -E "BE-T(9|10|11|12|13|14)" /Users/woosung/.claude/plans/sprint-6-vivid-clarke.md` 결과 6행 ∩ `grep -E "BE-T(9|10|11|12|13|14)" docs/dev-log/adr/014-service-boundary.md` 결과 6행. task ID + 진입 메서드 + 주입 dependency 모두 동일.
+- [ ] **C-1 본 ADR §"결과" 표 ↔ Sprint 6 plan §4.4 일치**: `grep -E "BE-T(9|10|11|12|13|14)" /Users/woosung/.claude/plans/sprint-6-vivid-clarke.md` 결과 6행 ∩ `grep -E "BE-T(9|10|11|12|13|14)" docs/adr/014-service-boundary.md` 결과 6행. task ID + 진입 메서드 + 주입 dependency 모두 동일.
 - [ ] **C-2 헌법 §4.2 갱신 적용**: `grep -n "embeddings.service" CONTEXT-MAP.md | grep -c "orchestrator"` ≥ 1 AND `grep -nE "(notes|rag).*embeddings.*⚠️|⚠️.*(notes|rag).*embeddings" CONTEXT-MAP.md` = 0 (D-2/D-3 ⚠️ 행 제거 확인). Mermaid의 `notes -.현재 부채` / `rag -.현재 부채` 두 점선 제거(`grep -c "현재 부채" CONTEXT-MAP.md` = 0).
 - [ ] **C-3 §7 D-2/D-3 closeout 표기**: `grep -nE "D-(2|3).*ADR-014" CONTEXT-MAP.md` 결과 2행 ∩ `grep "ADR-014로 해소" CONTEXT-MAP.md` 결과 ≥ 1.
-- [ ] **C-4 ADR-009 §"후속" F8 closeout cross-link**: `grep -A1 "F8" docs/dev-log/adr/009-stage1-retrofit.md | grep "ADR-014"` 결과 ≥ 1 AND closeout 표기 (취소선 또는 명시).
+- [ ] **C-4 ADR-009 §"후속" F8 closeout cross-link**: `grep -A1 "F8" docs/adr/009-stage1-retrofit.md | grep "ADR-014"` 결과 ≥ 1 AND closeout 표기 (취소선 또는 명시).
 - [ ] **C-5 notes/rag pipeline_service.py meetings 패턴 정합**: `grep -E "AsyncSession" backend/src/notes/pipeline_service.py backend/src/rag/pipeline_service.py` 결과 0 (헌법 I-1 정합 — Service에 AsyncSession import 금지). `cd backend && uv run pytest tests/notes/ tests/rag/ -v` 결과 PASS. commit 회수 검증 = `grep -c "await.*commit()" backend/src/notes/pipeline_service.py backend/src/rag/pipeline_service.py` 각 파일 ≤ 2 (성공 1 + 실패 1, 헌법 I-2 정합).
 - [ ] **C-6 rag/pipeline_service.py SSE 시작 전 권한 검증**: `grep -B20 "AsyncGenerator\|yield" backend/src/rag/pipeline_service.py | grep -E "visibility|require_|member" | head -1` 결과 ≥ 1 (yield 전에 visibility/member 검증 코드 존재). ADR-010 M1 RAG 품질 시그널 측정 시 권한 누락 source 오염 검증 = V-T5 PASS.
 - [ ] **C-7 Sprint 6 V-T2 시나리오 5 + V-T5가 ADR-011 S6 검증 입력**: `cd e2e && npx playwright test sprint-6-visibility.spec.ts -g "시나리오 5"` PASS AND `grep -E "V-T(2|5).*PERSONA|S6" /Users/woosung/.claude/plans/sprint-6-vivid-clarke.md` 결과 ≥ 1.
