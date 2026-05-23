@@ -45,7 +45,9 @@
 
 ---
 
-## BL-S26-1 — 필수 규칙 토큰 ≤ 3,000 추가 cut (Sprint 26 carry-over) ★★
+## BL-S26-1 — 필수 규칙 토큰 ≤ 3,000 추가 cut (Sprint 27a partial → carry-over) ★
+
+**Sprint 27a 진행** (2026-05-23): 2,918→2,614 words / 3,793→~3,398 tokens (10% 절감). 목표 ≤3,000 까지 추가 13% cut 필요. CONTEXT-MAP I-2/I-9/I-14/I-17/I-18 압축 + §2 4 박스 → 1 박스 + AGENTS.md Kairos 컨텍스트 80줄 → 8줄 (CONTEXT-MAP 위임). 추가 cut 시 정보 손실 risk → plan §3 정책으로 잔여 carry. ★★→★ 강도 하향.
 
 **현 상태:** 2026-05-23 Sprint 26 측정 = 2,845 words → 추정 3,698 tokens (목표 ≤ 3,000, 23% 초과).
 
