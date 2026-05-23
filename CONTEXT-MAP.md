@@ -93,9 +93,9 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 ## 7. 현재 부채
 
-활성 D-6 (second-brain §8 5건 미해결) · D-7 (actions dedupe 부재) · D-8 (회의 R2 hash 중복 미검출) · D-9 (meetings 8회 commit, BL-001) · D-10 (orphan ActionItem 분류 UI) · D-11 (MeetingSummary 타입 어노테이션 오류). 상세: `docs/REFACTORING-BACKLOG.md` BL-NNN.
+활성 D-7 (actions dedupe 부재) · D-8 (회의 R2 hash 중복 미검출) · D-9 (meetings 8회 commit, BL-001) · D-10 (orphan ActionItem 분류 UI) · D-11 (MeetingSummary 타입 어노테이션 오류). 상세: `docs/REFACTORING-BACKLOG.md` BL-NNN.
 
-해소 (~Sprint 24): D-1 (visibility) · D-2/D-3 (notes/rag pipeline 분리) · D-5 (inbox threshold).
+해소: D-1 (visibility, Sprint 6) · D-2/D-3 (notes/rag pipeline 분리, Sprint 6) · D-5 (inbox threshold, Sprint 6) · D-6 (second-brain §8 5건 — Sprint 27a, ADR-023, 후속 BL-S27-1/2/3).
 
 ## 8. 진입점
 

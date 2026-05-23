@@ -9,7 +9,39 @@
 
 **Sprint 26 (glittery-tulip) 부터 sprint-별 handoff/closeout/verification/kickoff/final-summary 파일을 작성하지 않는다.** 지속 정보는 (1) git log + 머지된 PR body, (2) 이 백로그의 BL 항목, (3) `.claude/projects/.../memory/MEMORY.md` (선택). 다음 sprint 첫 commit 의도는 마지막 머지된 PR 의 "다음 sprint 진입점" 섹션에 1-3줄로 남긴다.
 
-**현재 다음 픽업** (2026-05-23, Sprint 26 진행 중): Sprint 26 PR open 직후 3대 도구 통합 검증 → 사용자 머지 → Sprint 27 첫 작업 = 4 정량신호 재측정 (Atomic Update 실패 0회 확인) + `MEMORY.md` 휘발성화 vs 폐지 결정 (P2).
+**현재 다음 픽업** (2026-05-23, Sprint 27a 진행 중): Sprint 26 머지 완료 (PR #104 → main `1be5beb`) → Sprint 27a luminous-anchor (D-6 grill + BL-S26-1 토큰컷, 본 PR) → Sprint 27b GA launch (Clerk Production + Svix + 외부 5명 dogfooding) → Sprint 28 paid customer 1명 (PMF signal).
+
+**종료 기준** (3 도구 합의): GA launch 는 milestone, **paid customer 1명** 이 진짜 종료 신호.
+
+---
+
+## BL-S27-1 — WorkspaceMember.is_active soft delete (D-6.1 후속) ★
+
+**현 상태**: WorkspaceMember 는 hard delete. 퇴사 사용자의 creator_id reference 가 orphan 표시.
+
+**목표**: `is_active: bool` 컬럼 신설 + 퇴사 시 false 토글. audit trail 보존.
+
+**근거**: ADR-023 D-6.1.
+
+---
+
+## BL-S27-2 — RAG 신선도 라벨 + 6개월 stale 알림 (D-6.2/D-6.5 후속) ★
+
+**현 상태**: second-brain §6 Slite 모델 정의 (🟢 ≤1M / 🟡 1-3M / 🔴 >3M) — 미구현.
+
+**목표**: RAG 응답에 신선도 라벨 + 6개월 미갱신 콘텐츠 "이 정보가 아직 유효한가요?" 알림.
+
+**근거**: ADR-023 D-6.2 / D-6.5.
+
+---
+
+## BL-S27-3 — AdminAccessAudit 테이블 (D-6.4 후속) ★
+
+**현 상태**: admin/owner 가 private project 조회 시 audit log 없음 (visibility bypass).
+
+**목표**: `AdminAccessAudit (admin_user_id, private_project_id, first_access_at)` row 신설. 운영 가시성 + enterprise transition base.
+
+**근거**: ADR-023 D-6.4 회수 옵션.
 
 ---
 
