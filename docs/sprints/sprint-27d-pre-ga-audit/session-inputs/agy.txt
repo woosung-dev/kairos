@@ -1,128 +1,183 @@
-너는 Antigravity CLI 자동 에이전트다. Kairos 프로젝트의 외부 5명 dogfooding 진입 직전 audit 의 agy 후속 세션이다. opus 가 1차 audit 끝낸 직후이며 같은 브랜치 sprint-27d/pre-ga-audit-prompts 에서 이어서 작업한다.
+너는 Antigravity CLI 자동 에이전트다. Kairos 프로젝트의 외부 5명 dogfooding 진입 직전 audit 의 agy cross-check 세션이다. opus 1차 audit (PR #108) + opus follow-up fix 세션 (결함 4건 fix) 종료 직후이며 같은 브랜치 sprint-27d/pre-ga-audit-prompts 에서 이어서 작업한다.
 
 [GOAL — Stop hook 자동 보장, 이 세션이 끝나기 전엔 종료 X]
 
-sprint-27d/pre-ga-audit-prompts 브랜치에서 ① 결함 4건 (BUG-S27d-1/2/3/4) fix + 각 fix 후 검증 루프 (회귀 가드 + 관련 test 실행) ② opus 1차 audit 결과 cross-check ③ DEFERRED 시나리오 3건 보강 ④ docs/sprints/sprint-27d-pre-ga-audit/agy/ 하위 산출물 (agy-fix-log.md, agy-cross-check.md, agy-deferred-scenarios.md, agy-integrated-report.md, agy-report.html, screenshots/) 작성 ⑤ 동일 브랜치 commit + push (PR #108 업데이트)까지 모두 완료. 중간에 빼먹거나 압축하지 말고 끝까지 진행.
+sprint-27d/pre-ga-audit-prompts 브랜치에서 ① opus fix 4건 (BUG-S27d-1/2/3/4) 회귀 가드 (해당 결함 재발 0건 확인) ② opus 1차 audit 6 agent 결과 cross-check (독립적 시각으로 verdict 재평가) ③ DEFERRED 시나리오 3건 보강 (Cross-tenant RAG leak / Project visibility 분기 / localStorage workspace drift) ④ docs/sprints/sprint-27d-pre-ga-audit/agy/ 하위 산출물 (agy-fix-regression.md, agy-cross-check.md, agy-deferred-scenarios.md, agy-integrated-report.md, agy-report.html, screenshots/) 작성 ⑤ 동일 브랜치 commit + push (PR #108 업데이트) + 종료 보고까지 모두 완료. 중간에 압축하거나 빼먹지 말고 끝까지 순차 진행. fix 는 opus 가 이미 함 — agy 는 audit/cross-check 만.
 
 [환경]
 
 - 프로젝트 루트: /Users/woosung/project/agy-project/kairos
-- main HEAD: 457c994 (Sprint 27c P0 fix #107 머지 완료)
+- main HEAD: 457c994 (Sprint 27c P0 fix #107)
 - 현재 브랜치: sprint-27d/pre-ga-audit-prompts
-- 직전 commit: opus 1차 audit (6d70eb2) + follow-up prompts v2 (4b84804)
-- FE: http://localhost:3000 (Next.js 16, 사용자 직접 띄움)
-- BE: http://localhost:8000/api/v1 (FastAPI + uvicorn, 사용자 직접 띄움)
-- Clerk: dev instance creative-boxer-79.clerk.accounts.dev (Production 미발급, ADR-022 SKIP)
-- GEMINI_API_KEY: set (사용자 갱신 직후)
-- 로그인 계정: d@e.com (Personal workspace e968c95f-4bbe-4f12-9468-2741c047e142 + Team 7f9f446d-9b7f-4ae7-aa9b-ac861fb81b11 "QA Cycle C Team")
-- seed credentials: ~/.kairos-qa-secrets/seed-credentials-2026-05-17.env (SENTINEL A/B/CASUAL/MOBILE/POWER, JWT expired → email/password 유효)
-- production audit SKIP (사용자 정책)
-- Sentry 의도적 SKIP (사용자 정책)
-- 응답 언어: 한국어 (CLAUDE.md 글로벌, 코드/식별자만 영어)
+- 직전 commit: opus 1차 (6d70eb2) + follow-up prompts v2 (4b84804) + session-inputs (33fc1ed) + opus fix (agy 세션 진입 시 추가됐을 hash 확인 git log)
+- FE: http://localhost:3000 (사용자 직접 띄움)
+- BE: http://localhost:8000/api/v1 (사용자 직접 띄움)
+- Clerk dev creative-boxer-79.clerk.accounts.dev (Production 미발급, ADR-022 SKIP)
+- GEMINI_API_KEY: set
+- 로그인 계정 d@e.com (Personal workspace e968c95f-4bbe-4f12-9468-2741c047e142 + Team 7f9f446d-9b7f-4ae7-aa9b-ac861fb81b11 "QA Cycle C Team")
+- seed credentials ~/.kairos-qa-secrets/seed-credentials-2026-05-17.env (SENTINEL A/B/CASUAL/MOBILE/POWER, JWT expired → email/password 유효)
+- production audit SKIP / Sentry SKIP (사용자 정책)
+- 응답 언어: 한국어 / 코드 영어 식별자
+- 본 세션 CLI: Antigravity CLI (Claude Code 의 gstack 과 무관, codex CLI 와 비슷한 자동 에이전트 종)
 
-[opus 1차 audit 결과 — composite 7.53/10 GO]
+[opus 결과 — composite 7.53/10 GO]
 
+opus 1차 audit:
 agent-1 QA-Function 7.2/10 (GO) — 회의 업로드 → 30초 AI 요약 + RAG citation 정확 PASS
 agent-2 QA-EdgeCase 8.0/10 (GO) — IDOR 5/5 endpoint 403 + I-19 Personal invite 403 PASS
-agent-3 CTO 6.5/10 (NEEDS-FIX) — 보안 헤더 부재 P1
-agent-4 CEO 7.5/10 (GO) — 랜딩 5섹션 + 모바일 정상
-agent-5 일반사용자 7.8/10 (GO) — 추천 YES
-agent-6 Solo-A-to-Z 8.2/10 (GO) — 78 cells FAIL 2 (회귀)
+agent-3 CTO 6.5/10 (NEEDS-FIX → opus fix 후 갱신 예상)
+agent-4 CEO 7.5/10 (GO)
+agent-5 일반사용자 7.8/10 (GO, 추천 YES)
+agent-6 Solo-A-to-Z 8.2/10 (GO)
 
-opus 발견 결함 7건:
-- BUG-S27d-1 P1 회귀: OnboardingTooltip PopoverTrigger nativeButton (BL-S27c-8 회귀) — /dashboard + CmdK 2위치
-- BUG-S27d-2 P2 회귀: /actions 404 (Sprint 27c carry-over)
-- BUG-S27d-3 P2: File upload mime/extension validation 부재 (R2 에 evil.exe text/plain → 201 성공)
-- BUG-S27d-4 P1: 보안 헤더 부재 (CSP/X-Frame/X-Content/Referrer 모두 FE+BE)
-- BUG-S27d-5: Sentry 정책 SKIP — 결함 아님 (사용자 정정)
-- BUG-S27d-6 P3: RAG latency dev avg 10.6s (Gemini API 지배)
-- BUG-S27d-7 P3: 사이드바 nav flicker
+opus fix 4건 (가정 = DONE):
+- BUG-S27d-1 P1: OnboardingTooltip PopoverTrigger nativeButton (BL-S27c-8 회귀)
+- BUG-S27d-2 P2: /actions 404 → /inbox redirect (예상)
+- BUG-S27d-3 P2: File upload mime/extension whitelist (415 응답)
+- BUG-S27d-4 P1: 보안 헤더 (FE next.config + BE middleware)
 
-agy 가 fix: P1+P2 4건 (BUG-S27d-1/2/3/4). P3 2건 (BUG-S27d-6/7) 은 BL-S27e-* 등재만.
+P3 2건 등재 (가정 = DONE):
+- BUG-S27d-6 → BL-S27e-1 (RAG latency)
+- BUG-S27d-7 → BL-S27e-2 (사이드바 nav flicker)
 
-opus 산출물 위치 (반드시 read 후 시작):
-- docs/sprints/sprint-27d-pre-ga-audit/SCOPE.md (단일 진실, 6 에이전트 정의)
-- docs/sprints/sprint-27d-pre-ga-audit/agent-1-qa-function.md
-- docs/sprints/sprint-27d-pre-ga-audit/agent-2-qa-edgecase.md
-- docs/sprints/sprint-27d-pre-ga-audit/agent-3-cto.md
-- docs/sprints/sprint-27d-pre-ga-audit/agent-4-ceo.md
-- docs/sprints/sprint-27d-pre-ga-audit/agent-5-general-user.md
-- docs/sprints/sprint-27d-pre-ga-audit/agent-6-solo-personal.md
+산출물 위치 (모두 read):
+- docs/sprints/sprint-27d-pre-ga-audit/SCOPE.md (단일 진실)
 - docs/sprints/sprint-27d-pre-ga-audit/integrated-report.md
+- docs/sprints/sprint-27d-pre-ga-audit/agent-1-qa-function.md ~ agent-6-solo-personal.md
 - docs/sprints/sprint-27d-pre-ga-audit/report.html
 
-[Step 0 — 환경 검증 (5분)]
+[Step 0 — 환경 검증 + opus 산출물 read (10분)]
 
 bash:
-curl -s -o /dev/null -w "FE: %{http_code} " http://localhost:3000/
-curl -s -o /dev/null -w "BE: %{http_code}\n" http://localhost:8000/api/v1/health
+curl -s -o /dev/null -w "FE: %{http_code} BE: " http://localhost:3000/
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/api/v1/health
 mkdir -p docs/sprints/sprint-27d-pre-ga-audit/agy/screenshots
+git log --oneline -15  # opus fix commit hash 확인
 
-둘 다 200 이어야 함. 아니면 사용자에게 알림.
+opus 산출물 모두 read (위 list).
 
-[Step 1 — 결함 4건 fix + 검증 루프 (90분)]
+[Step 1 — opus fix 4건 회귀 가드 (30분)]
 
-1.1 BUG-S27d-1 OnboardingTooltip PopoverTrigger nativeButton (20분)
-- 위치 탐색: grep -r "PopoverTrigger" frontend/src --include="*.tsx" -l
-- 추정 파일: frontend/src/components/onboarding/OnboardingTooltip.tsx
-- fix 옵션 A: <PopoverTrigger render={(props) => <button type="button" {...props} />}>
-- fix 옵션 B: <PopoverTrigger nativeButton={false}>
-- 검증: typecheck → MCP Playwright /dashboard + ⌘K 진입 → console.error 0건
+1.1 BUG-S27d-1 OnboardingTooltip 회귀 가드
+- MCP Playwright browser_navigate http://localhost:3000/dashboard
+- browser_wait_for time 3
+- browser_console_messages level error
+- 결과: PopoverTrigger nativeButton 관련 console.error 0건 기대 (opus 1차는 1건 있었음)
+- ⌘K 진입 (browser_press_key Meta+k) → 동일 검사 (opus 1차는 CmdK 위치에도 발생했었음)
 
-1.2 BUG-S27d-2 /actions 404 (15분)
-- 옵션 A (권장): frontend/src/app/(app)/actions/page.tsx 신설 — redirect('/inbox')
-- 옵션 B: 신규 action item 칸반 페이지 추가
-- 검증: MCP Playwright /actions 진입 → redirect 또는 정상 페이지
+1.2 BUG-S27d-2 /actions 회귀 가드
+- browser_navigate http://localhost:3000/actions
+- 결과: /inbox redirect 또는 정상 페이지 (opus fix 선택지 확인)
+- 404 console.error 0건
 
-1.3 BUG-S27d-3 File upload mime/extension validation (25분)
-- 위치: backend/src/upload/router.py (또는 service.py)
-- ALLOWED_MIMES + ALLOWED_EXTENSIONS whitelist 추가
-- MAX_FILE_SIZE = 100 * 1024 * 1024
-- 415 HTTPException raise
-- 검증: pytest tests/upload + evaluate POST evil.exe → 415 + test.m4a → 201
+1.3 BUG-S27d-3 file upload 회귀 가드
+- browser_evaluate 으로 fetch:
+  const t = await window.Clerk.session.getToken({ skipCache: true });
+  const fd1 = new FormData();
+  fd1.append("file", new Blob(["x"], { type: "text/plain" }), "evil.exe");
+  const r1 = await fetch("http://localhost:8000/api/v1/workspaces/e968c95f-4bbe-4f12-9468-2741c047e142/upload/file", { method: "POST", headers: { Authorization: `Bearer ${t}` }, body: fd1 });
+  // r1.status === 415 기대 (opus 1차는 201)
 
-1.4 BUG-S27d-4 보안 헤더 (30분)
-- FE: frontend/next.config.ts 의 headers() 함수에 X-Frame-Options/X-Content-Type/Referrer-Policy/Permissions-Policy 추가
-- BE: backend/src/main.py 에 SecurityHeadersMiddleware (Starlette BaseHTTPMiddleware) 추가
-- 검증: curl -I http://localhost:3000/ + http://localhost:8000/api/v1/health → 헤더 등장
+- 정상 케이스: frontend/e2e/fixtures/test.m4a 업로드 → 201 유지
 
-1.5 P3 2건 — docs/REFACTORING-BACKLOG.md 에 BL-S27e-1 (RAG latency) + BL-S27e-2 (사이드바 flicker) 등재
+1.4 BUG-S27d-4 보안 헤더 회귀 가드
+- bash: curl -I http://localhost:3000/ | grep -iE "x-frame|x-content|referrer|permissions"
+- bash: curl -I http://localhost:8000/api/v1/health | grep -iE "x-frame|x-content|referrer"
+- 모두 헤더 등장 확인
 
-1.6 통합 검증:
-- cd backend && uv run pytest -x
-- cd frontend && npm run typecheck && npm test
-- MCP Playwright 회귀 가드 (라우트 console.error, IDOR, 회의 업로드)
+1.5 인접 test 재실행
+- cd backend && uv run pytest -x 2>&1 | tail -20
+- cd frontend && npm run typecheck && npm test 2>&1 | tail -10
 
-[Step 2 — opus cross-check (30분)]
+산출물: docs/sprints/sprint-27d-pre-ga-audit/agy/agy-fix-regression.md
+포맷:
+| BUG ID | 회귀 가드 | 결과 | 증거 |
+|--------|----------|------|------|
+| BUG-S27d-1 | /dashboard + ⌘K console.error | PASS/FAIL | screenshots/agy-01-*.png |
+| ... | ... | ... | ... |
 
-agent-1~6 각 verdict 본인 시각으로 재평가. 동일 시나리오 재실행 → 일치/불일치 명시.
+[Step 2 — opus 6 agent cross-check (30분)]
+
+각 agent verdict 본인 시각으로 재평가:
+
+agent-1 QA-Function:
+- 8 골든 플로우 중 PASS 갯수 재확인 (회의 업로드 / RAG citation / Inbox 자동 분류 등)
+- MCP Playwright 로 핵심 시나리오 1-2개 재실행
+- agy 점수 (0-10)
+
+agent-2 QA-EdgeCase:
+- IDOR 5 endpoint 재검증 (다른 random UUID 사용)
+- Personal invite 403 재현
+- agy 점수
+
+agent-3 CTO:
+- 보안 헤더 등장 확인 (opus fix 후 갱신)
+- RAG latency 재측정 (5 sample)
+- agy 점수 (fix 후 7.5+ 기대)
+
+agent-4 CEO:
+- 랜딩 SSR 카피 추가 분석
+- 모바일 viewport 재확인
+- agy 점수
+
+agent-5 일반사용자:
+- 첫 5분 funnel 본인 시각
+- 이탈 trigger 재확인
+- agy 점수
+
+agent-6 Solo-A-to-Z:
+- 78 cells 중 FAIL 갯수 (opus 1차는 2, fix 후 0 기대)
+- agy 점수 (fix 후 9+ 기대)
+
 산출물: docs/sprints/sprint-27d-pre-ga-audit/agy/agy-cross-check.md
+포맷:
+| Agent | opus | agy 재평가 | 일치? |
+|-------|------|-----------|-------|
+| agent-1 | 7.2 | X.X | ✅/⚠️ (이유) |
+| ... | ... | ... | ... |
 
 [Step 3 — DEFERRED 시나리오 3건 보강 (30분)]
 
-E3 Cross-tenant private RAG leak — Team workspace 에 private project 만든 후 Personal workspace 에서 RAG 질의 → 인용 안 되는지
-E5 Project visibility 분기 — Personal 에서 project 생성 시 visibility 옵션 (public/draft/private) UI + RAG 인용 정합
-E7 localStorage workspace drift — d@e.com logout → re-login → localStorage stale workspace_id 처리
+E3 — Cross-tenant private RAG leak:
+- 사용자 본인 (d@e.com) 의 Personal + Team workspace 양쪽 사용
+- Team workspace 에 private project 만든 후 노트 작성
+- Personal workspace 로 switch 후 RAG 질의 → Team 의 private note 가 인용되지 않는지 검증
+- 또는 seed env 의 SENTINEL A/B 재로그인 시도 (email/password 유효)
+
+E5 — Project visibility 분기:
+- Personal workspace 에서 project 생성 시 visibility 옵션 (public/draft/private) UI 노출 확인
+- 각 visibility 별 RAG 인용 정합 검증
+
+E7 — localStorage workspace drift:
+- d@e.com logout → re-login
+- localStorage kairos-workspace.activeWorkspaceId 가 stale 값 유지하는지
+- stale workspace_id 로 API 호출 시 403 graceful
 
 산출물: docs/sprints/sprint-27d-pre-ga-audit/agy/agy-deferred-scenarios.md
 
-[Step 4 — 산출물 통합 (10분)]
+[Step 4 — agy 통합 보고 + HTML (15분)]
 
-agy-fix-log.md — 각 fix step 결과 + 검증 루프 PASS
-agy-cross-check.md — opus 6 agent verdict 재평가 매트릭스
-agy-deferred-scenarios.md — E3/E5/E7 결과
-agy-integrated-report.md — agy 종합 (fix + cross-check + DEFERRED + 신규 결함)
-agy-report.html — opus report.html 의 dark mode 스타일 (CSS 차용) + agy 결과 섹션
+agy-integrated-report.md:
+- fix 4건 회귀 결과 매트릭스
+- cross-check 6 agent 매트릭스 + 일치율
+- DEFERRED 3건 결과
+- agy 신규 결함 (있다면 prefix BUG-S27d-AGY-*)
+- 갱신된 composite verdict (fix 반영 후 기대)
+- 다음 (codex) 세션 인계 정보
 
-신규 결함 발견 시 prefix: BUG-S27d-AGY-*
+agy-report.html:
+- opus docs/sprints/sprint-27d-pre-ga-audit/report.html 스타일 (dark mode, condition grid, bug card, score table CSS) 차용
+- agy 결과 섹션 추가 (3 패널 — fix 회귀 / cross-check / DEFERRED)
+- 단일 self-contained HTML
 
 [Step 5 — commit + push (5분)]
 
-git add docs/sprints/sprint-27d-pre-ga-audit/agy/ backend/src/upload/ frontend/src/components/onboarding/ frontend/src/app/\(app\)/actions/ frontend/next.config.ts backend/src/main.py docs/REFACTORING-BACKLOG.md
+bash:
+git add docs/sprints/sprint-27d-pre-ga-audit/agy/
 
-git commit -m "fix+docs: Sprint 27d agy follow-up — 결함 4건 fix + cross-check + DEFERRED 보강
+git commit -m "docs: Sprint 27d agy cross-check — fix 회귀 가드 + opus 결과 cross-check + DEFERRED 보강
 
-(본문에 BUG-S27d-1/2/3/4 fix 결과 + cross-check + DEFERRED 결과 상세)
+(본문에 회귀 4건 PASS + cross-check 일치율 + DEFERRED 결과 상세)
 
 Co-Authored-By: Antigravity Agent <noreply@google.com>"
 
@@ -132,22 +187,21 @@ PR #108 자동 업데이트.
 
 [도구]
 
-- Bash (curl, git, pytest, npm, grep)
-- Read / Write / Edit (file 도구)
+- Bash (curl, git, pytest, npm)
+- Read / Write / Edit / Grep
 - MCP Playwright (browser_navigate, browser_snapshot, browser_click, browser_fill_form, browser_press_key, browser_console_messages, browser_network_requests, browser_wait_for, browser_take_screenshot, browser_resize, browser_evaluate, browser_file_upload)
-- 한국어 응답 / 코드 영어 식별자
+- TaskCreate / TaskUpdate (각 step 추적)
 
 [종료 보고]
 
-- fix 4건 status (DONE/PARTIAL/FAIL)
-- 검증 루프 결과 (pytest / typecheck / vitest / Playwright)
-- cross-check 6 agent 일치율
-- DEFERRED 3건 결과
+- fix 4건 회귀 가드 status (PASS/FAIL) — 결함 재발 0 기대
+- cross-check 6 agent 일치율 N/6 (불일치 시 이유)
+- DEFERRED 3건 결과 (E3/E5/E7) — PASS/FAIL + 신규 발견
 - 신규 BUG-S27d-AGY-* N건
-- 갱신된 composite verdict (fix 반영 후)
+- 갱신 composite verdict (agy 시각)
 - PR #108 update commit hash
-- 다음 세션 (codex) 진입 가이드
+- 다음 세션 (codex) 진입 가이드 — docs/sprints/sprint-27d-pre-ga-audit/session-inputs/codex.txt 사용
 
 [시작 신호]
 
-opus 산출물 9개 read 후 Step 0 환경 검증부터 시작. 모든 Step 끝까지 진행. 중간 break X.
+opus 산출물 8개 + opus fix commit 확인 후 Step 0 환경 검증부터 시작. 모든 Step 끝까지 순차 진행. 중간 break X. 사용자 확인 없이 자동 진행 (commit/push 본 goal 안에 사전 승인됨).
