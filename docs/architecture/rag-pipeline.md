@@ -125,7 +125,7 @@ Query Processing (범위 필터 결정, 질문 정규화)
 └─────────────────────────────────────────────────────────┘
 ```
 
-> **Sprint 16 ADR-020 — 인덱스 / 세션 변수 정책** (`docs/dev-log/020-pgvector-hnsw-halfvec.md`):
+> **Sprint 16 ADR-020 — 인덱스 / 세션 변수 정책** (`docs/dev-log/adr/020-pgvector-hnsw-halfvec.md`):
 > - **Layer 1 (Semantic Cache)** + **Layer 3 (Vector Search)** 인덱스: pgvector **HNSW** on `halfvec(1536)`, `m=16, ef_construction=64`, `halfvec_cosine_ops`
 > - 트랜잭션 진입 시 `_apply_hnsw_session_params(session)` (`backend/src/embeddings/repository.py`) 자동 호출 — `SET LOCAL hnsw.ef_search=40` + `iterative_scan=relaxed_order` + `max_scan_tuples=20000`
 > - 헌법 강제: CONTEXT-MAP I-20 (타입/인덱스) + I-21 (세션 변수) + `rag/CONTEXT.md` R-13 (Layer 1/3 진입 강제)

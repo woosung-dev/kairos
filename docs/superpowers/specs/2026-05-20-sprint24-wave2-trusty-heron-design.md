@@ -4,7 +4,7 @@
 
 > Multi-Agent QA P0/P1 dogfood-blocking 결함 16 task fix bundle + Phase B Post-Swap Delta 측정 + 헌법 §4.2 정합.
 >
-> 입력: kickoff prompt `docs/sprint-24-wave2-kickoff-prompt.md` + `~/.claude/plans/docs-sprint-24-wave2-kickoff-prompt-md-cuddly-lecun.md` (approved) + `docs/dev-log/2026-05-19-sprint24-qa-multi-agent/{sprint-24-plan,evidence-matrix,post-swap-delta-stub}.md`
+> 입력: kickoff prompt `docs/sprint-24-wave2-kickoff-prompt.md` + `~/.claude/plans/docs-sprint-24-wave2-kickoff-prompt-md-cuddly-lecun.md` (approved) + `docs/dev-log/qa/2026-05-19-sprint24-qa-multi-agent/{sprint-24-plan,evidence-matrix,post-swap-delta-stub}.md`
 > 산출 PR: `sprint-24/wave2-trusty-heron` (Phase 별 1 commit, ~9-10 commit + Codex polish)
 > 데드라인: 2026-05-28 (Phase B 측정 검증)
 
@@ -68,7 +68,7 @@ Phase 9 회귀 안전망 (T-N+2 composite FK fixture)
 
 | 코드 변경 | 동시 갱신 docs |
 |---|---|
-| T-OBN-05 D 옵션 (banner 폐기 + tooltip) | (1) `backend/src/onboarding/CONTEXT.md` — UI 결정 변경 anchor (BE step lifecycle 책임은 그대로). (2) Sprint 22 산출물 doc deprecated 라벨 — `docs/dev-log/2026-05-19-sprint22-result-report.html` + `docs/dev-log/2026-05-19-sprint22-dogfooding.md` + `docs/superpowers/specs/2026-05-19-sprint22-onboarding-e2e-obs.md` + `docs/superpowers/plans/2026-05-19-sprint22-tasks.md` (4 문서 모두 D 옵션 결정 anchor link). (3) `docs/REFACTORING-BACKLOG.md` BL-NEW-OBN-DATA-RETRY 등재. (4) Atomic Update — banner 컴포넌트 제거 시 `frontend/CONTEXT.md` (있다면 onboarding-aware empty-state 섹션 제거) |
+| T-OBN-05 D 옵션 (banner 폐기 + tooltip) | (1) `backend/src/onboarding/CONTEXT.md` — UI 결정 변경 anchor (BE step lifecycle 책임은 그대로). (2) Sprint 22 산출물 doc deprecated 라벨 — `docs/dev-log/sprints/2026-05-19-sprint22-result-report.html` + `docs/dev-log/sprints/2026-05-19-sprint22-dogfooding.md` + `docs/superpowers/specs/2026-05-19-sprint22-onboarding-e2e-obs.md` + `docs/superpowers/plans/2026-05-19-sprint22-tasks.md` (4 문서 모두 D 옵션 결정 anchor link). (3) `docs/REFACTORING-BACKLOG.md` BL-NEW-OBN-DATA-RETRY 등재. (4) Atomic Update — banner 컴포넌트 제거 시 `frontend/CONTEXT.md` (있다면 onboarding-aware empty-state 섹션 제거) |
 | T-AI-DATE | `backend/CONTEXT.md` AI § + `docs/architecture/ai-pipeline.md` |
 | T-RAG-TIME-FILTER | `backend/src/embeddings/CONTEXT.md` + `docs/architecture/rag-pipeline.md` Layer 3 |
 | T-AUDIT-VIEW endpoint | `backend/src/<도메인>/CONTEXT.md` §엔드포인트 + `docs/api/endpoints.md` |
@@ -84,7 +84,7 @@ PR 본문 "Docs sync" 섹션 필수 — `git diff --stat docs/ backend/**/CONTEX
 
 ### Phase 1 — T-2 Post-Swap Delta (2h, P0 first)
 
-**산출물**: `docs/dev-log/2026-05-20-sprint24-wave2/post-swap-delta-report.md` + 비교 fixture.
+**산출물**: `docs/dev-log/sprints/2026-05-20-sprint24-wave2/post-swap-delta-report.md` + 비교 fixture.
 
 **측정 방법**:
 1. baseline (`003908a^` 직전 commit, `gemini-2.5-flash`) 결과 캡쳐 시도. **현실적으로 baseline 미캡쳐 (`f46a075`까지 모두 swap 이후)** → **alternative**: prompt cache + 직접 호출 baseline 생성. 또는 git checkout `003908a^` → temp branch 에서 동일 fixture 호출 → 측정.
@@ -135,7 +135,7 @@ Fail 시 **STOP + 사용자 보고 + revert PR 옵션 검토** (Phase 2 진입 �
 | **EmptyState 컴포넌트 자체** | `frontend/src/components/empty-state.tsx` (Sprint 22 OBN-03 `onboardingStep` + `context` prop 추가) | **정리** (`onboardingStep` + `context` props 제거 + onboarding-aware hint 분기 삭제 + plain copy 통일). Codex cross-check 누락 발견 |
 | EmptyState 호출처 onboarding-aware 분기 | `project-list.tsx:7,12` + `project-detail.tsx:26,86` + `meeting-summary.tsx:5,12` | **정리** (`useOnboarding` 의존 제거 + `onboardingStep` / `context` prop 전달 제거) |
 | **E2E banner assertion** | `frontend/e2e/tests/home.spec.ts` (G1 `Step 1/4`) + `first-project.spec.ts` (G2 `Step 2/4` NEW) + `mobile-responsive.spec.ts` (OBN-04 banner case) | **정리** (banner assertion 제거 또는 tooltip assertion 으로 교체). Codex cross-check 누락 발견 |
-| **Sprint 22 결과/dogfooding/spec/plan 문서** | `docs/dev-log/2026-05-19-sprint22-result-report.html` + `docs/dev-log/2026-05-19-sprint22-dogfooding.md` + `docs/superpowers/specs/2026-05-19-sprint22-onboarding-e2e-obs.md` + `docs/superpowers/plans/2026-05-19-sprint22-tasks.md` | **deprecated 라벨 + Sprint 24 Wave 2 D 옵션 결정 anchor** (D 옵션 spec 으로 link). Codex cross-check 누락 발견 |
+| **Sprint 22 결과/dogfooding/spec/plan 문서** | `docs/dev-log/sprints/2026-05-19-sprint22-result-report.html` + `docs/dev-log/sprints/2026-05-19-sprint22-dogfooding.md` + `docs/superpowers/specs/2026-05-19-sprint22-onboarding-e2e-obs.md` + `docs/superpowers/plans/2026-05-19-sprint22-tasks.md` | **deprecated 라벨 + Sprint 24 Wave 2 D 옵션 결정 anchor** (D 옵션 spec 으로 link). Codex cross-check 누락 발견 |
 | `useOnboarding` hook | `frontend/src/features/onboarding/hooks.ts` | **유지** (lifecycle/funnel 미래 가치 — Codex 확인) |
 | onboarding API client | `frontend/src/features/onboarding/api.ts` | **유지** |
 | BE onboarding 도메인 | `backend/src/onboarding/{service,router,repository,dependencies,schemas}.py` + `CONTEXT.md` | **유지** (Sprint 22 OBN-02 BE 자산, step lifecycle 책임 — 헌법 모순 없음 Codex 확인) |
@@ -217,7 +217,7 @@ shadcn `Tooltip` + `Popover` 의존성 확인 필요 (현재 미설치 시 `pnpm
 - localhost BE API workspaces/members/meetings/inbox 첫 진입 3015-3865ms 진단
 - 의심: Clerk JWT verify 직렬 + DB warm-up
 - profiling: cProfile + py-spy 또는 print timing. SQLAlchemy event listener `before_cursor_execute` + `after_cursor_execute` 로 query timing
-- 산출물: `docs/dev-log/2026-05-NN-be-perf-spike.md` (5-section report) + Top 1 fix commit
+- 산출물: `docs/dev-log/sprints/2026-05-NN-be-perf-spike.md` (5-section report) + Top 1 fix commit
 - 후속 fix carry-over BL 등재
 
 ### Phase 7 — 헌법 (3h)
@@ -384,7 +384,7 @@ MemoryPipelineService.capture_text_with_embedding(...)
 
 | Task | 신규 테스트 파일 | 종류 |
 |---|---|---|
-| T-2 | `docs/dev-log/2026-05-20-sprint24-wave2/post-swap-delta-report.md` | 측정 report |
+| T-2 | `docs/dev-log/sprints/2026-05-20-sprint24-wave2/post-swap-delta-report.md` | 측정 report |
 | T-AI-DATE | `backend/tests/services/test_ai_action_date_with_year_context.py` | pytest unit (4 case) |
 | T-RAG-MOCK-REMOVE | `frontend/e2e/tests/rag-search-scope.spec.ts` | Playwright snapshot |
 | T-OBN-05 | `frontend/e2e/tests/onboarding-tooltip-first-visit.spec.ts` + banner rollback regression | Playwright E2E (D 옵션) |
@@ -394,7 +394,7 @@ MemoryPipelineService.capture_text_with_embedding(...)
 | T-CMD-K-FIX | `frontend/src/features/home/components/__tests__/dashboard-suggestions.test.tsx` | vitest unit |
 | T-RAG-TIME-FILTER | `backend/tests/embeddings/test_rag_time_range_sql_clause.py` | pytest integration |
 | T-AUDIT-VIEW | `backend/tests/common/test_audit_promotions_endpoint.py` + `frontend/e2e/tests/settings-audit.spec.ts` | pytest + Playwright admin gate |
-| T-BE-PERF | `docs/dev-log/2026-05-NN-be-perf-spike.md` | profiling report |
+| T-BE-PERF | `docs/dev-log/sprints/2026-05-NN-be-perf-spike.md` | profiling report |
 | T-N+1 BL-006 | `backend/tests/architecture/test_no_memory_to_embeddings_lazy_import.py` | pytest custom rule |
 | T-N+4 BL-T2-003 | `backend/tests/services/test_whisper_chunked_4hr.py` | pytest mock |
 | T-N+2 | `backend/tests/fixtures/composite_fk.py` (12 SCN helper) + 기존 통합 test 에서 import | fixture module |

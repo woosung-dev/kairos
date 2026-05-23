@@ -70,7 +70,7 @@
 | `frontend/instrumentation.ts` | create | Task 7.2 |
 | `frontend/next.config.ts` | modify (withSentryConfig wrapper) | Task 7.2 |
 | `.env.example` | modify (SENTRY_DSN + NEXT_PUBLIC_SENTRY_DSN) | Task 7.3 |
-| `docs/dev-log/021-sentry-observability.md` | create (ADR Nygard) | Task 7.3 |
+| `docs/dev-log/adr/021-sentry-observability.md` | create (ADR Nygard) | Task 7.3 |
 | `frontend/e2e/tests/rag-citation.spec.ts` | modify (G4 skip 해제) | Task 8.1 |
 | `frontend/e2e/tests/first-project.spec.ts` | create (G2) | Task 8.2 |
 | `frontend/e2e/tests/auth-relogin.spec.ts` | create (G7) | Task 8.3 |
@@ -79,8 +79,8 @@
 | `frontend/e2e/tests/meeting-upload.spec.ts` | modify (G3 progress assertion) | Task 8.6 |
 | `frontend/e2e/tests/qa-sentinel-p0.spec.ts` | modify (G5/G6 progress assertion) | Task 8.6 |
 | `frontend/e2e/tests/invite-page-regression.spec.ts` | modify (G6) | Task 8.6 |
-| `docs/dev-log/2026-05-19-sprint22-playwright-e2e.md` | create (결과 표) | Task 8.7 |
-| `docs/dev-log/2026-05-19-sprint22-dogfooding.md` | create (12분 walkthrough) | Task 8.7 |
+| `docs/dev-log/sprints/2026-05-19-sprint22-playwright-e2e.md` | create (결과 표) | Task 8.7 |
+| `docs/dev-log/sprints/2026-05-19-sprint22-dogfooding.md` | create (12분 walkthrough) | Task 8.7 |
 | `docs/REFACTORING-BACKLOG.md` | modify (BL-017 ✅ + carry-over) | Task 9.1 |
 | `docs/TODO.md` | modify (Sprint 22 Recently Completed) | Task 9.2 |
 
@@ -1873,7 +1873,7 @@ git commit -m "feat(obs): Sentry FE wire (@sentry/nextjs + instrumentation) (Spr
 
 **Files:**
 - Modify: `.env.example`
-- Create: `docs/dev-log/021-sentry-observability.md`
+- Create: `docs/dev-log/adr/021-sentry-observability.md`
 
 - [ ] **Step 7.3.1: .env.example 갱신**
 
@@ -1890,12 +1890,12 @@ SENTRY_PROJECT=kairos-fe
 
 - [ ] **Step 7.3.2: ADR 작성**
 
-`docs/dev-log/021-sentry-observability.md` — Nygard 4-section (Context / Decision / Status / Consequences). Sentry FE+BE 도입 근거 + PII scrub 정책 + sample rate + carry-over (OpenTelemetry CO-1).
+`docs/dev-log/adr/021-sentry-observability.md` — Nygard 4-section (Context / Decision / Status / Consequences). Sentry FE+BE 도입 근거 + PII scrub 정책 + sample rate + carry-over (OpenTelemetry CO-1).
 
 - [ ] **Step 7.3.3: commit (E24)**
 
 ```bash
-git add .env.example backend/.env.example frontend/.env.example docs/dev-log/021-sentry-observability.md
+git add .env.example backend/.env.example frontend/.env.example docs/dev-log/adr/021-sentry-observability.md
 git commit -m "docs: Sentry env + ADR-021 observability (Sprint 22)"
 ```
 
@@ -2131,8 +2131,8 @@ Expected: 8/8 NEW + 보강 spec PASS, 기존 spec 회귀 0
 ### Task 8.7: 결과 문서화
 
 **Files:**
-- Create: `docs/dev-log/2026-05-19-sprint22-playwright-e2e.md`
-- Create: `docs/dev-log/2026-05-19-sprint22-dogfooding.md`
+- Create: `docs/dev-log/sprints/2026-05-19-sprint22-playwright-e2e.md`
+- Create: `docs/dev-log/sprints/2026-05-19-sprint22-dogfooding.md`
 
 - [ ] **Step 8.7.1: Playwright 결과 표 작성**
 
@@ -2153,12 +2153,12 @@ Expected: 8/8 NEW + 보강 spec PASS, 기존 spec 회귀 0
 
 - [ ] **Step 8.7.2: Dogfooding walkthrough 작성**
 
-`docs/dev-log/2026-05-19-sprint22-dogfooding.md` — 가상 외부 user "Alice" 12분 walkthrough (spec §8.4 의 7 단계 결과 + screenshot 1-3장 + Sentry dashboard 결과).
+`docs/dev-log/sprints/2026-05-19-sprint22-dogfooding.md` — 가상 외부 user "Alice" 12분 walkthrough (spec §8.4 의 7 단계 결과 + screenshot 1-3장 + Sentry dashboard 결과).
 
 - [ ] **Step 8.7.3: commit (E30)**
 
 ```bash
-git add docs/dev-log/2026-05-19-sprint22-playwright-e2e.md docs/dev-log/2026-05-19-sprint22-dogfooding.md
+git add docs/dev-log/sprints/2026-05-19-sprint22-playwright-e2e.md docs/dev-log/sprints/2026-05-19-sprint22-dogfooding.md
 git commit -m "docs: Sprint 22 Playwright E2E 결과 + dogfooding walkthrough (Sprint 22)"
 ```
 
@@ -2261,7 +2261,7 @@ gh pr create --draft --base main --head sprint-22/onboarding-e2e-obs \
 - `backend/CONTEXT.md` §4 — 도메인 표
 - `docs/architecture/directory-map.md` — backend 트리
 - `docs/api/endpoints.md` — `GET /api/v1/users/me/onboarding`
-- `docs/dev-log/021-sentry-observability.md` (신설 ADR)
+- `docs/dev-log/adr/021-sentry-observability.md` (신설 ADR)
 
 ## Verification
 
@@ -2305,13 +2305,13 @@ Expected: `baseRefName=main` ✓
 ### Task 9.5: HTML 결과 보고서 작성 + memory + worktree 정리
 
 **Files:**
-- Create: `docs/dev-log/2026-05-19-sprint22-result-report.html`
+- Create: `docs/dev-log/sprints/2026-05-19-sprint22-result-report.html`
 - Update: `~/.claude/projects/-Users-woosung-project-agy-project-kairos/memory/project_sprint22_done.md` (신설)
 - Update: `~/.claude/projects/-Users-woosung-project-agy-project-kairos/memory/MEMORY.md` (인덱스 1줄)
 
 - [ ] **Step 9.5.1: HTML 결과 보고서**
 
-`docs/dev-log/2026-05-19-sprint22-result-report.html` — Sprint 18 multi-agent-qa report 패턴 따름. tailwind CDN + 섹션:
+`docs/dev-log/sprints/2026-05-19-sprint22-result-report.html` — Sprint 18 multi-agent-qa report 패턴 따름. tailwind CDN + 섹션:
 - Summary card (8 result metrics)
 - OBN-01~04 결과 표
 - Playwright G1~G8 표
@@ -2347,7 +2347,7 @@ git branch -D sprint-22/onboarding-e2e-obs
 - [ ] **Step 9.5.4: 최종 commit (E32)**
 
 ```bash
-git add docs/dev-log/2026-05-19-sprint22-result-report.html
+git add docs/dev-log/sprints/2026-05-19-sprint22-result-report.html
 git commit -m "docs: Sprint 22 HTML 결과 보고서 + memory closeout"
 ```
 

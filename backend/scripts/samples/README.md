@@ -88,7 +88,7 @@ ls -lh backend/scripts/samples/
 cd backend
 uv run python scripts/sprint15_day0_spike.py
 # 출력: per-sample latency/cost + aggregate + threshold violations
-# 결과 paste → docs/dev-log/sprint-15-cost-spike.md
+# 결과 paste → docs/dev-log/sprints/sprint-15-cost-spike.md
 ```
 
 누락 sample은 자동 skip + log. 최소 1개만 있어도 partial spike 가능.

@@ -306,7 +306,7 @@ Task 6 (D3 진단/fix) ───────────────────
 ### F3 — HTML 결과 보고서 final 갱신 (30min)
 
 #### Step
-1. `docs/dev-log/2026-05-19-sprint22-result-report.html` 의 "Codex 2차 진행 중" → "**APPROVE** (3 P2 finding 100% 수락)" 갱신
+1. `docs/dev-log/sprints/2026-05-19-sprint22-result-report.html` 의 "Codex 2차 진행 중" → "**APPROVE** (3 P2 finding 100% 수락)" 갱신
 2. e2e baseline fix 4 commit timeline 추가 (`2d7d1f3` ~ `7d97d5f`)
 3. CI final result 추가 (5/5 PASS, run 26068170657)
 
@@ -394,7 +394,7 @@ gh pr view <N> --json baseRefName,headRefName,state
    ```
 3. memory `~/.claude/projects/.../memory/project_sprint23_cozy_crystal_done.md` 신설
 4. `MEMORY.md` 인덱스 1줄 추가
-5. (선택) HTML 결과 보고서 작성 `docs/dev-log/2026-05-19-sprint23-result-report.html` (Sprint 22 패턴 재현)
+5. (선택) HTML 결과 보고서 작성 `docs/dev-log/sprints/2026-05-19-sprint23-result-report.html` (Sprint 22 패턴 재현)
 6. BACKLOG/TODO final sync — Sprint 23 completed mark + Sprint 24 진입 준비
 7. 사용자 보고 — Sprint 24 (ADR-019 Phase B) 진입 준비 완료
 

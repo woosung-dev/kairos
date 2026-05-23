@@ -1,7 +1,7 @@
 # pgvector HNSW 인덱스 운영 가이드 (Sprint 16 ADR-020)
 
 > **목적**: REINDEX CONCURRENTLY로 bloat 정리 + 인덱스 크기/성능 모니터링.
-> **상위 결정**: `docs/dev-log/020-pgvector-hnsw-halfvec.md` (ADR-020)
+> **상위 결정**: `docs/dev-log/adr/020-pgvector-hnsw-halfvec.md` (ADR-020)
 > **헌법**: `CONTEXT-MAP.md` I-20/I-21
 > **스크립트**: `backend/scripts/reindex_vectors.py`
 

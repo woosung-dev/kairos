@@ -36,7 +36,7 @@ Task 3 (BL-064 Note BG schedule, 4-6h) ────┘  │           Task 5 (PR
 ## Task 1. BL-066 D1/D3 dogfood verify (2-4h, controller 직접 + Playwright MCP)
 
 **Files:**
-- Create: `docs/dev-log/2026-05-19-sprint24-bl-066-verify.md`
+- Create: `docs/dev-log/sprints/2026-05-19-sprint24-bl-066-verify.md`
 - Modify (optional, 효과 충분 시): `frontend/tests/e2e/specs/workspace-switch.spec.ts`
 - Create (optional): `frontend/tests/e2e/specs/inbox-dismiss.spec.ts`
 
@@ -119,7 +119,7 @@ browser_snapshot()  # dismiss 한 item 이 list 에 없음 verify
 
 ### Step 1.4: 진단 결과 보고서 작성
 
-- [ ] `docs/dev-log/2026-05-19-sprint24-bl-066-verify.md` 작성
+- [ ] `docs/dev-log/sprints/2026-05-19-sprint24-bl-066-verify.md` 작성
 
 ```markdown
 # Sprint 24 BL-066 — D1/D3 dogfood verify
@@ -206,7 +206,7 @@ pkill -f "uvicorn src.main:app" && pkill -f "next dev"
 
 ```bash
 cd /Users/woosung/project/agy-project/kairos-sprint-24
-git add docs/dev-log/2026-05-19-sprint24-bl-066-verify.md
+git add docs/dev-log/sprints/2026-05-19-sprint24-bl-066-verify.md
 # (효과 충분 시) git add frontend/tests/e2e/specs/workspace-switch.spec.ts frontend/tests/e2e/specs/inbox-dismiss.spec.ts
 # (효과 부족 시) git add docs/REFACTORING-BACKLOG.md
 git commit -m "chore(verify): BL-066 D1/D3 dogfood reproduce + 결과 보고"

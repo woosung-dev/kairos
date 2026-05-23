@@ -4,7 +4,7 @@
 
 > Recall-first wedge (Sprint 15). MemoryItem capture → distill → recall → promote.
 > 상위: `CONTEXT-MAP.md` §2 (엔티티) + §4 (도메인 경계) + §6 (불변식 I-18/I-19).
-> 관련 ADR: `docs/dev-log/016-personal-team-ia.md` · `docs/dev-log/019-gemini-eol-migration.md`
+> 관련 ADR: `docs/dev-log/adr/016-personal-team-ia.md` · `docs/dev-log/adr/019-gemini-eol-migration.md`
 
 ---
 

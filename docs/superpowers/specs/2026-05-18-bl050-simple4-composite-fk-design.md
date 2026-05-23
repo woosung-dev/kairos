@@ -117,7 +117,7 @@ def downgrade():
 ### D4 — closeout (~1h)
 
 - `docs/REFACTORING-BACKLOG.md` BL-050 § Simple 4 ✅ 완료 마크 + 잔여 3 entity carry-over 명시
-- `docs/dev-log/2026-05-18-bl050-simple4-composite-fk.md` 신설 (Nygard 포맷, Sprint 21 머지 일자 기준 갱신)
+- `docs/dev-log/notes/2026-05-18-bl050-simple4-composite-fk.md` 신설 (Nygard 포맷, Sprint 21 머지 일자 기준 갱신)
 - 회귀: `pytest tests/` → **325 PASS + 1 skipped** (baseline 321 + 4 audit 신규)
 
 ## Data Flow
@@ -190,7 +190,7 @@ def downgrade():
 - `backend/tests/integration/test_workspace_integrity_audit.py` — 4 audit 함수 추가
 - `docs/REFACTORING-BACKLOG.md` — BL-050 § Simple 4 ✅ 마크 + carry-over
 - `docs/architecture/erd.md` — Atomic Update §4 매트릭스 동시 갱신
-- `docs/dev-log/2026-05-18-bl050-simple4-composite-fk.md` — 신설 (머지 일자 기준 갱신)
+- `docs/dev-log/notes/2026-05-18-bl050-simple4-composite-fk.md` — 신설 (머지 일자 기준 갱신)
 
 ## 다음 세션 인계 (Sprint 22 진입 후보)
 
