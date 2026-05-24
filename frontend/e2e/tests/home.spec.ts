@@ -21,7 +21,7 @@ test.describe("홈 — 인증 후 네비게이션", () => {
 
     // Cmd+K 검색 트리거 버튼 존재
     await expect(
-      page.getByRole("button", { name: /검색하거나 질문 입력/ }),
+      page.locator("button", { hasText: /검색하거나 질문 입력/ }),
     ).toBeVisible({ timeout: 15_000 });
 
     // G1 (Sprint 24 Wave 2 T-OBN-05 D 옵션): OnboardingBanner 폐기.

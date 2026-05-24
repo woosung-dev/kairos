@@ -53,7 +53,7 @@ test.describe("RAG citation → Source Viewer", () => {
     await page.goto("/dashboard");
 
     // Cmd+K 열기 (버튼 클릭)
-    await page.getByRole("button", { name: /검색하거나 질문 입력/ }).click();
+    await page.locator("button", { hasText: /검색하거나 질문 입력/ }).click();
 
     // 질문 입력 (Cmd+K 모달 내부 input)
     const input = page.locator('input[placeholder*="질문"], textarea[placeholder*="질문"]').first();
