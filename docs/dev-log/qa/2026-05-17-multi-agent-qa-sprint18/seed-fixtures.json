@@ -1,0 +1,126 @@
+{
+  "qa_run_id": "2026-05-17-multi-agent",
+  "seeded_at": "2026-05-24T01:11:05.139788+00:00",
+  "personas": {
+    "SENTINEL_A": {
+      "user_id": "1535ec08-cf1d-47d2-9672-04f0804a6a71",
+      "clerk_user_id": "user_3DlHnHHk51f5QpYjN10e3goKv52",
+      "email": "wkddntjd3429@naver.com",
+      "workspace_id": "9966a04e-0db3-4d65-a5fe-6c5c4f49901d",
+      "workspace_name": "[QA-2026-05-17] WS-QA-SENTINEL_A-2026-05-17",
+      "jwt_expires_at": "2026-05-16T22:32:12.000Z"
+    },
+    "SENTINEL_B": {
+      "user_id": "e0ccf7f7-8527-45f4-bf87-00346f3b713e",
+      "clerk_user_id": "user_3DpBbgkNmN7P2oSnutENi5CuWdQ",
+      "email": "wkddntjd3429-0@naver.com",
+      "workspace_id": "ce9e5d5c-74b8-4370-98d4-d16151bed130",
+      "workspace_name": "[QA-2026-05-17] WS-QA-SENTINEL_B-2026-05-17",
+      "jwt_expires_at": "2026-05-16T22:32:31.000Z"
+    },
+    "CASUAL": {
+      "user_id": "fa44964e-a05e-475e-9365-5cdc6789543e",
+      "clerk_user_id": "user_3DpBeO7IVYHg8LbVLqpAJbmwtIv",
+      "email": "wkddntjd3429-1@naver.com",
+      "workspace_id": "539ba7f4-367d-4aa9-be2d-3ce95955b19c",
+      "workspace_name": "[QA-2026-05-17] WS-QA-CASUAL-2026-05-17",
+      "jwt_expires_at": "2026-05-16T22:32:42.000Z"
+    },
+    "MOBILE": {
+      "user_id": "badd8197-b562-4f73-8d2c-a295bfe14494",
+      "clerk_user_id": "user_3DpBhYQlDDBXt6h2IeKVZdMjxAt",
+      "email": "wkddntjd3429-3@naver.com",
+      "workspace_id": "ecc6277f-d1e4-487f-8e3c-8e95c7c1c83e",
+      "workspace_name": "[QA-2026-05-17] WS-QA-MOBILE-2026-05-17",
+      "jwt_expires_at": "2026-05-16T22:32:52.000Z"
+    },
+    "POWER": {
+      "user_id": "0d6bb0d0-7176-4775-8a09-c5acfee7402a",
+      "clerk_user_id": "user_3DpBm4GOx7FOnaF8N2l5fJH2APF",
+      "email": "wkddntjd3429-5@naver.com",
+      "workspace_id": "0e3ed472-c331-438a-89a0-b0707bbbd91a",
+      "workspace_name": "[QA-2026-05-17] WS-QA-POWER-2026-05-17",
+      "jwt_expires_at": "2026-05-16T22:33:02.000Z"
+    }
+  },
+  "rag_visibility_fixtures": {
+    "public": {
+      "project_id": "b4d08f8c-8097-4b61-93ff-21814f8f0766",
+      "note_id": "f7e648cd-9264-4cdd-9ac9-e936cd2c5fed",
+      "chunk_id": "97d2fe44-063b-4c5c-a2e9-1cb65b423880",
+      "title": "[QA-2026-05-17] public-project",
+      "visibility": "public",
+      "expected_keyword": "alpha-public-fixture-2026."
+    },
+    "draft": {
+      "project_id": "15c4f373-e0c3-417d-a7be-31ced5aa96a8",
+      "note_id": "a30327a3-8c65-4d61-8a08-66952cbc70d2",
+      "chunk_id": "7c70ce6f-865e-430a-88a3-f2513707f7df",
+      "title": "[QA-2026-05-17] draft-project",
+      "visibility": "draft",
+      "expected_keyword": "beta-draft-fixture-2026."
+    },
+    "private": {
+      "project_id": "16a0f64b-eeb5-44f1-a4a4-18f220beb2e8",
+      "note_id": "6d6334e8-bb33-4635-8797-6c90fe6dc327",
+      "chunk_id": "5b71df8f-07c3-4e8c-91f7-9fc2a4437c2d",
+      "title": "[QA-2026-05-17] private-project",
+      "visibility": "private",
+      "expected_keyword": "gamma-private-fixture-2026."
+    }
+  },
+  "cross_tenant_fixture": {
+    "project_id": "3ab92499-f48c-4d5c-b579-a6e0deb4e1b1",
+    "note_id": "019ea0d0-6f2d-43bb-8a2c-9dcc24184812",
+    "chunk_id": "3b8f3fd4-2552-417d-a3f1-6c2b82f7151b",
+    "title": "[QA-2026-05-17] cross-tenant-private",
+    "visibility": "private",
+    "expected_keyword": "delta-cross-tenant-fixture-2026."
+  },
+  "power_fixtures": {
+    "projects": [
+      {
+        "project_id": "d85a6eec-78ce-495c-8c64-014c98a6c557",
+        "title": "[QA-2026-05-17] Power 프로젝트 A",
+        "visibility": "public"
+      },
+      {
+        "project_id": "3946ad4c-e673-4236-913d-bb84c3f6171a",
+        "title": "[QA-2026-05-17] Power 프로젝트 B",
+        "visibility": "public"
+      },
+      {
+        "project_id": "74b65d90-3ce2-4783-93f1-7f88d053ce51",
+        "title": "[QA-2026-05-17] Power 프로젝트 C",
+        "visibility": "draft"
+      },
+      {
+        "project_id": "d3ed8064-d37d-4104-979b-95edb923c532",
+        "title": "[QA-2026-05-17] Power 프로젝트 D",
+        "visibility": "private"
+      }
+    ],
+    "notes": [
+      {
+        "note_id": "3d3598c2-fb06-4272-8248-ed4d4de82328",
+        "title": "[QA-2026-05-17] Power 노트 1 — 단축키 검증용"
+      },
+      {
+        "note_id": "782070ff-cb99-48cd-9470-f3313798c30e",
+        "title": "[QA-2026-05-17] Power 노트 2 — 벌크 export 검증용"
+      },
+      {
+        "note_id": "6faa02a8-5642-480d-8409-12d9eb3e30e1",
+        "title": "[QA-2026-05-17] Power 노트 3 — 검색 고급 옵션 검증용"
+      },
+      {
+        "note_id": "4bbeeb36-6fcc-44b2-a009-297d5a4f4521",
+        "title": "[QA-2026-05-17] Power 노트 4 — Quick Capture 검증용"
+      },
+      {
+        "note_id": "94d5e916-eb7c-4f25-a7e4-a3c58c8b319e",
+        "title": "[QA-2026-05-17] Power 노트 5 — API 직접 호출 검증용"
+      }
+    ]
+  }
+}

@@ -67,8 +67,8 @@ test.describe("Onboarding Tooltip (T-OBN-05 D 옵션, Sprint 24 Wave 2)", () => 
     // 진짜 cmd-k trigger = dashboard 본문의 "검색하거나 질문 입력... ⌘K" button (toggleCmdK).
     // 정확한 selector = OnboardingTooltip(page="dashboard") 안의 button (dashboard tooltip 이 wrap).
     // dashboard tooltip 이 mark 처리되어 mount 안 되므로 우리 click 은 직접 button 도달.
-    const cmdKTrigger = page.getByRole("button", {
-      name: /검색하거나 질문 입력/,
+    const cmdKTrigger = page.locator("button", {
+      hasText: /검색하거나 질문 입력/,
     });
     await cmdKTrigger.click();
 

@@ -1,0 +1,270 @@
+{
+  "executed_at": "2026-05-24T01:14:07.896Z",
+  "total": 28,
+  "pass": 28,
+  "fail": 0,
+  "confirm_needed": 0,
+  "critical_findings": [],
+  "results": [
+    {
+      "case_id": "P0-1.1",
+      "description": "A admin + L1 public project_id → public 노출",
+      "status": 200,
+      "sources": [
+        "97d2fe44-063b-4c5c-a2e9-1cb65b423880"
+      ],
+      "body_snippet": "event: thinking\r\ndata: {\"status\": \"검색 중...\"}\r\n\r\nevent: search_results\r\ndata: {\"chunks\": [{\"id\": \"97d2fe44-063b-4c5c-a2e9-1cb65b423880\", \"text\": \"이번 분기 OKR 발표를 마쳤습니다. 전사 공유 가능한 내용입니다. 카이로스 검색 키워드: alpha-public-fixture-2026.\", \"source\": \"\", \"sourceType\": \"note\", \"date\": \"2026-05-24T01:11:14.645670\", \"speaker\": null, \"score\": 0.417, \"freshness\": \"recent\"}]}\r\n\r\nevent: answer\r\ndata: {\"token\": \"제\"}\r\n\r\nevent: answer\r\ndata: {\"token\": \"공해주신 소스를 바탕으로 답변 드립니다.\\n\\n* **alpha 공개 프로젝트 키워드\"}\r\n\r\nevent: answer\r\nd",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-1.2",
+      "description": "A admin + L1 private project_id (admin 우회)",
+      "status": 200,
+      "sources": [
+        "5b71df8f-07c3-4e8c-91f7-9fc2a4437c2d"
+      ],
+      "body_snippet": "event: thinking\r\ndata: {\"status\": \"검색 중...\"}\r\n\r\nevent: search_results\r\ndata: {\"chunks\": [{\"id\": \"5b71df8f-07c3-4e8c-91f7-9fc2a4437c2d\", \"text\": \"외부 노출 절대 금지. ProjectMember 만 접근. 카이로스 검색 키워드: gamma-private-fixture-2026.\", \"source\": \"\", \"sourceType\": \"note\", \"date\": \"2026-05-24T01:11:18.035769\", \"speaker\": null, \"score\": 0.32, \"freshness\": \"recent\"}]}\r\n\r\nevent: answer\r\ndata: {\"token\": \"제공\"}\r\n\r\nevent: answer\r\ndata: {\"token\": \"된 소스에 따른 정보는 다음과 같습니다.\\n\\n* **비공개 정보 접근\"}\r\n\r\nevent: answer\r\ndata: {\"token",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-1.3",
+      "description": "B (WS-A 비멤버) + L1 public 시도 → 403/404",
+      "status": 403,
+      "sources": [],
+      "body_snippet": "{\"detail\":\"워크스페이스 멤버가 아닙니다\"}",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-1.4",
+      "description": "A creator(ProjectMember) + L1 private → 노출",
+      "status": 200,
+      "sources": [
+        "5b71df8f-07c3-4e8c-91f7-9fc2a4437c2d"
+      ],
+      "body_snippet": "event: thinking\r\ndata: {\"status\": \"검색 중...\"}\r\n\r\nevent: search_results\r\ndata: {\"chunks\": [{\"id\": \"5b71df8f-07c3-4e8c-91f7-9fc2a4437c2d\", \"text\": \"외부 노출 절대 금지. ProjectMember 만 접근. 카이로스 검색 키워드: gamma-private-fixture-2026.\", \"source\": \"\", \"sourceType\": \"note\", \"date\": \"2026-05-24T01:11:18.035769\", \"speaker\": null, \"score\": 0.466, \"freshness\": \"recent\"}]}\r\n\r\nevent: answer\r\ndata: {\"token\": \"제공\"}\r\n\r\nevent: answer\r\ndata: {\"token\": \"된 소스에 기반한 답변입니다.\\n\\n* **검증 결과**:\"}\r\n\r\nevent: answer\r\ndata: {\"token\": \" `",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-1.5",
+      "description": "A creator + L1 draft → 노출",
+      "status": 200,
+      "sources": [
+        "7c70ce6f-865e-430a-88a3-f2513707f7df"
+      ],
+      "body_snippet": "event: thinking\r\ndata: {\"status\": \"검색 중...\"}\r\n\r\nevent: search_results\r\ndata: {\"chunks\": [{\"id\": \"7c70ce6f-865e-430a-88a3-f2513707f7df\", \"text\": \"아직 정리 중인 기획 초안입니다. 작성자와 ProjectMember만 봐야 합니다. 카이로스 검색 키워드: beta-draft-fixture-2026.\", \"source\": \"\", \"sourceType\": \"note\", \"date\": \"2026-05-24T01:11:16.925396\", \"speaker\": null, \"score\": 0.292, \"freshness\": \"recent\"}]}\r\n\r\nevent: answer\r\ndata: {\"token\": \"제공된 소스에 기반한 답변입니다.\\n\\n*\"}\r\n\r\nevent: answer\r\ndata: {\"token\": \" **문서 상태**: 현재 기획 초안이 정리 중에 있습니다. (📎 제목",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-1.6",
+      "description": "B (비멤버) + L1 draft → 403/404",
+      "status": 403,
+      "sources": [],
+      "body_snippet": "{\"detail\":\"워크스페이스 멤버가 아닙니다\"}",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-1.7",
+      "description": "A admin + L2 글로벌 (project_id 없음) → admin 우회로 모두",
+      "status": 200,
+      "sources": [
+        "07a47e67-1a7b-46b1-a33a-b262b7cfc86e",
+        "5b71df8f-07c3-4e8c-91f7-9fc2a4437c2d",
+        "87741c54-55c8-4dfd-8967-f6edf8df05b4",
+        "97d2fe44-063b-4c5c-a2e9-1cb65b423880",
+        "eb6f88e6-98ec-4f55-942d-a409343f8d6f",
+        "7c70ce6f-865e-430a-88a3-f2513707f7df",
+        "32bea4ed-4eb4-4d0d-bcd2-81245028b8c6",
+        "22be9d7d-6fb7-41fe-9f63-c4cd4a28d8d2"
+      ],
+      "body_snippet": "event: thinking\r\ndata: {\"status\": \"검색 중...\"}\r\n\r\nevent: search_results\r\ndata: {\"chunks\": [{\"id\": \"07a47e67-1a7b-46b1-a33a-b262b7cfc86e\", \"text\": \"외부 노출 절대 금지. ProjectMember 만 접근. 카이로스 검색 키워드: gamma-private-fixture-2026.\", \"source\": \"\", \"sourceType\": \"note\", \"date\": \"2026-05-16T22:34:04.623459\", \"speaker\": null, \"score\": 0.352, \"freshness\": \"recent\"}, {\"id\": \"5b71df8f-07c3-4e8c-91f7-9fc2a4437c2d\", \"text\": \"외부 노출 절대 금지. ProjectMember 만 접근. 카이로스 검색 키워드: gamma-private-fixture-2026.\", \"source\": \"\", \"s",
+      "verdict": "PASS",
+      "notes": "admin이라 public+draft+private 모두 노출되어야"
+    },
+    {
+      "case_id": "P0-1.8",
+      "description": "A 동일 query 재호출 → L3 cache hit",
+      "status": 200,
+      "sources": [
+        "07a47e67-1a7b-46b1-a33a-b262b7cfc86e",
+        "5b71df8f-07c3-4e8c-91f7-9fc2a4437c2d",
+        "87741c54-55c8-4dfd-8967-f6edf8df05b4",
+        "97d2fe44-063b-4c5c-a2e9-1cb65b423880",
+        "eb6f88e6-98ec-4f55-942d-a409343f8d6f",
+        "7c70ce6f-865e-430a-88a3-f2513707f7df",
+        "32bea4ed-4eb4-4d0d-bcd2-81245028b8c6",
+        "22be9d7d-6fb7-41fe-9f63-c4cd4a28d8d2"
+      ],
+      "body_snippet": "event: search_results\r\ndata: {\"chunks\": [{\"id\": \"07a47e67-1a7b-46b1-a33a-b262b7cfc86e\", \"text\": \"외부 노출 절대 금지. ProjectMember 만 접근. 카이로스 검색 키워드: gamma-private-fixture-2026.\", \"source\": \"\", \"sourceType\": \"note\", \"date\": \"2026-05-16T22:34:04.623459\", \"speaker\": null, \"score\": 0.352, \"freshness\": \"recent\"}, {\"id\": \"5b71df8f-07c3-4e8c-91f7-9fc2a4437c2d\", \"text\": \"외부 노출 절대 금지. ProjectMember 만 접근. 카이로스 검색 키워드: gamma-private-fixture-2026.\", \"source\": \"\", \"sourceType\": \"note\", \"date\": \"2026-05-24T01:11:18",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-1.9",
+      "description": "A 다른 query (cache miss → L2)",
+      "status": 200,
+      "sources": [
+        "07a47e67-1a7b-46b1-a33a-b262b7cfc86e",
+        "5b71df8f-07c3-4e8c-91f7-9fc2a4437c2d",
+        "7c70ce6f-865e-430a-88a3-f2513707f7df",
+        "eb6f88e6-98ec-4f55-942d-a409343f8d6f",
+        "87741c54-55c8-4dfd-8967-f6edf8df05b4",
+        "97d2fe44-063b-4c5c-a2e9-1cb65b423880",
+        "32bea4ed-4eb4-4d0d-bcd2-81245028b8c6",
+        "22be9d7d-6fb7-41fe-9f63-c4cd4a28d8d2"
+      ],
+      "body_snippet": "event: thinking\r\ndata: {\"status\": \"검색 중...\"}\r\n\r\nevent: search_results\r\ndata: {\"chunks\": [{\"id\": \"07a47e67-1a7b-46b1-a33a-b262b7cfc86e\", \"text\": \"외부 노출 절대 금지. ProjectMember 만 접근. 카이로스 검색 키워드: gamma-private-fixture-2026.\", \"source\": \"\", \"sourceType\": \"note\", \"date\": \"2026-05-16T22:34:04.623459\", \"speaker\": null, \"score\": 0.307, \"freshness\": \"recent\"}, {\"id\": \"5b71df8f-07c3-4e8c-91f7-9fc2a4437c2d\", \"text\": \"외부 노출 절대 금지. ProjectMember 만 접근. 카이로스 검색 키워드: gamma-private-fixture-2026.\", \"source\": \"\", \"s",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-1.10",
+      "description": "B + L2 본인 WS → B 자기 cross_tenant 청크 노출",
+      "status": 200,
+      "sources": [
+        "65e9d772-4acc-47ee-8e69-89ea65b416ec",
+        "3b8f3fd4-2552-417d-a3f1-6c2b82f7151b"
+      ],
+      "body_snippet": "event: thinking\r\ndata: {\"status\": \"검색 중...\"}\r\n\r\nevent: search_results\r\ndata: {\"chunks\": [{\"id\": \"65e9d772-4acc-47ee-8e69-89ea65b416ec\", \"text\": \"Sentinel B 워크스페이스 전용. A 토큰으로 접근 시 leak되면 IDOR 버그. 카이로스 검색 키워드: delta-cross-tenant-fixture-2026.\", \"source\": \"\", \"sourceType\": \"note\", \"date\": \"2026-05-16T22:34:06.157829\", \"speaker\": null, \"score\": 0.449, \"freshness\": \"recent\"}, {\"id\": \"3b8f3fd4-2552-417d-a3f1-6c2b82f7151b\", \"text\": \"Sentinel B 워크스페이스 전용. A 토큰으로 접근 시 leak되면 IDOR 버그. 카이로스 검색 키워드: delta-c",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-1.11",
+      "description": "🔥 A + L2 WS-A → B의 cross-tenant 청크 절대 안 보임",
+      "status": 200,
+      "sources": [
+        "07a47e67-1a7b-46b1-a33a-b262b7cfc86e",
+        "5b71df8f-07c3-4e8c-91f7-9fc2a4437c2d",
+        "7c70ce6f-865e-430a-88a3-f2513707f7df",
+        "eb6f88e6-98ec-4f55-942d-a409343f8d6f",
+        "87741c54-55c8-4dfd-8967-f6edf8df05b4",
+        "97d2fe44-063b-4c5c-a2e9-1cb65b423880",
+        "32bea4ed-4eb4-4d0d-bcd2-81245028b8c6",
+        "22be9d7d-6fb7-41fe-9f63-c4cd4a28d8d2"
+      ],
+      "body_snippet": "event: thinking\r\ndata: {\"status\": \"검색 중...\"}\r\n\r\nevent: search_results\r\ndata: {\"chunks\": [{\"id\": \"07a47e67-1a7b-46b1-a33a-b262b7cfc86e\", \"text\": \"외부 노출 절대 금지. ProjectMember 만 접근. 카이로스 검색 키워드: gamma-private-fixture-2026.\", \"source\": \"\", \"sourceType\": \"note\", \"date\": \"2026-05-16T22:34:04.623459\", \"speaker\": null, \"score\": 0.2, \"freshness\": \"recent\"}, {\"id\": \"5b71df8f-07c3-4e8c-91f7-9fc2a4437c2d\", \"text\": \"외부 노출 절대 금지. ProjectMember 만 접근. 카이로스 검색 키워드: gamma-private-fixture-2026.\", \"source\": \"\", \"sou",
+      "verdict": "PASS",
+      "notes": "OK"
+    },
+    {
+      "case_id": "P0-1.12",
+      "description": "🔥 A 토큰 + WS-B URL + cross_tenant project_id (IDOR)",
+      "status": 403,
+      "sources": [],
+      "body_snippet": "{\"detail\":\"워크스페이스 멤버가 아닙니다\"}",
+      "verdict": "PASS",
+      "notes": "OK"
+    },
+    {
+      "case_id": "P0-2.1",
+      "description": "GET /api/v1/workspaces/ce9e5d5c-74b8-4370-98d4-d16151bed130",
+      "status": 403,
+      "body_snippet": "{\"detail\":\"워크스페이스 멤버가 아닙니다\"}",
+      "verdict": "PASS",
+      "notes": "🔥 Codex 발견: require_viewer 누락 의심"
+    },
+    {
+      "case_id": "P0-2.2",
+      "description": "GET /api/v1/workspaces/ce9e5d5c-74b8-4370-98d4-d16151bed130/members",
+      "status": 403,
+      "body_snippet": "{\"detail\":\"워크스페이스 멤버가 아닙니다\"}",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-2.3",
+      "description": "GET /api/v1/workspaces/ce9e5d5c-74b8-4370-98d4-d16151bed130/projects",
+      "status": 403,
+      "body_snippet": "{\"detail\":\"워크스페이스 멤버가 아닙니다\"}",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-2.4",
+      "description": "GET /api/v1/notes/019ea0d0-6f2d-43bb-8a2c-9dcc24184812",
+      "status": 404,
+      "body_snippet": "{\"detail\":\"Not Found\"}",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-2.5",
+      "description": "PATCH /api/v1/notes/019ea0d0-6f2d-43bb-8a2c-9dcc24184812",
+      "status": 404,
+      "body_snippet": "{\"detail\":\"Not Found\"}",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-2.6",
+      "description": "DELETE /api/v1/notes/019ea0d0-6f2d-43bb-8a2c-9dcc24184812",
+      "status": 404,
+      "body_snippet": "{\"detail\":\"Not Found\"}",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-2.7",
+      "description": "GET /api/v1/projects/3ab92499-f48c-4d5c-b579-a6e0deb4e1b1",
+      "status": 404,
+      "body_snippet": "{\"detail\":\"Not Found\"}",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-2.8",
+      "description": "GET /api/v1/workspaces/ce9e5d5c-74b8-4370-98d4-d16151bed130/projects?status=active",
+      "status": 403,
+      "body_snippet": "{\"detail\":\"워크스페이스 멤버가 아닙니다\"}",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-2.9",
+      "description": "GET /api/v1/workspaces/ce9e5d5c-74b8-4370-98d4-d16151bed130/invites",
+      "status": 403,
+      "body_snippet": "{\"detail\":\"워크스페이스 멤버가 아닙니다\"}",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-2.10",
+      "description": "POST /api/v1/workspaces/ce9e5d5c-74b8-4370-98d4-d16151bed130/invites",
+      "status": 403,
+      "body_snippet": "{\"detail\":\"워크스페이스 멤버가 아닙니다\"}",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-2.11",
+      "description": "GET /api/v1/workspaces/ce9e5d5c-74b8-4370-98d4-d16151bed130/inbox",
+      "status": 403,
+      "body_snippet": "{\"detail\":\"워크스페이스 멤버가 아닙니다\"}",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-2.12",
+      "description": "GET /api/v1/workspaces/ce9e5d5c-74b8-4370-98d4-d16151bed130/projects/3ab92499-f48c-4d5c-b579-a6e0deb4e1b1/members",
+      "status": 403,
+      "body_snippet": "{\"detail\":\"워크스페이스 멤버가 아닙니다\"}",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-2.13",
+      "description": "GET /api/v1/projects/3ab92499-f48c-4d5c-b579-a6e0deb4e1b1/members",
+      "status": 404,
+      "body_snippet": "{\"detail\":\"Not Found\"}",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-3.1",
+      "description": "POST /workspaces/{wsA}/upload/presigned-url (signed URL 발급)",
+      "status": 200,
+      "body_snippet": "{\"uploadUrl\":\"https://3031fa20bdc27a165d0d1f5fe9f46125.r2.cloudflarestorage.com/nexus-core-storage/uploads/2835f43f-c73c-4071-90e8-35fb1a66065c/qa-test.webm?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=e5c81762a38fdcffe681ec15e930e736%2F20260524%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260524T011404Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=content-type%3Bhost&X-Amz-Signature=dc47ec223b4373d1446e00444af13a5633116cd1b8466d70416a1a3504d32496\",\"fileKey\":\"uploads/2835f43f-c73c-4071-90e8-35fb1a6606",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-3.2",
+      "description": "GET /meetings/{nonexistent}/status (404 boundary)",
+      "status": 404,
+      "body_snippet": "{\"detail\":\"Not Found\"}",
+      "verdict": "PASS"
+    },
+    {
+      "case_id": "P0-3.3",
+      "description": "GET /workspaces/{wsA}/meetings (list sanity)",
+      "status": 200,
+      "body_snippet": "{\"items\":[{\"id\":\"0024fd0c-d124-4c7f-b335-feb1b6a28e0d\",\"workspaceId\":\"9966a04e-0db3-4d65-a5fe-6c5c4f49901d\",\"title\":\"[QA-2026-05-17] Power API capture test\",\"recordedAt\":null,\"durationSec\":null,\"status\":\"completed\",\"hasTranscript\":true,\"hasSummary\":true,\"actionItemCount\":2,\"createdAt\":\"2026-05-17T10:48:22.650156\",\"updatedAt\":\"2026-05-17T10:48:22.650168\"}],\"total\":1,\"page\":1,\"pageSize\":20,\"hasNext\":false}",
+      "verdict": "PASS",
+      "notes": "실제 audio e2e (record → STT → AI → Inbox) 는 별도 페르소나 또는 manual"
+    }
+  ]
+}

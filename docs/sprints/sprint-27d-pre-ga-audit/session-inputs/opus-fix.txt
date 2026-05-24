@@ -1,0 +1,228 @@
+너는 Claude Opus 4.7 (Claude Code) 자동 에이전트다. Kairos 프로젝트의 외부 5명 dogfooding 진입 직전 audit 의 opus 후속 fix 세션이다. opus 1차 audit (PR #108) 종료 직후이며 같은 브랜치 sprint-27d/pre-ga-audit-prompts 에서 이어서 작업한다.
+
+[GOAL — Stop hook 자동 보장, 이 세션이 끝나기 전엔 종료 X]
+
+sprint-27d/pre-ga-audit-prompts 브랜치에서 opus 1차 audit 가 발견한 결함 4건 (BUG-S27d-1/2/3/4) 을 fix + 각 fix 후 검증 루프 (해당 시나리오 회귀 가드 + pytest + typecheck + vitest 실행) + P3 2건 (BUG-S27d-6/7) BL-S27e-* 등재 + 단일 commit + push (PR #108 업데이트) + 종료 보고까지 모두 완료. 중간에 압축하거나 빼먹지 말고 끝까지 순차 진행.
+
+[환경]
+
+- 프로젝트 루트: /Users/woosung/project/agy-project/kairos
+- main HEAD: 457c994 (Sprint 27c P0 fix #107 머지 완료)
+- 현재 브랜치: sprint-27d/pre-ga-audit-prompts
+- 직전 commit: opus 1차 (6d70eb2) + follow-up prompts v2 (4b84804) + session-inputs (33fc1ed)
+- FE: http://localhost:3000 (Next.js 16, 사용자 직접 띄움 — 이 세션은 띄우지 않음)
+- BE: http://localhost:8000/api/v1 (FastAPI + uvicorn, 사용자 직접 띄움)
+- Clerk dev creative-boxer-79.clerk.accounts.dev (Production 미발급, ADR-022 SKIP)
+- GEMINI_API_KEY: set (사용자 갱신 직후)
+- 로그인 계정 d@e.com (Personal workspace e968c95f-4bbe-4f12-9468-2741c047e142 + Team 7f9f446d-9b7f-4ae7-aa9b-ac861fb81b11 "QA Cycle C Team")
+- production audit SKIP (사용자 정책)
+- Sentry 의도적 SKIP (사용자 정책)
+- 응답 언어: 한국어 (CLAUDE.md 글로벌, 코드 식별자만 영어)
+
+[opus 1차 audit 결과 — composite 7.53/10 GO, 결함 7건]
+
+opus 산출물 (반드시 read 후 시작):
+- docs/sprints/sprint-27d-pre-ga-audit/SCOPE.md
+- docs/sprints/sprint-27d-pre-ga-audit/integrated-report.md
+- docs/sprints/sprint-27d-pre-ga-audit/agent-1-qa-function.md (BUG-S27d-1/2 상세)
+- docs/sprints/sprint-27d-pre-ga-audit/agent-2-qa-edgecase.md (BUG-S27d-3 상세)
+- docs/sprints/sprint-27d-pre-ga-audit/agent-3-cto.md (BUG-S27d-4 상세)
+- docs/sprints/sprint-27d-pre-ga-audit/agent-6-solo-personal.md (BUG-S27d-7 상세)
+- docs/sprints/sprint-27d-pre-ga-audit/report.html
+
+fix 대상 결함 6건 (Sentry 제외):
+- BUG-S27d-1 P1 회귀: OnboardingTooltip PopoverTrigger nativeButton (BL-S27c-8 회귀) — /dashboard + CmdK 2위치
+- BUG-S27d-2 P2 회귀: /actions 404 (Sprint 27c carry-over)
+- BUG-S27d-3 P2 신규: File upload mime/extension validation 부재 (R2 에 evil.exe text/plain → 201)
+- BUG-S27d-4 P1 신규: 보안 헤더 부재 (CSP/X-Frame/X-Content/Referrer 모두 FE+BE)
+- BUG-S27d-6 P3 신규: RAG latency dev avg 10.6s (직접 fix X, BL-S27e-1 등재)
+- BUG-S27d-7 P3 신규: 사이드바 nav flicker (직접 fix X, BL-S27e-2 등재)
+
+이 세션이 fix: P1+P2 4건 (BUG-S27d-1/2/3/4). P3 2건 (-6/-7) 은 BL-S27e-* 등재만.
+
+[Step 0 — 환경 검증 (5분)]
+
+bash:
+curl -s -o /dev/null -w "FE: %{http_code} " http://localhost:3000/
+curl -s -o /dev/null -w "BE: %{http_code}\n" http://localhost:8000/api/v1/health
+
+둘 다 200 이어야 함. 아니면 사용자에게 띄우라고 요청.
+
+opus 산출물 위 8개 모두 read.
+
+[Step 1 — BUG-S27d-1 fix: OnboardingTooltip PopoverTrigger nativeButton (20분)]
+
+원인: Base UI 의 PopoverTrigger 는 default 로 nativeButton={true} (native <button> 기대). 현재 OnboardingTooltip 의 render prop 이 <div> 로 렌더 → console.error.
+
+파일: frontend/src/components/onboarding/onboarding-tooltip.tsx
+컴포넌트 라이브러리: frontend/src/components/ui/popover.tsx (Base UI 의 @base-ui/react/popover wrapper)
+
+추정 변경:
+- onboarding-tooltip.tsx 안의 <PopoverTrigger render={(props) => <div ... children ... />} /> 에 nativeButton={false} 추가
+- 이유: children 이 button 일 수 있어 button 안 button 위반 회피. nativeButton={false} 로 Base UI 가 div 를 button-role 로 처리.
+
+fix 적용 후:
+- cd frontend && npm run typecheck (0 errors)
+- MCP Playwright (browser_navigate /dashboard → browser_wait_for time 3 → browser_console_messages level error) → 0 errors 기대
+- ⌘K 진입 (browser_press_key Meta+k) 후 동일 검사 → 0 errors
+- vitest 관련 spec 있다면 cd frontend && npm test -- OnboardingTooltip
+
+[Step 2 — BUG-S27d-2 fix: /actions 404 (15분)]
+
+옵션 A (권장): redirect /actions → /inbox
+파일 신설: frontend/src/app/(app)/actions/page.tsx
+
+내용:
+import { redirect } from 'next/navigation';
+export default function ActionsPage() {
+  redirect('/inbox');
+}
+
+또는 옵션 B: 신규 action item 칸반 페이지 추가 (시간 비용 큼, 옵션 A 권장).
+
+검증:
+- MCP Playwright browser_navigate http://localhost:3000/actions → /inbox redirect 확인
+- console.error 0건
+
+[Step 3 — BUG-S27d-3 fix: file upload mime/extension whitelist (25분)]
+
+위치: backend/src/upload/router.py (또는 service.py)
+구조 확인: grep -rn "upload" backend/src/upload/ | head -20
+
+fix 패턴 (router.py 또는 service.py 의 upload handler):
+
+ALLOWED_MIMES = {
+    "audio/mp4", "audio/x-m4a", "audio/mpeg", "audio/wav", "audio/webm",
+    "video/mp4", "video/webm",
+}
+ALLOWED_EXTENSIONS = {".m4a", ".mp3", ".mp4", ".wav", ".webm"}
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
+
+# UploadFile handler 안:
+if file.content_type not in ALLOWED_MIMES:
+    raise HTTPException(status_code=415, detail=f"지원하지 않는 파일 형식: {file.content_type}")
+if not file.filename or not any(file.filename.lower().endswith(ext) for ext in ALLOWED_EXTENSIONS):
+    raise HTTPException(status_code=415, detail="지원하지 않는 파일 확장자")
+# size check (FastAPI UploadFile 은 stream 이므로 read 한 후 len)
+contents = await file.read()
+if len(contents) > MAX_FILE_SIZE:
+    raise HTTPException(status_code=413, detail="파일 크기 100MB 초과")
+# 기존 R2 upload 로직 계속 (contents 또는 file.seek(0) 후 사용)
+
+검증:
+- cd backend && uv run pytest tests/upload/ -v (관련 unit test)
+- cd backend && uv run pytest -x (전체)
+- MCP Playwright browser_evaluate 으로 fetch test:
+  * evil.exe + text/plain → 415 기대 (opus 는 201)
+  * test.m4a + audio/x-m4a → 201 유지
+- 정상 케이스: frontend/e2e/fixtures/test.m4a 업로드 → 정상 동작
+
+[Step 4 — BUG-S27d-4 fix: 보안 헤더 (FE next.config + BE middleware) (30분)]
+
+FE — frontend/next.config.ts:
+파일 read 후 headers() 함수 추가 (또는 기존 headers 에 항목 추가):
+
+async headers() {
+  return [
+    {
+      source: '/:path*',
+      headers: [
+        { key: 'X-Frame-Options', value: 'DENY' },
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+        { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=()' },
+      ],
+    },
+  ];
+},
+
+BE — backend/src/main.py:
+SecurityHeadersMiddleware 추가 (Starlette BaseHTTPMiddleware):
+
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+검증:
+- FE: dev server hot-reload 또는 restart 후
+- bash: curl -I http://localhost:3000/ | grep -iE "x-frame|x-content|referrer|permissions"
+- bash: curl -I http://localhost:8000/api/v1/health | grep -iE "x-frame|x-content|referrer"
+- 모두 헤더 등장 확인
+
+[Step 5 — P3 2건 BL-S27e-* 등재 (5분)]
+
+파일: docs/REFACTORING-BACKLOG.md (있다면) 또는 docs/sprints/sprint-27d-pre-ga-audit/BL-S27e.md (신설)
+
+추가:
+- BL-S27e-1 (P3, Sprint 28+): RAG latency 모니터링 + p95 < 5s 목표 (BUG-S27d-6)
+  - 현재 localhost dev avg 10.6s (5 sample 측정). Gemini API 지배.
+  - 대응: Sentry performance monitoring 도입 시 자동 추적 / 캐시 hit 률 모니터링
+- BL-S27e-2 (P3, Sprint 28+): 사이드바 nav flicker 디버깅 (BUG-S27d-7)
+  - /notes 진입 시 일부 nav link 일시 미표시
+  - 대응: useEffect dependency 분석 / SWR cache hydration 검토
+
+[Step 6 — 통합 검증 (10분)]
+
+bash:
+cd backend && uv run pytest -x 2>&1 | tail -30
+cd frontend && npm run typecheck 2>&1 | tail -5
+cd frontend && npm test 2>&1 | tail -10
+
+모두 PASS 기대. fail 시 fix 또는 사용자에게 알림.
+
+추가 MCP Playwright 회귀 가드:
+- /dashboard, /new, /inbox, /memory, /notes, /projects, /settings, /search, /actions, /pricing 진입 → console.error 0건
+- 회의 업로드 (test.m4a) → 정상 동작 (mime 검증으로 인한 회귀 없음)
+- RAG (⌘K + 자연어 질의) → SSE + citation
+
+[Step 7 — commit + push (5분)]
+
+bash:
+git add frontend/src/components/onboarding/onboarding-tooltip.tsx \
+        frontend/src/app \
+        frontend/next.config.ts \
+        backend/src/upload \
+        backend/src/main.py \
+        docs/REFACTORING-BACKLOG.md \
+        docs/sprints/sprint-27d-pre-ga-audit/
+
+git commit -m "fix: Sprint 27d opus follow-up — 결함 4건 fix + BL-S27e-* 등재
+
+(본문에 BUG-S27d-1/2/3/4 fix 상세 + 검증 결과 + 회귀 가드 PASS 명시)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+
+git push origin sprint-27d/pre-ga-audit-prompts
+
+PR #108 자동 업데이트.
+
+[도구]
+
+- Bash (curl, git, pytest, npm, grep, find)
+- Read / Write / Edit / Grep
+- MCP Playwright (browser_navigate, browser_snapshot, browser_click, browser_fill_form, browser_press_key, browser_console_messages, browser_network_requests, browser_wait_for, browser_take_screenshot, browser_resize, browser_evaluate, browser_file_upload)
+- TaskCreate / TaskUpdate (각 fix step 추적)
+
+[종료 보고]
+
+- fix 4건 status (DONE/PARTIAL/FAIL):
+  * BUG-S27d-1: DONE (회귀 가드 console.error 0)
+  * BUG-S27d-2: DONE (/actions → /inbox redirect)
+  * BUG-S27d-3: DONE (evil.exe → 415 / test.m4a → 201)
+  * BUG-S27d-4: DONE (헤더 4종 등장 확인)
+- 검증 루프: pytest XX PASS / typecheck 0 / vitest XX PASS / Playwright 회귀 PASS
+- BL-S27e-1/2 등재 완료
+- commit hash + PR #108 update
+- 다음 세션 (agy) 진입 가이드 — docs/sprints/sprint-27d-pre-ga-audit/session-inputs/agy.txt 사용
+
+[시작 신호]
+
+opus 산출물 8개 read 후 Step 0 환경 검증부터 시작. 모든 Step 끝까지 순차 진행. 중간 break X. 사용자 확인 없이 자동 진행 (Git Safety Protocol 의 commit/push 도 본 goal 안에 사전 승인됨).

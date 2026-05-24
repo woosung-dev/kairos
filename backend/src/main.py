@@ -8,6 +8,8 @@ from fastapi.responses import JSONResponse
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import text
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
 from src.common.database import get_async_session
 
@@ -91,6 +93,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# BUG-S27d-4 fix (Sprint 27d opus follow-up): clickjacking / MIME sniffing / referer leak
+# 차단. CORSMiddleware 다음 등록 = 외곽 레이어 → 정상 응답과 exception handler 응답 모두 적용.
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        response = await call_next(request)
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Permissions-Policy", "camera=(), microphone=(self), geolocation=()"
+        )
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 def _attach_cors(request: Request, response: JSONResponse) -> JSONResponse:
