@@ -157,6 +157,22 @@
 
 ---
 
+## BL-S27e-4 — FE 병렬 E2E flake (storageState / account isolation) ★ (P3)
+
+**현 상태**: Sprint 27d codex audit 의 CODEX-OBS-1. FE 전체 병렬 E2E 10 tests 중 2건이 최초 1회 실패 후 focused 재실행에서 PASS. `e2e/.auth/user.json` storageState 단일 공유 + onboarding localStorage 마크가 병렬 worker 간 race. dogfooding blocker 는 아니나 CI 게이트로 올리기 전 정리 필요.
+
+**증상**: `pnpm e2e` 병렬 실행 시 `onboarding-tooltip-first-visit.spec.ts` + `actions-redirect.spec.ts` 일부 worker 가 동일 storageState 의 localStorage 마크 충돌로 console.error 또는 timing fail.
+
+**Fix 후보**:
+- (a) worker 별 storageState 분리 (`e2e/.auth/user-{worker}.json`) + setup 에서 N개 계정 병렬 로그인
+- (b) onboarding localStorage 마크 prefix 에 worker index 포함
+- (c) `fullyParallel: false` 임시 회귀 가드 (성능 손해)
+- (d) onboarding spec 만 serial group 으로 격리 (project 분리)
+
+**근거**: Sprint 27d codex final audit `codex-regression.md` CODEX-OBS-1. P3 분류.
+
+---
+
 ## BL-S27-1 — WorkspaceMember.is_active soft delete (D-6.1 후속) ★
 
 **현 상태**: WorkspaceMember 는 hard delete. 퇴사 사용자의 creator_id reference 가 orphan 표시.
