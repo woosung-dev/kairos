@@ -1,10 +1,23 @@
 import type { Metadata } from "next";
+import { Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { koKR } from "@clerk/localizations";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { QueryProvider } from "@/lib/query-client";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
+
+// Sprint 28 PERF-10 — Geist Mono self-host (next/font/google).
+// Satoshi (Fontshare) + Pretendard (jsdelivr) 는 next/font/google 미지원
+// → 별도 sprint local woff2 다운로드 후 next/font/local (BL-S27e-D carry).
+// 본 fix: Geist Mono 만 self-host → 외부 fonts.googleapis.com / fonts.gstatic.com
+// preconnect 제거 가능 (LCP 부분 회복).
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-geist-mono",
+  weight: ["400", "500"],
+});
 
 export const metadata: Metadata = {
   title: "Kairos — 팀의 세컨드 브레인",
@@ -18,14 +31,10 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider localization={koKR}>
-      <html lang="ko" suppressHydrationWarning>
+      <html lang="ko" suppressHydrationWarning className={geistMono.variable}>
         <head>
-          <link rel="preconnect" href="https://fonts.googleapis.com" />
-          <link
-            rel="preconnect"
-            href="https://fonts.gstatic.com"
-            crossOrigin="anonymous"
-          />
+          {/* Sprint 28 PERF-10 partial — Geist Mono 는 next/font/google 적용 (self-host).
+              Satoshi + Pretendard 는 BL-S27e-D carry (next/font/local woff2 다운로드 필요). */}
           <link rel="preconnect" href="https://api.fontshare.com" />
           <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="anonymous" />
           {/* BL-045 (Sprint 18): Satoshi 는 Indian Type Foundry/Fontshare 호스팅.
@@ -33,10 +42,6 @@ export default function RootLayout({
               DESIGN.md §Typography 정합. */}
           <link
             href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&display=swap"
-            rel="stylesheet"
-          />
-          <link
-            href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&display=swap"
             rel="stylesheet"
           />
           <link
