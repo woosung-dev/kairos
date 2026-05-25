@@ -57,7 +57,8 @@ export default defineConfig({
     },
     // Sprint 27e Round 2 BUG-S27e-TEST-r2-1 — public-only project: storageState/setup 의존 없음.
     // FE 보안 헤더 회귀 가드 (security-headers.spec.ts) 의 CI 게이트 운영화 — Clerk creds 불요.
-    // chromium CI sandbox 가 127.0.0.1 도 ERR_NAME_NOT_RESOLVED — --no-sandbox 필수.
+    // CI chromium 의 ERR_NAME_NOT_RESOLVED (localhost 도 127.0.0.1 도 fail) 회피:
+    // --no-sandbox + --host-resolver-rules 로 internal DNS 강제 매핑.
     {
       name: "public-only",
       testMatch: /security-headers\.spec\.ts/,
@@ -68,6 +69,7 @@ export default defineConfig({
             "--no-sandbox",
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
+            "--host-resolver-rules=MAP localhost 127.0.0.1",
           ],
         },
       },

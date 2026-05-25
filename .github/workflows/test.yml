@@ -83,13 +83,14 @@ jobs:
           # (validation 없음, secrets 없이 public route 만 검증하므로 영향 0).
           CLERK_SECRET_KEY: "sk_test_fake"
           NEXT_PUBLIC_API_URL: "http://localhost:8000"
+        # 0.0.0.0 bind 명시 — CI 환경에서 IPv4/IPv6 dual-stack 보장.
         run: |
-          pnpm start -p 3000 > /tmp/next.log 2>&1 &
+          pnpm start -p 3000 -H 0.0.0.0 > /tmp/next.log 2>&1 &
           echo "Next.js PID $!"
 
       - name: Wait for Next.js (security-headers gate)
-        # Sprint 27e Round 2 r2-1: 127.0.0.1 사용 (CI chromium 의 localhost IPv6 ::1
-        # resolve fail 회피 — ERR_NAME_NOT_RESOLVED). Next.js 16 cold start 180s.
+        # Sprint 27e Round 2 r2-1: wait-on 은 OS DNS (Node.js) 사용 — localhost OK.
+        # chromium 만 별도 fix (playwright.config.ts --host-resolver-rules 매핑).
         run: |
           npx wait-on http://127.0.0.1:3000/sign-in -t 180000 -v || {
             echo "--- wait-on failed; /tmp/next.log ---"
@@ -100,8 +101,8 @@ jobs:
       - name: Run security-headers spec only (public route, no secrets)
         env:
           E2E_PORT: "3000"
-          # CI chromium 의 localhost DNS resolve fail 회피 — 127.0.0.1 직접 사용.
-          E2E_BASE_URL: "http://127.0.0.1:3000"
+          # baseURL localhost — chromium 의 --host-resolver-rules 가 127.0.0.1 매핑.
+          E2E_BASE_URL: "http://localhost:3000"
         run: pnpm exec playwright test --project=public-only
 
       - name: Upload Next.js log on failure
