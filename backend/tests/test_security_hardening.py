@@ -1,11 +1,14 @@
-# T-SEC-4 + T-SEC-5 보안 강화 회귀 테스트 (Sprint 25 Wave 3)
+# T-SEC-4 + T-SEC-5 보안 강화 회귀 테스트 (Sprint 25 Wave 3) + Sprint 27e BUG-S27e-TEST-1
 """
 Sprint 25 Wave 3 보안 마감 — Sentinel P2 보완.
 
 - T-SEC-4 (BUG-SENTINEL-004): CaptureTextRequest.transcript_text max_length=200_000
 - T-SEC-5 (BL-SNT-CANDIDATE-B): production 환경 docs/openapi 노출 차단
+- Sprint 27e BUG-S27e-TEST-1: Sprint 27d BUG-S27d-4 보안 헤더 4종 회귀 가드 (BE)
 """
 import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
 from pydantic import ValidationError
 
 from src.meetings.schemas import CaptureTextRequest
@@ -55,3 +58,42 @@ class TestProductionDocsBlocked:
         is_production = app_env == "production"
         docs_url = None if is_production else "/api/v1/docs"
         assert docs_url == "/api/v1/docs"
+
+
+# Sprint 27e BUG-S27e-TEST-1 — Sprint 27d BUG-S27d-4 보안 헤더 4종 회귀 가드.
+# main.py:103-108 의 SecurityHeadersMiddleware 가 모든 응답에 4 헤더를 set 한다.
+# middleware reorder / 제거 시 CI 가 즉시 감지.
+@pytest_asyncio.fixture
+async def public_client():
+    """인증 없이 health / 404 호출용 — middleware chain 만 검증."""
+    from src.main import app
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+
+
+class TestSecurityHeadersRegression:
+    """BUG-S27d-4 회귀 가드 (Sprint 27e BUG-S27e-TEST-1)."""
+
+    @pytest.mark.asyncio
+    async def test_security_headers_present_on_health_check(self, public_client):
+        """GET /api/v1/health 응답에 4종 보안 헤더 동시 존재."""
+        response = await public_client.get("/api/v1/health")
+        assert response.status_code == 200
+        assert response.headers.get("x-frame-options") == "DENY"
+        assert response.headers.get("x-content-type-options") == "nosniff"
+        assert response.headers.get("referrer-policy") == "strict-origin-when-cross-origin"
+        perm = response.headers.get("permissions-policy", "")
+        assert "camera=()" in perm
+        assert "microphone=(self)" in perm
+        assert "geolocation=()" in perm
+
+    @pytest.mark.asyncio
+    async def test_security_headers_present_on_404(self, public_client):
+        """404 응답에서도 헤더 보장 (clickjacking 방어 일관성)."""
+        response = await public_client.get("/api/v1/nonexistent-path-xyz")
+        assert response.status_code == 404
+        assert response.headers.get("x-frame-options") == "DENY"
+        assert response.headers.get("x-content-type-options") == "nosniff"
+        assert response.headers.get("referrer-policy") == "strict-origin-when-cross-origin"
