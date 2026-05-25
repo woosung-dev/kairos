@@ -39,6 +39,8 @@ logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
+# Sprint 27e Round 2 BUG-S27e-ARCH-r2-4 — global_exception_handler 의 stack trace logging 진입점.
+logger = logging.getLogger(__name__)
 
 
 def _scrub_pii_hook(event, hint):
@@ -130,8 +132,14 @@ def _attach_cors(request: Request, response: JSONResponse) -> JSONResponse:
 
 
 @app.exception_handler(Exception)
-async def global_exception_handler(request: Request, _exc: Exception) -> JSONResponse:
-    """BE-T4: 5xx 오류 시 CORS 헤더 강제 (exception_handler 레이어)."""
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """BE-T4: 5xx 오류 시 CORS 헤더 강제 (exception_handler 레이어).
+
+    Sprint 27e Round 2 BUG-S27e-ARCH-r2-4 — Sentry SKIP path 의 forensic 보장.
+    Sentry DSN 미설정 환경 (dev/staging 또는 cron job) 에서도 stack trace 가
+    Cloud Run stdout log 에 영구 보존되어야 incident response 가능.
+    """
+    logger.exception("global_unhandled_5xx", exc_info=exc, extra={"path": str(request.url.path)})
     response = JSONResponse(
         status_code=500,
         content={"detail": "Internal Server Error"},

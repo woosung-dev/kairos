@@ -42,6 +42,13 @@ export default defineConfig({
     },
     {
       name: "chromium",
+      // r2-1: security-headers.spec.ts 는 public-only project 가 단독 게이트 — chromium 중복 실행 회피.
+      // qa-* spec 은 top-level testIgnore 와 동일 — project-level testIgnore 가 top-level 을
+      // override 하므로 여기에도 명시 (Playwright 동작).
+      testIgnore: [
+        /security-headers\.spec\.ts/,
+        ...(process.env.CI ? [/qa-.*\.spec\.ts/] : []),
+      ],
       use: {
         ...devices["Desktop Chrome"],
         storageState: "e2e/.auth/user.json",
@@ -52,6 +59,25 @@ export default defineConfig({
         },
       },
       dependencies: ["setup"],
+    },
+    // Sprint 27e Round 2 BUG-S27e-TEST-r2-1 — public-only project: storageState/setup 의존 없음.
+    // FE 보안 헤더 회귀 가드 (security-headers.spec.ts) 의 CI 게이트 운영화 — Clerk creds 불요.
+    // CI chromium 의 ERR_NAME_NOT_RESOLVED (localhost 도 127.0.0.1 도 fail) 회피:
+    // --no-sandbox + --host-resolver-rules 로 internal DNS 강제 매핑.
+    {
+      name: "public-only",
+      testMatch: /security-headers\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: {
+          args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--host-resolver-rules=MAP localhost 127.0.0.1",
+          ],
+        },
+      },
     },
   ],
 

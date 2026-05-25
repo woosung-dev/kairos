@@ -65,12 +65,13 @@ def test_cron_token_dev_fallback_rejected_in_production(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     # 다른 validator (issuer) 회피 — production URL 명시
     monkeypatch.setenv("CLERK_JWT_ISSUER", "https://clerk.example-app.com")
+    monkeypatch.setenv("CLERK_JWT_AUDIENCE", "https://api.example.com")
     monkeypatch.delenv("CRON_SECRET_TOKEN", raising=False)
 
     from src.core.config import Settings
 
     # _env_file=None 으로 .env 파일 무시 — process env 만 사용해서 검증.
-    with pytest.raises(ValueError, match="CRON_SECRET_TOKEN must be set in production"):
+    with pytest.raises(ValueError, match="CRON_SECRET_TOKEN must be set in non-dev"):
         Settings(_env_file=None)
 
 
@@ -91,13 +92,14 @@ def test_cron_token_custom_value_accepted_in_production(monkeypatch):
     """production + 실제 secret 설정 시 OK."""
     _set_required_env(monkeypatch)
     monkeypatch.setenv("APP_ENV", "production")
-    monkeypatch.setenv("CRON_SECRET_TOKEN", "prod-real-secret-xyz-32bytes-long")
+    monkeypatch.setenv("CRON_SECRET_TOKEN", "prod-real-secret-xyz-32bytes-long-aaaa")
     monkeypatch.setenv("CLERK_JWT_ISSUER", "https://clerk.example-app.com")
+    monkeypatch.setenv("CLERK_JWT_AUDIENCE", "https://api.example.com")
 
     from src.core.config import Settings
 
     settings = Settings(_env_file=None)
-    assert settings.cron_secret_token.get_secret_value() == "prod-real-secret-xyz-32bytes-long"
+    assert settings.cron_secret_token.get_secret_value() == "prod-real-secret-xyz-32bytes-long-aaaa"
 
 
 # Sprint 27e BUG-S27e-SEC-3 회귀 가드 — production 환경에서 dev Clerk issuer URL 거부.
@@ -105,7 +107,8 @@ def test_clerk_jwt_issuer_dev_rejected_in_production(monkeypatch):
     """production + dev issuer URL → ValueError."""
     _set_required_env(monkeypatch)
     monkeypatch.setenv("APP_ENV", "production")
-    monkeypatch.setenv("CRON_SECRET_TOKEN", "prod-real-secret-xyz-32bytes-long")
+    monkeypatch.setenv("CRON_SECRET_TOKEN", "prod-real-secret-xyz-32bytes-long-aaaa")
+    monkeypatch.setenv("CLERK_JWT_AUDIENCE", "https://api.example.com")
     # dev URL override 안 함 → default 가 dev — validator 가 raise
     monkeypatch.delenv("CLERK_JWT_ISSUER", raising=False)
 
@@ -119,10 +122,85 @@ def test_clerk_jwt_issuer_prod_url_accepted(monkeypatch):
     """production + 실 production URL → OK."""
     _set_required_env(monkeypatch)
     monkeypatch.setenv("APP_ENV", "production")
-    monkeypatch.setenv("CRON_SECRET_TOKEN", "prod-real-secret-xyz-32bytes-long")
+    monkeypatch.setenv("CRON_SECRET_TOKEN", "prod-real-secret-xyz-32bytes-long-aaaa")
     monkeypatch.setenv("CLERK_JWT_ISSUER", "https://clerk.example-app.com")
+    monkeypatch.setenv("CLERK_JWT_AUDIENCE", "https://api.example.com")
 
     from src.core.config import Settings
 
     settings = Settings(_env_file=None)
     assert settings.clerk_jwt_issuer == "https://clerk.example-app.com"
+
+
+# Sprint 27e Round 2 BUG-S27e-SEC-r2-2 회귀 가드 — staging 환경 우회 + audience None default 거부.
+def test_cron_token_dev_fallback_rejected_in_staging(monkeypatch):
+    """r2-3: staging 환경에서도 dev fallback token 거부 (Round 1 fix 가 production 만 차단했음)."""
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "staging")
+    monkeypatch.setenv("CLERK_JWT_ISSUER", "https://clerk.example-app.com")
+    monkeypatch.setenv("CLERK_JWT_AUDIENCE", "https://api.example.com")
+    monkeypatch.delenv("CRON_SECRET_TOKEN", raising=False)
+
+    from src.core.config import Settings
+
+    with pytest.raises(ValueError, match="CRON_SECRET_TOKEN must be set in non-dev"):
+        Settings(_env_file=None)
+
+
+def test_cron_token_short_value_rejected_in_production(monkeypatch):
+    """r2-3: 1글자 token 도 production 통과하던 결함 차단 (min 32 byte 강제)."""
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("CRON_SECRET_TOKEN", "x")  # 1 글자 (32 byte 미만)
+    monkeypatch.setenv("CLERK_JWT_ISSUER", "https://clerk.example-app.com")
+    monkeypatch.setenv("CLERK_JWT_AUDIENCE", "https://api.example.com")
+
+    from src.core.config import Settings
+
+    with pytest.raises(ValueError, match="must be >= 32 bytes"):
+        Settings(_env_file=None)
+
+
+def test_clerk_jwt_issuer_dev_rejected_in_staging(monkeypatch):
+    """r2-2: staging 환경에서도 dev issuer URL 거부 (Round 1 fix 가 production 만 차단했음)."""
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "staging")
+    monkeypatch.setenv("CRON_SECRET_TOKEN", "prod-real-secret-xyz-32bytes-long-aaaa")
+    monkeypatch.setenv("CLERK_JWT_AUDIENCE", "https://api.example.com")
+    monkeypatch.delenv("CLERK_JWT_ISSUER", raising=False)
+
+    from src.core.config import Settings
+
+    with pytest.raises(ValueError, match="must be Clerk Production"):
+        Settings(_env_file=None)
+
+
+def test_clerk_jwt_audience_none_rejected_in_production(monkeypatch):
+    """r2-2: audience None default 가 verify_aud: False fallback 으로 audience 검증 영구 skip 차단."""
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("CRON_SECRET_TOKEN", "prod-real-secret-xyz-32bytes-long-aaaa")
+    monkeypatch.setenv("CLERK_JWT_ISSUER", "https://clerk.example-app.com")
+    monkeypatch.delenv("CLERK_JWT_AUDIENCE", raising=False)
+
+    from src.core.config import Settings
+
+    with pytest.raises(ValueError, match="CLERK_JWT_AUDIENCE must be explicitly set"):
+        Settings(_env_file=None)
+
+
+def test_is_non_dev_env_via_environment_only(monkeypatch):
+    """r2-4: ENVIRONMENT=production + APP_ENV=development → validator 가 production 처럼 동작 (OR + lower 일관성)."""
+    _set_required_env(monkeypatch)
+    # 배포 파이프라인이 ENVIRONMENT 만 production 으로 설정 + APP_ENV 누락 시나리오
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.delenv("CRON_SECRET_TOKEN", raising=False)
+    monkeypatch.setenv("CLERK_JWT_ISSUER", "https://clerk.example-app.com")
+    monkeypatch.setenv("CLERK_JWT_AUDIENCE", "https://api.example.com")
+
+    from src.core.config import Settings
+
+    # _is_non_dev_env 가 environment 도 확인 — dev fallback token 거부
+    with pytest.raises(ValueError, match="must be set in non-dev"):
+        Settings(_env_file=None)

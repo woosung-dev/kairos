@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
 
+    # Sprint 27e Round 2 r2-4 — validator 가 environment 도 참조하므로 field 순서 우선.
+    # (Pydantic V2 field_validator 는 정의 순서대로 실행 — environment 가 cron_secret_token
+    # 보다 앞에 있어야 info.data 에서 보임.)
+    environment: str = "development"
+
     # CORS (쉼표 구분, 예: "http://localhost:3000,https://kairos.vercel.app")
     cors_origins: str = "http://localhost:3000"
 
@@ -51,7 +56,7 @@ class Settings(BaseSettings):
     # Sentry (Sprint 22 Task 7 — Observability)
     sentry_dsn: SecretStr | None = None
     sentry_traces_sample_rate: float = 0.1
-    environment: str = "development"
+    # environment 는 위로 이동 (r2-4 validator 가 참조)
 
     # Upload validation (Sprint 25 T-SEC-3 — BUG-SENTINEL-003)
     # 500MB 기본 한도. 음성 4시간 = ~120MB(64kbps mp3) ~ 480MB(128kbps wav) 커버.
@@ -73,27 +78,65 @@ class Settings(BaseSettings):
         extra="ignore",         # 선언되지 않은 변수 무시
     )
 
-    # Sprint 27e BUG-S27e-SEC-4 — production 환경에서 dev fallback 토큰 거부.
+    # Sprint 27e Round 2 BUG-S27e-SEC-r2-4 — production 판별 분기 통합.
+    # main.py 의 _is_production (OR + lower) 와 validator 의 분기 일관성 회복.
+    # app_env / environment 둘 중 하나라도 production 이면 prod 판정.
+    @staticmethod
+    def _is_non_dev_env(app_env: str, environment: str = "development") -> bool:
+        """production / staging 등 비-dev 환경 통합 판정 (validator + main.py 공통)."""
+        non_dev = {"production", "staging", "stage", "prod"}
+        return app_env.lower() in non_dev or environment.lower() in non_dev
+
+    # Sprint 27e BUG-S27e-SEC-4 + Round 2 r2-3 — non-dev 환경에서 dev fallback + 약한 token 거부.
+    # r2-3: staging 우회 (app_env=="production" 단일 비교) 차단 + 32 byte min length 강제.
     @field_validator("cron_secret_token")
     @classmethod
-    def _no_default_cron_in_prod(cls, v: SecretStr, info) -> SecretStr:
-        app_env = info.data.get("app_env", "development")
-        if app_env == "production" and v.get_secret_value() == _CRON_TOKEN_DEV_FALLBACK:
+    def _validate_cron_token(cls, v: SecretStr, info) -> SecretStr:
+        if cls._is_non_dev_env(
+            info.data.get("app_env", "development"),
+            info.data.get("environment", "development"),
+        ):
+            val = v.get_secret_value()
+            if val == _CRON_TOKEN_DEV_FALLBACK:
+                raise ValueError(
+                    "CRON_SECRET_TOKEN must be set in non-dev (production/staging) "
+                    "(dev fallback 'dev-cron-secret-CHANGE-ME-IN-PROD' rejected)"
+                )
+            if len(val) < 32:
+                raise ValueError(
+                    f"CRON_SECRET_TOKEN must be >= 32 bytes in non-dev (got {len(val)})"
+                )
+        return v
+
+    # Sprint 27e BUG-S27e-SEC-3 + Round 2 r2-2 — non-dev 환경에서 dev Clerk issuer 거부.
+    # r2-2: staging 우회 차단 (validator 가 app_env=="production" 단일 비교 였음).
+    # dev issuer hard-code 2 곳 (line 32 default + 본 substring) atomic update 책임 명시.
+    @field_validator("clerk_jwt_issuer")
+    @classmethod
+    def _no_dev_issuer_in_non_dev(cls, v: str, info) -> str:
+        if cls._is_non_dev_env(
+            info.data.get("app_env", "development"),
+            info.data.get("environment", "development"),
+        ) and "creative-boxer-79.clerk.accounts.dev" in v:
             raise ValueError(
-                "CRON_SECRET_TOKEN must be set in production "
-                "(dev fallback 'dev-cron-secret-CHANGE-ME-IN-PROD' rejected)"
+                "CLERK_JWT_ISSUER must be Clerk Production instance URL in non-dev "
+                "(production/staging). dev issuer 'creative-boxer-79.clerk.accounts.dev' rejected"
             )
         return v
 
-    # Sprint 27e BUG-S27e-SEC-3 — production 환경에서 dev Clerk issuer 거부.
-    @field_validator("clerk_jwt_issuer")
+    # Sprint 27e Round 2 BUG-S27e-SEC-r2-2 — non-dev 환경에서 audience None default 거부.
+    # SEC-3 fix 의 audience 검증 영구 skip 방지 (None → verify_aud: False fallback 차단).
+    @field_validator("clerk_jwt_audience")
     @classmethod
-    def _no_dev_issuer_in_prod(cls, v: str, info) -> str:
-        app_env = info.data.get("app_env", "development")
-        if app_env == "production" and "creative-boxer-79.clerk.accounts.dev" in v:
+    def _require_audience_in_non_dev(cls, v: str | None, info) -> str | None:
+        if cls._is_non_dev_env(
+            info.data.get("app_env", "development"),
+            info.data.get("environment", "development"),
+        ) and v is None:
             raise ValueError(
-                "CLERK_JWT_ISSUER must be Clerk Production instance URL in production "
-                "(dev issuer 'creative-boxer-79.clerk.accounts.dev' rejected)"
+                "CLERK_JWT_AUDIENCE must be explicitly set in non-dev "
+                "(production/staging). implicit aud-skip (None) rejected — "
+                "audience 검증 영구 skip 방지"
             )
         return v
 

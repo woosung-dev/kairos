@@ -1,0 +1,233 @@
+너는 Claude Code (Opus 4.7 또는 그 이상) 자동 에이전트다. Kairos 프로젝트 Sprint 27e (4-reviewer multi-agent audit) 의 **Round 2 — Cross-Check + Adversarial Verification** 세션이다.
+
+[GOAL — Stop hook 자동 보장, 이 세션이 끝나기 전엔 종료 X]
+
+Round 1 (PR #109, commit `2195c8b`) 의 차단 fix RESOLVED 가 진짜 RESOLVED 인지 verify + Round 1 의 blind spot 보완 (정적 분석 한계 + LLM bias) + 실 환경 측정 (FE/BE up 가정) + adversarial fuzz + 신규 결함 발견까지 모두 단일 세션 안에서 진행. 통합 보고서 final-integrated-report.md (Round 1 + Round 2) 작성 + 필요 시 추가 fix + 동일 PR #109 에 commit/push + CI 재검증.
+
+[Round 1 컨텍스트 (반드시 head 안 머지된 상태로 가정)]
+
+- PR #109 OPEN, mergeable (사용자 merge 미실시 가정)
+- branch: `sprint-27e/multi-review`, HEAD `2195c8b` (Round 1 audit+fix + tiptap CI fix)
+- Round 1 verdict: NEEDS-FIX (차단 6건) → fix 후 GO (차단 0건)
+- Round 1 산출물 7 파일 (`docs/sprints/sprint-27e-multi-review/`)
+- Round 1 CI 5/5 PASS (backend-test / frontend-build / e2e / Vercel / Preview Comments)
+
+본 세션이 PR #109 merge **후** 시작했다면: main HEAD 가 Sprint 27e squash commit. 그 경우 `git log --oneline -3` 으로 확인 + 본 세션 작업 branch 신설 `sprint-27e/round2-cross-check`. merge **전** 이면 같은 branch `sprint-27e/multi-review` 위에 commit 추가.
+
+[환경]
+
+- 프로젝트 루트: /Users/woosung/project/agy-project/kairos
+- FE: http://localhost:3000 (Next.js 16.2.6, 사용자 직접 띄움)
+- BE: http://localhost:8000/api/v1 (FastAPI + uvicorn, 사용자 직접 띄움)
+- **이번 세션은 사용자가 FE/BE 실 띄우는 것을 강력 권고** (Round 1 의 정적 한계 보완을 위함) — 안 띄워졌으면 fail-graceful 로 정적 분석만
+- Clerk dev creative-boxer-79.clerk.accounts.dev (Production 미발급)
+- GEMINI_API_KEY: set
+- 로그인 계정 d@e.com (Personal `e968c95f-…` + Team `7f9f446d-…`)
+- seed credentials ~/.kairos-qa-secrets/seed-credentials-2026-05-17.env
+- production audit SKIP / Sentry SKIP / Clerk Production SKIP (사용자 정책)
+- 응답 언어: 한국어
+
+[Round 2 의 위치 (Sprint 27d 패턴 정합)]
+
+Sprint 27d 가 opus → agy → codex 3-세션 통합으로 평균 8.02 GO 도출. 본 sprint 도 동일 패턴 적용:
+
+- Round 1 (본 세션 직전 완료) = opus 정적 분석 + dep audit + fix
+- **Round 2 (본 세션)** = agy 시각 cross-check + 실측 + adversarial + 누락 발견
+- (선택) Round 3 = codex final adversarial (별도 sprint 진입 신호 시)
+
+Round 2 의 고유 가치:
+1. **fix verify** — Round 1 의 RESOLVED 6건이 진짜 RESOLVED 인지 commit-level + runtime 검증
+2. **blind spot 보완** — 정적 분석으로 못 잡은 결함 (race / leak / e2e flake / regression chain)
+3. **실측 baseline** — RAG p95 / API latency / dashboard LCP / 회의 처리 시간 (Round 1 의 SCOPE GO 조건 중 UNKNOWN 항목 해소)
+4. **adversarial fuzz** — IDOR creative payload / prompt injection / mime spoof / role tamper 등 Round 1 의 정적 분석으로 못 찾은 dynamic 결함
+5. **BL-S27e-A~F 우선순위 재평가** — Round 1 의 BL 37건이 외부 5명 진입 직전 실제 critical 한지 재판단
+
+[필독 산출물]
+
+본 세션 시작 시 다음 모두 read:
+
+1. **Round 1 통합 보고서**: `docs/sprints/sprint-27e-multi-review/integrated-report.md`
+2. **Round 1 4 reviewer 산출물**:
+   - `docs/sprints/sprint-27e-multi-review/security-findings.md`
+   - `docs/sprints/sprint-27e-multi-review/performance-findings.md`
+   - `docs/sprints/sprint-27e-multi-review/test-coverage-findings.md`
+   - `docs/sprints/sprint-27e-multi-review/architecture-findings.md`
+3. **Round 1 진입 prompt** (Round 2 와의 차이 명확화): `docs/sprints/sprint-27e-multi-review/session-inputs/main.txt`
+4. **4 reviewer 정의**: `docs/sprints/sprint-27e-multi-review/agents/{security,performance,test-coverage,architecture}-reviewer.md`
+5. **Round 1 fix commit diff**: `git show 2195c8b ebf67a7 --stat`
+6. **Sprint 27d agy cross-check 패턴 참조** (구조 차용): `docs/sprints/sprint-27d-pre-ga-audit/agy-integrated-report.md` + `agy-cross-check.md`
+7. **CONTEXT-MAP.md + ADR-***: 014/019/020/021/022/023/024
+8. **모듈별 CONTEXT.md** (BE 15 + FE 14)
+
+[Step 0 — 환경 검증 + 브랜치 결정 (5분)]
+
+```bash
+curl -s -o /dev/null -w "FE: %{http_code} " http://localhost:3000/
+curl -s -o /dev/null -w "BE: %{http_code}\n" http://localhost:8000/api/v1/health
+git status
+git log --oneline -5
+gh pr view 109 --json state,mergeable -q '.state, .mergeable'
+```
+
+분기:
+- PR #109 OPEN + branch `sprint-27e/multi-review` checkout → 같은 branch 위에 Round 2 commit 추가
+- PR #109 MERGED + main HEAD = Sprint 27e squash → 신규 branch `sprint-27e/round2-cross-check` (main 에서 분기) → 별개 PR
+
+FE/BE 둘 다 200 권장. 안 띄워졌으면 사용자에게 알리고 정적 + dependency audit + commit-level verify 로 진행 (실측 항목 SKIP 명시).
+
+[Step 1 — Round 1 fix verify (15분)]
+
+Round 1 의 차단 6건 RESOLVED 가 진짜 RESOLVED 인지 검증:
+
+1. **SEC-1**: `cd frontend && pnpm audit --audit-level critical` 0건 + `grep '@clerk/nextjs' package.json` 7.4.1 이상 확인
+2. **SEC-2**: `pnpm audit --audit-level high` 에서 GHSA-q3j6 (fast-uri) 외 next 관련 advisory 없는지 + `next` 버전 16.2.5+
+3. **SEC-3**: `backend/src/auth/dependencies.py` 의 jwt.decode 호출에 `issuer=` 명시 + `core/config.py` 의 `clerk_jwt_issuer` validator 존재
+4. **SEC-4**: `core/config.py` 의 `cron_secret_token` field_validator 존재 + APP_ENV=production + CHANGE-ME fallback → ValueError 시뮬레이션 (pytest 실행)
+5. **TEST-1**: `cd backend && uv run pytest tests/test_security_hardening.py::TestSecurityHeadersRegression -v` 2 PASS + `cd frontend && cat e2e/tests/security-headers.spec.ts` 존재
+6. **TEST-2**: `cd backend && uv run pytest tests/auth/test_personal_workspace_race_concurrent.py -v` 2 PASS
+
+각 verify 결과 표 작성 (RESOLVED-verified / 회귀 / 미보완). 실패 시 즉시 Round 2 의 critical finding.
+
+[Step 2 — 4 reviewer 재실행 (cross-check 시각, ~45분 각, 병렬 권장)]
+
+본 세션도 4 sub-agent 병렬 spawn. 각 sub-agent prompt 는 Round 1 main.txt 와 동일하되 다음 차이 명시:
+
+```
+너는 Sprint 27e Round 2 <reviewer 이름>. Round 1 (`<reviewer>-findings.md`)
+를 read 후 cross-check + 누락 발견 + adversarial verify.
+
+Round 1 산출물 read 후 다음 4 시각으로 추가 audit:
+
+(a) Round 1 RESOLVED 마크의 실 코드 정합 verify (file:line read)
+(b) Round 1 이 놓친 영역 (정적 분석 한계 — race / runtime / e2e 동적)
+(c) 실 환경 측정 (가능 시): IDOR fetch / latency / e2e spec 실제 실행
+(d) Round 1 의 비차단 BL carry 항목 (자기 영역) 중 외부 5명 직접 영향 항목 재평가
+
+ID prefix: `BUG-S27e-<X>-r2-N` (Round 1 결함과 구분)
+산출물: `docs/sprints/sprint-27e-multi-review/<reviewer>-findings-r2.md`
+형식: Round 1 과 동일 (header / 매트릭스 / 개별 / Summary)
+
+추가 항목 (Round 1 정의에 없던 깊이):
+- 보안: dependency CVE 의 sentry transitive 차원 + Cloud Run / Neon 환경 변수 misconfig 시나리오
+- 성능: 실측 metric (RAG p95 5 sample / API 5 endpoint × 5 sample / dashboard LCP / 회의 처리)
+- 테스트: e2e spec 실제 실행 결과 (npm run e2e --grep <patten>) + Round 1 추가 권고 14건 중 실제 신설 가능 여부
+- 아키텍처: ARCH-1~7 의 실제 fix 비용 정량 + Sprint 28 carry vs 본 sprint 진입 권고 표
+
+응답 길이: 산출물 파일에 작성, 대화 200 단어 미만.
+```
+
+4 sub-agent 완료 후 main orchestrator 가 산출물 4 파일 read.
+
+[Step 3 — 통합 v2 작성 (~30분)]
+
+`docs/sprints/sprint-27e-multi-review/integrated-report-r2.md`:
+
+- Round 1 + Round 2 통합
+- fix verify 표 (RESOLVED 6건의 실 RESOLVED 여부)
+- 신규 발견 매트릭스 (Round 2 고유)
+- Round 1 의 BL 37건 중 외부 진입 직전 fix 필요 항목 escalation
+- 충돌 해결 (Round 1 vs Round 2 시각 차이 reconcile)
+- 최종 verdict: GO / NEEDS-FIX / NO-GO
+
+`docs/sprints/sprint-27e-multi-review/final-integrated-report.md`:
+
+- Sprint 27d 의 final-integrated-report.md 형식 차용
+- Round 1 + Round 2 평균 점수 (가능 시)
+- 외부 5명 dogfooding / production 진입 final GO 여부
+
+`docs/sprints/sprint-27e-multi-review/final-report.html`:
+
+- 시각화 (Round 1 report.html 차용 + final verdict)
+
+[Step 4 — 신규 차단 결함 사용자 결정]
+
+Round 2 신규 차단 0건이면 Step 5 스킵.
+1건 이상이면:
+
+1. AskUserQuestion 옵션 제시:
+   - (a) 본 세션 안에서 fix (autonomous)
+   - (b) 선택 fix (P0 만)
+   - (c) carry — 외부 진입 보류 + Sprint 28 escalate (NO-GO)
+2. 사용자 답변 후 진행
+
+[Step 5 — 신규 차단 fix (사용자 승인 시)]
+
+각 신규 차단:
+1. TaskCreate 로 추적
+2. fix 코드 적용 + 회귀 가드 추가
+3. pytest / vitest / e2e focused 재실행
+4. final-integrated-report.md status 갱신 (RESOLVED)
+
+모든 fix 후 회귀 검증:
+- `cd backend && uv run pytest -x` 전체 PASS
+- `cd frontend && npm run typecheck && npm test && npm run build` 전체 PASS
+- 가능 시 e2e focused
+
+[Step 6 — commit + push (사용자 사전 승인)]
+
+PR #109 가 OPEN + 같은 branch 라면:
+
+```bash
+git add docs/sprints/sprint-27e-multi-review/ <fix 파일들>
+git commit -m "audit-r2: Sprint 27e Round 2 cross-check + 신규 결함 N건 fix
+
+(본문: Round 1 fix verify 결과 + Round 2 신규 발견 + final verdict)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+git push origin sprint-27e/multi-review
+```
+
+PR #109 가 MERGED 라면 신규 PR:
+
+```bash
+gh pr create --title "Sprint 27e Round 2 cross-check + 신규 결함 fix" --body "..."
+```
+
+[Step 7 — CI 모니터링 + 종료 보고]
+
+- `gh pr checks <number>` Monitor (Round 1 패턴 따라)
+- 모두 PASS 확인
+- 종료 보고:
+  - Round 2 4 reviewer cross-check 완료
+  - Round 1 fix verify 결과 (RESOLVED-verified 갯수 / 회귀 갯수)
+  - Round 2 신규 발견 갯수 + fix status
+  - final verdict (GO / NEEDS-FIX / NO-GO)
+  - BL-S27e-* 갱신 (carry list 우선순위 변경 또는 escalation)
+  - 다음 단계: PR merge / Sprint 28 진입
+
+[도구]
+
+- Bash (curl / git / gh / pytest / npm)
+- Read / Write / Edit / Grep / Glob
+- Agent (general-purpose — 4 sub-reviewer Round 2 spawn)
+- MCP Playwright (사용자 FE/BE up 시 — IDOR / e2e timing / adversarial)
+- TaskCreate / TaskUpdate (각 step + 각 신규 결함 fix 추적)
+- Monitor (CI 결과)
+
+[정책 SKIP (Round 1 동일)]
+
+- production 환경 실 audit: SKIP
+- Sentry 활성: SKIP 유지
+- Clerk Production 발급: SKIP 유지
+
+[Round 1 vs Round 2 변별점]
+
+Round 2 가 단순 Round 1 재실행이 되면 비용 낭비. 다음 차이를 명시적으로 만들 것:
+
+1. Round 1 산출물을 input 으로 받음 (재발견 회피)
+2. RESOLVED 마크 verify (commit-level read + pytest 실제 실행)
+3. 정적 → 실측 전환 (FE/BE up 시)
+4. 비차단 BL 의 외부 진입 직전 critical escalation 평가
+5. dependency CVE 의 transitive 깊이 (fast-uri Sentry 등) 추적
+6. e2e flake / race / runtime 결함 (Round 1 의 blind spot)
+
+[시작 신호]
+
+필독 산출물 1~8 모두 read 후 Step 0 환경 검증부터 시작. 모든 Step 끝까지 순차 진행. 중간 break X. 사용자 확인 없이 자동 진행 (Git Safety Protocol 의 commit/push 도 본 goal 안에 사전 승인됨 — 단 Step 4 의 신규 차단 결함 fix 결정만 사용자 답변 필요).
+
+본 세션의 정체성:
+- Sprint 27e Round 2 — Cross-Check + Adversarial + 실측
+- Round 1 의 보완 + 검증 + 깊이 추가
+- final verdict 도출 → 외부 5명 진입 또는 production 진입 unlocking 최종 판정
+
+시작.
