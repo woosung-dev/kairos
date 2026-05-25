@@ -29,7 +29,8 @@ class ActionItem(SQLModel, table=True):
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    workspace_id: uuid.UUID = Field(foreign_key="workspaces.id")
+    # Sprint 28 PERF-2 — index=True (alembic be0e82ab810c, ix_action_items_workspace_id 정합).
+    workspace_id: uuid.UUID = Field(foreign_key="workspaces.id", index=True)
     meeting_id: uuid.UUID | None = Field(default=None, foreign_key="meetings.id")
     project_id: uuid.UUID | None = Field(default=None, foreign_key="projects.id")
     title: str

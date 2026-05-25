@@ -14,7 +14,8 @@ class Meeting(SQLModel, table=True):
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    workspace_id: uuid.UUID = Field(foreign_key="workspaces.id")
+    # Sprint 28 PERF-2 — index=True (alembic be0e82ab810c, ix_meetings_workspace_id 정합).
+    workspace_id: uuid.UUID = Field(foreign_key="workspaces.id", index=True)
     title: str
     file_key: str  # R2 저장 경로
     source: str | None = None  # None=오디오, "text"=텍스트 캡처
