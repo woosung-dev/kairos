@@ -157,19 +157,51 @@
 
 ---
 
-## BL-S27e-4 — FE 병렬 E2E flake (storageState / account isolation) ★ (P3)
+## BL-S27e-4 — FE CI 실패 재분류 (tiptap dep + Nightly Gemini key) ★ (P3)
 
-**현 상태**: Sprint 27d codex audit 의 CODEX-OBS-1. FE 전체 병렬 E2E 10 tests 중 2건이 최초 1회 실패 후 focused 재실행에서 PASS. `e2e/.auth/user.json` storageState 단일 공유 + onboarding localStorage 마크가 병렬 worker 간 race. dogfooding blocker 는 아니나 CI 게이트로 올리기 전 정리 필요.
+**⚠️ Sprint 27e Round 2 재분류** (2026-05-25, TEST-r2-2): "병렬 E2E flake 2 spec" 가설 false. 실제 fail 은 (a) `frontend-build` 단계 tiptap useEditor overload type error (CI run 26389145626 — Round 1 PR #109 의 tiptap 4개 직접 의존성 3.22.0 vs transitive 3.23.6 peer 충돌, 이미 commit 2195c8b 으로 해소) + (b) Nightly `meeting-upload.spec.ts` GEMINI_API_KEY=fake (환경 결함). **flake 아닌 코드/환경 결함**.
 
-**증상**: `pnpm e2e` 병렬 실행 시 `onboarding-tooltip-first-visit.spec.ts` + `actions-redirect.spec.ts` 일부 worker 가 동일 storageState 의 localStorage 마크 충돌로 console.error 또는 timing fail.
+**현 상태 (재분류 후)**:
+- (a) tiptap dep: Round 1 PR #109 commit 2195c8b 으로 RESOLVED (`@tiptap/* 3.23.6` 통일)
+- (b) Nightly Gemini key: 사용자 task — Nightly Heavy E2E workflow secrets 점검 필요
+
+**Round 1 cited 가설 (stale)**: storageState 단일 공유 + onboarding localStorage race — Sprint 27d codex audit CODEX-OBS-1 의 추정. Round 2 의 CI history 재검증 (`gh run list --workflow=test.yml --limit 30 since 2026-05-21`) 결과 main 가지 5/5 PASS / flake rate 0% — 추정 false 확정.
+
+**근거**: Sprint 27e Round 2 test-coverage-findings-r2.md §3 CI flake 정량. P3 유지.
+
+---
+
+## BL-S27e-G — Production cutover hardening (Sprint 27e Round 2 신규) ✅ **완료 (Sprint 27e Round 2, 2026-05-25)**
+
+**해소**: PR #110 — SEC-r2-2/3/4 fix 묶음.
+- `core/config.py` `_is_non_dev_env()` staticmethod 추출 (production + staging 통합 판정, OR + lower 일관성)
+- `_validate_cron_token`: non-dev 환경 dev fallback 거부 + min 32 byte 강제
+- `_no_dev_issuer_in_non_dev`: staging 도 dev Clerk issuer URL 거부
+- `_require_audience_in_non_dev`: audience None default 가 `verify_aud=False` fallback 영구 SKIP 차단
+- `tests/test_config.py` 4 신규 케이스 (staging 우회 + 약한 token + audience None + ENVIRONMENT-only) — 12/12 PASS
+
+**근거**: Sprint 27e Round 2 security-findings-r2.md §2 r2-2/3/4. ADR-024 Clerk Production cutover 직격 결함.
+
+---
+
+## BL-S27e-H — backend dependency upper-bound 정책 (Sprint 27e Round 2 신규) ★ (P3)
+
+**현 상태**: `backend/pyproject.toml` 17 dependencies 중 `pgvector>=0.4.2,<1.0.0` 만 upper-bound 명시. 나머지 (google-genai/openai/sentry-sdk/fastapi 등) 하한만 → `uv sync` 자동 재해결 시 major bump (1.x → 2.x) 자동 적용 가능 → breaking API 변경 risk.
 
 **Fix 후보**:
-- (a) worker 별 storageState 분리 (`e2e/.auth/user-{worker}.json`) + setup 에서 N개 계정 병렬 로그인
-- (b) onboarding localStorage 마크 prefix 에 worker index 포함
-- (c) `fullyParallel: false` 임시 회귀 가드 (성능 손해)
-- (d) onboarding spec 만 serial group 으로 격리 (project 분리)
+- (a) `uv.lock` pin 만 신뢰: CI 와 production Dockerfile 에서 `uv sync --frozen` 강제 (단순)
+- (b) `pyproject.toml` 에 명시 upper-bound (`google-genai>=1.70.0,<2.0.0`) — 17 파일 patch
+- (c) CI 에 `uv lock --check` 추가 (lock-pyproject mismatch 차단)
 
-**근거**: Sprint 27d codex final audit `codex-regression.md` CODEX-OBS-1. P3 분류.
+**권고**: 옵션 (a) + (c) 조합. uv.lock 이 ground truth, CI 가 drift 차단.
+
+**근거**: Sprint 27e Round 2 security-findings-r2.md §2 r2-10. P3 분류.
+
+---
+
+## BL-S27e-4-OLD — FE 병렬 E2E flake (Sprint 27d 추정, false alarm) ✅ **재분류 (Sprint 27e Round 2)**
+
+원 BL 본문은 위 BL-S27e-4 본문에 historical record 로 흡수. flake 가설 false 확정.
 
 ---
 
