@@ -25,7 +25,7 @@ audit 후 차단 6건 모두 fix 적용 완료 → **NEEDS-FIX → GO (외부 5�
 - frontend vitest: **56 PASS** (변경 없음)
 - frontend typecheck: **PASS** (tiptap transitive 버전 충돌 type 경고 — BL-S27e-D PERF-11 dynamic import 동반 처리)
 - frontend build: **PASS**
-- `pnpm audit --audit-level critical`: **0 critical** (SEC-1/2 advisory 사라짐). `--audit-level high`: 2 high (fast-uri Sentry transitive — Sentry 도입 시 함께 해소, BL-S27e-A carry)
+- `pnpm audit --audit-level critical`: **0 critical** (SEC-1/2 advisory 사라짐). `--audit-level high`: 2 high (fast-uri transitive — **Round 2 errata 정정**: Sentry 가 아닌 `shadcn@4.1.2 > @modelcontextprotocol/sdk@1.29.0 > ajv > fast-uri` 경로. shadcn devDependencies 이동으로 해소 가능, BUG-S27e-SEC-r2-1/r2-5 참조)
 
 ---
 

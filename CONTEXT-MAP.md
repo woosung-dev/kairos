@@ -40,9 +40,9 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 ## 4. 도메인 경계
 
-### 4.1 백엔드 모듈 (13)
+### 4.1 백엔드 모듈 (15)
 
-`auth · workspaces · projects · inbox · meetings · notes · actions · memory · upload · embeddings · rag · common · core · services`. 폴더 표준: `router/service/repository/schemas/models/dependencies/exceptions.py`. 상세: `docs/architecture/directory-map.md`.
+`auth · workspaces · projects · inbox · meetings · notes · actions · memory · onboarding · upload · embeddings · rag · common · core · services`. 폴더 표준: `router/service/repository/schemas/models/dependencies/exceptions.py`. 상세: `docs/architecture/directory-map.md`.
 
 ### 4.2 의존 규칙 (헌법 결정 #1, ADR-014)
 
@@ -57,7 +57,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 ### 4.3 프론트엔드 features (FSD)
 
-`inbox · projects · meetings · actions · notes · rag · members · workspaces · upload · sources · home` (11). shadcn `components/ui/` 수정 금지 (DESIGN.md). TiptapEditor 는 `features/notes/components/note-editor.tsx`.
+`actions · audit · home · inbox · meetings · members · memory · notes · onboarding · projects · rag · sources · upload · workspaces` (14). shadcn `components/ui/` 수정 금지 (DESIGN.md). TiptapEditor 는 `features/notes/components/note-editor.tsx`.
 
 ## 5. visibility 도메인 용어 (ADR-014)
 

@@ -65,6 +65,32 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_fake"
           NEXT_PUBLIC_API_URL: "http://localhost:8000"
 
+      # Sprint 27e Round 2 BUG-S27e-TEST-r2-1 — FE 보안 헤더 회귀 가드 CI 게이트.
+      # security-headers.spec.ts 는 public route (`/sign-in`, `/`) 만 검증 — secrets/BE 불요.
+      # frontend-build job 의 build artifact 재사용 → 항상 실행 (E2E_ENABLED 무관).
+      - name: Install Playwright (chromium only)
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start Next.js app for security-headers spec
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_fake"
+          NEXT_PUBLIC_API_URL: "http://localhost:8000"
+        run: |
+          pnpm start -p 3000 > /tmp/next.log 2>&1 &
+          echo "Next.js PID $!"
+
+      - name: Wait for Next.js (security-headers gate)
+        run: npx wait-on http://localhost:3000/ -t 60000
+
+      - name: Run security-headers spec only (public route, no secrets)
+        env:
+          E2E_PORT: "3000"
+        run: pnpm exec playwright test --project=public-only
+
+      - name: Upload Next.js log on failure
+        if: failure()
+        run: cat /tmp/next.log || true
+
   # ── E2E 잡 활성화 방법 ────────────────────────────────────────────────────────
   # 1. Repository Settings → Secrets and variables → Variables 탭
   #    E2E_ENABLED = 'true' 추가

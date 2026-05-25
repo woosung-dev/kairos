@@ -205,9 +205,11 @@
 
 ## BL-S26-1 — 필수 규칙 토큰 ≤ 3,000 추가 cut (Sprint 27a partial → carry-over) ★
 
-**Sprint 27a 진행** (2026-05-23): 2,918→2,614 words / 3,793→~3,398 tokens (10% 절감). 목표 ≤3,000 까지 추가 13% cut 필요. CONTEXT-MAP I-2/I-9/I-14/I-17/I-18 압축 + §2 4 박스 → 1 박스 + AGENTS.md Kairos 컨텍스트 80줄 → 8줄 (CONTEXT-MAP 위임). 추가 cut 시 정보 손실 risk → plan §3 정책으로 잔여 carry. ★★→★ 강도 하향.
+**⚠️ Sprint 27e Round 2 회귀 발견** (2026-05-25, ARCH-r2-7): Sprint 27a partial 보고 `~3,398 tokens` 대비 현 실측 = **CONTEXT-MAP.md 7,960 bytes (`wc -c`) / 106 lines**. ADR-024 supersedes + I-21 HNSW 세션 변수 + 후속 추가로 본문 다시 확장. 목표 ≤3,000 까지 잔여 ~62% (보고 13% 가 stale). Sprint 27a 후 atomic update 정책 정합 회복 필요 — 향후 헌법 추가 시 토큰 비용 명시 책임.
 
-**현 상태:** 2026-05-23 Sprint 26 측정 = 2,845 words → 추정 3,698 tokens (목표 ≤ 3,000, 23% 초과).
+**Sprint 27a 진행** (2026-05-23, stale): 2,918→2,614 words / 3,793→~3,398 tokens (10% 절감). 목표 ≤3,000 까지 추가 13% cut 필요. CONTEXT-MAP I-2/I-9/I-14/I-17/I-18 압축 + §2 4 박스 → 1 박스 + AGENTS.md Kairos 컨텍스트 80줄 → 8줄 (CONTEXT-MAP 위임). 추가 cut 시 정보 손실 risk → plan §3 정책으로 잔여 carry. ★★→★ 강도 하향.
+
+**현 상태:** 2026-05-25 Sprint 27e Round 2 측정 = CONTEXT-MAP.md **7,960 bytes / 106 lines** (~2.3x 회귀). 목표 ≤ 3,000 tokens (~150% 초과 추정).
 
 **대상:** `AGENTS.md` (135줄) + `CONTEXT-MAP.md` (106줄) + `.ai/common/global.md` (71줄) + `.ai/templates/workflow.md` (80줄) = 392줄.
 
@@ -437,9 +439,20 @@ async def extract_actions_and_link(self, ...) -> dict:
 
 ---
 
-## BL-005 — memory.service.promote() Service Session 직접 접근 제거 (I-1 / Backend Rules §3 위반)
+## BL-005 — memory.service.promote() Service Session 직접 접근 제거 ✅ **완료 (Sprint 19 PR #1 C10, 2026-05-18)**
 
-**현 상태:**
+**해소** (Sprint 27e Round 2 BUG-S27e-ARCH-7 verified):
+- `backend/src/memory/service.py:405-505` `MemoryService.promote()` 가 `self.workspace_repo.find_by_id(target_workspace_id)` + `self.workspace_repo.find_member(...)` 사용 — WorkspaceRepository 경유.
+- `grep "self.repo.session.execute" backend/src/memory/service.py` = **0 hit** verified.
+- `MemoryService.__init__` workspace_repo 주입 강제 (line 424 fail-closed RuntimeError).
+
+**근거**: Sprint 19 PR #1 C10 (Codex F-4), memory `project_sprint19_pr1_kickoff.md`. Sprint 27e Round 2 architecture-findings-r2.md §1 ARCH-7 verify.
+
+---
+
+(이하 historical record — closed 마크 위 본 BL 의 원 기록 보존)
+
+**현 상태 (해소 전):**
 `backend/src/memory/service.py:420, 431` — `MemoryService.promote`가 `self.repo.session.execute(target_q)` / `self.repo.session.execute(member_q)` 직접 호출. Backend Rules §3 (AsyncSession은 Repository만 보유) 위반. Workspace + WorkspaceMember 조회를 repo 위임 없이 inline.
 
 **목표 인터페이스:**
