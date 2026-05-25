@@ -53,7 +53,8 @@ jobs:
 
       - name: Install backend deps
         working-directory: backend
-        run: uv sync
+        # Sprint 28 BUG-S28-SEC-1 — `--frozen` 강제 (lock drift 차단)
+        run: uv sync --frozen
 
       - name: Run alembic upgrade head
         working-directory: backend
