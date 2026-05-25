@@ -674,13 +674,18 @@ async def _call_distill(
     """Gemini distill 호출. 반환: (distilled, in_tok, out_tok, elapsed_ms, error)."""
     from google import genai
 
+    from src.services.ai_resilience import with_gemini_timeout
+
     settings = get_settings()
     client = genai.Client(api_key=settings.gemini_api_key.get_secret_value())
     start = time.time()
     try:
         prompt = MEMORY_DISTILL_PROMPT.format(content=text)
-        resp = await client.aio.models.generate_content(
-            model=GEMINI_MODEL, contents=prompt
+        # Sprint 28 PERF-4 — timeout + circuit breaker.
+        resp = await with_gemini_timeout(
+            client.aio.models.generate_content(
+                model=GEMINI_MODEL, contents=prompt
+            )
         )
         elapsed = int((time.time() - start) * 1000)
         raw = parse_json_response(resp.text or "")
@@ -741,14 +746,19 @@ async def _call_transcribe(
     """Whisper transcribe 호출. 반환: (transcript, elapsed_ms, error)."""
     from openai import AsyncOpenAI
 
+    from src.services.ai_resilience import with_whisper_timeout
+
     settings = get_settings()
     client = AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value())
     start = time.time()
     try:
         f = io.BytesIO(audio_bytes)
         f.name = "audio.wav"
-        resp = await client.audio.transcriptions.create(
-            model=WHISPER_MODEL, file=f, language="ko"
+        # Sprint 28 PERF-4 — timeout + circuit breaker.
+        resp = await with_whisper_timeout(
+            client.audio.transcriptions.create(
+                model=WHISPER_MODEL, file=f, language="ko"
+            )
         )
         elapsed = int((time.time() - start) * 1000)
         return (getattr(resp, "text", "") or ""), elapsed, None

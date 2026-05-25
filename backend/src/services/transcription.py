@@ -115,11 +115,16 @@ class TranscriptionService:
             if wav_path and wav_path != input_tmp and os.path.exists(wav_path):
                 os.unlink(wav_path)
 
-        response = await self.client.audio.transcriptions.create(
-            model="whisper-1",
-            file=audio_file,
-            response_format="verbose_json",
-            timestamp_granularities=["segment"],
+        # Sprint 28 PERF-4 — timeout + circuit breaker (Whisper hang 차단).
+        from src.services.ai_resilience import with_whisper_timeout
+
+        response = await with_whisper_timeout(
+            self.client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                response_format="verbose_json",
+                timestamp_granularities=["segment"],
+            )
         )
 
         segments = [
