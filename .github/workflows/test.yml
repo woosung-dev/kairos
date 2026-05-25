@@ -74,6 +74,10 @@ jobs:
       - name: Start Next.js app for security-headers spec
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_fake"
+          # Sprint 27e Round 2 r2-1 — Next.js 16 + Clerk 7.4.1 runtime 가 server-side
+          # secretKey 필요 (build 시점만 아니라 next start 도). fake 값으로 부팅 OK
+          # (validation 없음, secrets 없이 public route 만 검증하므로 영향 0).
+          CLERK_SECRET_KEY: "sk_test_fake"
           NEXT_PUBLIC_API_URL: "http://localhost:8000"
         run: |
           pnpm start -p 3000 > /tmp/next.log 2>&1 &
