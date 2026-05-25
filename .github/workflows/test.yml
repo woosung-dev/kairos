@@ -80,7 +80,14 @@ jobs:
           echo "Next.js PID $!"
 
       - name: Wait for Next.js (security-headers gate)
-        run: npx wait-on http://localhost:3000/ -t 60000
+        # Sprint 27e Round 2 r2-1: Next.js 16 cold start CI 환경에서 60s 초과 가능 → 180s.
+        # 실패 시 next log 즉시 dump (디버깅).
+        run: |
+          npx wait-on http://localhost:3000/ -t 180000 -v || {
+            echo "--- wait-on failed; /tmp/next.log ---"
+            cat /tmp/next.log || true
+            exit 1
+          }
 
       - name: Run security-headers spec only (public route, no secrets)
         env:
