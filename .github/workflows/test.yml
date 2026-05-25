@@ -62,7 +62,9 @@ jobs:
       - name: Build (includes type check)
         run: pnpm build
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_fake"
+          # Clerk 7.4.1 publishable key 검증 통과 형식 — pk_test_ + base64(host$).
+          # `clerk.example.com$` → Y2xlcmsuZXhhbXBsZS5jb20k. 실제 fake 라 API 호출 X.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZXhhbXBsZS5jb20k"
           NEXT_PUBLIC_API_URL: "http://localhost:8000"
 
       # Sprint 27e Round 2 BUG-S27e-TEST-r2-1 — FE 보안 헤더 회귀 가드 CI 게이트.
@@ -73,7 +75,9 @@ jobs:
 
       - name: Start Next.js app for security-headers spec
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_fake"
+          # Clerk 7.4.1 publishable key 검증 통과 형식 — pk_test_ + base64(host$).
+          # `clerk.example.com$` → Y2xlcmsuZXhhbXBsZS5jb20k. 실제 fake 라 API 호출 X.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZXhhbXBsZS5jb20k"
           # Sprint 27e Round 2 r2-1 — Next.js 16 + Clerk 7.4.1 runtime 가 server-side
           # secretKey 필요 (build 시점만 아니라 next start 도). fake 값으로 부팅 OK
           # (validation 없음, secrets 없이 public route 만 검증하므로 영향 0).
