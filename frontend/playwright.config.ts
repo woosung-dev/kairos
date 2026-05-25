@@ -43,7 +43,12 @@ export default defineConfig({
     {
       name: "chromium",
       // r2-1: security-headers.spec.ts 는 public-only project 가 단독 게이트 — chromium 중복 실행 회피.
-      testIgnore: /security-headers\.spec\.ts/,
+      // qa-* spec 은 top-level testIgnore 와 동일 — project-level testIgnore 가 top-level 을
+      // override 하므로 여기에도 명시 (Playwright 동작).
+      testIgnore: [
+        /security-headers\.spec\.ts/,
+        ...(process.env.CI ? [/qa-.*\.spec\.ts/] : []),
+      ],
       use: {
         ...devices["Desktop Chrome"],
         storageState: "e2e/.auth/user.json",
