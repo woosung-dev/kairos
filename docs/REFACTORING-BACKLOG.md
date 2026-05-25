@@ -171,6 +171,80 @@
 
 ---
 
+## BL-S27e-A — 보안 hygiene cluster (Sprint 28 일부 RESOLVED, 일부 carry) ★ (P2)
+
+**Sprint 28 일부 RESOLVED**:
+- ✅ **SEC-3 (BUG-S28-SEC-3)** — JWT 검증 실패 4 except `logger.warning` + extra={error_type} 추가 (commit `feacccc` + `a1eea27`). pytest 4 case.
+
+**Sprint 28 잔존 carry**:
+- SEC-5 — `workspaces/invite_service.py:159-204` + `member_router.py` audit_events 테이블 + 4 endpoint hook
+- SEC-6 — rate-limit (slowapi: RAG ≤ 30/min, upload ≤ 10/min)
+- SEC-7 — `main.py:89-95` CORS allow_methods + allow_headers 화이트리스트
+- SEC-11 — Sentry SKIP path forensic 표준화 (SEC-3 가 JWT 만 cover)
+
+---
+
+## BL-S27e-B — 보안 hardening cluster (Sprint 28 일부 RESOLVED, 일부 carry) ★ (P3)
+
+- SEC-8 + r2-9 — 3 prompt 모두 `<<<SOURCE_BLOCK>>>` 구분자 통일
+- SEC-9 — `common/r2.py:23-46` filename slugify + NFC + 길이 200
+- ✅ **SEC-10 (BUG-S28-SEC-2)** — Sprint 28 fix: `r2-cleanup.yml:28` SHA pin 통일 (commit `5a199db`)
+
+---
+
+## BL-S27e-C — 성능 P1 cluster (Sprint 28 일부 RESOLVED, 일부 carry) ★★ (P1)
+
+**Sprint 28 RESOLVED**:
+- ✅ **PERF-4 (P0 격상)** — Gemini + Whisper timeout + circuit breaker (commit `1c2f8ff`, 7 test PASS)
+- ✅ **BUG-S28-PERF-RT-1** — User + Member cache. dashboard 4286→1586ms (commit `feacccc`, 11 test)
+- ✅ **PERF-2** — workspace_id 인덱스 3건 (alembic `be0e82ab810c`, commit `c8f777a`)
+
+**잔존 carry**:
+- PERF-1 — `common/r2.py` R2Service singleton `_ensure_client()`
+- PERF-3 — `upload/router.py:91` streaming upload
+- PERF-5 — `rag/router.py` SSE `is_disconnected()` per-yield
+- PERF-r2-2 — RAG/meetings/memory/notes AI client lifespan singleton
+- PERF-r2-3 — `rag/service.py:112-131` hybrid search 병렬 await
+- PERF-r2-4 잔여 — 1차 진입 lazy seed
+- PERF-r2-5 — connection pool 5+10=15 vs Cloud Run max-concurrency 80
+- BUG-S28-PERF-1 — list endpoints single SQL window 또는 cursor pagination (5 도메인)
+- BUG-S28-PERF-2 — Whisper API timeout 추가 spot (chunked_transcription)
+- BUG-S28-PERF-3 — meetings BG audio streaming download
+
+---
+
+## BL-S27e-D — 성능 P2/P3 cluster (Sprint 28 carry) ★ (P2/P3)
+
+- PERF-6/7/8/9/11/12 + PERF-r2-6~12 + BUG-S28-PERF-4~12 — promote cache wipe / cache cleanup cron / created_at 인덱스 / inbox N+1 / tiptap dynamic / refetchOnWindowFocus / lifespan singleton / BG task leak / member cache scope 등
+
+---
+
+## BL-S27e-E — 테스트 정량 cluster (Sprint 28 일부 RESOLVED) ★ (P1/P2)
+
+**Sprint 28 RESOLVED**:
+- ✅ **TEST-5** — invite accept happy-path e2e (`invite-accept-happy-path.spec.ts` 신설)
+- ✅ **TEST-7** — upload mime real browser e2e (`upload-mime-validation.spec.ts` 신설)
+
+**잔존 carry**:
+- TEST-3 — `vitest.config.ts` `coverage.include: ['src/**']`
+- TEST-4 — `workspaces` 모듈 branch coverage
+- TEST-6 — 회의 retry e2e
+- TEST-8/9/10 — 큰 입력 / 유니코드 / Personal+Team 통합
+
+---
+
+## BL-S27e-F — 아키텍처 deepening cluster (Sprint 28 carry, 5-6d) ★★ (P1/P2)
+
+- ARCH-1 + ARCH-r2-1 + ARCH-5 + BUG-S28-ARCH-2 — OnboardingService DI 통일 + Demeter helper
+- ARCH-2 + ARCH-r2-3 — services DTO 일관
+- ARCH-3 + BUG-S28-ARCH-1 — `backend/src/audit/` 도메인 신설 → BE 16 모듈
+- ARCH-6 — `common/promote_helpers.py` 확장 + 5 도메인 promote SRP
+- ARCH-r2-2 — auth lazy seed LazySeedService 추출
+- BUG-S28-ARCH-4 — `core ↔ common` cycle 분리
+- BUG-S28-ARCH-5 (= TEST-7) — architecture test gate 4건
+
+---
+
 ## BL-S27e-G — Production cutover hardening (Sprint 27e Round 2 신규) ✅ **완료 (Sprint 27e Round 2, 2026-05-25)**
 
 **해소**: PR #110 — SEC-r2-2/3/4 fix 묶음.
@@ -241,7 +315,7 @@
 
 **Sprint 27a 진행** (2026-05-23, stale): 2,918→2,614 words / 3,793→~3,398 tokens (10% 절감). 목표 ≤3,000 까지 추가 13% cut 필요. CONTEXT-MAP I-2/I-9/I-14/I-17/I-18 압축 + §2 4 박스 → 1 박스 + AGENTS.md Kairos 컨텍스트 80줄 → 8줄 (CONTEXT-MAP 위임). 추가 cut 시 정보 손실 risk → plan §3 정책으로 잔여 carry. ★★→★ 강도 하향.
 
-**현 상태:** 2026-05-25 Sprint 27e Round 2 측정 = CONTEXT-MAP.md **7,960 bytes / 106 lines** (~2.3x 회귀). 목표 ≤ 3,000 tokens (~150% 초과 추정).
+**현 상태:** 2026-05-26 Sprint 28 Round A 측정 = CONTEXT-MAP.md **8,007 bytes / 106 lines** (Sprint 27e Round 2 7,960 대비 +47 bytes 추가 회귀). 목표 ≤ 3,000 tokens (~167% 초과). 본 sprint 진정한 cut 시도 X — BL-S26-1 목표 자체 재검토 권고 (token vs byte 단위 명시 + tiktoken 도구 표준화 — BUG-S28-ARCH-7).
 
 **대상:** `AGENTS.md` (135줄) + `CONTEXT-MAP.md` (106줄) + `.ai/common/global.md` (71줄) + `.ai/templates/workflow.md` (80줄) = 392줄.
 
