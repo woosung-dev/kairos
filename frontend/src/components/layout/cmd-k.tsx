@@ -38,6 +38,8 @@ export function CmdK() {
     toggleRagOverlay,
     cmdKInitialQuery,
     setCmdKInitialQuery,
+    cmdKAutoSubmit,
+    setCmdKAutoSubmit,
   } = useUIStore();
   const [search, setSearch] = useState("");
   const [isRagMode, setIsRagMode] = useState(false);
@@ -62,13 +64,28 @@ export function CmdK() {
 
   // Sprint 24 Wave 2 T-CMD-K-FIX: openCmdKWithQuery 로 진입한 경우 query 자동 입력 + RAG 모드.
   // store 의 cmdKInitialQuery 가 set 되면 palette 도 열려있어야 함 (openCmdKWithQuery 가 함께 set).
+  // Sprint 27e Post-Merge BUG-QA-3: autoSubmit=true 시 prefill 직후 RAG 자동 호출.
   useEffect(() => {
     if (cmdKOpen && cmdKInitialQuery) {
-      setSearch(cmdKInitialQuery);
+      const q = cmdKInitialQuery;
+      const auto = cmdKAutoSubmit;
+      setSearch(q);
       setIsRagMode(true);
       setCmdKInitialQuery(""); // 1회성 consumption
+      setCmdKAutoSubmit(false);
+      if (auto && q.trim()) {
+        // RAG 모드 즉시 호출 — handleSubmit 의 RAG 분기와 동일 동작.
+        const question = q.startsWith("?") ? q.slice(1).trim() : q.trim();
+        if (question) {
+          ask(question);
+          toggleRagOverlay();
+          toggleCmdK();
+          setSearch("");
+          setIsRagMode(false);
+        }
+      }
     }
-  }, [cmdKOpen, cmdKInitialQuery, setCmdKInitialQuery]);
+  }, [cmdKOpen, cmdKInitialQuery, cmdKAutoSubmit, setCmdKInitialQuery, setCmdKAutoSubmit, ask, toggleRagOverlay, toggleCmdK]);
 
   // ? 접두사로 RAG 모드 자동 전환
   useEffect(() => {

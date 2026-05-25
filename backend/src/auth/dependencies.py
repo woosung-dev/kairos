@@ -120,6 +120,11 @@ async def verify_clerk_token(authorization: str = Header(default="")) -> dict:
         decode_kwargs: dict = {
             "algorithms": ["RS256"],
             "issuer": settings.clerk_jwt_issuer,
+            # Sprint 27e Post-Merge BUG-QA-2 — Clerk dev JWT exp = 60s + FE Clerk SDK
+            # 의 stale token cache 결합으로 페이지 전환 시 401 다발. 10s clock skew
+            # 허용으로 short window 통과 — 정상 사용자 UX 회복.
+            # production 에선 token exp 가 더 길어 leeway 영향 마이크로.
+            "leeway": 10,
         }
         if settings.clerk_jwt_audience is not None:
             decode_kwargs["audience"] = settings.clerk_jwt_audience
@@ -172,6 +177,14 @@ async def get_current_user(
 
     repo = UserRepository(session)
     user = await repo.find_by_clerk_id(claims["sub"])
+
+    # Sprint 27e Post-Merge BUG-QA-1 fast path — 이미 onboarding_step >= 1 (lazy seed 완료)
+    # 사용자는 매 request lazy seed SKIP (workspace + member + onboarding hook).
+    # dashboard 첫 진입 5 endpoint fanout 시 BE call 5건 × ~1.5s = 7.5s 의 hidden cost 해소.
+    # 신규 user / step=0 (lazy seed 미완료) 는 기존 경로로 fall-through.
+    if user is not None and user.onboarding_step >= 1:
+        return user
+
     is_new_user = user is None
     if user is None:
         # 첫 로그인: race-safe lazy seed (ON CONFLICT, workspace INSERT 패턴 정합)
