@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sprint 27e Multi-Agent Audit — Kairos</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #11151b;
+    --panel-2: #161b22;
+    --text: #e6e8eb;
+    --text-dim: #9aa3ad;
+    --border: #232a33;
+    --accent: #4ade80;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --info: #60a5fa;
+    --purple: #c084fc;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .container { max-width: 1180px; margin: 0 auto; padding: 48px 24px 120px; }
+  header { border-bottom: 1px solid var(--border); padding-bottom: 32px; margin-bottom: 40px; }
+  h1 { font-size: 34px; margin: 0 0 8px; font-weight: 800; }
+  h2 { font-size: 22px; margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 17px; margin: 24px 0 10px; }
+  .sub { color: var(--text-dim); }
+  .meta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; color: var(--text-dim); font-size: 13px; }
+  code { font-family: var(--mono); background: var(--panel-2); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-weight: 700; font-size: 12px; }
+  .go { color: var(--accent); background: rgba(74,222,128,.14); border: 1px solid rgba(74,222,128,.32); }
+  .warn { color: var(--warn); background: rgba(251,191,36,.14); border: 1px solid rgba(251,191,36,.32); }
+  .danger { color: var(--danger); background: rgba(248,113,113,.14); border: 1px solid rgba(248,113,113,.34); }
+  .info { color: var(--info); background: rgba(96,165,250,.14); border: 1px solid rgba(96,165,250,.32); }
+  .purple { color: var(--purple); background: rgba(192,132,252,.14); border: 1px solid rgba(192,132,252,.32); }
+  .hero {
+    border: 1px solid rgba(248,113,113,.30);
+    background: linear-gradient(135deg, rgba(248,113,113,.10), rgba(251,191,36,.05));
+    border-radius: 14px;
+    padding: 30px;
+  }
+  .verdict { font-size: 34px; font-weight: 850; margin: 0 0 8px; color: var(--danger); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 22px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .label { color: var(--text-dim); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .value { font-size: 24px; font-weight: 800; margin-top: 4px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 20px; }
+  .reviewer-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .reviewer-card h3 { margin: 0 0 10px; font-size: 16px; }
+  .reviewer-card .nums { display: flex; gap: 10px; margin-top: 12px; }
+  .reviewer-card .num-blk { flex: 1; }
+  .num-val { font-size: 22px; font-weight: 800; }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--panel); color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  tr.total { background: rgba(248,113,113,.10); font-weight: 800; }
+  .bar { height: 7px; background: var(--panel); border-radius: 999px; overflow: hidden; margin-top: 5px; }
+  .bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--info)); }
+  .bug { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; margin: 10px 0; }
+  .bug.block { border-left: 4px solid var(--danger); }
+  .bug.warn-l { border-left: 4px solid var(--warn); }
+  .bug.ok { border-left: 4px solid var(--accent); }
+  .muted { color: var(--text-dim); }
+  ul { padding-left: 20px; }
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-right: 6px; background: var(--panel-2); color: var(--text-dim); }
+  details { margin: 10px 0; }
+  summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+  .small { font-size: 13px; }
+  .file { font-family: var(--mono); color: var(--info); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <span class="badge go">GO (post-fix)</span>
+    <h1>Sprint 27e — 4-Reviewer Multi-Agent Audit</h1>
+    <p class="sub">보안 · 성능 · 테스트커버리지 · 아키텍처 4 전문 reviewer 의 통합 기술 deep audit. Sprint 27d (product/UX GO 8.02) 후속. <strong>차단 6건 모두 RESOLVED</strong> (BE 482 PASS / FE 56 PASS / typecheck PASS / build PASS / pnpm audit critical=0).</p>
+    <div class="meta">
+      <span>Branch <code>sprint-27e/multi-review</code></span>
+      <span>Baseline <code>1b24898</code></span>
+      <span>Date <code>2026-05-25</code></span>
+      <span>환경 <code>로컬 FE/BE down — 정적 분석 + pytest/vitest</code></span>
+    </div>
+  </header>
+
+  <section class="hero" style="border-color: rgba(74,222,128,.30); background: linear-gradient(135deg, rgba(74,222,128,.10), rgba(96,165,250,.05));">
+    <div class="verdict" style="color: var(--accent);">GO — 차단 6건 RESOLVED, 외부 5명 진입 unlocked</div>
+    <p class="sub">audit 시점 NEEDS-FIX (차단 6건) → fix 적용 후 GO. 비차단 37건은 BL-S27e-A~F 6 묶음으로 Sprint 28 carry.</p>
+    <div class="grid">
+      <div class="card"><div class="label">차단 결함</div><div class="value" style="color:var(--accent)">6건 → 0건</div></div>
+      <div class="card"><div class="label">BE pytest</div><div class="value" style="color:var(--accent)">482 PASS</div></div>
+      <div class="card"><div class="label">FE vitest / typecheck / build</div><div class="value" style="color:var(--accent)">56 / OK / OK</div></div>
+      <div class="card"><div class="label">pnpm audit critical</div><div class="value" style="color:var(--accent)">0</div></div>
+    </div>
+  </section>
+
+  <h2>차단 결함 Fix Status</h2>
+  <table>
+    <thead><tr><th>ID</th><th>status</th><th>적용</th></tr></thead>
+    <tbody>
+      <tr><td>BUG-S27e-SEC-1</td><td><span class="badge go">RESOLVED</span></td><td><code>@clerk/nextjs 7.0.8 → 7.4.1</code> (GHSA-vqx2 사라짐)</td></tr>
+      <tr><td>BUG-S27e-SEC-2</td><td><span class="badge go">RESOLVED</span></td><td><code>next 16.2.2 → 16.2.6</code> (middleware bypass + SSRF 사라짐)</td></tr>
+      <tr><td>BUG-S27e-SEC-3</td><td><span class="badge go">RESOLVED</span></td><td>JWT <code>issuer=</code> + <code>audience=</code> 명시 + Settings 분리 + production validator + 4 case test</td></tr>
+      <tr><td>BUG-S27e-SEC-4</td><td><span class="badge go">RESOLVED</span></td><td><code>cron_secret_token</code> field_validator + 3 case test</td></tr>
+      <tr><td>BUG-S27e-TEST-1</td><td><span class="badge go">RESOLVED</span></td><td>BE pytest 2 case + FE e2e <code>security-headers.spec.ts</code> 신설</td></tr>
+      <tr><td>BUG-S27e-TEST-2</td><td><span class="badge go">RESOLVED</span></td><td>BE <code>test_personal_workspace_race_concurrent.py</code> asyncio.gather N=5/10 race</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4 Reviewer 결과</h2>
+  <div class="grid-4">
+    <div class="reviewer-card">
+      <h3>🛡 보안 전문가</h3>
+      <p class="muted small">OWASP A01~A10 + Clerk JWT / R2 / RAG / 도메인 특이</p>
+      <div class="nums">
+        <div class="num-blk"><div class="label">차단</div><div class="num-val" style="color:var(--danger)">4</div></div>
+        <div class="num-blk"><div class="label">비차단</div><div class="num-val" style="color:var(--warn)">7</div></div>
+      </div>
+      <p class="small muted">P0×2 deps CVE (Clerk + Next) + P1×2 (JWT issuer/aud + cron token 평문). dependency upgrade 가 가장 critical.</p>
+    </div>
+    <div class="reviewer-card">
+      <h3>⚡ 성능 분석가</h3>
+      <p class="muted small">알고리즘 / DB / 캐싱 / sync blocking / 리소스 / FE</p>
+      <div class="nums">
+        <div class="num-blk"><div class="label">차단</div><div class="num-val" style="color:var(--accent)">0</div></div>
+        <div class="num-blk"><div class="label">비차단</div><div class="num-val" style="color:var(--warn)">15</div></div>
+      </div>
+      <p class="small muted">P1×5 cluster (R2 / DB index / OOM / Gemini timeout / SSE disconnect) — 외부 진입 후 일정 규모 도달 시 즉시 발현.</p>
+    </div>
+    <div class="reviewer-card">
+      <h3>🧪 테스트 커버리지</h3>
+      <p class="muted small">신규 기능 / 에지 / 통합 / 품질 / 정량</p>
+      <div class="nums">
+        <div class="num-blk"><div class="label">차단</div><div class="num-val" style="color:var(--danger)">2</div></div>
+        <div class="num-blk"><div class="label">비차단</div><div class="num-val" style="color:var(--warn)">8</div></div>
+      </div>
+      <p class="small muted">BE pytest 469 PASS / lines 65.69% / branches 41.08% (둘 다 임계 미달). 신규 기능 cover 8/11. 추가 권고 14건.</p>
+    </div>
+    <div class="reviewer-card">
+      <h3>🏛 아키텍처 가디언</h3>
+      <p class="muted small">헌법 / ADR / SOLID / 결합도-응집도 / 비전</p>
+      <div class="nums">
+        <div class="num-blk"><div class="label">차단</div><div class="num-val" style="color:var(--accent)">0</div></div>
+        <div class="num-blk"><div class="label">비차단</div><div class="num-val" style="color:var(--warn)">7</div></div>
+      </div>
+      <p class="small muted">헌법 위반 1 (OnboardingService I-1) + governance stale (헌법 모듈 수 + BL-005 closed 마크 누락) + SOLID/SRP 5 도메인 promote 100+ LOC.</p>
+    </div>
+  </div>
+
+  <h2>GO 조건 평가 (SCOPE)</h2>
+  <table>
+    <thead><tr><th>조건</th><th>기준</th><th>측정</th><th>판정</th></tr></thead>
+    <tbody>
+      <tr><td>차단 결함</td><td>0건</td><td>6건</td><td><span class="badge danger">FAIL</span></td></tr>
+      <tr><td>OWASP carry</td><td>≤ 3건 (각 P2 이하)</td><td>P2/P3 7건 (P0/P1 4건이 차단)</td><td><span class="badge warn">PARTIAL</span></td></tr>
+      <tr><td>성능 critical path p95</td><td>RAG ≤ 15s / API ≤ 500ms / 회의 ≤ 60s</td><td>환경 미실행 — 실측 SKIP. 정적 추정 헤드룸 작음.</td><td><span class="badge info">UNKNOWN</span></td></tr>
+      <tr><td>테스트 커버리지</td><td>신규 기능 ≥ 80% / 통합 핵심 5/5</td><td>72.7% (8/11) / 3/5</td><td><span class="badge danger">FAIL</span></td></tr>
+      <tr><td>헌법 정합성</td><td>CONTEXT-MAP + ADR 위반 0</td><td>7건 (차단 0, doc stale carry)</td><td><span class="badge go">PASS (carry)</span></td></tr>
+    </tbody>
+  </table>
+
+  <h2>🔴 차단 결함 6건</h2>
+
+  <div class="bug block">
+    <strong>BUG-S27e-SEC-1</strong> <span class="badge danger">P0 critical</span>
+    <div class="muted small file">frontend/package.json · frontend/src/proxy.ts:15-19</div>
+    <p><strong>@clerk/nextjs@7.0.8</strong> middleware route protection bypass (GHSA-vqx2-fgx2-5wq9, critical). <code>auth.protect()</code> 패턴 직격.</p>
+    <p class="muted small">fix: <code>pnpm up @clerk/nextjs@^7.2.1</code></p>
+  </div>
+
+  <div class="bug block">
+    <strong>BUG-S27e-SEC-2</strong> <span class="badge danger">P0</span>
+    <div class="muted small file">frontend/package.json · next@16.2.2</div>
+    <p>Next.js 다중 high CVE (Middleware/Proxy bypass + SSRF + DoS), patched 16.2.5.</p>
+    <p class="muted small">fix: <code>pnpm up next@^16.2.5</code></p>
+  </div>
+
+  <div class="bug block">
+    <strong>BUG-S27e-SEC-3</strong> <span class="badge warn">P1</span>
+    <div class="muted small file">backend/src/auth/dependencies.py:111-124</div>
+    <p>JWT <code>verify_aud=False</code> + issuer 미전달. ADR-024 Clerk Production cutover 직격.</p>
+    <p class="muted small">fix: <code>audience=</code> + <code>issuer=</code> 명시 + Settings 추가</p>
+  </div>
+
+  <div class="bug block">
+    <strong>BUG-S27e-SEC-4</strong> <span class="badge danger">P1 (data loss risk)</span>
+    <div class="muted small file">backend/src/core/config.py:39</div>
+    <p><code>cron_secret_token</code> 평문 fallback. env miss 시 R2 voice 메모 전수 삭제 가능 (audit log 0).</p>
+    <p class="muted small">fix: default 제거 + lifespan validator</p>
+  </div>
+
+  <div class="bug block">
+    <strong>BUG-S27e-TEST-1</strong> <span class="badge danger">P0</span>
+    <div class="muted small file">backend/src/main.py:103-108 · frontend/next.config.ts:5-15 (코드 OK, 가드 부재)</div>
+    <p>Sprint 27d BUG-S27d-4 보안 헤더 4종 fix 의 회귀 가드 0건. middleware reorder 시 누락 감지 불가.</p>
+    <p class="muted small">fix: BE pytest 2 case + FE e2e <code>security-headers.spec.ts</code></p>
+  </div>
+
+  <div class="bug block">
+    <strong>BUG-S27e-TEST-2</strong> <span class="badge danger">P0</span>
+    <div class="muted small file">backend/tests/auth/test_personal_workspace_race.py (sequential 만)</div>
+    <p>BL-S27c-1 lazy seed 진정한 concurrent race (asyncio.gather 별개 connection) 미검증.</p>
+    <p class="muted small">fix: <code>test_personal_workspace_race_concurrent.py</code> integration</p>
+  </div>
+
+  <h2>가장 Critical 3건</h2>
+  <ol>
+    <li><strong>BUG-S27e-SEC-1</strong> — Clerk middleware bypass critical CVE, 우리 코드 직격. <code>pnpm up</code> 1줄로 fix. 외부 5명 진입 전 필수.</li>
+    <li><strong>BUG-S27e-SEC-4</strong> — cron 평문 fallback. config.py 1줄 + validator. 단일 사용자가 다인 데이터 파괴 가능.</li>
+    <li><strong>BUG-S27e-TEST-1</strong> — 27d 보안 헤더 회귀 가드 부재. 27d fix 가 1 PR 만에 회귀 가능.</li>
+  </ol>
+
+  <h2>차단 결함 fix 순서 (~4h 추정)</h2>
+  <table>
+    <thead><tr><th>순서</th><th>ID</th><th>작업</th><th>예상</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>SEC-1 + SEC-2</td><td><code>pnpm up @clerk/nextjs@^7.2.1 next@^16.2.5</code> + build + audit clean</td><td>1h</td></tr>
+      <tr><td>2</td><td>SEC-4</td><td><code>cron_secret_token</code> default 제거 + Settings validator + 1 case test</td><td>30분</td></tr>
+      <tr><td>3</td><td>SEC-3</td><td>JWT audience + issuer 명시 + Settings 분리 + 2 case test</td><td>1h</td></tr>
+      <tr><td>4</td><td>TEST-1</td><td>BE pytest 2 case + FE e2e 1 spec</td><td>1h</td></tr>
+      <tr><td>5</td><td>TEST-2</td><td>asyncio.gather concurrent integration</td><td>1h</td></tr>
+      <tr class="total"><td colspan="3">합계</td><td>~4h</td></tr>
+    </tbody>
+  </table>
+
+  <h2>🟡 비차단 — BL-S27e-A~F 6 묶음 carry (37건)</h2>
+  <div class="bug warn-l"><strong>BL-S27e-A — 보안 hygiene</strong> <span class="badge warn">P2</span> · SEC-5 audit_events · SEC-6 rate-limit · SEC-7 CORS 화이트리스트 · SEC-11 logging.warning + Cloud Run alert</div>
+  <div class="bug warn-l"><strong>BL-S27e-B — 보안 hardening</strong> <span class="badge warn">P3</span> · SEC-8 RAG prompt 구분자 · SEC-9 filename slugify · SEC-10 GHA SHA pin</div>
+  <div class="bug warn-l"><strong>BL-S27e-C — 성능 P1 cluster</strong> <span class="badge warn">P1</span> · PERF-1 R2 singleton · PERF-2 DB workspace_id 인덱스 3건 · PERF-3 streaming upload (OOM) · PERF-4 Gemini timeout · PERF-5 SSE disconnect</div>
+  <div class="bug warn-l"><strong>BL-S27e-D — 성능 P2 cluster</strong> <span class="badge warn">P2</span> · PERF-6 scoped cache · PERF-7 cache cleanup cron · PERF-8 created_at index · PERF-9 inbox N+1 · PERF-10 next/font · PERF-11 dynamic lazy</div>
+  <div class="bug warn-l"><strong>BL-S27e-E — 테스트 + 정량</strong> <span class="badge warn">P1-P2</span> · TEST-3 vitest.config · TEST-4 workspaces branch · TEST-5 invite accept e2e · TEST-6 회의 retry · TEST-7 upload mime e2e · TEST-8/9/10 에지</div>
+  <div class="bug warn-l"><strong>BL-S27e-F — 아키텍처 + governance</strong> <span class="badge warn">P1-P3</span> · ARCH-1 OnboardingService I-1 · ARCH-2 services DTO 분리 · ARCH-3 audit 도메인 · ARCH-4 헌법 모듈 수 · ARCH-5 Demeter · ARCH-6 promote SRP · ARCH-7 BL-005 closed</div>
+
+  <h2>Sprint 27d 대비</h2>
+  <ul>
+    <li>27d PASS 재확인: IDOR (BE RBAC 100%), upload mime, 보안 헤더 4종, RAG cross-tenant. regression 없음.</li>
+    <li>신규 발견 = dependency CVE 2건 (npm 신규 advisory) + JWT 검증 + cron 평문 + 회귀 가드 부재 + concurrent race 미검증 + R2 singleton 정량 + Gemini timeout + DB index.</li>
+    <li>verdict 충돌 없음: 27d (GO 8.02 product) vs 27e (NEEDS-FIX 기술) — 다른 차원.</li>
+  </ul>
+
+  <h2>최종 권고</h2>
+  <ol>
+    <li>차단 6건 fix 후 production 진입 또는 외부 5명 dogfooding 진입.</li>
+    <li>fix 후 회귀 검증: <code>uv run pytest -x</code> + <code>npm run typecheck</code> + <code>npm test</code> + e2e focused.</li>
+    <li>비차단 37건 → BL-S27e-A~F 6 묶음으로 <code>docs/refactoring-backlog.md</code> 등재 → Sprint 28 dogfooding-stabilize.</li>
+    <li>ADR-024 Clerk Production cutover 직전 SEC-3 fix 가 lock-in.</li>
+    <li>성능 정량 baseline 은 로컬 up 후 또는 staging Cloud Run 측정 → BL-S27e-C 진입 신호.</li>
+  </ol>
+</div>
+</body>
+</html>

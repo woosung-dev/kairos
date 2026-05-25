@@ -1,8 +1,11 @@
 # 앱 환경변수를 pydantic-settings로 관리하는 설정 모듈
 from functools import lru_cache
 
-from pydantic import SecretStr
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Sprint 15 R-CRON 의 dev fallback 토큰 — production 에선 절대 사용 X (validator 가 차단).
+_CRON_TOKEN_DEV_FALLBACK = "dev-cron-secret-CHANGE-ME-IN-PROD"
 
 
 class Settings(BaseSettings):
@@ -24,6 +27,11 @@ class Settings(BaseSettings):
     # Clerk
     clerk_secret_key: SecretStr
     clerk_webhook_secret: SecretStr
+    # Sprint 27e BUG-S27e-SEC-3 — JWT issuer/audience 명시 검증 (ADR-024 cutover 직격 결함 fix).
+    # default = dev instance — production 은 env 로 override 필수 (validator 가 dev URL 차단).
+    clerk_jwt_issuer: str = "https://creative-boxer-79.clerk.accounts.dev"
+    # Clerk JWT Templates 에 audience 설정 시 사용 — 미설정이면 None 으로 audience 검증 skip.
+    clerk_jwt_audience: str | None = None
 
     # Cloudflare R2
     r2_account_id: SecretStr
@@ -36,7 +44,9 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr
 
     # Cron (Sprint 15 R-CRON — R2 30일 cleanup endpoint 인증)
-    cron_secret_token: SecretStr = SecretStr("dev-cron-secret-CHANGE-ME-IN-PROD")
+    # Sprint 27e BUG-S27e-SEC-4 — production 환경에서 dev fallback 토큰 사용 금지.
+    # default 는 dev/test 편의 — validator 가 production 환경에서만 raise.
+    cron_secret_token: SecretStr = SecretStr(_CRON_TOKEN_DEV_FALLBACK)
 
     # Sentry (Sprint 22 Task 7 — Observability)
     sentry_dsn: SecretStr | None = None
@@ -63,8 +73,32 @@ class Settings(BaseSettings):
         extra="ignore",         # 선언되지 않은 변수 무시
     )
 
+    # Sprint 27e BUG-S27e-SEC-4 — production 환경에서 dev fallback 토큰 거부.
+    @field_validator("cron_secret_token")
+    @classmethod
+    def _no_default_cron_in_prod(cls, v: SecretStr, info) -> SecretStr:
+        app_env = info.data.get("app_env", "development")
+        if app_env == "production" and v.get_secret_value() == _CRON_TOKEN_DEV_FALLBACK:
+            raise ValueError(
+                "CRON_SECRET_TOKEN must be set in production "
+                "(dev fallback 'dev-cron-secret-CHANGE-ME-IN-PROD' rejected)"
+            )
+        return v
+
+    # Sprint 27e BUG-S27e-SEC-3 — production 환경에서 dev Clerk issuer 거부.
+    @field_validator("clerk_jwt_issuer")
+    @classmethod
+    def _no_dev_issuer_in_prod(cls, v: str, info) -> str:
+        app_env = info.data.get("app_env", "development")
+        if app_env == "production" and "creative-boxer-79.clerk.accounts.dev" in v:
+            raise ValueError(
+                "CLERK_JWT_ISSUER must be Clerk Production instance URL in production "
+                "(dev issuer 'creative-boxer-79.clerk.accounts.dev' rejected)"
+            )
+        return v
+
 
 @lru_cache
 def get_settings() -> Settings:
     """Settings 싱글톤 반환. 앱 전체에서 동일 인스턴스 재사용."""
-    return Settings()
+    return Settings()  # type: ignore[call-arg] — BaseSettings 가 .env / env 에서 값 채움 (false positive)

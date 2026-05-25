@@ -74,17 +74,18 @@ def _jwt_cache_set(key: str, claims: dict, token_exp: float | None = None) -> No
 def _get_jwks_client():
     """Clerk JWKS 클라이언트를 가져온다 (싱글톤).
 
-    cache_keys=True (Sprint 24 Wave 2 T-BE-PERF, low-risk 보강):
-      pyjwt 기본은 cache_keys=False — kid → signing_key 매핑을 매번 재구성한다.
-      JWKS set 자체는 cache_jwk_set=True (default, 300s) 로 이미 캐시되지만,
-      kid lookup overhead 제거를 위해 cache_keys=True 추가. _JWT_CLAIMS_CACHE 가 hit 되면
-      이 경로는 우회되므로 부수 효과 없음.
+    Sprint 27e BUG-S27e-SEC-3 — Clerk issuer URL 을 settings 기반으로 분리.
+      이전: 하드코드 dev URL → ADR-024 Clerk Production cutover 시 swap 결손 risk.
+      이후: settings.clerk_jwt_issuer + "/.well-known/jwks.json" — production env 로 override.
+
+    cache_keys=True (Sprint 24 Wave 2 T-BE-PERF, low-risk 보강).
     """
     global _jwks_client
     if _jwks_client is None:
-        # Clerk Frontend API JWKS URL — clerk_secret_key 에서 도메인 직접 추출 불가
+        from src.core.config import get_settings
+        settings = get_settings()
         _jwks_client = jwt.PyJWKClient(
-            "https://creative-boxer-79.clerk.accounts.dev/.well-known/jwks.json",
+            f"{settings.clerk_jwt_issuer}/.well-known/jwks.json",
             cache_keys=True,
         )
     return _jwks_client
@@ -109,14 +110,23 @@ async def verify_clerk_token(authorization: str = Header(default="")) -> dict:
         return cached
 
     try:
+        from src.core.config import get_settings
+        settings = get_settings()
         jwks_client = _get_jwks_client()
         signing_key = jwks_client.get_signing_key_from_jwt(token)
-        claims = jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=["RS256"],
-            options={"verify_aud": False},
-        )
+        # Sprint 27e BUG-S27e-SEC-3 — issuer 검증 명시 + audience 명시 (None 이면 PyJWT 가 skip).
+        # 이전: options={"verify_aud": False} + issuer 미전달 → cross-account JWT 통과 risk.
+        # 이후: 환경별 issuer 강제 + audience 일치 검증 (audience 미설정 시 PyJWT default).
+        decode_kwargs: dict = {
+            "algorithms": ["RS256"],
+            "issuer": settings.clerk_jwt_issuer,
+        }
+        if settings.clerk_jwt_audience is not None:
+            decode_kwargs["audience"] = settings.clerk_jwt_audience
+        else:
+            # Clerk JWT Template 미설정 환경 — audience claim 자체 검증은 skip
+            decode_kwargs["options"] = {"verify_aud": False}
+        claims = jwt.decode(token, signing_key.key, **decode_kwargs)
         # Clerk JWT의 sub 클레임 = Clerk 사용자 ID
         result = {"sub": claims["sub"]}
         # Codex F-1 fix: token exp 를 cache TTL 상한으로 (만료된 token cache hit 차단)
@@ -124,6 +134,11 @@ async def verify_clerk_token(authorization: str = Header(default="")) -> dict:
         return result
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="토큰이 만료되었습니다")
+    except jwt.InvalidIssuerError:
+        # Sprint 27e BUG-S27e-SEC-3 — issuer mismatch 명시 분리 (forensic).
+        raise HTTPException(status_code=401, detail="유효하지 않은 토큰 발급자입니다")
+    except jwt.InvalidAudienceError:
+        raise HTTPException(status_code=401, detail="유효하지 않은 토큰 대상입니다")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다")
     except Exception:
