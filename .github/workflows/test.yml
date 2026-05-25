@@ -88,12 +88,10 @@ jobs:
           echo "Next.js PID $!"
 
       - name: Wait for Next.js (security-headers gate)
-        # Sprint 27e Round 2 r2-1: Next.js 16 cold start CI 환경에서 60s 초과 가능 → 180s.
-        # `/` 는 dashboard 리다이렉트 + RSC 가 BE fetch (NEXT_PUBLIC_API_URL=http://localhost:8000)
-        # → ECONNREFUSED → 500. `/sign-in` 은 public route + BE 무관 → 200 보장.
-        # 실패 시 next log 즉시 dump (디버깅).
+        # Sprint 27e Round 2 r2-1: 127.0.0.1 사용 (CI chromium 의 localhost IPv6 ::1
+        # resolve fail 회피 — ERR_NAME_NOT_RESOLVED). Next.js 16 cold start 180s.
         run: |
-          npx wait-on http://localhost:3000/sign-in -t 180000 -v || {
+          npx wait-on http://127.0.0.1:3000/sign-in -t 180000 -v || {
             echo "--- wait-on failed; /tmp/next.log ---"
             cat /tmp/next.log || true
             exit 1
@@ -102,6 +100,8 @@ jobs:
       - name: Run security-headers spec only (public route, no secrets)
         env:
           E2E_PORT: "3000"
+          # CI chromium 의 localhost DNS resolve fail 회피 — 127.0.0.1 직접 사용.
+          E2E_BASE_URL: "http://127.0.0.1:3000"
         run: pnpm exec playwright test --project=public-only
 
       - name: Upload Next.js log on failure
