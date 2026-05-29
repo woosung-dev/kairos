@@ -109,3 +109,30 @@ describe("useWorkspaceStore — hasRole RBAC matrix", () => {
     });
   });
 });
+
+describe("useWorkspaceStore — ensureOwner 계정 전환 가드 (BL-S27c-12)", () => {
+  beforeEach(() => {
+    useWorkspaceStore.setState({ activeWorkspaceId: null, ownerUserId: null });
+  });
+
+  it("같은 user 재호출 시 activeWorkspaceId 유지 (no-op)", () => {
+    useWorkspaceStore.setState({ activeWorkspaceId: "ws-1", ownerUserId: "user_A" });
+    useWorkspaceStore.getState().ensureOwner("user_A");
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBe("ws-1");
+    expect(useWorkspaceStore.getState().ownerUserId).toBe("user_A");
+  });
+
+  it("다른 user 로 전환 시 stale activeWorkspaceId 초기화 + owner 갱신", () => {
+    useWorkspaceStore.setState({ activeWorkspaceId: "ws-A", ownerUserId: "user_A" });
+    useWorkspaceStore.getState().ensureOwner("user_B");
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBeNull();
+    expect(useWorkspaceStore.getState().ownerUserId).toBe("user_B");
+  });
+
+  it("ownerUserId 미설정(레거시 persist)에서 첫 호출 시 stale 정리", () => {
+    useWorkspaceStore.setState({ activeWorkspaceId: "ws-legacy", ownerUserId: null });
+    useWorkspaceStore.getState().ensureOwner("user_A");
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBeNull();
+    expect(useWorkspaceStore.getState().ownerUserId).toBe("user_A");
+  });
+});

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useCallback } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { useUIStore } from "@/store/ui";
 import { useSourceViewerStore } from "@/features/sources/store";
 import { useBreakpoint } from "@/hooks/use-media-query";
@@ -11,11 +12,31 @@ import { CmdK } from "./cmd-k";
 import { BottomNav } from "./bottom-nav";
 import { SourceViewer } from "@/features/sources/components/source-viewer";
 import { useSyncWorkspaceRole } from "@/features/members/hooks";
+import { useWorkspaces } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 
 export function PanelLayout({ children }: { children: React.ReactNode }) {
   const { isMobile, isCompact } = useBreakpoint();
+  const { userId } = useAuth();
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const ensureOwner = useWorkspaceStore((s) => s.ensureOwner);
+  const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId);
+  const { data: workspaces } = useWorkspaces();
+
+  // 계정 소유자 가드 (BL-S27c-12): 다른 user 로 전환되면 이전 user 의
+  // activeWorkspaceId 를 즉시 초기화해 cross-tenant 403 을 막는다. user id 만
+  // 비교하므로 워크스페이스 목록 로딩/생성 타이밍과 무관(race-free).
+  useEffect(() => {
+    if (userId) ensureOwner(userId);
+  }, [userId, ensureOwner]);
+
+  // activeWorkspaceId 가 비어있으면(초기/소유자 가드 직후) 첫 워크스페이스로 self-heal.
+  // 비어있을 때만 채우므로 워크스페이스 생성/전환으로 막 설정된 wid 를 덮어쓰지 않는다.
+  useEffect(() => {
+    if (workspaces?.length && !activeWorkspaceId) {
+      setActiveWorkspaceId(workspaces[0].id);
+    }
+  }, [workspaces, activeWorkspaceId, setActiveWorkspaceId]);
 
   // 워크스페이스 변경 시 역할 동기화
   useSyncWorkspaceRole(activeWorkspaceId ?? undefined);
