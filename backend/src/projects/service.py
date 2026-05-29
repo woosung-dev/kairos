@@ -101,6 +101,12 @@ class ProjectService:
         page_size: int = 20,
     ) -> dict:
         """워크스페이스 프로젝트 목록 (페이지네이션 + visibility 권한 분기)."""
+        # BUG-ARCHIVED-PROJECT-LEAK (defense): status 미지정 시 기본 active-only.
+        # archived/completed 는 명시 status 로만 조회된다 (사이드바 Archive 섹션은 status='archived' 전송).
+        # repo.find_by_workspace 는 flexible query builder 로 유지 — pipeline_service auto-link 의
+        # 직접 호출(status=None=전체)에는 영향 없음.
+        if status is None:
+            status = "active"
         offset = (page - 1) * page_size
         projects = await self.repo.find_by_workspace(
             workspace_id,
