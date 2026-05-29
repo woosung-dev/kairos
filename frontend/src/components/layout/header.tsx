@@ -92,6 +92,7 @@ export function Header() {
           <DropdownMenuTrigger
             className="flex items-center gap-2 p-1 rounded-lg transition-colors cursor-pointer outline-none"
             style={{ WebkitTapHighlightColor: "transparent" }}
+            aria-label="계정 메뉴"
           >
             <div
               className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-opacity hover:opacity-80"

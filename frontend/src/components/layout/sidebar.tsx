@@ -316,6 +316,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
           gap: collapsed ? "0" : "12px",
         }}
         title={collapsed ? item.label : undefined}
+        aria-label={collapsed ? item.label : undefined}
       >
         <Icon size={18} />
         {!collapsed && (
