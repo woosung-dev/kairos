@@ -19,10 +19,33 @@
 
 검증: **전체 BE 528 pass/1 skip 무회귀** · FE `tsc --noEmit` clean · 라이브 스샷(p5-fix-new-mobile375-after / p5-fix-meeting-failed-after).
 
+## FIX 적용 현황 — Sprint 28c P3 polish (branch `sprint-28c/a11y-polish`, PR1)
+| ID | 적용 | commit |
+|---|---|---|
+| A11Y-AVATAR-LABEL (P3) | ✅ FIXED — avatar trigger `aria-label="계정 메뉴"` (라이브 a11y tree 확인) | c9c20f1 |
+| A11Y-ICON-RAIL-768 (P3) | ✅ FIXED — collapsed nav + 설정 링크 `aria-label` (focus-visible 은 전역 :focus-visible 이미 적용 → 비추가). 768 라이브 스냅샷 확인 | c9c20f1 + b2d4ab1 |
+| UX-CMDK-GLYPH (P3) | ✅ FIXED — kbd `var(--font-mono), system-ui, sans-serif` per-glyph fallback. ⌘K 렌더 4곳 전수(header/cmd-k/dashboard/rag-home) | b2244f3 |
+| OBS-VIEWER-VISIBILITY-BTN (P3) | ✅ FIXED — VisibilityBadge `interactive` prop(BUG-H02 onClick 가드 유지) + detail/dashboard `interactive={canManage}`. viewer 라이브 = disabled/default cursor/label 툴팁 | b39dea6 |
+| BUG-ARCHIVED-PROJECT-LEAK (P3) | ✅ FIXED — service.list_projects status=None→'active' 기본. repo 는 flexible 유지(pipeline auto-link 무영향). 테스트 반전 + reachability | 03ad9b2 |
+| DESIGN-TOKEN-DRIFT (P3) | ✅ FIXED — citation-badge/action-kanban/today-feed 하드코드 hex→var() + ::selection→var(--accent-foreground). 토큰 resolve 동일값 = 시각 무회귀 | f0bb461 |
+| BUG-SEARCH-CURRENT-PROJECT-NOOP (P3, B2 결정=숨김) | ✅ FIXED — 글로벌 search "현재 프로젝트" 탭 제거(전체/선택한소스만). projectId 인프라 유지 | 0f04524 |
+
+검증(PR1): **로컬 CI 게이트 4종 green** — backend pytest **526 passed** · vitest **56 passed** · next build(+typecheck) · security-headers public-only **2/2** · `tsc --noEmit` clean. 라이브 MCP Playwright(3계정 중 C·B) console.error 0(B 의 stale-wid 403 은 BUG-H01 류 기존이슈, 본 변경 무관). 스샷 `screenshots/s28c-*`(dashboard ⌘K / search 2탭 / viewer 비대화형 배지 다크).
+
+## FIX 적용 현황 — Sprint 28c 설계종속 (branch `sprint-28c/memory-ws-filter`, PR2)
+| ID | 적용 | commit |
+|---|---|---|
+| BUG-MEMORY-WS-FILTER (P3, 결정=WHERE+테스트) | ⏳ 진행 — memory 5 mutation workspace_id WHERE + cross-ws 차단 통합테스트(정적→실증). composite FK 는 제외(memory 는 타 FK target 아님) | (PR2) |
+
+**Sprint 28c 결정/연기 (사용자 confirm)**:
+- **BL-DATA-HYGIENE-SEED** → **GA/ADR-024 연기**. ⚠️ 조사결과 lazy seed(`auth/dependencies.py`)는 이미 JWT claims(name/email)를 읽어 User 를 채움. displayName="사용자"/email="" 의 원인은 **Clerk 기본 세션토큰이 email/name claim 미포함**(JWT 템플릿 커스터마이즈 필요)임 → 코드 fix 아님. Clerk Prod 설정 시 기존 코드가 자동 동작.
+- **BUG-MEMORY-WS-FILTER composite FK** → 제외(라이브 IDOR 없음 + memory 는 타 composite FK 의 target 아님).
+- **search project picker** → 제외(과한 범위, 탭 숨김 채택).
+
 **미적용 (잔여 — 사용자 결정/후속)**:
 - **BUG-INBOX-PROMOTE-STUB** (P2) — 제품 결정 필요. "다른 프로젝트"·"수정" 둘 다 동일 미구현 editing stub → picker 구현(기능) vs edit affordance 제거(UX 축소) 택1.
 - **(정정·완료)** 실패 pipeline 은 error_message 를 **정상 기록함**(BE 로그 검증 — httpx 404 `str(e)`). 초기 "값 null" 은 uvicorn 이 redaction 전 stale 코드였던 탓 — BE 재기동 후 detail 응답 errorMessage 정상 반환 확인. FE 는 **친화적 메시지만** 표시(원시 httpx 오류·서명 URL 의 UI 덤프 회피); errorMessage 는 API 에 support/디버깅용 보존(status 엔드포인트와 동일). 선택 polish = pipeline 이 error_message 를 사용자친화 문구로 sanitize.
-- **P3 polish**: A11Y-AVATAR-LABEL · A11Y-ICON-RAIL-768 · UX-CMDK-GLYPH · OBS-VIEWER-VISIBILITY-BTN · DESIGN-TOKEN-DRIFT · BUG-MEMORY-WS-FILTER(통합테스트 실증) · BL-DATA-HYGIENE-SEED · BUG-SEARCH-CURRENT-PROJECT-NOOP · BUG-ARCHIVED-PROJECT-LEAK(BE 기본 active-only defense) · LANDING-TEXT-WHITE(nit).
+- **P3 polish** → **대부분 Sprint 28c 처리**(위 `FIX 적용 현황 — Sprint 28c` 표 참조). 잔여: BUG-MEMORY-WS-FILTER(PR2 진행) · BL-DATA-HYGIENE-SEED(GA 연기) · LANDING-TEXT-WHITE(nit, 미처리).
 
 ---
 
