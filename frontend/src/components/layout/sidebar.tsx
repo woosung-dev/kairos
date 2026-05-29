@@ -426,6 +426,8 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
             background: pathname === "/settings" ? "var(--surface-active)" : "transparent",
             borderRadius: "var(--radius-sm)",
           }}
+          title={collapsed ? "설정" : undefined}
+          aria-label={collapsed ? "설정" : undefined}
         >
           <Settings size={16} />
           {!collapsed && <span>설정</span>}
