@@ -26,12 +26,12 @@
 ### frontend/.env.local
 
 ```bash
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_mvhptLjIsVcHn7r4D5gPNmgNDc73jCsvOa7khThqBI
-CLERK_SECRET_KEY=sk_test_mvhptLjIsVcHn7r4D5gPNmgNDc73jCsvOa7khThqBI
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_<REDACTED — Clerk 대시보드에서 확인>
+CLERK_SECRET_KEY=sk_test_<REDACTED — .env.local 에만 보관, 절대 커밋 금지>
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-> Clerk 키는 backend/.env.local과 동일한 프로젝트. Publishable key는 Clerk 대시보드에서 확인.
+> ⚠️ 2026-05-29 보안: 실 Clerk dev secret 이 본 문서에 평문 커밋되어 있던 것을 redaction 함(SEC-CLERK-SECRET-COMMITTED). 키는 .env.local 에만 두고 커밋 금지. **Clerk 대시보드에서 secret rotation 필요**(노출된 키 무효화). Clerk 키는 backend/.env 와 동일 프로젝트.
 
 ---
 
