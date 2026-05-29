@@ -313,7 +313,7 @@
   }
   ::selection {
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-foreground);
   }
 
   /* 랜딩 입장 애니메이션 */

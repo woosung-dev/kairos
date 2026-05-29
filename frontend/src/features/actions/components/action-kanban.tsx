@@ -29,9 +29,9 @@ const COLUMNS = [
 type ColumnId = (typeof COLUMNS)[number]["id"];
 
 const PRIORITY_COLORS: Record<ActionPriority, string> = {
-  high: "#F87171",
-  medium: "#FBBF24",
-  low: "#60A5FA",
+  high: "var(--error)",
+  medium: "var(--warning)",
+  low: "var(--info)",
 };
 
 const PRIORITY_LABELS: Record<ActionPriority, string> = {
