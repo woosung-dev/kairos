@@ -79,7 +79,9 @@ function ProcessingView({ status }: { status: MeetingStatus }) {
 
 /* ── 실패 안내 (S28b BUG-MEETING-FAILED-UI) ── */
 
-function FailedMeetingView({ errorMessage }: { errorMessage: string | null }) {
+function FailedMeetingView() {
+  // 사용자에겐 친화적 메시지만 노출 — 원시 error_message(서명 URL 포함 httpx 오류 등)는
+  // 상세 응답(errorMessage)에 남겨 support/디버깅용으로 두되 UI 에 raw 로 덤프하지 않음.
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <span className="text-4xl mb-4">⚠️</span>
@@ -90,9 +92,7 @@ function FailedMeetingView({ errorMessage }: { errorMessage: string | null }) {
         분석에 실패했습니다
       </h3>
       <p className="text-sm mb-4 max-w-md" style={{ color: "var(--text-muted)" }}>
-        {errorMessage
-          ? `실패 원인: ${errorMessage}`
-          : "처리 중 오류가 발생했습니다. 파일을 확인하고 다시 업로드해 주세요."}
+        처리 중 오류가 발생했습니다. 파일 형식과 크기를 확인하고 다시 업로드해 주세요.
       </p>
       <a
         href="/new"
@@ -246,7 +246,7 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
 
       {/* 상태별 본문: 실패 / 처리중 / 완료 탭 (S28b BUG-MEETING-FAILED-UI) */}
       {meeting.status === "failed" ? (
-        <FailedMeetingView errorMessage={meeting.errorMessage} />
+        <FailedMeetingView />
       ) : isProcessing ? (
         <ProcessingView status={meeting.status} />
       ) : (

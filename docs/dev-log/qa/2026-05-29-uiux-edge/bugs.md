@@ -21,7 +21,7 @@
 
 **미적용 (잔여 — 사용자 결정/후속)**:
 - **BUG-INBOX-PROMOTE-STUB** (P2) — 제품 결정 필요. "다른 프로젝트"·"수정" 둘 다 동일 미구현 editing stub → picker 구현(기능) vs edit affordance 제거(UX 축소) 택1.
-- **잔여 BE**: 실패 pipeline 의 R2-fetch 경로가 error_message 미기록(detail 노출은 fix 됐으나 값 null → FE graceful fallback). 별도 BE 보완 권장.
+- **(정정·완료)** 실패 pipeline 은 error_message 를 **정상 기록함**(BE 로그 검증 — httpx 404 `str(e)`). 초기 "값 null" 은 uvicorn 이 redaction 전 stale 코드였던 탓 — BE 재기동 후 detail 응답 errorMessage 정상 반환 확인. FE 는 **친화적 메시지만** 표시(원시 httpx 오류·서명 URL 의 UI 덤프 회피); errorMessage 는 API 에 support/디버깅용 보존(status 엔드포인트와 동일). 선택 polish = pipeline 이 error_message 를 사용자친화 문구로 sanitize.
 - **P3 polish**: A11Y-AVATAR-LABEL · A11Y-ICON-RAIL-768 · UX-CMDK-GLYPH · OBS-VIEWER-VISIBILITY-BTN · DESIGN-TOKEN-DRIFT · BUG-MEMORY-WS-FILTER(통합테스트 실증) · BL-DATA-HYGIENE-SEED · BUG-SEARCH-CURRENT-PROJECT-NOOP · BUG-ARCHIVED-PROJECT-LEAK(BE 기본 active-only defense) · LANDING-TEXT-WHITE(nit).
 
 ---
