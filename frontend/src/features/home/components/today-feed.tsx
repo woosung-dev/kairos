@@ -41,11 +41,11 @@ function InboxCard({ count }: { count: number }) {
         <div
           className="flex items-center justify-center w-8 h-8 rounded"
           style={{
-            background: "rgba(251,191,36,0.1)",
+            background: "color-mix(in srgb, var(--warning) 10%, transparent)",
             borderRadius: "var(--radius-sm)",
           }}
         >
-          <Inbox size={16} style={{ color: "#FBBF24" }} />
+          <Inbox size={16} style={{ color: "var(--warning)" }} />
         </div>
         <div>
           <p
@@ -63,7 +63,7 @@ function InboxCard({ count }: { count: number }) {
         <span
           className="flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold"
           style={{
-            background: "#FBBF24",
+            background: "var(--warning)",
             color: "var(--background)",
           }}
         >

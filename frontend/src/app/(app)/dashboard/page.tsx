@@ -196,7 +196,8 @@ export default function DashboardPage() {
               style={{
                 background: "var(--surface-active)",
                 borderRadius: "var(--radius-sm)",
-                fontFamily: "var(--font-mono)",
+                // ⌘(U+2318) 가 Geist Mono 미포함 → system-ui per-glyph fallback (UX-CMDK-GLYPH)
+                fontFamily: "var(--font-mono), system-ui, sans-serif",
               }}
             >
               ⌘K

@@ -208,7 +208,8 @@ export function CmdK() {
                       style={{
                         background: "var(--surface-active)",
                         color: "var(--text-muted)",
-                        fontFamily: "var(--font-mono)",
+                        // ⌘(U+2318) 가 Geist Mono 미포함 → system-ui per-glyph fallback (UX-CMDK-GLYPH)
+                        fontFamily: "var(--font-mono), system-ui, sans-serif",
                         borderRadius: "var(--radius-sm)",
                       }}
                     >

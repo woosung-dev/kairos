@@ -316,6 +316,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
           gap: collapsed ? "0" : "12px",
         }}
         title={collapsed ? item.label : undefined}
+        aria-label={collapsed ? item.label : undefined}
       >
         <Icon size={18} />
         {!collapsed && (
@@ -425,6 +426,8 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
             background: pathname === "/settings" ? "var(--surface-active)" : "transparent",
             borderRadius: "var(--radius-sm)",
           }}
+          title={collapsed ? "설정" : undefined}
+          aria-label={collapsed ? "설정" : undefined}
         >
           <Settings size={16} />
           {!collapsed && <span>설정</span>}

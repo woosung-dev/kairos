@@ -142,6 +142,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
             <VisibilityBadge
               visibility={project.visibility}
               isLoading={isRoleLoading}
+              interactive={canManage}
               onClick={() => {
                 // closure 캐싱 회피 — 핸들러는 항상 같은 참조,
                 // 호출 시점에 canManage 평가하여 race-condition 차단 (BUG-H02)

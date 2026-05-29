@@ -17,14 +17,14 @@ const CITATION_COLORS: Record<
     color: "var(--accent)",
   },
   2: {
-    bg: "rgba(167,139,250,0.1)",
-    bgActive: "#A78BFA",
-    color: "#A78BFA",
+    bg: "color-mix(in srgb, var(--chart-3) 10%, transparent)",
+    bgActive: "var(--chart-3)",
+    color: "var(--chart-3)",
   },
   3: {
-    bg: "rgba(251,191,36,0.1)",
-    bgActive: "#FBBF24",
-    color: "#FBBF24",
+    bg: "color-mix(in srgb, var(--warning) 10%, transparent)",
+    bgActive: "var(--warning)",
+    color: "var(--warning)",
   },
 };
 

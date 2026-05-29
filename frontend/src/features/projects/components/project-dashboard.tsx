@@ -393,6 +393,7 @@ function DashboardHeader({
         <VisibilityBadge
           visibility={project.visibility}
           isLoading={isRoleLoading}
+          interactive={canManage}
           onClick={() => {
             // closure 캐싱 회피 (BUG-H02) — 호출 시점 canManage 평가
             if (canManage) onVisibilityClick();

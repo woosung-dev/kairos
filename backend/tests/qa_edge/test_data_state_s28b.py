@@ -124,15 +124,14 @@ async def test_notes_pagination_contract_page1_and_page2(
 # ─── 2. Archived project list-filter 동작 (열린 질문 결판) ──────────────────
 
 
-async def test_archived_project_appears_in_unfiltered_list(
+async def test_default_list_excludes_archived(
     integration_session: AsyncSession,
 ):
-    """status 필터 미지정 /projects 기본 목록에 archived project 가 노출되는지 실측.
+    """status 필터 미지정 /projects 기본 목록은 archived 를 제외한다 (active-only).
 
-    DEFINITIVE FINDING: projects/repository.py:46 의 `if status:` 는 status query 가
-    들어올 때만 WHERE Project.status == status 를 적용한다. status=None(미지정) 이면
-    분기를 타지 않아 active + archived 가 **모두** 반환된다.
-    → archived project 는 기본 grid 에 누설된다 (YES). 본 테스트는 ACTUAL 동작을 assert.
+    BUG-ARCHIVED-PROJECT-LEAK fix: projects/service.py list_projects 가 status=None 시
+    기본값을 'active' 로 강제한다. archived/completed 는 명시 status 로만 조회된다.
+    (사이드바 Archive 섹션은 status='archived' 를 명시 전송하므로 무영향.)
     """
     owner = await _make_user(integration_session, "오너")
     ws = await _make_team_ws(integration_session, owner.id)
@@ -164,15 +163,26 @@ async def test_archived_project_appears_in_unfiltered_list(
     statuses = {p["status"] for p in unfiltered["items"]}
     ids = {p["id"] for p in unfiltered["items"]}
 
-    # DEFINITIVE: archived 가 기본(필터 미지정) 목록에 포함된다 (YES, 누설).
-    assert unfiltered["total"] == 2, (
-        f"필터 미지정 시 active+archived 모두 카운트되어야 함. statuses={statuses}"
+    # FIX: 기본(필터 미지정) 목록은 active 만 (archived 제외).
+    assert unfiltered["total"] == 1, (
+        f"필터 미지정 시 active 만 카운트되어야 함. statuses={statuses}"
     )
-    assert "archived" in statuses, (
-        "archived project 가 기본 목록에 노출됨 (projects/repository.py:46 `if status:` 미적용)"
+    assert "archived" not in statuses, (
+        "기본 목록에 archived 가 노출되면 안 됨 (BUG-ARCHIVED-PROJECT-LEAK fix)"
     )
-    assert "active" in statuses
-    assert active["id"] in ids and to_archive["id"] in ids
+    assert statuses == {"active"}
+    assert active["id"] in ids and to_archive["id"] not in ids
+
+    # 명시 status='archived' 로는 여전히 조회 가능 (reachability 보존).
+    archived_only = await service.list_projects(
+        workspace_id=ws.id,
+        requester_user_id=owner.id,
+        requester_role="owner",
+        status="archived",
+    )
+    archived_ids = {p["id"] for p in archived_only["items"]}
+    assert archived_only["total"] == 1
+    assert to_archive["id"] in archived_ids
 
 
 async def test_status_active_filter_excludes_archived(
