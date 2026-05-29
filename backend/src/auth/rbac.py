@@ -23,7 +23,8 @@ ROLE_LEVEL: dict[str, int] = {
 # Sprint 28 BUG-S28-PERF-RT-1 fix — WorkspaceMember in-process TTL cache.
 # Round B 측정: dashboard 4 endpoint × RBAC SELECT × Neon RTT (1-2s) 가 fanout critical path
 # 의 큰 부분. JWT cache + User cache 와 동일 60s TTL 패턴. cache hit 시 SELECT 0.
-# role 변경 → 60s 안 반영 (acceptable, role 변경 자체는 invite/promote/demote 빈도 낮음).
+# role 변경/제거 → invite_service 가 invalidate_member_cache() 호출로 즉시 반영
+# (BUG-RBAC-CACHE-STALE fix). 그 외 경로는 60s TTL 내 자연 만료.
 _MEMBER_CACHE: dict[tuple[uuid.UUID, uuid.UUID], tuple[WorkspaceMember, float]] = {}
 _MEMBER_CACHE_TTL_SEC = 60.0
 _MEMBER_CACHE_MAX_SIZE = 2000
