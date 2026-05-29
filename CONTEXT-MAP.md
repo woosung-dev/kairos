@@ -16,7 +16,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 상세 ERD: `docs/architecture/erd.md`. 본 문서는 코드 사실 우선.
 
-**격리**: Workspace(personal/team) · WorkspaceMember · Project(public/draft/private) · ProjectMember · User(clerk_id, onboarding 0~4). **콘텐츠**: InboxItem · Meeting+TranscriptSegment+MeetingSummary+MeetingProjectLink · ActionItem(nullable parents) · Note(Tiptap) · MemoryItem(text/voice). **audit**: PromoteAudit(memory) · ItemPromotionAudit(4 도메인) · MemoryAiCall · MemoryEvent. **벡터**: EmbeddingChunk(halfvec 1536d L1/L2) · SemanticCache(TTL 7d ≥0.93) · MemoryQueryEmbeddingCache.
+**격리**: Workspace(personal/team) · WorkspaceMember · Project(public/draft/private) · ProjectMember · User(clerk_id, onboarding 0~4). **콘텐츠**: InboxItem · Meeting+TranscriptSegment+MeetingSummary+MeetingProjectLink · ActionItem(nullable parents) · Note(Tiptap) · MemoryItem(text/voice) · FeedbackEntry(dogfooding, user-level·workspace nullable). **audit**: PromoteAudit(memory) · ItemPromotionAudit(4 도메인) · MemoryAiCall · MemoryEvent. **벡터**: EmbeddingChunk(halfvec 1536d L1/L2) · SemanticCache(TTL 7d ≥0.93) · MemoryQueryEmbeddingCache.
 
 ### 별칭 금지 (도메인 용어 위반 감지)
 
@@ -40,9 +40,9 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 ## 4. 도메인 경계
 
-### 4.1 백엔드 모듈 (15)
+### 4.1 백엔드 모듈 (16)
 
-`auth · workspaces · projects · inbox · meetings · notes · actions · memory · onboarding · upload · embeddings · rag · common · core · services`. 폴더 표준: `router/service/repository/schemas/models/dependencies/exceptions.py`. 상세: `docs/architecture/directory-map.md`.
+`auth · workspaces · projects · inbox · meetings · notes · actions · feedback · memory · onboarding · upload · embeddings · rag · common · core · services`. 폴더 표준: `router/service/repository/schemas/models/dependencies/exceptions.py`. 상세: `docs/architecture/directory-map.md`.
 
 ### 4.2 의존 규칙 (헌법 결정 #1, ADR-014)
 
@@ -83,7 +83,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 | I-10 | Inbox confidence 임계값: 워크스페이스별 `workspaces.inbox_threshold` (기본 0.9), PATCH 가능 | `workspaces/models.py`, `meetings/pipeline_service.py` |
 | I-11 | shadcn `components/ui/` 수정 금지 | `frontend/src/components/ui/` |
 | I-12 | 언어 정책: 사고/문서/주석 한국어, 코드/네이밍 영어 | AGENTS.md §1 |
-| I-13 | API workspace prefix: `/api/v1/workspaces/{workspace_id}/<resource>` (auth 예외 `/api/v1/users`) | `<domain>/router.py` |
+| I-13 | API workspace prefix: `/api/v1/workspaces/{workspace_id}/<resource>` (예외: auth `/api/v1/users`, user-level `/api/v1/feedback` — 워크스페이스 비종속 dogfooding 피드백) | `<domain>/router.py` |
 | I-14 | Pydantic V2 + 100% async + SQLModel typed query (Sprint 20 BL-054): 상세 allowlist (G1~G3-keep-dialect 5 카테고리) `backend/CONTEXT.md` B-10 | code review |
 | I-15 | Secret 은 `SecretStr`, 사용 시 `.get_secret_value()` | `core/config.py` |
 | I-16 | DB snake_case ↔ API camelCase: Pydantic alias 변환 | `<domain>/schemas.py` |
