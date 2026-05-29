@@ -2,6 +2,7 @@
 
 import { useActionItems, useUpdateActionItem } from "@/features/actions/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { ActionItem, ActionStatus } from "@/features/actions/types";
 
 /* ── Props ── */
@@ -42,13 +43,9 @@ export function ActionView({ meetingId }: ActionViewProps) {
   /* 로딩 */
   if (isLoading) {
     return (
-      <div className="space-y-2 animate-pulse">
+      <div className="space-y-2">
         {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="h-14 rounded-lg"
-            style={{ background: "var(--surface-active)" }}
-          />
+          <Skeleton key={i} className="h-14 rounded-lg" />
         ))}
       </div>
     );

@@ -6,6 +6,7 @@
 import { SmartInboxItemCard } from "./inbox-item-card";
 import { useInbox } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { InboxItem } from "../types";
 
 /* ── 로딩 스켈레톤 ── */
@@ -16,7 +17,7 @@ function InboxSkeleton() {
       {[1, 2, 3].map((i) => (
         <div
           key={i}
-          className="p-4 rounded-lg border animate-pulse"
+          className="p-4 rounded-lg border"
           style={{
             background: "var(--surface)",
             borderColor: "var(--border-subtle)",
@@ -24,11 +25,11 @@ function InboxSkeleton() {
           }}
         >
           <div className="flex items-start gap-3">
-            <div className="w-6 h-6 rounded" style={{ background: "var(--surface-active)" }} />
+            <Skeleton className="w-6 h-6 rounded" />
             <div className="flex-1 space-y-2">
-              <div className="h-4 rounded w-2/3" style={{ background: "var(--surface-active)" }} />
-              <div className="h-3 rounded w-full" style={{ background: "var(--surface-active)" }} />
-              <div className="h-3 rounded w-3/4" style={{ background: "var(--surface-active)" }} />
+              <Skeleton className="h-4 rounded w-2/3" />
+              <Skeleton className="h-3 rounded w-full" />
+              <Skeleton className="h-3 rounded w-3/4" />
             </div>
           </div>
         </div>

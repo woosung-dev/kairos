@@ -39,6 +39,7 @@ import type { Note } from "@/features/notes/types";
 import { EditProjectDialog } from "./edit-project-dialog";
 import { ProjectMembersPanel } from "./project-members-panel";
 import { VisibilityBadge } from "./visibility-badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { VisibilityChangeDialog } from "./visibility-change-dialog";
 
 /* ── 상태 라벨 ── */
@@ -75,18 +76,18 @@ function isOverdue(dateStr: string | null): boolean {
 
 function DashboardSkeleton() {
   return (
-    <div className="p-6 animate-pulse space-y-6">
-      <div className="h-8 rounded w-1/3" style={{ background: "var(--surface-active)" }} />
-      <div className="h-4 rounded w-2/3" style={{ background: "var(--surface-active)" }} />
+    <div className="p-6 space-y-6">
+      <Skeleton className="h-8 rounded w-1/3" />
+      <Skeleton className="h-4 rounded w-2/3" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-20 rounded-lg" style={{ background: "var(--surface-active)" }} />
+            <Skeleton key={i} className="h-20 rounded-lg" />
           ))}
         </div>
         <div className="space-y-2">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-12 rounded-lg" style={{ background: "var(--surface-active)" }} />
+            <Skeleton key={i} className="h-12 rounded-lg" />
           ))}
         </div>
       </div>
@@ -199,15 +200,15 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
 
       {/* 로딩 중이면 스켈레톤 */}
       {isContentLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-pulse">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-20 rounded-lg" style={{ background: "var(--surface-active)" }} />
+              <Skeleton key={i} className="h-20 rounded-lg" />
             ))}
           </div>
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-12 rounded-lg" style={{ background: "var(--surface-active)" }} />
+              <Skeleton key={i} className="h-12 rounded-lg" />
             ))}
           </div>
         </div>
