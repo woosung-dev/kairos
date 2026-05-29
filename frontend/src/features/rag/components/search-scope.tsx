@@ -6,7 +6,9 @@
 import { useState } from "react";
 import { useRagStore } from "../store";
 
-type ScopeTab = "all" | "project" | "selected";
+// "현재 프로젝트" 는 글로벌 /search 에 현재 프로젝트 컨텍스트가 없어 무동작(전체와 동일)이라 제거
+// (BUG-SEARCH-CURRENT-PROJECT-NOOP). searchFilter.projectId 인프라는 향후 in-project RAG 용으로 store 에 유지.
+type ScopeTab = "all" | "selected";
 
 const TIME_OPTIONS = [
   { value: "", label: "전체 기간" },
@@ -32,7 +34,6 @@ export function SearchScope() {
         {(
           [
             { key: "all", label: "전체" },
-            { key: "project", label: "현재 프로젝트" },
             { key: "selected", label: "선택한 소스" },
           ] as const
         ).map((tab) => (
