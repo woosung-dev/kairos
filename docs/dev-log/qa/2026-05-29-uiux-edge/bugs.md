@@ -6,6 +6,24 @@
 
 상태: `신규`/`확정(carry-over)`/`정적`/`관찰`. 각 헤드라인은 3평가자 중 최소 1이 코드 file:line 재현.
 
+## FIX 적용 현황 (branch `sprint-28b/uiux-edge-fixes`, 6 commits, 미푸쉬)
+| ID | 적용 | commit |
+|---|---|---|
+| SEC-CLERK-SECRET-COMMITTED (P0) | ✅ 파일 redaction (**rotation 은 운영자 잔여**) | d5463cc |
+| BUG-WS-MEMBER-UNIQUE (P1) | ✅ FIXED — 모델+마이그레이션 **Neon 적용** + 회귀가드 2건 | 5cf7dae |
+| BUG-MEETING-FAILED-UI (+OBS-MEETING-ACTIONS) (P2) | ✅ FIXED — BE errorMessage 노출 + FE 실패뷰+재업로드 CTA + export 게이트 | 68d6f30 |
+| UX-NEW-GRID-375 (P2) | ✅ FIXED — grid-cols-1 sm:grid-cols-3 (375 스샷 검증) | 8335d26 |
+| DARK-CONTRAST-MUTED (P2) | ✅ FIXED — #5C5C63→#7A7A82 (4.66:1 AA) | 8335d26 |
+| RQ-KEY-COLLISION (P2) | ✅ FIXED — projectKeys.list params 포함 | 8335d26 |
+| FE-PAGESIZE-PARAM-MISMATCH (P3) | ✅ FIXED — page_size→pageSize | 8335d26 |
+
+검증: **전체 BE 528 pass/1 skip 무회귀** · FE `tsc --noEmit` clean · 라이브 스샷(p5-fix-new-mobile375-after / p5-fix-meeting-failed-after).
+
+**미적용 (잔여 — 사용자 결정/후속)**:
+- **BUG-INBOX-PROMOTE-STUB** (P2) — 제품 결정 필요. "다른 프로젝트"·"수정" 둘 다 동일 미구현 editing stub → picker 구현(기능) vs edit affordance 제거(UX 축소) 택1.
+- **잔여 BE**: 실패 pipeline 의 R2-fetch 경로가 error_message 미기록(detail 노출은 fix 됐으나 값 null → FE graceful fallback). 별도 BE 보완 권장.
+- **P3 polish**: A11Y-AVATAR-LABEL · A11Y-ICON-RAIL-768 · UX-CMDK-GLYPH · OBS-VIEWER-VISIBILITY-BTN · DESIGN-TOKEN-DRIFT · BUG-MEMORY-WS-FILTER(통합테스트 실증) · BL-DATA-HYGIENE-SEED · BUG-SEARCH-CURRENT-PROJECT-NOOP · BUG-ARCHIVED-PROJECT-LEAK(BE 기본 active-only defense) · LANDING-TEXT-WHITE(nit).
+
 ---
 
 ## P0 — 시크릿 노출 (QA 블로커와 분리)
