@@ -44,7 +44,7 @@
 | LANDING-TEXT-WHITE (nit) | ✅ FIXED — CTA 3곳(hero/nav/pricing) text-white→var(--accent-foreground). 다크 랜딩(accent #3ECFB4) 흰텍스트 ≈1.7:1 → 어두운 텍스트 고대비. 브랜드 accent 무변경 | edf8365 |
 | DESIGN-TOKEN cluster (skeleton, P3) | ✅ FIXED — 공용 components/ui/skeleton.tsx + 6개 ad-hoc 스켈레톤 통일(시각 패리티 유지) | 7c7f119 |
 
-검증(PR3, FE-only): vitest **56** · next build(+typecheck) · `tsc --noEmit` clean · security-headers public-only **2/2**(실 Kairos 빌드 :3100 — :3000 은 타 앱 점유로 우회). ⚠️ 라이브 랜딩 스샷은 이 환경 브라우저가 :3000 에 고정(custom host-resolver)돼 :3100 도달 불가(ERR_NAME_NOT_RESOLVED) → **객관 증거(선언적 CSS 토큰 정의 + 게이트 통과 + dark accent-foreground=#0A0A0B CSS 확인)로 대체검증**. P3 변경 전부 선언적 CSS/토큰이라 빌드 통과 = 정합. nit 잔여: 로딩카피/px 타이포 통일(의도적 → skip).
+검증(PR3, FE-only): vitest **56** · next build(+typecheck) · `tsc --noEmit` clean · security-headers public-only **2/2**. **사후 라이브 확인 완료**(:3000 점유 프로세스 종료 후 Kairos 재기동, dev 캐시 clean 후): ① P3-C 다크 랜딩 CTA computed color = `#0A0A0B`(어두운 텍스트) on accent `#3ECFB4` → 기존 흰텍스트 ≈1.7:1 해소(스샷 `s28c-landing-dark.png`), 라이트는 흰텍스트 유지(`s28c-landing-light.png`). ② P3-A `[data-theme=light]` probe `--warning` resolve = `rgb(217,119,6)`=`#D97706`(신규 라이트값, 기존 다크 #fbbf24 아님). ③ 라이트 대시보드 정상 렌더(`s28c-light-dashboard.png`, console.error 0). nit 잔여: 로딩카피/px 타이포 통일(의도적 → skip).
 
 **Sprint 28c 결정/연기 (사용자 confirm)**:
 - **BL-DATA-HYGIENE-SEED** → **GA/ADR-024 연기**. ⚠️ 조사결과 lazy seed(`auth/dependencies.py`)는 이미 JWT claims(name/email)를 읽어 User 를 채움. displayName="사용자"/email="" 의 원인은 **Clerk 기본 세션토큰이 email/name claim 미포함**(JWT 템플릿 커스터마이즈 필요)임 → 코드 fix 아님. Clerk Prod 설정 시 기존 코드가 자동 동작.
