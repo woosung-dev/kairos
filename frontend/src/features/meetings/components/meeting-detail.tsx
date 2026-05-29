@@ -9,6 +9,7 @@ import { MeetingExportButton } from "./export-button";
 import { useMeetingDetail } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { MeetingStatus } from "../types";
 
 /* ── 3뷰 탭 ── */
@@ -40,19 +41,19 @@ const STATUS_COLORS: Record<MeetingStatus, { background: string; color: string }
 
 function MeetingDetailSkeleton() {
   return (
-    <div className="p-6 animate-pulse">
+    <div className="p-6">
       <div className="mb-6">
-        <div className="h-8 rounded w-2/3 mb-2" style={{ background: "var(--surface-active)" }} />
-        <div className="h-4 rounded w-1/3" style={{ background: "var(--surface-active)" }} />
+        <Skeleton className="h-8 rounded w-2/3 mb-2" />
+        <Skeleton className="h-4 rounded w-1/3" />
       </div>
       <div className="flex gap-4 mb-6 border-b" style={{ borderColor: "var(--border-subtle)" }}>
         {["요약", "트랜스크립트", "액션"].map((tab) => (
-          <div key={tab} className="h-10 w-20 rounded" style={{ background: "var(--surface-active)" }} />
+          <Skeleton key={tab} className="h-10 w-20 rounded" />
         ))}
       </div>
       <div className="space-y-3">
-        <div className="h-24 rounded-lg" style={{ background: "var(--surface-active)" }} />
-        <div className="h-32 rounded-lg" style={{ background: "var(--surface-active)" }} />
+        <Skeleton className="h-24 rounded-lg" />
+        <Skeleton className="h-32 rounded-lg" />
       </div>
     </div>
   );

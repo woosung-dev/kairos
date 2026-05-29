@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MoreHorizontal, Shield, ShieldCheck, Crown, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -82,11 +83,7 @@ export function MemberList({ workspaceId, currentUserRole }: MemberListProps) {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="h-14 rounded-lg animate-pulse"
-            style={{ background: "var(--surface-active)" }}
-          />
+          <Skeleton key={i} className="h-14 rounded-lg" />
         ))}
       </div>
     );

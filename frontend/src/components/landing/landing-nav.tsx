@@ -61,13 +61,15 @@ export function LandingNav() {
         </Link>
         <Link
           href="/sign-up"
-          className="inline-flex cursor-pointer items-center justify-center rounded-lg font-semibold text-white transition-all active:scale-[0.97]"
+          className="inline-flex cursor-pointer items-center justify-center rounded-lg font-semibold transition-all active:scale-[0.97]"
           style={{
             fontFamily: "var(--font-display)",
             fontSize: 13,
             minHeight: 36,
             padding: "0 16px",
             background: "var(--accent)",
+            // accent-foreground = 라이트 흰색/다크 어두운색 (LANDING-TEXT-WHITE)
+            color: "var(--accent-foreground)",
             borderRadius: "var(--radius-lg)",
           }}
         >

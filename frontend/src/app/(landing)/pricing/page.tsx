@@ -74,12 +74,14 @@ export default async function PricingPage() {
         <div className="flex flex-wrap items-center justify-center gap-2.5">
           <Link
             href="/sign-up"
-            className="inline-flex cursor-pointer items-center justify-center rounded-lg px-6 font-semibold text-white transition-all active:scale-[0.97]"
+            className="inline-flex cursor-pointer items-center justify-center rounded-lg px-6 font-semibold transition-all active:scale-[0.97]"
             style={{
               fontFamily: "var(--font-display)",
               fontSize: 14,
               minHeight: 44,
               background: "var(--accent)",
+              // accent-foreground = 라이트 흰색/다크 어두운색 (LANDING-TEXT-WHITE)
+              color: "var(--accent-foreground)",
               boxShadow: "0 2px 8px rgba(15,168,137,0.18)",
               borderRadius: "var(--radius-lg)",
             }}

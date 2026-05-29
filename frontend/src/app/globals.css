@@ -152,6 +152,19 @@
   --accent-hover: #0D9278;
   --accent-subtle: rgba(15,168,137,0.08);
 
+  /* semantic/chart 토큰 라이트 재정의 (DESIGN-TOKEN-DRIFT 후속) —
+     미정의 시 :root(다크) 상속으로 흰 배경 대비 미달(amber #FBBF24 ≈1.4:1).
+     색조 유지한 -600 계열(랜딩 라이트 cat 색과 정합)로 대비 확보. */
+  --success: #059669;
+  --warning: #D97706;
+  --error: #DC2626;
+  --info: #2563EB;
+  --chart-1: #0D9488;
+  --chart-2: #EA580C;
+  --chart-3: #7C3AED;
+  --chart-4: #2563EB;
+  --chart-5: #DC2626;
+
   /* shadcn 호환 매핑 (라이트) */
   --foreground: #111111;
   --card: #FFFFFF;

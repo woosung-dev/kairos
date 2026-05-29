@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Copy, Check, Link2, Trash2, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -108,11 +109,7 @@ export function InviteManager({
     return (
       <div className="space-y-3">
         {[1, 2].map((i) => (
-          <div
-            key={i}
-            className="h-14 rounded-lg animate-pulse"
-            style={{ background: "var(--surface-active)" }}
-          />
+          <Skeleton key={i} className="h-14 rounded-lg" />
         ))}
       </div>
     );
