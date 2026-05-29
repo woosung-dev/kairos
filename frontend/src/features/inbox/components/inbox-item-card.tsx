@@ -4,7 +4,8 @@ import { useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
 import { useWorkspaceStore } from "@/features/workspaces/store";
-import { useDismissInbox } from "../hooks";
+import { useProjects } from "@/features/projects/hooks";
+import { useDismissInbox, useClassifyInbox } from "../hooks";
 import type { InboxItem } from "../types";
 
 /* ── 라벨/아이콘 맵 ── */
@@ -36,6 +37,16 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
   // Sprint 25 BL-069 fix: dismiss 가 BE persist 되도록 mutation wire.
   // 기존 setStatus 만 호출 → 새로고침 시 dismissed 항목 재출현 회귀. 사용자 결정 손실.
   const dismissMutation = useDismissInbox(activeWorkspaceId ?? undefined);
+  // S28b 기능추가: inbox classify persistence + "다른 프로젝트" picker.
+  // 기존 handleConfirm/editing 은 local state 만 변경(미persist) → classify mutation wire.
+  const classifyMutation = useClassifyInbox(activeWorkspaceId ?? undefined);
+  const { data: projectsData } = useProjects(activeWorkspaceId ?? undefined, {
+    status: "active",
+  });
+  const projects = projectsData?.items ?? [];
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(
+    item.aiSuggestedProjectId ?? ""
+  );
 
   /* aiConfidence가 null일 때 0으로 폴백 */
   const confidencePercent = item.aiConfidence !== null
@@ -46,7 +57,16 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
   const isAutoProcessed = item.isProcessed;
 
   function handleConfirm() {
+    // AI 제안 프로젝트가 있으면 그곳으로 classify(persist), 없으면 picker 오픈.
+    if (!item.aiSuggestedProjectId) {
+      setStatus("editing");
+      return;
+    }
     setStatus("confirmed");
+    classifyMutation.mutate(
+      { id: item.id, projectIds: [item.aiSuggestedProjectId] },
+      { onError: () => setStatus("idle") }
+    );
   }
 
   function handleDismiss() {
@@ -65,6 +85,15 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
 
   function handleRevert() {
     setStatus("idle");
+  }
+
+  function handleClassifyToSelected() {
+    if (!selectedProjectId) return;
+    setStatus("confirmed");
+    classifyMutation.mutate(
+      { id: item.id, projectIds: [selectedProjectId] },
+      { onError: () => setStatus("editing") }
+    );
   }
 
   /* 확정/무시된 상태이면 축약 표시 */
@@ -322,7 +351,7 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
         </div>
       )}
 
-      {/* "다른 프로젝트" 편집 모드 (P2: 실제 프로젝트 콤보박스 연동 예정) */}
+      {/* "다른 프로젝트" 편집 모드 — 프로젝트 선택 picker (S28b 기능추가) */}
       {status === "editing" && (
         <div
           className="mt-3 p-3 rounded border"
@@ -335,16 +364,53 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
           <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
             프로젝트를 선택하세요
           </p>
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            프로젝트 선택 기능은 준비 중입니다.
-          </p>
-          <button
-            onClick={() => setStatus("idle")}
-            className="mt-2 text-xs"
-            style={{ color: "var(--text-muted)", cursor: "pointer", minHeight: "44px" }}
-          >
-            취소
-          </button>
+          {projects.length === 0 ? (
+            <p className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+              연결할 프로젝트가 없습니다. 먼저 프로젝트를 만들어주세요.
+            </p>
+          ) : (
+            <select
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              className="w-full px-2 py-1.5 mb-2 rounded border text-sm bg-transparent outline-none"
+              style={{
+                borderColor: "var(--border)",
+                color: "var(--text-primary)",
+                borderRadius: "var(--radius-sm)",
+              }}
+              aria-label="프로젝트 선택"
+            >
+              <option value="">프로젝트 선택...</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.title}
+                </option>
+              ))}
+            </select>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleClassifyToSelected}
+              disabled={!selectedProjectId || classifyMutation.isPending}
+              className="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: "var(--accent)",
+                color: "var(--background)",
+                borderRadius: "var(--radius-sm)",
+                cursor: "pointer",
+                minHeight: "44px",
+              }}
+            >
+              이 프로젝트로 이동
+            </button>
+            <button
+              onClick={() => setStatus("idle")}
+              className="text-xs"
+              style={{ color: "var(--text-muted)", cursor: "pointer", minHeight: "44px" }}
+            >
+              취소
+            </button>
+          </div>
         </div>
       )}
 
