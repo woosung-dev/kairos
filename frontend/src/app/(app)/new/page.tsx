@@ -140,7 +140,7 @@ export default function NewContentPage() {
       </div>
 
       {/* 유형 선택 카드 */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {CONTENT_TYPES.map((type) => (
           <button
             key={type.id}

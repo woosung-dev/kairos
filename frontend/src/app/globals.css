@@ -65,7 +65,7 @@
   --border-subtle: #1E1E22;
   --text-primary: #EDEDEF;
   --text-secondary: #8E8E93;
-  --text-muted: #5C5C63;
+  --text-muted: #7A7A82; /* S28b DARK-CONTRAST-MUTED fix: #5C5C63(2.98:1) → 4.66:1 on #0A0A0B (WCAG AA) */
   --accent: #3ECFB4;
   --accent-hover: #35B39C;
   --accent-subtle: rgba(62,207,180,0.1);
