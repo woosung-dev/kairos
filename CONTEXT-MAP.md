@@ -61,7 +61,9 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 ## 5. visibility 도메인 용어 (ADR-014)
 
-`Project.visibility = public / draft / private`. public = workspace 전체. draft = ProjectMember 만. private = ProjectMember 만 + RAG 검색 자동 제외. 별칭 금지: hidden / secret / closed.
+`Project.visibility = public / draft / private`. public = workspace 전체. draft = creator(작성자) 전용 (admin/owner 우회). private = ProjectMember 만 (admin/owner 우회) + RAG 검색 자동 제외. 별칭 금지: hidden / secret / closed.
+
+> 2026-05-29 전체정검 정정 (BUG-DRAFT-DOC-CONTRADICTION): 이전엔 draft="ProjectMember 만"으로 기술됐으나 실제 코드(`backend/src/projects/repository.py` `_apply_visibility_filter`)는 draft=creator-only 이며 2계정 라이브로 확정됨(member 가 타인 draft 미접근, 404). 코드 = source of truth, `projects/CONTEXT.md` P-5 와도 정합.
 
 `WorkspaceInvite.default_project_visibility` = 초대 가입 사용자 기본값.
 

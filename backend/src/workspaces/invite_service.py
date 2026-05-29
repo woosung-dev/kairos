@@ -240,6 +240,12 @@ class InviteService:
         await self.repo.update_member_role(member_id, workspace_id, new_role)
         await self.repo.commit()
 
+        # BUG-RBAC-CACHE-STALE fix: 권한 강등 즉시 반영 — RBAC in-process 캐시 무효화
+        # (없으면 RoleChecker 가 최대 60s 동안 옛 role 로 통과).
+        from src.auth.rbac import invalidate_member_cache
+
+        invalidate_member_cache(workspace_id, member.user_id)
+
         return {
             "id": str(member.id),
             "userId": str(member.user_id),
@@ -261,6 +267,11 @@ class InviteService:
 
         await self.repo.remove_member(member_id, workspace_id)
         await self.repo.commit()
+
+        # BUG-RBAC-CACHE-STALE fix: 멤버 제거 즉시 반영 — RBAC in-process 캐시 무효화.
+        from src.auth.rbac import invalidate_member_cache
+
+        invalidate_member_cache(workspace_id, member.user_id)
 
     # --- 내부 헬퍼 ---
 

@@ -21,6 +21,33 @@ test.describe("D1 — 워크스페이스 스위처 즉시 전환 (Sprint 23)", (
     await page.goto("/dashboard");
     await page.waitForLoadState("networkidle");
 
+    // 2026-05-29 전체정검 BUG-WS-SWITCH-BROKEN 회귀가드 강화:
+    // 이 spec 은 onClick 핸들러 미발화(전환 불능)를 잡아야 하나, 1개 ws 만 시드된
+    // 환경에선 non-active 옵션 0개 → 과거 test.skip 으로 무력화(hollow-green)돼
+    // 버그가 출시까지 생존했다. 전환 테스트엔 2+ ws 가 필수 전제이므로 부족 시 API 로 시드.
+    const token: string | null = await page.evaluate(async () => {
+      // @ts-ignore - Clerk SDK globals
+      return (await window?.Clerk?.session?.getToken()) ?? null;
+    });
+    if (token) {
+      const apiUrl = process.env.E2E_API_URL ?? "http://localhost:8000";
+      const headers = { Authorization: `Bearer ${token}` };
+      const listRes = await page.request.get(`${apiUrl}/api/v1/workspaces`, {
+        headers,
+      });
+      if (listRes.ok()) {
+        const list = await listRes.json();
+        if (Array.isArray(list) && list.length < 2) {
+          await page.request.post(`${apiUrl}/api/v1/workspaces`, {
+            headers: { ...headers, "Content-Type": "application/json" },
+            data: { name: "E2E 전환 테스트 워크스페이스" },
+          });
+          await page.reload();
+          await page.waitForLoadState("networkidle");
+        }
+      }
+    }
+
     // 현재 wid 확인 (Zustand persist key `kairos-workspace`)
     const wsIdBefore = await page.evaluate(
       () =>
@@ -59,13 +86,12 @@ test.describe("D1 — 워크스페이스 스위처 즉시 전환 (Sprint 23)", (
       workspaceOptions.push(item);
     }
 
-    if (workspaceOptions.length === 0) {
-      test.skip(
-        true,
-        "non-active workspace option 0 — 1개 ws 만 seed 된 환경 carry-over",
-      );
-      return;
-    }
+    // 위에서 2+ ws 를 보장했으므로 non-active 옵션은 반드시 존재해야 한다.
+    // (과거 hollow-green: 여기서 skip → BUG-WS-SWITCH-BROKEN 미검출.)
+    expect(
+      workspaceOptions.length,
+      "2+ 워크스페이스 보장 후에도 non-active 옵션 0 — 스위처 렌더/시드 회귀",
+    ).toBeGreaterThan(0);
 
     await workspaceOptions[0].click();
 

@@ -19,7 +19,8 @@ class InboxItem(SQLModel, table=True):
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    workspace_id: uuid.UUID = Field(foreign_key="workspaces.id")
+    # Sprint 28 PERF-2 — index=True (alembic be0e82ab810c, ix_inbox_items_workspace_id 정합).
+    workspace_id: uuid.UUID = Field(foreign_key="workspaces.id", index=True)
     title: str
     summary: str | None = None
     source_type: str  # meeting | note | attachment
