@@ -46,6 +46,20 @@
 
 검증(PR3, FE-only): vitest **56** · next build(+typecheck) · `tsc --noEmit` clean · security-headers public-only **2/2**. **사후 라이브 확인 완료**(:3000 점유 프로세스 종료 후 Kairos 재기동, dev 캐시 clean 후): ① P3-C 다크 랜딩 CTA computed color = `#0A0A0B`(어두운 텍스트) on accent `#3ECFB4` → 기존 흰텍스트 ≈1.7:1 해소(스샷 `s28c-landing-dark.png`), 라이트는 흰텍스트 유지(`s28c-landing-light.png`). ② P3-A `[data-theme=light]` probe `--warning` resolve = `rgb(217,119,6)`=`#D97706`(신규 라이트값, 기존 다크 #fbbf24 아님). ③ 라이트 대시보드 정상 렌더(`s28c-light-dashboard.png`, console.error 0). nit 잔여: 로딩카피/px 타이포 통일(의도적 → skip).
 
+## FIX 적용 현황 — Sprint 28d P3 마감 + 안정화 (branch `sprint-28d/fe-polish-stabilize`)
+> PR3 가 "의도적 skip" 한 로딩카피/px 타이포를 **사용자 재결정(전부 토큰화)** 으로 마감 + 머지된 라이트 semantic 토큰의 DESIGN.md atomic 문서화 + dogfooding 안정화 carry 2건.
+
+| ID | 적용 | 비고 |
+|---|---|---|
+| DESIGN-TOKEN px 타이포 (P3, cluster 잔여) | ✅ FIXED — `globals.css @utility .text-caption(11px)/.text-micro(10px)` 정의 + `text-[11px]`(23)/`text-[10px]`(43) 전부 치환(34파일). 생성 CSS 동일 px = 시각 무회귀 | 사용자 Q1 = 전부 토큰화 |
+| DESIGN-TOKEN 로딩 카피 (P3, cluster 잔여) | ✅ FIXED — "로딩 중…/로딩 중..." 8건 → canonical "불러오는 중..."(loading.tsx 기준) 통일 | 주석/aria 미접촉 |
+| 라이트 semantic 토큰 (P3, A4 atomic doc) | ✅ FIXED — 머지된 `[data-theme=light]` -600 토큰을 `DESIGN.md §Color` Light Semantic 표 + Decisions Log + Scale 에 문서화(텍스트 대비 caveat 포함) | 코드는 52906dd(PR3) |
+| BL-S27c-12 logout stale workspace (P1) | ✅ FIXED — store `ownerUserId`+`ensureOwner` race-free 가드 + panel-layout self-heal. 단위테스트 3건 | REFACTORING-BACKLOG 동기화 |
+| BL-S27e-2 사이드바 nav flicker (P3) | ✅ FIXED — NAV_BOTTOM 역할 게이트가 role 미해결(null) 시 낙관적 노출(viewer 확정 때만 숨김) | 루트코즈=workspaceRole persist 제외 |
+| BL-S27c-8 PopoverTrigger A11Y (P1) | ✅ 이미 해소(Sprint 27d BUG-S27d-1, stale backlog) — 코드 재확인 | — |
+
+검증(Sprint 28d, FE-only): `tsc --noEmit` clean · `next build` 전 라우트 OK · vitest **59**(+3 ensureOwner) · 생성 CSS `.text-caption{font-size:11px}`/`.text-micro{font-size:10px}` 확인. 라이브(계정전환 403/nav flicker)는 로컬 2-계정 + 백엔드 스모크 권고(변경 저위험: px=시각무변·copy=문자열·B1 단위테스트·B3 빌드clean).
+
 **Sprint 28c 결정/연기 (사용자 confirm)**:
 - **BL-DATA-HYGIENE-SEED** → **GA/ADR-024 연기**. ⚠️ 조사결과 lazy seed(`auth/dependencies.py`)는 이미 JWT claims(name/email)를 읽어 User 를 채움. displayName="사용자"/email="" 의 원인은 **Clerk 기본 세션토큰이 email/name claim 미포함**(JWT 템플릿 커스터마이즈 필요)임 → 코드 fix 아님. Clerk Prod 설정 시 기존 코드가 자동 동작.
 - **BUG-MEMORY-WS-FILTER composite FK** → 제외(라이브 IDOR 없음 + memory 는 타 composite FK 의 target 아님).
