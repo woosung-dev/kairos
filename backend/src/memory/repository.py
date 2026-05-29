@@ -52,45 +52,62 @@ class MemoryRepository:
         )
         return (await self.session.exec(stmt)).one_or_none()
 
+    # I-9: update/delete 는 workspace_id WHERE 강제 (PK-only → cross-ws mutation 차단 defense-in-depth).
+    # 호출부(background task)는 이미 workspace_id 검증된 item 을 pre-fetch 하므로 기능 영향 0,
+    # 2-layer 격리 갭만 해소 (BUG-MEMORY-WS-FILTER).
     async def update_distilled(
         self,
         memory_id: uuid.UUID,
+        workspace_id: uuid.UUID,
         distilled_json: dict,
         status: str,
     ) -> None:
         await self.session.exec(
             update(MemoryItem)
-            .where(MemoryItem.id == memory_id)
+            .where(
+                MemoryItem.id == memory_id,
+                MemoryItem.workspace_id == workspace_id,
+            )
             .values(distilled_json=distilled_json, status=status)
         )
 
     async def update_embedding(
         self,
         memory_id: uuid.UUID,
+        workspace_id: uuid.UUID,
         embedding_chunk_id: uuid.UUID,
         status: str,
     ) -> None:
         await self.session.exec(
             update(MemoryItem)
-            .where(MemoryItem.id == memory_id)
+            .where(
+                MemoryItem.id == memory_id,
+                MemoryItem.workspace_id == workspace_id,
+            )
             .values(embedding_chunk_id=embedding_chunk_id, status=status)
         )
 
     async def update_status(
-        self, memory_id: uuid.UUID, status: str
+        self, memory_id: uuid.UUID, workspace_id: uuid.UUID, status: str
     ) -> None:
         await self.session.exec(
             update(MemoryItem)
-            .where(MemoryItem.id == memory_id)
+            .where(
+                MemoryItem.id == memory_id,
+                MemoryItem.workspace_id == workspace_id,
+            )
             .values(status=status)
         )
 
     async def update_transcript(
-        self, memory_id: uuid.UUID, raw_content: str
+        self, memory_id: uuid.UUID, workspace_id: uuid.UUID, raw_content: str
     ) -> None:
         await self.session.exec(
             update(MemoryItem)
-            .where(MemoryItem.id == memory_id)
+            .where(
+                MemoryItem.id == memory_id,
+                MemoryItem.workspace_id == workspace_id,
+            )
             .values(raw_content=raw_content)
         )
 
@@ -136,11 +153,16 @@ class MemoryRepository:
         )
         return list((await self.session.exec(stmt)).all())
 
-    async def clear_r2_audio_key(self, memory_id: uuid.UUID) -> None:
-        """r2_audio_key NULL 처리 — R2 객체 삭제 후 호출."""
+    async def clear_r2_audio_key(
+        self, memory_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> None:
+        """r2_audio_key NULL 처리 — R2 객체 삭제 후 호출. I-9 workspace_id WHERE 강제."""
         await self.session.exec(
             update(MemoryItem)
-            .where(MemoryItem.id == memory_id)
+            .where(
+                MemoryItem.id == memory_id,
+                MemoryItem.workspace_id == workspace_id,
+            )
             .values(r2_audio_key=None)
         )
 

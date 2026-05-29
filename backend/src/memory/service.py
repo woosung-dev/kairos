@@ -226,7 +226,7 @@ class MemoryService:
                 await r2.delete_object(item.r2_audio_key)
             except Exception:
                 continue
-            await self.repo.clear_r2_audio_key(item.id)
+            await self.repo.clear_r2_audio_key(item.id, item.workspace_id)
             deleted += 1
         if deleted:
             await self.repo.commit()
@@ -535,7 +535,9 @@ class MemoryService:
                     error_message=error,
                 )
             )
-            await repo.update_distilled(memory_id, distilled, "embedding_pending")
+            await repo.update_distilled(
+                memory_id, workspace_id, distilled, "embedding_pending"
+            )
             await repo.commit()
 
             # 2. embed (A6 — capture 후 항상 embedding)
@@ -557,7 +559,7 @@ class MemoryService:
                 )
             )
             if embed_error or not embedding:
-                await repo.update_status(memory_id, "embedding_failed")
+                await repo.update_status(memory_id, workspace_id, "embedding_failed")
                 await repo.commit()
                 return
 
@@ -574,7 +576,7 @@ class MemoryService:
                 chunk_index=0,
                 chunk_level=2,
             )
-            await repo.update_embedding(memory_id, chunk.id, "active")
+            await repo.update_embedding(memory_id, workspace_id, chunk.id, "active")
             await repo.commit()
 
     async def _bg_transcribe_distill_embed(
@@ -590,7 +592,7 @@ class MemoryService:
                 wav_bytes = await self._download_audio_from_r2(r2_key)
             except Exception as exc:  # R2 다운로드 실패
                 logger.warning("R2 다운로드 실패 (memory=%s): %s", memory_id, exc)
-                await repo.update_status(memory_id, "embedding_failed")
+                await repo.update_status(memory_id, workspace_id, "embedding_failed")
                 await repo.commit()
                 return
 
@@ -609,11 +611,11 @@ class MemoryService:
                 )
             )
             if error or not transcript:
-                await repo.update_status(memory_id, "embedding_failed")
+                await repo.update_status(memory_id, workspace_id, "embedding_failed")
                 await repo.commit()
                 return
-            await repo.update_transcript(memory_id, transcript)
-            await repo.update_status(memory_id, "processing")
+            await repo.update_transcript(memory_id, workspace_id, transcript)
+            await repo.update_status(memory_id, workspace_id, "processing")
             await repo.commit()
 
         # text branch와 동일한 흐름 재사용
@@ -799,7 +801,7 @@ async def _bg_promote_embed(
                 .where(PromotionAudit.id == audit_id)
                 .values(embedding_status="failed")
             )
-            await repo.update_status(new_memory_id, "embedding_failed")
+            await repo.update_status(new_memory_id, target_workspace_id, "embedding_failed")
             await session.commit()
             return
 
@@ -815,7 +817,7 @@ async def _bg_promote_embed(
             chunk_index=0,
             chunk_level=2,
         )
-        await repo.update_embedding(new_memory_id, chunk.id, "active")
+        await repo.update_embedding(new_memory_id, target_workspace_id, chunk.id, "active")
         await session.exec(
             _update(PromotionAudit)
             .where(PromotionAudit.id == audit_id)
