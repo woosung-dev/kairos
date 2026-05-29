@@ -51,7 +51,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
           {project.title}
         </h3>
         <span
-          className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-medium"
+          className="shrink-0 px-1.5 py-0.5 rounded-full text-micro font-medium"
           style={{
             background: `${STATUS_COLORS[project.status]}20`,
             color: STATUS_COLORS[project.status],
@@ -63,7 +63,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
           const Icon = VISIBILITY_ICON[project.visibility];
           return (
             <span
-              className="shrink-0 inline-flex items-center gap-1 text-[10px]"
+              className="shrink-0 inline-flex items-center gap-1 text-micro"
               style={{ color: VISIBILITY_COLOR_VAR[project.visibility] }}
               title={VISIBILITY_LABELS[project.visibility]}
               aria-label={`Visibility: ${VISIBILITY_LABELS[project.visibility]}`}
@@ -80,7 +80,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
           {project.tags.map((tag) => (
             <span
               key={tag}
-              className="px-1.5 py-0.5 rounded-full text-[10px]"
+              className="px-1.5 py-0.5 rounded-full text-micro"
               style={{
                 background: "var(--surface-active)",
                 color: "var(--text-muted)",

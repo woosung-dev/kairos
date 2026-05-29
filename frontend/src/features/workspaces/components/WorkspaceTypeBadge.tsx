@@ -31,7 +31,7 @@ export function WorkspaceTypeBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] ${className ?? ""}`}
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-caption ${className ?? ""}`}
       style={{
         fontFamily: "var(--font-mono)",
         background: isPersonal ? "var(--surface-active)" : "var(--accent-subtle)",

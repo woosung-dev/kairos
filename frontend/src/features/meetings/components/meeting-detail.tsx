@@ -232,7 +232,7 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
             {speakers.map((speaker) => (
               <span
                 key={speaker}
-                className="px-2 py-0.5 rounded-full text-[11px]"
+                className="px-2 py-0.5 rounded-full text-caption"
                 style={{
                   background: "var(--surface-active)",
                   color: "var(--text-secondary)",

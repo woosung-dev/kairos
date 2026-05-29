@@ -191,7 +191,7 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
               {item.title}
             </h3>
             <span
-              className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px]"
+              className="shrink-0 px-1.5 py-0.5 rounded-full text-micro"
               style={{
                 background: "var(--surface-active)",
                 color: "var(--text-muted)",
@@ -235,7 +235,7 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
           {item.aiSuggestedTags.map((tag) => (
             <span
               key={tag}
-              className="px-1.5 py-0.5 rounded text-[10px]"
+              className="px-1.5 py-0.5 rounded text-micro"
               style={{
                 background: "var(--surface-active)",
                 color: "var(--text-muted)",
@@ -264,7 +264,7 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
           </span>
           {confidencePercent !== null && (
             <span
-              className="text-[10px] ml-auto"
+              className="text-micro ml-auto"
               style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
             >
               {confidencePercent}%

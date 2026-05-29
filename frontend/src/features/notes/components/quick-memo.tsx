@@ -216,7 +216,7 @@ export function QuickMemo() {
       {/* 저장된 메모 목록 */}
       {isLoadingNotes ? (
         <div className="py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
-          로딩 중...
+          불러오는 중...
         </div>
       ) : notes.length > 0 ? (
         <div className="grid gap-3">
@@ -283,7 +283,7 @@ function MemoCard({
           <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
             {memo.title || "제목 없음"}
           </h3>
-          <span className="text-[10px] shrink-0 ml-2" style={{ color: "var(--text-muted)" }}>
+          <span className="text-micro shrink-0 ml-2" style={{ color: "var(--text-muted)" }}>
             {createdDate}
           </span>
         </div>
@@ -293,7 +293,7 @@ function MemoCard({
         <div className="flex items-center gap-2">
           {projectTitle && (
             <span
-              className="px-1.5 py-0.5 rounded text-[10px]"
+              className="px-1.5 py-0.5 rounded text-micro"
               style={{
                 background: "var(--accent-subtle)",
                 color: "var(--accent)",
@@ -313,7 +313,7 @@ function MemoCard({
               e.stopPropagation();
               setIsPromoteOpen(true);
             }}
-            className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-colors border"
+            className="flex items-center gap-1 px-2 py-1 rounded text-caption font-medium transition-colors border"
             style={{
               borderColor: "var(--border)",
               color: "var(--text-muted)",

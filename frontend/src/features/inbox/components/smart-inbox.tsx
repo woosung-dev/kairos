@@ -123,7 +123,7 @@ export function SmartInbox() {
               확인 필요
             </h2>
             <span
-              className="px-1.5 py-0.5 rounded-full text-[10px] font-medium"
+              className="px-1.5 py-0.5 rounded-full text-micro font-medium"
               style={{
                 background: "rgba(251,191,36,0.1)",
                 color: "var(--warning)",

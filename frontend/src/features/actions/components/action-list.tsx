@@ -37,7 +37,7 @@ export function ActionList() {
     return (
       <div className="flex items-center justify-center py-12">
         <span className="text-sm" style={{ color: "var(--text-muted)" }}>
-          로딩 중...
+          불러오는 중...
         </span>
       </div>
     );
@@ -121,7 +121,7 @@ function ActionRow({
 
       {/* 상태 뱃지 */}
       <span
-        className="px-2 py-0.5 rounded-full text-[10px]"
+        className="px-2 py-0.5 rounded-full text-micro"
         style={{
           background: "var(--surface-active)",
           color: "var(--text-muted)",
@@ -132,7 +132,7 @@ function ActionRow({
 
       {/* 우선순위 뱃지 */}
       <span
-        className="px-2 py-0.5 rounded-full text-[10px]"
+        className="px-2 py-0.5 rounded-full text-micro"
         style={{
           background: `${PRIORITY_COLORS[item.priority]}20`,
           color: PRIORITY_COLORS[item.priority],

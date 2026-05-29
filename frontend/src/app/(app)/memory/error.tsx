@@ -34,7 +34,7 @@ export default function MemoryError({
         recall / promote 처리가 지연되었거나 일시적 오류일 수 있습니다. 이미 저장된 메모는 안전합니다.
       </p>
       {error.digest && (
-        <p className="text-[10px] mb-6" style={{ color: "var(--text-muted)" }}>
+        <p className="text-micro mb-6" style={{ color: "var(--text-muted)" }}>
           digest: {error.digest}
         </p>
       )}

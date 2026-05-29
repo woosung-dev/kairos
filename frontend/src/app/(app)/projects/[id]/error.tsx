@@ -34,7 +34,7 @@ export default function ProjectError({
         프로젝트가 삭제되었거나 접근 권한이 없을 수 있습니다. 다시 시도하거나 프로젝트 목록으로 이동하세요.
       </p>
       {error.digest && (
-        <p className="text-[10px] mb-6" style={{ color: "var(--text-muted)" }}>
+        <p className="text-micro mb-6" style={{ color: "var(--text-muted)" }}>
           digest: {error.digest}
         </p>
       )}

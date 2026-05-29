@@ -40,7 +40,7 @@ export default function RecallMetricsPage() {
 
   // F-2C v2 (Sprint 25 polish, agy 3차 발견): panel-layout 의 <main id="main-content"> 안에
   // 자체 <main> nest → HTML5 spec 위반 (페이지당 main 1개). section 으로 교체.
-  if (!isLoaded) return <section className="p-8">로딩 중…</section>;
+  if (!isLoaded) return <section className="p-8">불러오는 중...</section>;
   if (!isFounder) {
     return (
       <section className="p-8 max-w-2xl">
@@ -64,7 +64,7 @@ export default function RecallMetricsPage() {
         </p>
       </header>
 
-      {metrics.isLoading && <p>로딩 중…</p>}
+      {metrics.isLoading && <p>불러오는 중...</p>}
       {metrics.isError && (
         <p className="text-destructive">메트릭 조회 실패: {metrics.error?.message}</p>
       )}

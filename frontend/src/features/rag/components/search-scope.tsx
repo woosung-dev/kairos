@@ -41,7 +41,7 @@ export function SearchScope() {
             key={tab.key}
             type="button"
             onClick={() => setScopeTab(tab.key)}
-            className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors cursor-pointer"
+            className="px-2.5 py-1 rounded-full text-caption font-medium transition-colors cursor-pointer"
             style={{
               background:
                 scopeTab === tab.key
@@ -117,7 +117,7 @@ export function SearchScope() {
       {/* "선택한 소스" 탭 — Sprint 24 Wave 2: MOCK 제거 후 empty state (BL-NEW-RAG-SOURCE-SELECT 진입 시 실 API + selection state). */}
       {scopeTab === "selected" && (
         <div
-          className="mt-1 rounded border border-dashed px-3 py-3 text-[11px] leading-relaxed"
+          className="mt-1 rounded border border-dashed px-3 py-3 text-caption leading-relaxed"
           style={{
             borderColor: "var(--border-subtle)",
             borderRadius: "var(--radius-sm)",

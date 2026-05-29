@@ -34,7 +34,7 @@ export default function InboxError({
         AI 분류 서버 일시 장애일 수 있습니다. 다시 시도하거나 새 항목 추가는 그대로 가능합니다.
       </p>
       {error.digest && (
-        <p className="text-[10px] mb-6" style={{ color: "var(--text-muted)" }}>
+        <p className="text-micro mb-6" style={{ color: "var(--text-muted)" }}>
           digest: {error.digest}
         </p>
       )}

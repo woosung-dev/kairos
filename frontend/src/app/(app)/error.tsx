@@ -34,7 +34,7 @@ export default function AppError({
         잠시 후 다시 시도해주세요. 문제가 계속되면 새로고침하거나 다른 페이지로 이동하세요.
       </p>
       {error.digest && (
-        <p className="text-[10px] mb-6" style={{ color: "var(--text-muted)" }}>
+        <p className="text-micro mb-6" style={{ color: "var(--text-muted)" }}>
           digest: {error.digest}
         </p>
       )}

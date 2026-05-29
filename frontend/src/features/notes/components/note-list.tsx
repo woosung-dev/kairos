@@ -27,7 +27,7 @@ export function NoteList({ projectId, onSelect }: NoteListProps) {
   if (isLoading) {
     return (
       <div className="p-4 text-sm" style={{ color: "var(--text-muted)" }}>
-        로딩 중...
+        불러오는 중...
       </div>
     );
   }

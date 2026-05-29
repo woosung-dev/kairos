@@ -27,7 +27,7 @@ export function RagSources({ sources }: RagSourcesProps) {
     <div className="pl-3">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-1 text-[11px] mb-1"
+        className="flex items-center gap-1 text-caption mb-1"
         style={{ color: "var(--text-muted)" }}
       >
         <span>📎 소스 {sources.length}건</span>
@@ -39,7 +39,7 @@ export function RagSources({ sources }: RagSourcesProps) {
           {sources.map((source) => (
             <div
               key={source.id}
-              className="flex items-center gap-2 px-2 py-1.5 rounded text-[11px]"
+              className="flex items-center gap-2 px-2 py-1.5 rounded text-caption"
               style={{
                 background: "var(--surface-hover)",
                 borderRadius: "var(--radius-sm)",

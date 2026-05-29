@@ -149,7 +149,7 @@ export function CmdK() {
         <div className="px-4 py-3 border-b flex items-center gap-2" style={{ borderColor: "var(--border-subtle)" }}>
           {isRagMode && (
             <span
-              className="px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0"
+              className="px-1.5 py-0.5 rounded text-micro font-medium shrink-0"
               style={{
                 background: "var(--accent)",
                 color: "var(--background)",
@@ -204,7 +204,7 @@ export function CmdK() {
                       <span>{item.label}</span>
                     </div>
                     <kbd
-                      className="text-[10px] px-1.5 py-0.5 rounded"
+                      className="text-micro px-1.5 py-0.5 rounded"
                       style={{
                         background: "var(--surface-active)",
                         color: "var(--text-muted)",

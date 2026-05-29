@@ -34,7 +34,7 @@ export function RagPanel() {
         {messages.length > 0 && (
           <button
             onClick={clearMessages}
-            className="text-[10px] px-2 py-0.5 rounded"
+            className="text-micro px-2 py-0.5 rounded"
             style={{
               color: "var(--text-muted)",
               background: "var(--surface-hover)",

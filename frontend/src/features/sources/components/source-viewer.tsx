@@ -194,7 +194,7 @@ export function SourceViewer({
           </h2>
           {highlightChunks.length > 0 && (
             <span
-              className="shrink-0 px-1.5 py-0.5 rounded text-[10px]"
+              className="shrink-0 px-1.5 py-0.5 rounded text-micro"
               style={{
                 background: "var(--accent-subtle)",
                 color: "var(--accent)",
@@ -258,7 +258,7 @@ export function SourceViewer({
 
       {/* 메타 정보 */}
       <div
-        className="flex items-center gap-3 px-4 py-2 border-b text-[11px]"
+        className="flex items-center gap-3 px-4 py-2 border-b text-caption"
         style={{
           borderColor: "var(--border-subtle)",
           color: "var(--text-muted)",
@@ -282,7 +282,7 @@ export function SourceViewer({
       >
         {isLoading && (
           <div
-            className="mb-3 text-[11px]"
+            className="mb-3 text-caption"
             style={{ color: "var(--text-muted)" }}
           >
             전체 내용 불러오는 중...

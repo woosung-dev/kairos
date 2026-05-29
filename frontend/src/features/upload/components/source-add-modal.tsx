@@ -191,7 +191,7 @@ export function SourceAddModal({ isOpen, onClose, onNavigateToMemo }: SourceAddM
                 <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
                   {method.label}
                 </h3>
-                <p className="text-[11px] leading-snug" style={{ color: "var(--text-muted)" }}>
+                <p className="text-caption leading-snug" style={{ color: "var(--text-muted)" }}>
                   {method.description}
                 </p>
               </button>
@@ -331,7 +331,7 @@ function FileUploadView({ onClose }: { onClose: () => void }) {
             <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
               파일을 여기에 드래그하거나 클릭하여 선택
             </p>
-            <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>
+            <p className="text-micro mt-1" style={{ color: "var(--text-muted)" }}>
               오디오/비디오 → 회의, 텍스트(.txt/.md) → 노트
             </p>
           </>
