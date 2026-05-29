@@ -35,7 +35,16 @@
 ## FIX 적용 현황 — Sprint 28c 설계종속 (branch `sprint-28c/memory-ws-filter`, PR2)
 | ID | 적용 | commit |
 |---|---|---|
-| BUG-MEMORY-WS-FILTER (P3, 결정=WHERE+테스트) | ⏳ 진행 — memory 5 mutation workspace_id WHERE + cross-ws 차단 통합테스트(정적→실증). composite FK 는 제외(memory 는 타 FK target 아님) | (PR2) |
+| BUG-MEMORY-WS-FILTER (P3, 결정=WHERE+테스트) | ✅ FIXED — memory 5 mutation workspace_id WHERE + cross-ws 차단 통합테스트 3건(정적→실증). composite FK 는 제외(memory 는 타 FK target 아님). BE 529 pass. PR #118 merged | b733547 |
+
+## FIX 적용 현황 — Sprint 28c P3 polish 2차 (branch `sprint-28c/p3-polish-2`, PR3)
+| ID | 적용 | commit |
+|---|---|---|
+| 라이트모드 semantic 토큰 (P3, DESIGN-TOKEN-DRIFT 후속) | ✅ FIXED — [data-theme=light] 에 --warning/error/info/success/chart-1..5 -600 계열 정의(다크 상속 → amber on white ≈1.4:1 해소, 랜딩 라이트 cat 색과 정합). 다크 무변경 | 52906dd |
+| LANDING-TEXT-WHITE (nit) | ✅ FIXED — CTA 3곳(hero/nav/pricing) text-white→var(--accent-foreground). 다크 랜딩(accent #3ECFB4) 흰텍스트 ≈1.7:1 → 어두운 텍스트 고대비. 브랜드 accent 무변경 | edf8365 |
+| DESIGN-TOKEN cluster (skeleton, P3) | ✅ FIXED — 공용 components/ui/skeleton.tsx + 6개 ad-hoc 스켈레톤 통일(시각 패리티 유지) | 7c7f119 |
+
+검증(PR3, FE-only): vitest **56** · next build(+typecheck) · `tsc --noEmit` clean · security-headers public-only **2/2**(실 Kairos 빌드 :3100 — :3000 은 타 앱 점유로 우회). ⚠️ 라이브 랜딩 스샷은 이 환경 브라우저가 :3000 에 고정(custom host-resolver)돼 :3100 도달 불가(ERR_NAME_NOT_RESOLVED) → **객관 증거(선언적 CSS 토큰 정의 + 게이트 통과 + dark accent-foreground=#0A0A0B CSS 확인)로 대체검증**. P3 변경 전부 선언적 CSS/토큰이라 빌드 통과 = 정합. nit 잔여: 로딩카피/px 타이포 통일(의도적 → skip).
 
 **Sprint 28c 결정/연기 (사용자 confirm)**:
 - **BL-DATA-HYGIENE-SEED** → **GA/ADR-024 연기**. ⚠️ 조사결과 lazy seed(`auth/dependencies.py`)는 이미 JWT claims(name/email)를 읽어 User 를 채움. displayName="사용자"/email="" 의 원인은 **Clerk 기본 세션토큰이 email/name claim 미포함**(JWT 템플릿 커스터마이즈 필요)임 → 코드 fix 아님. Clerk Prod 설정 시 기존 코드가 자동 동작.
@@ -45,7 +54,7 @@
 **미적용 (잔여 — 사용자 결정/후속)**:
 - **BUG-INBOX-PROMOTE-STUB** (P2) — 제품 결정 필요. "다른 프로젝트"·"수정" 둘 다 동일 미구현 editing stub → picker 구현(기능) vs edit affordance 제거(UX 축소) 택1.
 - **(정정·완료)** 실패 pipeline 은 error_message 를 **정상 기록함**(BE 로그 검증 — httpx 404 `str(e)`). 초기 "값 null" 은 uvicorn 이 redaction 전 stale 코드였던 탓 — BE 재기동 후 detail 응답 errorMessage 정상 반환 확인. FE 는 **친화적 메시지만** 표시(원시 httpx 오류·서명 URL 의 UI 덤프 회피); errorMessage 는 API 에 support/디버깅용 보존(status 엔드포인트와 동일). 선택 polish = pipeline 이 error_message 를 사용자친화 문구로 sanitize.
-- **P3 polish** → **대부분 Sprint 28c 처리**(위 `FIX 적용 현황 — Sprint 28c` 표 참조). 잔여: BUG-MEMORY-WS-FILTER(PR2 진행) · BL-DATA-HYGIENE-SEED(GA 연기) · LANDING-TEXT-WHITE(nit, 미처리).
+- **P3 polish** → **Sprint 28c 전부 처리**(PR1 6 + PR2 memory + PR3 라이트토큰/랜딩CTA/skeleton, 위 `FIX 적용 현황 — Sprint 28c` 3개 표 참조). 잔여: BL-DATA-HYGIENE-SEED(GA 연기, 코드 fix 아님) · 로딩카피/px 타이포 통일(의도적 → skip).
 
 ---
 
