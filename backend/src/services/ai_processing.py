@@ -15,6 +15,10 @@ from src.common.prompts import (
     parse_json_response,
 )
 from src.core.config import get_settings
+from src.services.ai_resilience import (
+    GEMINI_STREAM_TIMEOUT_SEC,
+    with_gemini_timeout,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +82,12 @@ class AIProcessingService:
             "next_meeting_agenda": list[str],
         }
         """
-        response = await self.client.aio.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=f"{MEETING_SUMMARY_SYSTEM_PROMPT}\n\n{transcript}",
+        # Sprint 28 PERF-4 — timeout + circuit breaker (infinite hang 차단).
+        response = await with_gemini_timeout(
+            self.client.aio.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=f"{MEETING_SUMMARY_SYSTEM_PROMPT}\n\n{transcript}",
+            )
         )
         raw = parse_json_response(response.text)
         MeetingSummaryResult.model_validate(raw)
@@ -124,9 +131,12 @@ class AIProcessingService:
             current_date=current_date_str,
         )
 
-        response = await self.client.aio.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=prompt,
+        # Sprint 28 PERF-4 — timeout + circuit breaker.
+        response = await with_gemini_timeout(
+            self.client.aio.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=prompt,
+            )
         )
         raw = parse_json_response(response.text)
         MeetingActionsResult.model_validate(raw)
@@ -148,9 +158,14 @@ class AIProcessingService:
             question=question,
         )
 
-        stream = await self.client.aio.models.generate_content_stream(
-            model=GEMINI_MODEL,
-            contents=prompt,
+        # Sprint 28 PERF-4 — stream init timeout 60s. stream iteration 자체는
+        # SSE 토큰 yield 라 별도 timeout 적용 안 함 (사용자 disconnect 시 자연 종료).
+        stream = await with_gemini_timeout(
+            self.client.aio.models.generate_content_stream(
+                model=GEMINI_MODEL,
+                contents=prompt,
+            ),
+            timeout_sec=GEMINI_STREAM_TIMEOUT_SEC,
         )
         async for chunk in stream:
             if chunk.text:

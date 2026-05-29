@@ -1,6 +1,7 @@
 # backend/src/auth/dependencies.py
 """Auth 의존성 — Depends() 조립의 유일한 위치."""
 import hashlib
+import logging
 import time
 import jwt
 from fastapi import Depends, Header, HTTPException
@@ -10,6 +11,9 @@ from src.auth.models import User
 from src.auth.repository import UserRepository
 from src.auth.service import AuthService
 from src.common.database import get_async_session
+
+# Sprint 28 BUG-S28-SEC-3 — JWT 검증 실패 forensic logging (Sentry SKIP path).
+_auth_logger = logging.getLogger("src.auth.jwt_failure")
 
 # Clerk JWKS 캐시
 _jwks_client = None
@@ -28,6 +32,43 @@ _JWT_CACHE_MAX_SIZE = 1000
 def _token_cache_key(token: str) -> str:
     """token 전체를 캐시 키로 쓰면 메모리 낭비 — sha256 hash 로 32 byte 고정."""
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+# Sprint 28 BUG-S28-PERF-RT-1 fix — User in-process TTL cache (clerk_id → User).
+# Round B dynamic verify 결과: find_by_clerk_id 가 매 호출 1.2-4.5s (Neon dev cold start + RTT).
+# dashboard 5 endpoint fanout 시 5× SELECT users WHERE clerk_id = 4-22s hidden cost.
+# JWT cache 와 동일 패턴 + 동일 TTL 60s. cache hit 시 SELECT 0 → 외부 사용자 매 클릭 sub-ms.
+_USER_CACHE: dict[str, tuple[User, float]] = {}
+_USER_CACHE_TTL_SEC = 60.0
+_USER_CACHE_MAX_SIZE = 1000
+
+
+def _user_cache_get(clerk_id: str) -> User | None:
+    entry = _USER_CACHE.get(clerk_id)
+    if entry is None:
+        return None
+    user, expires_at = entry
+    if time.time() >= expires_at:
+        _USER_CACHE.pop(clerk_id, None)
+        return None
+    return user
+
+
+def _user_cache_set(clerk_id: str, user: User) -> None:
+    now = time.time()
+    if len(_USER_CACHE) >= _USER_CACHE_MAX_SIZE:
+        expired = [k for k, (_, exp) in _USER_CACHE.items() if exp <= now]
+        for k in expired:
+            _USER_CACHE.pop(k, None)
+        if len(_USER_CACHE) >= _USER_CACHE_MAX_SIZE:
+            oldest = next(iter(_USER_CACHE))
+            _USER_CACHE.pop(oldest, None)
+    _USER_CACHE[clerk_id] = (user, now + _USER_CACHE_TTL_SEC)
+
+
+def invalidate_user_cache(clerk_id: str) -> None:
+    """User cache 강제 invalidate — onboarding step 증가 직후 호출 권고 (60s 지연 회피)."""
+    _USER_CACHE.pop(clerk_id, None)
 
 
 def _jwt_cache_get(key: str) -> dict | None:
@@ -120,6 +161,11 @@ async def verify_clerk_token(authorization: str = Header(default="")) -> dict:
         decode_kwargs: dict = {
             "algorithms": ["RS256"],
             "issuer": settings.clerk_jwt_issuer,
+            # Sprint 27e Post-Merge BUG-QA-2 — Clerk dev JWT exp = 60s + FE Clerk SDK
+            # 의 stale token cache 결합으로 페이지 전환 시 401 다발. 10s clock skew
+            # 허용으로 short window 통과 — 정상 사용자 UX 회복.
+            # production 에선 token exp 가 더 길어 leeway 영향 마이크로.
+            "leeway": 10,
         }
         if settings.clerk_jwt_audience is not None:
             decode_kwargs["audience"] = settings.clerk_jwt_audience
@@ -133,15 +179,20 @@ async def verify_clerk_token(authorization: str = Header(default="")) -> dict:
         _jwt_cache_set(cache_key, result, token_exp=claims.get("exp"))
         return result
     except jwt.ExpiredSignatureError:
+        _auth_logger.warning("jwt_expired", extra={"error_type": "ExpiredSignatureError"})
         raise HTTPException(status_code=401, detail="토큰이 만료되었습니다")
     except jwt.InvalidIssuerError:
         # Sprint 27e BUG-S27e-SEC-3 — issuer mismatch 명시 분리 (forensic).
+        _auth_logger.warning("jwt_invalid_issuer", extra={"error_type": "InvalidIssuerError"})
         raise HTTPException(status_code=401, detail="유효하지 않은 토큰 발급자입니다")
     except jwt.InvalidAudienceError:
+        _auth_logger.warning("jwt_invalid_audience", extra={"error_type": "InvalidAudienceError"})
         raise HTTPException(status_code=401, detail="유효하지 않은 토큰 대상입니다")
-    except jwt.InvalidTokenError:
+    except jwt.InvalidTokenError as _e:
+        _auth_logger.warning("jwt_invalid_token", extra={"error_type": type(_e).__name__})
         raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다")
-    except Exception:
+    except Exception as _e:
+        _auth_logger.warning("jwt_verify_unexpected_error", extra={"error_type": type(_e).__name__})
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
 
 
@@ -170,8 +221,28 @@ async def get_current_user(
     """
     from sqlmodel import text as _text
 
+    # Sprint 28 BUG-S28-PERF-RT-1 fix — User in-process TTL cache (clerk_id → User, 60s).
+    # JWT cache 와 동일 패턴 + 동일 TTL. Neon dev cold start + RTT 1.2-4.5s 의 hidden cost
+    # 가 dashboard 5 endpoint fanout 시 5× = 6-22s 잠재 (실측 4286ms critical path).
+    # cache hit 시 SELECT 1번도 SKIP → fast path 보다 더 빨라짐 (DB query 0).
+    # 60s 안 onboarding_step 갱신은 cache TTL 만료 후 반영 (acceptable, hook 자체는 동기 DB write).
+    clerk_id = claims["sub"]
+    cached_user = _user_cache_get(clerk_id)
+    if cached_user is not None:
+        return cached_user
+
     repo = UserRepository(session)
-    user = await repo.find_by_clerk_id(claims["sub"])
+    user = await repo.find_by_clerk_id(clerk_id)
+
+    # Sprint 27e Post-Merge BUG-QA-1 fast path — 이미 onboarding_step >= 1 (lazy seed 완료)
+    # 사용자는 매 request lazy seed SKIP (workspace + member + onboarding hook).
+    # dashboard 첫 진입 5 endpoint fanout 시 BE call 5건 × ~1.5s = 7.5s 의 hidden cost 해소.
+    # 신규 user / step=0 (lazy seed 미완료) 는 기존 경로로 fall-through.
+    if user is not None and user.onboarding_step >= 1:
+        # Sprint 28 — User cache 저장 (fast path 도달 시점에만 — onboarding 완료 user 한정).
+        _user_cache_set(clerk_id, user)
+        return user
+
     is_new_user = user is None
     if user is None:
         # 첫 로그인: race-safe lazy seed (ON CONFLICT, workspace INSERT 패턴 정합)

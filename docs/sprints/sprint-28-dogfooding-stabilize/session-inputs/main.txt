@@ -1,0 +1,232 @@
+너는 Claude Code (Opus 4.7 또는 그 이상) 자동 에이전트다. Kairos 프로젝트 Sprint 28 — **dogfooding-stabilize + audit pattern 진화** 세션이다.
+
+[GOAL — Stop hook 자동 보장, 이 세션이 끝나기 전엔 종료 X]
+
+Sprint 27 (a/b/c/d/e Round 1+2 + QA dynamic verify) 의 carry 항목 일괄 처리 + Sprint 28 의 audit pattern 진화 ("MCP Playwright runtime smoke" 명시) + 외부 5명 dogfooding 진입 직전 안전망 완성. 통합 보고서 + 신규 차단 fix + 동일 PR 에 commit/push + CI 재검증.
+
+[Sprint 27 carry list — 본 세션 우선 처리 대상]
+
+본 sprint 진입 전 Sprint 27 가 "외부 5명 진입 *전* 권고" 로 carry 한 항목 + Round 1/2 audit 가 정적 한계로 못 잡은 항목 + QA dynamic verify (PR #111) 가 발견한 patterns:
+
+P0/P1 fix 대상 (외부 진입 *전*):
+- **PERF-4 (P0 격상, Sprint 27e Round 2)** — Gemini timeout + tenacity retry + half-open circuit breaker 구현. vendor incident 1주에 1회 평균, 외부 5명 다중 다운 risk. `services/ai_processing.py:81,127,151` + `memory/service.py:682`. asyncio.wait_for(timeout=30) + tenacity exponential backoff + 5 연속 실패 → 60s open. ~1.5d
+- **PERF-10 (P1 격상)** — next/font local self-host (Satoshi/Pretendard woff2). `frontend/src/app/layout.tsx:23-45`. 외부 첫 인상 LCP 직접. ~0.5d
+- **TEST-5** — invite accept happy-path e2e (`frontend/e2e/tests/invite-accept-happy-path.spec.ts`). owner 발급 → user 수락 → role 확인 → cross-workspace switch. ~1.5h
+- **TEST-7** — upload mime real browser e2e (`frontend/e2e/tests/upload-mime-validation.spec.ts`). proxy 경로 + 위장 .exe 거부. ~1h
+- **PERF-r2-1** — staging Cloud Run 환경 RAG p95 10 sample 측정 → baseline 등재. 30분.
+
+비차단 carry (BL-S27e-A~H 묶음, 본 sprint 안 일부 처리):
+- **BL-S27e-A** (보안 hygiene): SEC-5 audit_events 도메인 신설 + SEC-6 rate-limit (slowapi) + SEC-7 CORS allow_headers/methods 화이트리스트 + SEC-11 logging.warning (Sentry SKIP path forensic).
+- **BL-S27e-B** (보안 hardening): SEC-8 + r2-9 = 3 prompt 모두 `<<<SOURCE_BLOCK>>>` 구분자 통일 + SEC-9 filename slugify + SEC-10 GHA SHA pin 통일.
+- **BL-S27e-C cluster** (성능 P1): PERF-1 R2 boto3 singleton + PERF-2 DB 인덱스 3건 (workspace_id) + PERF-3 streaming upload + PERF-5 SSE disconnect 감지.
+- **BL-S27e-D cluster** (성능 P2): PERF-6/11/12 + PERF-r2-2/3/4/5/6/7/8/9/10/11 — lifespan singleton (genai/openai), hybrid search 병렬, SemanticCache TTL filter.
+- **BL-S27e-E** (테스트 정량): TEST-3 vitest.config coverage.include + TEST-4 workspaces branch + TEST-8/9/10 에지.
+- **BL-S27e-F** (아키텍처): ARCH-1/2/3/5/6 + ARCH-r2-1/2/3 — OnboardingService DI 통일 + services DTO + audit 도메인 분리 + promote_helpers 확장. ~5-6d (architecture deepening sprint).
+- **BL-S27e-G** (production cutover hardening): ✅ 이미 PR #110 으로 RESOLVED (SEC-r2-2/3/4). 본 sprint 추가 없음.
+- **BL-S27e-H** (backend dep upper-bound): `uv sync --frozen` CI 강제 + `uv lock --check` gate. 30분.
+
+QA dynamic verify (PR #111) 가 발견한 신규 carry:
+- **BUG-QA-4** (P2): CSP script-src warning — BL-S27e-3 carry 진행.
+- **BUG-QA-5/6/7** (P3, external): Clerk dev 502 + telemetry CORS + structural CSS. `@clerk/ui` import 도입 권고 — 본 sprint 안 별도 PR.
+
+Round 1/2 errata (governance):
+- **ARCH-r2-7 회귀**: 헌법 토큰컷 (BL-S26-1) Sprint 27a partial 보고 3,398 bytes → 실측 7,960 bytes (~2.3x 회귀). 본 sprint 안 진정한 cut 시도 또는 분리 ADR.
+- **Round 2 BL-S27e-4 재분류**: flake 가설 false → tiptap dep + Nightly Gemini key 환경 결함. Nightly secret 점검 (사용자 task).
+
+[audit pattern 진화 — 본 sprint 부터 적용]
+
+Sprint 27 의 핵심 학습 = **"audit ≠ dynamic verify"**. 정적 분석 4 sub-agent 가 audit 한계 안에서 GO 판정해도 진짜 dogfooding-blocker (dashboard 7.5s / JWT 1분 expiry / UX intent vs instinct gap) 는 catch 불가. PR #111 의 QA dynamic verify 가 처음으로 MCP Playwright + gstack browse 사용 → 3건 fix.
+
+본 sprint 의 audit pattern 은 **3-Round 분리**:
+
+**Round A (Static + Dep audit)** — 기존 Sprint 27e Round 1 pattern. 4 sub-agent (Security / Performance / Test-Coverage / Architecture) 병렬, file:line 증거.
+
+**Round B (MCP Playwright runtime smoke)** — **신규 명시**. 본 sprint 부터 audit 의 필수 layer. 4 reviewer 가 자기 영역의 dynamic verify 진행.
+
+각 reviewer 의 MCP Playwright runtime smoke 의무 항목:
+
+- **Security**: live IDOR fetch (cross-workspace UUID tamper / JWT issuer tamper / cron token brute) + 보안 헤더 4종 live (curl + playwright network) + JWT cache DoS bench (1000+ tokens) + prompt injection 6s smoke (`?` mode RAG)
+- **Performance**: dashboard 첫 진입 LCP/TTI (Lighthouse 또는 playwright network timing) + RAG p95 5 sample (실 사용자 시간) + 회의 업로드 5분 sample end-to-end + DB query 수 (BE middleware log) + Cloud Run cold start (재시작 후 첫 요청)
+- **Test-Coverage**: e2e spec 실 실행 (CI 게이트 자체 + main 가지 history flake rate) + mutation test 최소 3 mutation (main.py 보안 헤더 / config validator / lazy seed) + 추천 권고 케이스 ROI 5건 신설 가능성 실측
+- **Architecture**: runtime config verify (lifespan startup / env var loading) + 의존성 cycle runtime 검증 (실 import 시점 ImportError 회피 확인) + Sentry SKIP path 의 5xx forensic dump 확인
+
+**Round C (Adversarial fuzz + production)** — Round 2 가 정적 추정만 한 영역의 실 verify. (선택 — 본 sprint 진입 신호 시)
+
+[필독 산출물]
+
+본 세션 시작 시 다음 모두 read:
+
+1. Sprint 27e Round 1 통합: `docs/sprints/sprint-27e-multi-review/integrated-report.md`
+2. Sprint 27e Round 2 통합: `docs/sprints/sprint-27e-multi-review/integrated-report-r2.md`
+3. Sprint 27e final: `docs/sprints/sprint-27e-multi-review/final-integrated-report.md`
+4. **Sprint 27e QA dynamic verify (PR #111)**: `docs/sprints/sprint-27e-multi-review/qa-dynamic-verify.md`
+5. `docs/REFACTORING-BACKLOG.md` BL-S27e-A~H + BL-S27c-* 전수
+6. `CONTEXT-MAP.md` (헌법, BE 15 모듈 + FE 14 features 갱신 완료)
+7. `docs/adr/` 014/019/020/021/022/023/024 — 특히 024 cutover lock-in 의 SEC-r2-2/3/4 fix
+8. Sprint 28 진입 시 자동 retrofit 항목 (사용자 결정):
+   - Clerk Production 발급 완료 시 ADR-024 cutover + SEC-r2-* runtime verify
+   - 외부 5명 baseline 측정 (PERF-r2-1)
+
+[환경]
+
+- 프로젝트 루트: /Users/woosung/project/agy-project/kairos
+- FE: http://localhost:3000 (Next.js 16.2.6)
+- BE: http://localhost:8000/api/v1 (FastAPI + uvicorn)
+- **이번 세션은 사용자가 FE/BE 띄우는 것이 audit 진입 조건** — Round B (MCP Playwright runtime smoke) 진행 위해 필수. 안 띄워졌으면 사용자에게 즉시 요청.
+- 로그인 d@e.com 또는 a@e.com (패턴: prefix + "e" — 사용자 4계정 보유)
+- seed credentials `~/.kairos-qa-secrets/seed-credentials-2026-05-17.env`
+- Clerk dev creative-boxer-79.clerk.accounts.dev (Production 미발급 — 사용자 결정 시 발급)
+- 응답 언어: 한국어
+
+[Step 0 — 환경 검증 + carry list 확인 + 사용자 결정 분기 (10분)]
+
+```bash
+curl -s -o /dev/null -w "FE: %{http_code} " http://localhost:3000/
+curl -s -o /dev/null -w "BE: %{http_code}\n" http://localhost:8000/api/v1/health
+git status
+git log --oneline -5
+gh pr list --state open --limit 5
+```
+
+분기:
+- FE/BE 둘 다 200 → Round A + Round B 모두 진행
+- FE/BE down → **사용자에게 즉시 요청 (audit pattern 진화 의무 항목)** — Round B 의무라 띄움 없이는 본 sprint 의의 X. 안 띄우면 audit 일시 중단.
+
+진입 결정 (AskUserQuestion):
+1. Sprint 27 carry 처리 범위: (a) P0/P1 only (PERF-4 + PERF-10 + TEST-5/7) / (b) P0/P1 + 일부 BL-S27e-A/B/C/H / (c) BL 전체 (~5-6d, architecture deepening sprint 분리)
+2. ADR-024 Clerk Production cutover: (a) 본 sprint 안 / (b) 별도 sprint
+3. Round C (adversarial fuzz) 포함 여부: (a) Round A + B 만 / (b) A + B + C
+
+[Step 1 — Round A 실행 (4 sub-agent 병렬, ~45분 각, 기존 pattern)]
+
+본 sprint 의 베이스라인 (main HEAD `<commit>`) 기준 4 sub-agent 병렬 spawn. Sprint 27e Round 1 의 main.txt 와 같은 형식 — file:line 증거 + 매트릭스 + 개별 발견 + Summary.
+
+신규 baseline 명시:
+- Sprint 27e Round 2 (PR #110) + QA dynamic verify (PR #111) 머지 후 main
+- Round 2 의 BL-S27e-A~H 가 carry 상태 (본 sprint 가 처리)
+- BL-S27e-G 는 PR #110 으로 RESOLVED 마크
+
+각 sub-agent prompt 에 다음 명시:
+- "Sprint 27 carry list 의 자기 영역 항목 verify (이미 fix 인지 / 회귀했는지)"
+- "Round A 는 정적 분석 only — Round B 가 dynamic verify 진행"
+
+[Step 2 — Round B 실행 (MCP Playwright runtime smoke, 본 sprint 핵심 신규)]
+
+**가장 중요한 단계.** Sprint 27 의 진짜 gap.
+
+진입 조건: FE/BE up 200. d@e.com 로그인 (browse + MCP Playwright 동시 사용 권장 — cross-verify).
+
+4 reviewer 가 자기 영역 dynamic verify (위 audit pattern 진화 §"각 reviewer 의 MCP Playwright runtime smoke 의무 항목" 참조):
+
+- Security live IDOR / JWT tamper / 보안 헤더 / DoS bench
+- Performance dashboard LCP / RAG p95 / 회의 5분 sample / Cloud Run cold start
+- Test-Coverage e2e CI 게이트 + main flake rate + mutation 3건 + 신규 spec ROI 측정
+- Architecture runtime config + 의존성 cycle + Sentry SKIP forensic
+
+각 reviewer 산출물: `docs/sprints/sprint-28-dogfooding-stabilize/<reviewer>-runtime-findings.md`
+
+[Step 3 — Round C 실행 (선택, 사용자 결정 시)]
+
+adversarial fuzz + production verify:
+- Codex consult: prompt injection 6s smoke (`?` mode RAG, 3 prompt 동시)
+- staging Cloud Run RAG p95 10 sample 측정 (PERF-r2-1 baseline)
+- adversarial JWT (wrong issuer / wrong audience / expired token / null bytes)
+- adversarial cron token (1글자 / 32 byte exact / 1 KB)
+- IDOR creative payload (UUID v4 brute force / cross-workspace projection)
+
+[Step 4 — Sprint 27 carry 일괄 처리 + 신규 차단 fix]
+
+Round A + B (+C) 결과 통합 후:
+
+1. Sprint 27 carry 의 사용자 선택 항목 fix:
+   - PERF-4 Gemini circuit breaker (1.5d)
+   - PERF-10 next/font local (0.5d)
+   - TEST-5 invite accept e2e (1.5h)
+   - TEST-7 upload mime e2e (1h)
+   - 본 sprint 안 가능 항목 (1d 이내) 묶음
+2. Round B 가 발견한 신규 차단 fix (예: 추가 dogfooding-blocker)
+3. governance fix (BL backlog 갱신 + ADR retrofit + 헌법 토큰컷 재시도)
+
+각 fix 별 atomic commit + 회귀 가드 (mutation test 100% kill rate 의무) + pytest/vitest/typecheck 회귀.
+
+[Step 5 — 통합 보고서 + 차단 결함 사용자 결정 + commit/push]
+
+통합 산출물:
+- `docs/sprints/sprint-28-dogfooding-stabilize/integrated-report.md` (Round A + B 통합)
+- `docs/sprints/sprint-28-dogfooding-stabilize/final-integrated-report.md` (Sprint 27 carry + Round A + B + C 최종)
+- `docs/sprints/sprint-28-dogfooding-stabilize/final-report.html` (시각화)
+
+Sprint 27e 의 산출물 형식 차용 — fix verify 표 + 신규 발견 매트릭스 + BL escalation + final verdict.
+
+차단 결함 0건이면 commit + push 진입.
+1건 이상이면 AskUserQuestion:
+- (a) 본 세션 안 fix
+- (b) 선택 fix
+- (c) BL carry + 외부 진입 보류 (NO-GO)
+
+commit:
+```bash
+git add <fix 파일들> docs/sprints/sprint-28-dogfooding-stabilize/
+git commit -m "audit-s28: Sprint 28 dogfooding-stabilize — Round A+B + Sprint 27 carry fix
+(본문: carry 처리 / Round A 결과 / Round B 신규 / final verdict)
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+git push origin sprint-28/dogfooding-stabilize
+gh pr create --title "Sprint 28 dogfooding-stabilize — audit Round A+B + Sprint 27 carry fix" --body "..."
+```
+
+[Step 6 — CI 모니터링 + 종료 보고]
+
+- `gh pr checks <number>` Monitor
+- 모두 PASS 확인
+- 종료 보고:
+  - Round A 정적 audit 결과 (4 reviewer)
+  - Round B dynamic verify 결과 (4 reviewer)
+  - Sprint 27 carry 처리 수 (예: P0/P1 5건 fix / BL 3건 carry)
+  - 신규 발견 + fix 갯수
+  - final verdict (GO / NEEDS-FIX / NO-GO)
+  - 다음 단계: PR merge / Sprint 29 (Clerk Production cutover or architecture deepening) 진입
+
+[Sprint 27 audit pattern 변별점 — 본 sprint 의 신규성]
+
+| 차원 | Sprint 27 (Round 1+2) | Sprint 28 (Round A+B+C) |
+|---|---|---|
+| MCP Playwright | 0건 (정적 + pytest 만) | **의무** (각 reviewer 자기 영역 dynamic verify) |
+| FE/BE 환경 | down 시 SKIP (자동) | **up 강제** (audit 진입 조건) |
+| 사용자 인지 갭 | catch 불가 (UX intent vs instinct) | dynamic verify 로 catch |
+| RAG end-to-end | spec 코드 read | **실 LLM 답변 + 출처 인용 verify** |
+| dashboard LCP | 정적 추정 | **실측 (Lighthouse 또는 playwright timing)** |
+| JWT runtime | jwt.decode kwargs read | **1분 expiry 실측 + leeway verify** |
+| Lazy seed | pytest race 가드 | **dashboard 진입 실측 (N endpoint × ms)** |
+| Mutation test | 1건 (Round 2) | **3건 이상** (각 reviewer 자기 영역) |
+| errata 분류 | Round 2 가 1건 발견 | **Round A→B→C 각 단계 errata 명시** |
+| Carry 처리 | sprint 별 BL 등재 만 | **carry list 본 sprint 안 일괄 처리** |
+
+[도구]
+
+- Bash (curl / git / gh / pytest / npm / Lighthouse if available)
+- Read / Write / Edit / Grep / Glob
+- Agent (general-purpose — 4 sub-reviewer Round A + B spawn)
+- **MCP Playwright (의무 — 각 reviewer 자기 영역)**:
+  - `mcp__playwright__browser_navigate` / `browser_click` / `browser_snapshot` / `browser_take_screenshot` / `browser_wait_for` / `browser_evaluate` / `browser_network_requests`
+- **gstack browse** (cross-verify): `~/.claude/skills/gstack/browse/dist/browse` (status / goto / snapshot / click / fill / press / js / network / console / screenshot)
+- TaskCreate / TaskUpdate (각 step + 각 신규 결함 fix 추적)
+- Monitor (CI 결과)
+- Codex consult (Round C adversarial)
+
+[정책 SKIP (Sprint 27 동일)]
+
+- production 환경 실 audit: 사용자 결정 시만
+- Sentry 활성: SKIP 유지 (단 SEC-11 / r2-6 / r2-7 fix 시 logging.warning 추가)
+- Clerk Production 발급: 사용자 결정 시만 (ADR-024 cutover)
+
+[시작 신호]
+
+필독 산출물 1~8 모두 read 후 Step 0 환경 검증부터 시작. 모든 Step 끝까지 순차 진행. 중간 break X. 사용자 확인 없이 자동 진행 (Git Safety Protocol 의 commit/push 도 본 goal 안에 사전 승인됨 — 단 Step 4 의 carry 처리 범위 + 신규 차단 결함 fix 결정만 사용자 답변 필요).
+
+본 세션의 정체성:
+- Sprint 28 — dogfooding-stabilize + audit pattern 진화
+- Round A (static) + Round B (MCP Playwright runtime smoke 신규 명시) + Round C (optional adversarial)
+- Sprint 27 carry list (PERF-4/10/15 + TEST-5/7 + BL-S27e-A~H + 헌법 토큰컷 회귀 + errata 정정) 일괄 처리
+- 외부 5명 dogfooding 진입 final 안전망 — Round B 의 dynamic verify 가 본 sprint 의 핵심 신규
+
+시작.

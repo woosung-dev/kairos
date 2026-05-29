@@ -126,7 +126,7 @@ export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
             <DropdownMenuItem
               key={ws.id}
               className="px-3 py-2 cursor-pointer flex items-center gap-2"
-              onSelect={() => handleSwitch(ws.id)}
+              onClick={() => handleSwitch(ws.id)}
               title={suffix ? `${ws.name} (생성: ${ws.createdAt.slice(0, 10)})` : ws.name}
             >
               <WorkspaceTypeBadge workspace={ws} size="sm" />

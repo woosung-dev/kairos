@@ -19,8 +19,9 @@ jobs:
         with:
           version: "latest"
 
+      # Sprint 28 BUG-S28-SEC-1 — `--frozen` 강제 (lock-pyproject drift PR CI 통과 차단)
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Run tests
         run: uv run pytest --ignore=tests/services/test_transcription.py --ignore=tests/test_r2_cors_regression.py -v
@@ -160,7 +161,8 @@ jobs:
 
       - name: Install backend deps
         working-directory: backend
-        run: uv sync
+        # Sprint 28 BUG-S28-SEC-1 — `--frozen` 강제 (lock drift 차단)
+        run: uv sync --frozen
 
       - name: Run alembic upgrade head
         working-directory: backend

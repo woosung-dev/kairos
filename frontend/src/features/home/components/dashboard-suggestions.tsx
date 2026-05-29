@@ -32,7 +32,7 @@ export function DashboardSuggestions() {
             key={q}
             type="button"
             data-testid="dashboard-suggestion-button"
-            onClick={() => openCmdKWithQuery(q)}
+            onClick={() => openCmdKWithQuery(q, true)}
             className="text-left px-3 py-2.5 rounded border text-sm transition-colors"
             style={{
               borderColor: "var(--border-subtle)",

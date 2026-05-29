@@ -24,13 +24,15 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
+      # Sprint 28 BUG-S28-SEC-2 — SHA pin (다른 yml 3개 패턴 정합)
       - name: Setup uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f  # v4
         with:
-          version: "0.5.4"
+          version: "latest"
 
+      # Sprint 28 BUG-S28-SEC-1 — `uv sync --frozen` 강제 (lock-pyproject drift 차단)
       - name: Sync deps
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Run R2 cleanup
         env:
