@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     sentry_traces_sample_rate: float = 0.1
     # environment 는 위로 이동 (r2-4 validator 가 참조)
 
+    # Slack (Sprint 28 Wave 1 — dogfooding 피드백 알림)
+    # 미설정 시 send_slack_message 는 no-op (피드백은 DB 에 항상 저장). Sentry SKIP 정책과 정합.
+    slack_feedback_webhook_url: str | None = None
+
     # Upload validation (Sprint 25 T-SEC-3 — BUG-SENTINEL-003)
     # 500MB 기본 한도. 음성 4시간 = ~120MB(64kbps mp3) ~ 480MB(128kbps wav) 커버.
     max_upload_bytes: int = 500 * 1024 * 1024

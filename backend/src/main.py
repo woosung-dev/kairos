@@ -18,6 +18,7 @@ from src.auth.router import router as auth_router
 from src.common.audit_router import router as audit_router
 from src.core.config import get_settings
 from src.core.lifespan import lifespan
+from src.feedback.router import router as feedback_router
 from src.inbox.router import router as inbox_router
 from src.meetings.router import router as meetings_router
 from src.memory.admin_router import admin_router as memory_admin_router
@@ -184,6 +185,7 @@ app.include_router(member_router)
 app.include_router(invite_router)
 app.include_router(invite_public_router)
 app.include_router(audit_router)
+app.include_router(feedback_router)
 
 
 @app.get("/api/v1/health")
