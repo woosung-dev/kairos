@@ -117,6 +117,9 @@ class MeetingService:
         summary = await self.repo.get_summary(meeting_id, workspace_id)
 
         result = self._to_list_item(meeting)
+        # S28b BUG-MEETING-FAILED-UI: 실패 사유를 상세 응답에 노출 (이전엔 status
+        # 엔드포인트에만 errorMessage 가 있어 detail 뷰가 실패 원인을 못 보여줬다).
+        result["errorMessage"] = meeting.error_message
         result["transcript"] = [
             {
                 "speaker": seg.speaker,

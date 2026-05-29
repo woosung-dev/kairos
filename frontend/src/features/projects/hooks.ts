@@ -63,7 +63,7 @@ export function useProjects(wid: string | undefined, params?: FetchProjectsParam
   const { getToken } = useAuth();
 
   return useQuery({
-    queryKey: projectKeys.list(wid ?? ""),
+    queryKey: projectKeys.list(wid ?? "", params),
     queryFn: async () => {
       const token = await getToken();
       if (!token) throw new Error("인증이 필요합니다");

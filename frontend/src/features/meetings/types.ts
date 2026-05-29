@@ -37,6 +37,7 @@ export interface TranscriptSegment {
 export interface MeetingDetail extends Meeting {
   transcript: TranscriptSegment[] | null;
   summary: MeetingSummary | null;
+  errorMessage: string | null; // S28b BUG-MEETING-FAILED-UI: 실패 사유 노출
   projects: { id: UUID; title: string; category: string }[];
 }
 

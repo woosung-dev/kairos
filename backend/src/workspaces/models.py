@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime
 
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -21,6 +22,12 @@ class Workspace(SQLModel, table=True):
 
 class WorkspaceMember(SQLModel, table=True):
     __tablename__ = "workspace_members"
+    # BUG-WS-MEMBER-UNIQUE (S28b): (workspace_id, user_id) DB UNIQUE backstop.
+    # lazy-seed/invite-accept 의 app-level NOT EXISTS 가드는 멀티워커(Cloud Run >1
+    # 인스턴스) interleave 에 backstop 없음 → 중복 멤버십 row 가능. DB 제약으로 차단.
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "user_id", name="uq_workspace_member"),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     workspace_id: uuid.UUID = Field(foreign_key="workspaces.id")

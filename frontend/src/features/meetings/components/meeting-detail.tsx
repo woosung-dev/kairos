@@ -77,6 +77,38 @@ function ProcessingView({ status }: { status: MeetingStatus }) {
   );
 }
 
+/* ── 실패 안내 (S28b BUG-MEETING-FAILED-UI) ── */
+
+function FailedMeetingView() {
+  // 사용자에겐 친화적 메시지만 노출 — 원시 error_message(서명 URL 포함 httpx 오류 등)는
+  // 상세 응답(errorMessage)에 남겨 support/디버깅용으로 두되 UI 에 raw 로 덤프하지 않음.
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <span className="text-4xl mb-4">⚠️</span>
+      <h3
+        className="text-lg font-semibold mb-2"
+        style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}
+      >
+        분석에 실패했습니다
+      </h3>
+      <p className="text-sm mb-4 max-w-md" style={{ color: "var(--text-muted)" }}>
+        처리 중 오류가 발생했습니다. 파일 형식과 크기를 확인하고 다시 업로드해 주세요.
+      </p>
+      <a
+        href="/new"
+        className="px-4 py-2 rounded text-sm font-medium"
+        style={{
+          background: "var(--accent)",
+          color: "var(--background)",
+          borderRadius: "var(--radius-sm)",
+        }}
+      >
+        다시 업로드
+      </a>
+    </div>
+  );
+}
+
 /* ── 컴포넌트 ── */
 
 interface MeetingDetailProps {
@@ -153,7 +185,10 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
           >
             {STATUS_LABELS[meeting.status]}
           </span>
-          <MeetingExportButton meetingId={meetingId} meetingTitle={meeting.title} />
+          {/* S28b OBS-MEETING-ACTIONS: export 는 완료 상태에서만 (빈/실패 export 방지) */}
+          {meeting.status === "completed" && (
+            <MeetingExportButton meetingId={meetingId} meetingTitle={meeting.title} />
+          )}
           {/* Sprint 23 D4: 워크스페이스 이동 (promote 1-button) */}
           <button
             type="button"
@@ -209,8 +244,10 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
         )}
       </div>
 
-      {/* 처리 중 상태면 탭 대신 안내 메시지 */}
-      {isProcessing ? (
+      {/* 상태별 본문: 실패 / 처리중 / 완료 탭 (S28b BUG-MEETING-FAILED-UI) */}
+      {meeting.status === "failed" ? (
+        <FailedMeetingView />
+      ) : isProcessing ? (
         <ProcessingView status={meeting.status} />
       ) : (
         <>
