@@ -108,7 +108,7 @@ function ProjectSources({
   if (items.length === 0) {
     return (
       <div
-        className="ml-4 px-2 py-1 text-[11px]"
+        className="ml-4 px-2 py-1 text-caption"
         style={{ color: "var(--text-muted)" }}
       >
         소스 없음
@@ -125,7 +125,7 @@ function ProjectSources({
           <Link
             key={`${item.type}-${item.id}`}
             href={item.href}
-            className="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] truncate transition-colors"
+            className="flex items-center gap-1.5 px-2 py-1 rounded text-caption truncate transition-colors"
             style={{
               background: isItemActive ? "var(--surface-active)" : "transparent",
               color: isItemActive ? "var(--text-primary)" : "var(--text-muted)",
@@ -250,7 +250,7 @@ function ProjectsList({
             <Archive size={12} />
             <span>Archive</span>
             <span
-              className="ml-auto text-[10px]"
+              className="ml-auto text-micro"
               style={{ color: "var(--text-muted)" }}
             >
               {archivedProjects.length}
@@ -291,6 +291,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
   const pathname = usePathname();
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const hasRole = useWorkspaceStore((s) => s.hasRole);
+  const workspaceRole = useWorkspaceStore((s) => s.workspaceRole);
 
   // Sprint 14 T-9: Inbox 카운트 정책 = 미처리(!isProcessed) 항목 수.
   // /inbox 페이지의 "미처리" 필터 결과와 동일 source-of-truth (동일 query key 캐시 공유).
@@ -325,7 +326,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
         {/* Inbox 배지 — 미처리 항목 수 (Sprint 14 T-9, 0건이면 숨김) */}
         {!collapsed && item.hasBadge && unprocessedInboxCount > 0 && (
           <span
-            className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+            className="text-micro font-medium px-1.5 py-0.5 rounded-full"
             style={{
               background: "var(--accent)",
               color: "var(--background)",
@@ -338,7 +339,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
         {/* NEW 핀 — Sprint 15 Memory 진입점 강조 */}
         {!collapsed && item.hasNewPill && (
           <span
-            className="text-[10px] font-medium px-1.5 py-0.5 rounded-full uppercase tracking-wider"
+            className="text-micro font-medium px-1.5 py-0.5 rounded-full uppercase tracking-wider"
             style={{
               background: "var(--accent)",
               color: "var(--background)",
@@ -402,9 +403,13 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
           }}
         />
 
-        {/* 하단 네비: 빠른 메모 / + 추가 (Viewer에게 숨김) */}
+        {/* 하단 네비: 빠른 메모 / + 추가 (Viewer에게 숨김).
+            역할 미해결(workspaceRole === null = members API 로딩 중)이면 낙관적으로
+            노출 — 쓰기 권한은 서버에서 강제되므로 nav 가시성은 UX 일 뿐. viewer 로
+            확정될 때만 숨겨 role-fetch 윈도우의 nav flicker 방지 (BL-S27e-2). */}
         {NAV_BOTTOM.filter(
-          (item) => !item.requiresWrite || hasRole("member")
+          (item) =>
+            !item.requiresWrite || workspaceRole === null || hasRole("member")
         ).map(renderNavItem)}
       </nav>
 
