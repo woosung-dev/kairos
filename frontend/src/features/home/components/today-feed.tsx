@@ -61,7 +61,7 @@ function InboxCard({ count }: { count: number }) {
       </div>
       <div className="flex items-center gap-1">
         <span
-          className="flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold"
+          className="flex items-center justify-center w-5 h-5 rounded-full text-micro font-bold"
           style={{
             background: "var(--warning)",
             color: "var(--background)",
@@ -113,7 +113,7 @@ function ActionsDueList({ actions }: { actions: ActionDueEntry[] }) {
               {action.title}
             </span>
             <span
-              className="text-[10px] px-1.5 py-0.5 rounded"
+              className="text-micro px-1.5 py-0.5 rounded"
               style={{
                 background: "var(--surface-hover)",
                 color: "var(--text-muted)",
@@ -179,7 +179,7 @@ function RecentActivityList({ activities }: { activities: RecentActivity[] }) {
                 {act.title}
               </span>
               <span
-                className="shrink-0 text-[10px]"
+                className="shrink-0 text-micro"
                 style={{ color: "var(--text-muted)" }}
               >
                 {act.timestamp}

@@ -430,7 +430,7 @@ function DashboardHeader({
           {project.tags.map((tag) => (
             <span
               key={tag}
-              className="px-1.5 py-0.5 rounded text-[10px]"
+              className="px-1.5 py-0.5 rounded text-micro"
               style={{
                 background: "var(--surface-active)",
                 color: "var(--text-muted)",
@@ -469,7 +469,7 @@ function MeetingCard({ meeting }: { meeting: Meeting }) {
               {meeting.title}
             </h3>
             <span
-              className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px]"
+              className="shrink-0 px-1.5 py-0.5 rounded-full text-micro"
               style={{
                 background: "var(--surface-active)",
                 color: "var(--text-muted)",
@@ -478,7 +478,7 @@ function MeetingCard({ meeting }: { meeting: Meeting }) {
               회의
             </span>
           </div>
-          <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+          <div className="text-micro" style={{ color: "var(--text-muted)" }}>
             {displayDate}
             {meeting.actionItemCount > 0 && (
               <span className="ml-2">액션 {meeting.actionItemCount}개</span>
@@ -511,7 +511,7 @@ function NoteCard({ note }: { note: Note }) {
               {note.title}
             </h3>
             <span
-              className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px]"
+              className="shrink-0 px-1.5 py-0.5 rounded-full text-micro"
               style={{
                 background: "var(--surface-active)",
                 color: "var(--text-muted)",
@@ -525,7 +525,7 @@ function NoteCard({ note }: { note: Note }) {
               {note.plainText}
             </p>
           )}
-          <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+          <div className="text-micro" style={{ color: "var(--text-muted)" }}>
             {displayDate}
           </div>
         </div>
@@ -563,7 +563,7 @@ function ActionRow({ action, onToggle }: { action: ActionItem; onToggle: () => v
         >
           {action.title}
         </p>
-        <div className="flex items-center gap-2 text-[10px]" style={{ color: "var(--text-muted)" }}>
+        <div className="flex items-center gap-2 text-micro" style={{ color: "var(--text-muted)" }}>
           {action.assignee && <span>{action.assignee.displayName}</span>}
           {action.dueDate && (
             <>

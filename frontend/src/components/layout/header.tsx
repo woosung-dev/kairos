@@ -74,7 +74,7 @@ export function Header() {
         <span className="truncate hidden md:inline">팀 지식 검색...</span>
         <span className="truncate md:hidden">검색</span>
         <kbd
-          className="ml-auto px-1.5 py-0.5 rounded text-[10px] shrink-0"
+          className="ml-auto px-1.5 py-0.5 rounded text-micro shrink-0"
           style={{
             background: "var(--surface-active)",
             color: "var(--text-muted)",

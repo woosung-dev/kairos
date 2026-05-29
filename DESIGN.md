@@ -28,7 +28,8 @@
   - h3: 18px / 600 (Satoshi)
   - body: 15px / 400 (Pretendard) / line-height 1.6
   - small: 13px / 400 (Pretendard)
-  - caption: 11px / 400 (Geist Mono)
+  - caption: 11px / 400 (Geist Mono) — 유틸 `.text-caption` (globals.css)
+  - micro: 10px — 배지/카운트 등 sub-caption. 유틸 `.text-micro` (globals.css). 임의값 `text-[10px]` 우회 제거용
 
 ## Color
 - **Approach:** Restrained — 1 accent + neutrals. 색상은 아껴서, 정확하게.
@@ -66,11 +67,21 @@
 - **Completed:** #F0963C (주황) — 완료된 프로젝트
 - **Archived:** #6B6B73 (회색) — 비활성/보관
 
-### Semantic
+### Semantic (Dark 기본)
 - **Success:** #34D399
 - **Warning:** #FBBF24
 - **Error:** #F87171
 - **Info:** #60A5FA
+
+### Semantic (Light)
+> 라이트 배경(#FFF/#FAFAFA)에서 다크용 값을 그대로 상속하면 대비 미달(amber #FBBF24 ≈1.4:1).
+> 색조 유지한 -600 계열로 재정의 — 랜딩 라이트 cat 색과 정합. `[data-theme="light"]` 에 적용.
+- **Success:** #059669
+- **Warning:** #D97706
+- **Error:** #DC2626
+- **Info:** #2563EB
+
+> ⚠️ 대비 caveat. 위 -600 값은 배지/인디케이터(비텍스트 3:1) 기준이다. 본문 텍스트로 쓸 경우 Success(3.9:1)·Warning(3.6:1)은 WCAG AA 4.5:1 미달 — 텍스트 용도면 -700 계열(#047857/#B45309)로 올린다.
 
 ### Dark Mode Strategy
 - 채도 10~20% 낮춤
@@ -127,6 +138,7 @@
 | 2026-04-01 | Pretendard 한국어 본문 | Apple SD Gothic Neo 대비 가독성, 자간, 웨이트 다양성 우위. |
 | 2026-05-14 | Sprint 15 Recall-first patch (§Workspace Types + §Recall UI) | Stage 2 mini design-consultation. Restrained philosophy 유지 — 색상 신규 0, icon + typography로 Personal/Team 구분. Promote = ghost variant (retention feature 위상). |
 | 2026-05-15 | Sprint 17 Workspace Switcher + Recall UI atomic update (BL-014/015/018) | §Recall UI에서 capture row + tabs 제거 (search-first FAB layout 실제 구현 반영). Bottom Nav 5th [검색] → [메모] (Sprint 14 T-11 retrofit). Workspace switcher dropdown spec lock-in (header.tsx topbar). |
+| 2026-05-29 | Sprint 28d Light Semantic 토큰 재정의 (DESIGN-TOKEN-DRIFT 후속) | 라이트 모드가 다크용 semantic(#FBBF24 등) 상속 → 대비 미달. -600 계열 light override (`[data-theme="light"]`, globals.css). 배지/인디케이터 기준이며 텍스트 용도는 -700 권장 caveat 명시. |
 
 ---
 

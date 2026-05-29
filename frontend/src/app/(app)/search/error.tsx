@@ -34,7 +34,7 @@ export default function SearchError({
         RAG 임베딩 검색이 일시 장애일 수 있습니다. 다시 시도하거나 키워드를 단순화하세요.
       </p>
       {error.digest && (
-        <p className="text-[10px] mb-6" style={{ color: "var(--text-muted)" }}>
+        <p className="text-micro mb-6" style={{ color: "var(--text-muted)" }}>
           digest: {error.digest}
         </p>
       )}

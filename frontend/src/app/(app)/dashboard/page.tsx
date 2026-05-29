@@ -133,7 +133,7 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-          로딩 중...
+          불러오는 중...
         </p>
       </div>
     );
@@ -192,7 +192,7 @@ export default function DashboardPage() {
           >
             <span>검색하거나 질문 입력...</span>
             <kbd
-              className="px-2 py-0.5 rounded text-[10px]"
+              className="px-2 py-0.5 rounded text-micro"
               style={{
                 background: "var(--surface-active)",
                 borderRadius: "var(--radius-sm)",

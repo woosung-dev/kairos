@@ -81,11 +81,13 @@
 
 ---
 
-## BL-S27c-8 — A11Y PopoverTrigger nativeButton 3 page 공통 ★ (P1)
+## BL-S27c-8 — A11Y PopoverTrigger nativeButton 3 page 공통 ★ (P1) ✅ **이미 해소 (Sprint 27d BUG-S27d-1)**
 
 **현 상태**: Dashboard / Projects / CmdK 진입 시 console error `Base UI: A component that acts as a button expected a native <button> because the nativeButton prop is true`. OnboardingTooltip 의 PopoverTrigger render prop 에 non-button.
 
 **목표**: PopoverTrigger 의 `nativeButton` prop=false 또는 render slot 에 native `<button>` 전달.
+
+**해소 확인 (Sprint 28d, 2026-05-29)**: `components/onboarding/onboarding-tooltip.tsx:123` 에 `nativeButton={false}` 이미 적용 (BUG-S27d-1 fix, Sprint 27d). backlog 미갱신이던 stale 항목 — Sprint 28d 코드 재확인 + grep 결과 다른 PopoverTrigger 사용처 없음.
 
 ---
 
@@ -107,7 +109,7 @@
 
 ---
 
-## BL-S27c-12 — logout 시 `localStorage.kairos-workspace` clear ★★ (P1, Wave 4 발견)
+## BL-S27c-12 — logout 시 `localStorage.kairos-workspace` clear ★★ (P1, Wave 4 발견) ✅ **완료 (Sprint 28d, 2026-05-29)**
 
 **현 상태**: Clerk `signOut()` 후에도 `localStorage.kairos-workspace.activeWorkspaceId` 가 이전 user 의 workspace_id 잔존. 다른 user login 시 stale ID 사용 → cross-tenant API 호출 → 403 → UI 에 "워크스페이스 멤버가 아닙니다" 표시.
 
@@ -116,6 +118,8 @@
 **Fix 후보**: (a) Clerk `<SignOutButton onSignOutComplete>` hook 에 `localStorage.removeItem('kairos-workspace')` (b) Zustand persist onRehydrate 에 user_id verification 가드 (c) `kairos-workspace` 의 user_id 도 함께 저장 + activeWorkspaceId 와 비교.
 
 **근거**: Sprint 27c Wave 4 audit `WAVE-4-VERIFIED.md`.
+
+**해소 (Sprint 28d, 2026-05-29)**: 후보 (a)+(c) 조합. ① 정상 logout 경로는 `88eb306` 이 `onSelect→onClick` 정합으로 이미 동작(`setActiveWorkspaceId("")` + `queryClient.clear()`). ② 비-드롭다운 경로(세션만료/계정전환) 방어로 store 에 `ownerUserId` + `ensureOwner(userId)` 추가 — user id 만 비교해 워크스페이스 목록과 무관(race-free), `panel-layout.tsx` 에서 mount 시 호출 → 다른 user 면 stale `activeWorkspaceId` 즉시 초기화. 비어있으면 첫 워크스페이스 self-heal. 단위테스트 3건(`store.test.ts`).
 
 ---
 
@@ -137,13 +141,15 @@
 
 ---
 
-## BL-S27e-2 — 사이드바 nav flicker 디버깅 (Sprint 27d carry) ★ (P3)
+## BL-S27e-2 — 사이드바 nav flicker 디버깅 (Sprint 27d carry) ★ (P3) ✅ **완료 (Sprint 28d, 2026-05-29)**
 
 **현 상태**: Sprint 27d opus audit (agent-5 일반사용자) `/notes` 진입 시 사이드바 일부 nav link 가 일시 미표시 → 곧 정상 복원. useEffect dependency 또는 SWR cache hydration 타이밍 이슈 추정.
 
 **목표**: render order 분석 + initial render 시 nav skeleton 또는 SSR-hydration 동기화.
 
 **근거**: Sprint 27d opus audit BUG-S27d-7 (P3). 기능 손실 0, 시각 잡음.
+
+**해소 (Sprint 28d, 2026-05-29)**: 루트코즈 = `sidebar.tsx` NAV_BOTTOM(`/notes`·`/new`, `requiresWrite`)이 `hasRole("member")` 로 필터되는데 `workspaceRole` 은 persist 제외(매 세션 `useSyncWorkspaceRole` 의 members API 로딩 후 설정) → 로딩 윈도우엔 null → 항목 숨김 → 역할 해결 후 등장 = flicker. fix = 역할 미해결(null)이면 낙관적 노출(쓰기 권한은 서버 강제, nav 가시성은 UX), viewer 로 확정될 때만 숨김. 다수(owner/member) 케이스 flicker 제거.
 
 ---
 

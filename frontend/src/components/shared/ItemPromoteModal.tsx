@@ -274,7 +274,7 @@ export function ItemPromoteModal({
         <div className="mt-2">
           <label
             htmlFor="promote-target"
-            className="mb-2 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+            className="mb-2 block text-caption font-medium uppercase tracking-wide text-muted-foreground"
           >
             대상 워크스페이스
           </label>

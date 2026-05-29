@@ -44,7 +44,7 @@ export default function SettingsPage() {
           className="flex items-center justify-center h-full"
           style={{ color: "var(--text-muted)" }}
         >
-          로딩 중...
+          불러오는 중...
         </div>
       }
     >

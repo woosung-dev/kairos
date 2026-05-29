@@ -349,3 +349,12 @@
     }
   }
 }
+
+/* 배지·캡션용 sub-scale 타이포 토큰 (DESIGN.md caption 11px + 그 아래 micro 10px).
+   임의값 text-[10px]/text-[11px] 우회 제거 — font-size 만 지정해 시각 무회귀. */
+@utility text-caption {
+  font-size: 11px;
+}
+@utility text-micro {
+  font-size: 10px;
+}

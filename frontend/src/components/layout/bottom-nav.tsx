@@ -55,7 +55,7 @@ export function BottomNav() {
               }}
             />
             <span
-              className="text-[10px]"
+              className="text-micro"
               style={{
                 color: isActive ? "var(--text-primary)" : "var(--text-muted)",
               }}

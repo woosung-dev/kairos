@@ -31,7 +31,7 @@ export function MessageActions({
       <button
         type="button"
         onClick={handleCopy}
-        className="flex items-center gap-1 px-2 py-1 rounded text-[11px] border transition-colors cursor-pointer"
+        className="flex items-center gap-1 px-2 py-1 rounded text-caption border transition-colors cursor-pointer"
         style={{
           borderColor: "var(--border-subtle)",
           color: isCopied ? "var(--accent)" : "var(--text-muted)",
@@ -56,7 +56,7 @@ export function MessageActions({
       <button
         type="button"
         onClick={onSaveAsNote}
-        className="flex items-center gap-1 px-2 py-1 rounded text-[11px] border transition-colors cursor-pointer"
+        className="flex items-center gap-1 px-2 py-1 rounded text-caption border transition-colors cursor-pointer"
         style={{
           borderColor: "var(--border-subtle)",
           color: "var(--text-muted)",
@@ -79,7 +79,7 @@ export function MessageActions({
       <button
         type="button"
         onClick={onExport}
-        className="flex items-center gap-1 px-2 py-1 rounded text-[11px] border transition-colors cursor-pointer"
+        className="flex items-center gap-1 px-2 py-1 rounded text-caption border transition-colors cursor-pointer"
         style={{
           borderColor: "var(--border-subtle)",
           color: "var(--text-muted)",

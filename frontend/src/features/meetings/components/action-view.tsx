@@ -154,15 +154,15 @@ function ActionRow({ action, onToggle }: { action: ActionItem; onToggle: () => v
         </p>
         <div className="flex items-center gap-3 mt-1">
           {action.assignee && (
-            <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+            <span className="text-caption" style={{ color: "var(--text-muted)" }}>
               {action.assignee.displayName}
             </span>
           )}
           {action.dueDate && (
             <>
-              <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>&middot;</span>
+              <span className="text-caption" style={{ color: "var(--text-muted)" }}>&middot;</span>
               <span
-                className="text-[11px]"
+                className="text-caption"
                 style={{
                   color: isOverdue(action.dueDate) && !isDone ? "var(--error)" : "var(--text-muted)",
                   fontFamily: "var(--font-mono)",
@@ -175,7 +175,7 @@ function ActionRow({ action, onToggle }: { action: ActionItem; onToggle: () => v
           {/* 우선순위 뱃지 */}
           {action.priority === "high" && (
             <span
-              className="text-[10px] ml-auto px-1.5 py-0.5 rounded"
+              className="text-micro ml-auto px-1.5 py-0.5 rounded"
               style={{
                 background: "rgba(239,68,68,0.1)",
                 color: "var(--error)",

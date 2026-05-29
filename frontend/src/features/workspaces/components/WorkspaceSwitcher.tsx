@@ -111,7 +111,7 @@ export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
       <DropdownMenuContent align="start" side="bottom" sideOffset={6} className="w-[260px]">
         <div className="px-3 py-2">
           <span
-            className="text-[11px] uppercase tracking-wide"
+            className="text-caption uppercase tracking-wide"
             style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
           >
             워크스페이스

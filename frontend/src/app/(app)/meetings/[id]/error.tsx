@@ -34,7 +34,7 @@ export default function MeetingError({
         회의가 아직 처리 중이거나 (STT/AI) 삭제되었을 수 있습니다. 잠시 후 다시 시도하세요.
       </p>
       {error.digest && (
-        <p className="text-[10px] mb-6" style={{ color: "var(--text-muted)" }}>
+        <p className="text-micro mb-6" style={{ color: "var(--text-muted)" }}>
           digest: {error.digest}
         </p>
       )}

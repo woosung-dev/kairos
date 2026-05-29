@@ -101,7 +101,7 @@ export function ProjectMembersPanel({
         </h3>
         {!isPrivate && (
           <span
-            className="text-[11px]"
+            className="text-caption"
             style={{ color: "var(--text-muted)" }}
           >
             visibility=Private 시에만 명시 멤버 매핑 의미 있음

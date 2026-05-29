@@ -124,7 +124,7 @@ export function ActionKanban() {
     return (
       <div className="flex items-center justify-center py-12">
         <span className="text-sm" style={{ color: "var(--text-muted)" }}>
-          로딩 중...
+          불러오는 중...
         </span>
       </div>
     );
@@ -234,7 +234,7 @@ function KanbanColumn({ id, label, color, items }: KanbanColumnProps) {
           {label}
         </span>
         <span
-          className="text-[10px] px-1.5 py-0.5 rounded-full"
+          className="text-micro px-1.5 py-0.5 rounded-full"
           style={{
             background: "var(--surface-active)",
             color: "var(--text-muted)",
@@ -276,7 +276,7 @@ function KanbanCardContent({ item }: { item: ActionItem }) {
         <div className="flex items-center gap-2">
           {item.assignee && (
             <span
-              className="text-[10px] px-1.5 py-0.5 rounded-full"
+              className="text-micro px-1.5 py-0.5 rounded-full"
               style={{
                 background: "var(--surface-active)",
                 color: "var(--text-muted)",
@@ -287,7 +287,7 @@ function KanbanCardContent({ item }: { item: ActionItem }) {
           )}
           {/* 우선순위 뱃지 */}
           <span
-            className="text-[10px] px-1.5 py-0.5 rounded-full"
+            className="text-micro px-1.5 py-0.5 rounded-full"
             style={{
               background: `${PRIORITY_COLORS[item.priority]}20`,
               color: PRIORITY_COLORS[item.priority],
@@ -298,7 +298,7 @@ function KanbanCardContent({ item }: { item: ActionItem }) {
         </div>
         {item.dueDate && (
           <span
-            className="text-[10px]"
+            className="text-micro"
             style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
           >
             {item.dueDate}
