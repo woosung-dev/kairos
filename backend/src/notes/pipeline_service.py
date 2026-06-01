@@ -13,6 +13,10 @@ project visibility 동적 검증 (admin 이상은 우회).
 """
 import uuid
 
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from src.embeddings.repository import EmbeddingRepository
 from src.embeddings.service import EmbeddingService
 from src.notes.repository import NoteRepository
 from src.projects.repository import ProjectRepository
@@ -24,10 +28,14 @@ class NotePipelineService:
         note_repo: NoteRepository,
         embedding_service: EmbeddingService,
         project_repo: ProjectRepository,
+        session_factory: async_sessionmaker[AsyncSession] | None = None,
     ) -> None:
         self.note_repo = note_repo
         self.embedding_service = embedding_service
         self.project_repo = project_repo
+        # P0 fix (2026-06-01): BG embedding 은 fresh 세션 필요 — request-scoped 세션은
+        # HTTP 응답 직후 닫혀 BackgroundTasks 실행 시 사용 불가 (Sprint 9 버그 클래스 재발 방지).
+        self.session_factory = session_factory
 
     async def embed_note_async(
         self, note_id: uuid.UUID, workspace_id: uuid.UUID
@@ -36,20 +44,32 @@ class NotePipelineService:
 
         embedding 호출은 본 orchestrator 내부에서만 — 헌법 §4.2 정합.
         헌법 I-9 (Codex F-1): workspace_id 필수.
+
+        P0 fix (2026-06-01): request-scoped 세션은 HTTP 응답 직후 닫히므로
+        BackgroundTasks 실행 시점엔 사용 불가 → session_factory 로 fresh 세션 생성
+        (meetings.pipeline_service 와 동일 패턴).
         """
-        note = await self.note_repo.find_by_id(note_id, workspace_id)
-        if not note or not note.plain_text:
-            return
-        await self.embedding_service.embed_note(
-            note_id=note.id,
-            workspace_id=note.workspace_id,
-            project_id=note.project_id,
-            title=note.title,
-            plain_text=note.plain_text,
-        )
-        await self.embedding_service.invalidate_cache(
-            note.workspace_id, note.project_id
-        )
+        if self.session_factory is None:
+            raise RuntimeError(
+                "NotePipelineService.embed_note_async 는 session_factory 가 필요합니다 "
+                "(BackgroundTasks fresh 세션)."
+            )
+        async with self.session_factory() as session:
+            note_repo = NoteRepository(session)
+            embedding_service = EmbeddingService(EmbeddingRepository(session))
+            note = await note_repo.find_by_id(note_id, workspace_id)
+            if not note or not note.plain_text:
+                return
+            await embedding_service.embed_note(
+                note_id=note.id,
+                workspace_id=note.workspace_id,
+                project_id=note.project_id,
+                title=note.title,
+                plain_text=note.plain_text,
+            )
+            await embedding_service.invalidate_cache(
+                note.workspace_id, note.project_id
+            )
 
     async def delete_note_with_cleanup(
         self, note_id: uuid.UUID, workspace_id: uuid.UUID
