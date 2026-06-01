@@ -53,7 +53,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
         <span
           className="shrink-0 px-1.5 py-0.5 rounded-full text-micro font-medium"
           style={{
-            background: `${STATUS_COLORS[project.status]}20`,
+            // P1 fix (2026-06-01): `var(--x)20` 은 무효 CSS(배경 투명) → color-mix 로 12% tint
+            // (project-detail/dashboard 및 visibility-badge 와 동일 패턴).
+            background: `color-mix(in srgb, ${STATUS_COLORS[project.status]} 12%, transparent)`,
             color: STATUS_COLORS[project.status],
           }}
         >
