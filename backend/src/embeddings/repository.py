@@ -130,6 +130,23 @@ class EmbeddingRepository:
         )
         await self.session.flush()
 
+    async def find_chunk_project_ids(
+        self, source_type: str, source_id: uuid.UUID
+    ) -> set[uuid.UUID | None]:
+        """소스 청크들의 distinct project_id 집합 (Sprint 29 R1 notes-stale).
+
+        project_id 변경 시 변경 전 scope 의 SemanticCache 를 무효화하기 위해
+        갱신 직전의 기존 project_id 들을 수집한다.
+        """
+        result = await self.session.execute(
+            text(
+                "SELECT DISTINCT project_id FROM embedding_chunks "
+                "WHERE source_type = :stype AND source_id = :sid"
+            ),
+            {"stype": source_type, "sid": str(source_id)},
+        )
+        return {row[0] for row in result}
+
     # --- 검색 ---
 
     @staticmethod

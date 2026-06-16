@@ -71,6 +71,37 @@ class NotePipelineService:
                 note.workspace_id, note.project_id
             )
 
+    async def sync_note_project_id(
+        self, note_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> None:
+        """project_id 변경 시 EmbeddingChunk.project_id 동기화 + old/new 캐시 무효화.
+
+        Sprint 29 R1 (notes-stale): content 변경이 없으면 embed_note_async(BG) 가
+        실행되지 않아 chunk.project_id 가 stale 로 남아 RAG project-scope 필터가 틀린다.
+        재임베딩 없이 chunk 의 project_id 만 갱신(vector 보존) + 변경 전/후 project scope
+        의 SemanticCache 를 무효화한다.
+
+        request-scoped 세션 동기 처리 — note 의 현재(갱신된) project_id 와 기존 chunk 의
+        old project_id 를 같은 트랜잭션에서 읽으므로 embed_note_async 실행 순서와 무관하게
+        정확하다. embeddings 도메인은 cross-domain shared service (ADR-014 §4.2) 라
+        orchestrator 내부에서 EmbeddingRepository 직접 호출 허용.
+        """
+        note = await self.note_repo.find_by_id(note_id, workspace_id)
+        if note is None:
+            return
+        new_project_id = note.project_id
+        embed_repo = self.embedding_service.repo
+        old_project_ids = await embed_repo.find_chunk_project_ids("note", note_id)
+        if not old_project_ids:
+            # 아직 임베딩 전(plain_text 빈 노트 등) → 동기화 대상 없음.
+            # content 변경 시 embed_note_async 가 새 project_id 로 chunk 를 생성한다.
+            return
+        await embed_repo.update_project_id("note", note_id, new_project_id)
+        # 변경 전(old) + 변경 후(new) project scope 의 캐시 모두 무효화.
+        for scope in old_project_ids | {new_project_id}:
+            await embed_repo.delete_caches(workspace_id, scope)
+        await embed_repo.commit()
+
     async def delete_note_with_cleanup(
         self, note_id: uuid.UUID, workspace_id: uuid.UUID
     ) -> None:

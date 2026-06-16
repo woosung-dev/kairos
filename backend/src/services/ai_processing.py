@@ -17,6 +17,7 @@ from src.common.prompts import (
 from src.core.config import get_settings
 from src.services.ai_resilience import (
     GEMINI_STREAM_TIMEOUT_SEC,
+    gemini_breaker,
     with_gemini_timeout,
 )
 
@@ -167,6 +168,16 @@ class AIProcessingService:
             ),
             timeout_sec=GEMINI_STREAM_TIMEOUT_SEC,
         )
-        async for chunk in stream:
-            if chunk.text:
-                yield chunk.text
+        # Sprint 29 R1 (svc-breaker): stream init 성공 시 with_gemini_timeout 이 breaker 를
+        # reset 하지만, async for 중 mid-stream vendor 실패는 breaker 밖이라 집계되지 않았다
+        # → vendor 가 매번 init 후 mid-stream 실패해도 circuit 이 열리지 않는 구멍.
+        # mid-stream 실패를 on_failure 로 집계한다. 사용자 disconnect(CancelledError /
+        # GeneratorExit = BaseException)는 `except Exception` 이 잡지 않아 vendor 실패로
+        # 오집계되지 않는다.
+        try:
+            async for chunk in stream:
+                if chunk.text:
+                    yield chunk.text
+        except Exception:
+            gemini_breaker.on_failure()
+            raise

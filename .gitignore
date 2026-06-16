@@ -64,3 +64,6 @@ skills-lock.json
 .agents/
 .gstack/
 .context/
+
+# Python coverage artifact
+backend/.coverage
