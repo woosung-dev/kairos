@@ -9,7 +9,7 @@ type EmptyStateAction =
   | { label: string; onClick: () => void; href?: never };
 
 interface EmptyStateProps {
-  icon?: string;
+  icon?: React.ReactNode;
   title: string;
   description?: string;
   action?: EmptyStateAction;
@@ -29,7 +29,7 @@ export function EmptyState({
   };
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      {icon && <span className="text-4xl mb-4">{icon}</span>}
+      {icon && <div className="mb-4" style={{ color: "var(--text-muted)" }}>{icon}</div>}
       <h3
         className="text-lg font-semibold mb-2"
         style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}

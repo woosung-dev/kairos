@@ -361,3 +361,77 @@
 @utility text-micro {
   font-size: 10px;
 }
+
+/* Sprint 29 R4 (rag-markdown): RAG 답변 마크다운 렌더 스타일. 앱 토큰만 사용해 시각 정합.
+   이전엔 raw `###`/`**` 노출 → react-markdown 렌더 후 가독성 보장. */
+.rag-markdown {
+  white-space: normal;
+}
+.rag-markdown > :first-child {
+  margin-top: 0;
+}
+.rag-markdown > :last-child {
+  margin-bottom: 0;
+}
+.rag-markdown p {
+  margin: 0.5em 0;
+  white-space: pre-wrap;
+}
+.rag-markdown h1,
+.rag-markdown h2,
+.rag-markdown h3 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0.7em 0 0.3em;
+  font-family: var(--font-display);
+}
+.rag-markdown h1 {
+  font-size: 1.15rem;
+}
+.rag-markdown h2 {
+  font-size: 1.05rem;
+}
+.rag-markdown h3 {
+  font-size: 1rem;
+}
+.rag-markdown ul,
+.rag-markdown ol {
+  margin: 0.4em 0;
+  padding-left: 1.25em;
+}
+.rag-markdown ul {
+  list-style: disc;
+}
+.rag-markdown ol {
+  list-style: decimal;
+}
+.rag-markdown li {
+  margin: 0.2em 0;
+}
+.rag-markdown code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--surface-active);
+  padding: 0.1em 0.3em;
+  border-radius: var(--radius-sm);
+}
+.rag-markdown pre {
+  background: var(--surface-active);
+  padding: 0.6em 0.75em;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.rag-markdown pre code {
+  background: transparent;
+  padding: 0;
+}
+.rag-markdown strong {
+  font-weight: 600;
+}
+.rag-markdown blockquote {
+  border-left: 2px solid var(--border);
+  padding-left: 0.75em;
+  margin: 0.5em 0;
+  color: var(--text-secondary);
+}

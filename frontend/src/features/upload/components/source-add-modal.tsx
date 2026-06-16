@@ -3,6 +3,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { FileText, StickyNote, Link, ClipboardList, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCreateNote } from "@/features/notes/hooks";
 import { useCreateMeeting } from "@/features/meetings/hooks";
@@ -65,7 +66,7 @@ type InputMethod = "file" | "memo" | "url" | "paste";
 
 interface InputMethodCard {
   id: InputMethod;
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   description: string;
 }
@@ -73,25 +74,25 @@ interface InputMethodCard {
 const INPUT_METHODS: InputMethodCard[] = [
   {
     id: "file",
-    icon: "📄",
+    icon: <FileText className="w-6 h-6" />,
     label: "파일 업로드",
     description: "오디오, 문서, PDF, 이미지를 드래그 앤 드롭하세요",
   },
   {
     id: "memo",
-    icon: "📝",
+    icon: <StickyNote className="w-6 h-6" />,
     label: "빠른 메모",
     description: "아이디어나 메모를 빠르게 기록합니다",
   },
   {
     id: "url",
-    icon: "🔗",
+    icon: <Link className="w-6 h-6" />,
     label: "URL 입력",
     description: "웹 페이지 URL을 입력하면 내용을 가져옵니다",
   },
   {
     id: "paste",
-    icon: "📋",
+    icon: <ClipboardList className="w-6 h-6" />,
     label: "텍스트 붙여넣기",
     description: "텍스트를 복사하여 직접 붙여넣으세요",
   },
@@ -187,7 +188,7 @@ export function SourceAddModal({ isOpen, onClose, onNavigateToMemo }: SourceAddM
                 onMouseOver={(e) => (e.currentTarget.style.borderColor = "var(--accent)")}
                 onMouseOut={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
               >
-                <span className="text-2xl mb-2 block">{method.icon}</span>
+                <span className="mb-2 block" style={{ color: "var(--text-secondary)" }}>{method.icon}</span>
                 <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
                   {method.label}
                 </h3>
@@ -317,7 +318,7 @@ function FileUploadView({ onClose }: { onClose: () => void }) {
         />
         {file ? (
           <>
-            <span className="text-2xl mb-2">✅</span>
+            <CheckCircle2 className="w-8 h-8 mb-2" style={{ color: "var(--accent)" }} />
             <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
               {file.name}
             </p>
@@ -327,7 +328,7 @@ function FileUploadView({ onClose }: { onClose: () => void }) {
           </>
         ) : (
           <>
-            <span className="text-3xl mb-2">📄</span>
+            <FileText className="w-8 h-8 mb-2" style={{ color: "var(--text-muted)" }} />
             <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
               파일을 여기에 드래그하거나 클릭하여 선택
             </p>
@@ -382,7 +383,7 @@ function UrlInputView({ onClose }: { onClose: () => void }) {
         // invalid URL - 전체 문자열을 제목으로
       }
       await createNote.mutateAsync({
-        title: `🔗 ${host}`,
+        title: host,
         content: urlToTiptapDoc(trimmed, note),
       });
       toast.success("URL이 메모로 저장되었습니다");

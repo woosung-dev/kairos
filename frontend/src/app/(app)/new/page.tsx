@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { Mic, StickyNote, Paperclip, Circle, CheckCircle2, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { usePresignedUpload } from "@/features/upload/hooks";
 import { useRecording, type RecordingState } from "@/features/upload/useRecording";
@@ -10,19 +11,19 @@ import { useWorkspaceStore } from "@/features/workspaces/store";
 const CONTENT_TYPES = [
   {
     id: "meeting",
-    icon: "🎙️",
+    icon: <Mic className="w-8 h-8" />,
     title: "회의 녹음",
     description: "오디오/영상 파일을 업로드하면 AI가 자동으로 요약합니다",
   },
   {
     id: "note",
-    icon: "📝",
+    icon: <StickyNote className="w-8 h-8" />,
     title: "노트 작성",
     description: "아이디어, 메모, 회의록을 자유롭게 작성하세요",
   },
   {
     id: "attachment",
-    icon: "📎",
+    icon: <Paperclip className="w-8 h-8" />,
     title: "자료 업로드",
     description: "문서, PDF, 이미지 등 프로젝트 관련 자료를 업로드하세요",
   },
@@ -152,7 +153,7 @@ export default function NewContentPage() {
               borderRadius: "var(--radius-md)",
             }}
           >
-            <span className="text-3xl mb-3 block">{type.icon}</span>
+            <span className="mb-3 block">{type.icon}</span>
             <h3
               className="text-sm font-semibold mb-1"
               style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}
@@ -189,13 +190,28 @@ export default function NewContentPage() {
               <button
                 key={tab}
                 onClick={() => setMeetingTab(tab)}
-                className="px-4 py-2 text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors"
                 style={{
                   color: meetingTab === tab ? "var(--accent)" : "var(--text-muted)",
                   borderBottom: meetingTab === tab ? "2px solid var(--accent)" : "2px solid transparent",
                 }}
               >
-                {tab === "audio" ? "🎙️ 오디오 업로드" : tab === "record" ? "🔴 직접 녹음" : "📝 텍스트로 입력"}
+                {tab === "audio" ? (
+                  <>
+                    <Mic className="w-4 h-4" />
+                    오디오 업로드
+                  </>
+                ) : tab === "record" ? (
+                  <>
+                    <Circle className="w-3 h-3 fill-red-500 text-red-500" />
+                    직접 녹음
+                  </>
+                ) : (
+                  <>
+                    <StickyNote className="w-4 h-4" />
+                    텍스트로 입력
+                  </>
+                )}
               </button>
             ))}
           </div>
@@ -245,7 +261,7 @@ export default function NewContentPage() {
                 >
                   {file ? (
                     <>
-                      <span className="text-2xl mb-1">✅</span>
+                      <CheckCircle2 className="w-6 h-6 mb-1" />
                       <p className="text-sm" style={{ color: "var(--text-primary)" }}>
                         {file.name}
                       </p>
@@ -255,7 +271,7 @@ export default function NewContentPage() {
                     </>
                   ) : (
                     <>
-                      <span className="text-2xl mb-1">🎙️</span>
+                      <Mic className="w-6 h-6 mb-1" />
                       <p className="text-sm">클릭하여 파일 선택</p>
                       <p className="text-xs mt-1">MP3, WAV, M4A, MP4, WebM</p>
                     </>
@@ -280,14 +296,15 @@ export default function NewContentPage() {
               {/* 업로드 진행 */}
               {uploadStep && (
                 <div
-                  className="px-3 py-2 rounded text-sm"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded text-sm"
                   style={{
                     background: "var(--accent-subtle)",
                     color: "var(--accent)",
                     borderRadius: "var(--radius-sm)",
                   }}
                 >
-                  ⏳ {uploadStep}
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {uploadStep}
                 </div>
               )}
 
@@ -381,14 +398,15 @@ export default function NewContentPage() {
 
               {isCapturing && (
                 <div
-                  className="px-3 py-2 rounded text-sm"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded text-sm"
                   style={{
                     background: "var(--accent-subtle)",
                     color: "var(--accent)",
                     borderRadius: "var(--radius-sm)",
                   }}
                 >
-                  ⏳ AI가 처리 중입니다...
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  AI가 처리 중입니다...
                 </div>
               )}
 
@@ -433,13 +451,14 @@ export default function NewContentPage() {
         >
           <div>
             <p
-              className="text-base font-semibold mb-1"
+              className="flex items-center justify-center gap-1.5 text-base font-semibold mb-1"
               style={{
                 color: "var(--text-primary)",
                 fontFamily: "var(--font-display)",
               }}
             >
-              📝 빠른 메모로 이동
+              <StickyNote className="w-4 h-4" />
+              빠른 메모로 이동
             </p>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>
               아이디어 · 회의록 · 자유 메모는 빠른 메모에서 작성합니다.

@@ -1,5 +1,6 @@
 "use client";
 
+import { ClipboardList } from "lucide-react";
 import type { MeetingSummary } from "../types";
 
 /* ── Props ── */
@@ -16,7 +17,7 @@ export function MeetingSummaryView({ summary, onSwitchToTranscript }: MeetingSum
   if (!summary) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <span className="text-4xl mb-4">📋</span>
+        <ClipboardList className="w-10 h-10 mb-4" style={{ color: "var(--text-muted)" }} />
         <h3
           className="text-lg font-semibold mb-2"
           style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}

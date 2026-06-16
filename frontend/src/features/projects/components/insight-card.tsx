@@ -1,5 +1,7 @@
 "use client";
 
+import { Lightbulb } from "lucide-react";
+
 interface InsightCardProps {
   text: string;
 }
@@ -15,7 +17,7 @@ export function InsightCard({ text }: InsightCardProps) {
       }}
     >
       <div className="flex items-start gap-3">
-        <span className="text-lg shrink-0">💡</span>
+        <Lightbulb className="w-5 h-5 shrink-0" style={{ color: "var(--accent)" }} />
         <div className="flex-1 min-w-0">
           <p
             className="text-xs font-semibold mb-1 uppercase tracking-wide"

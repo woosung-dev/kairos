@@ -4,7 +4,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, StickyNote } from "lucide-react";
 import { toast } from "sonner";
 import { useNotes, useCreateNote } from "../hooks";
 import { useProjects } from "@/features/projects/hooks";
@@ -101,7 +101,7 @@ export function QuickMemo() {
             className="px-4 py-2 rounded text-sm font-medium transition-colors"
             style={{
               background: "var(--accent)",
-              color: "var(--background)",
+              color: "var(--accent-foreground)",
               borderRadius: "var(--radius-sm)",
               cursor: "pointer",
               minHeight: "44px",
@@ -199,7 +199,7 @@ export function QuickMemo() {
                 className="px-4 py-1.5 rounded text-xs font-medium transition-colors"
                 style={{
                   background: "var(--accent)",
-                  color: "var(--background)",
+                  color: "var(--accent-foreground)",
                   borderRadius: "var(--radius-sm)",
                   cursor: createNote.isPending ? "not-allowed" : "pointer",
                   minHeight: "44px",
@@ -231,7 +231,7 @@ export function QuickMemo() {
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <span className="text-4xl mb-4">📝</span>
+          <StickyNote className="w-10 h-10 mb-4" style={{ color: "var(--text-muted)" }} />
           <h3
             className="text-lg font-semibold mb-2"
             style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}

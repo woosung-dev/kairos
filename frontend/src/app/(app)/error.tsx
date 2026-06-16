@@ -2,6 +2,7 @@
 
 // (app) 그룹 ErrorBoundary — 페이지 trigger 에러를 graceful fallback 으로 처리
 import { useEffect } from "react";
+import { AlertTriangle } from "lucide-react";
 import { trackError } from "@/lib/track-error";
 
 export default function AppError({
@@ -20,7 +21,7 @@ export default function AppError({
       className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center"
       style={{ color: "var(--text-primary)" }}
     >
-      <span className="text-5xl mb-6">⚠️</span>
+      <AlertTriangle className="w-12 h-12 mb-6" style={{ color: "var(--text-muted)" }} />
       <h1
         className="text-xl font-bold mb-2"
         style={{ fontFamily: "var(--font-display)" }}

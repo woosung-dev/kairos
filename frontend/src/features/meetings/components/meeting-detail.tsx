@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Loader2, AlertTriangle } from "lucide-react";
 import { MeetingSummaryView } from "./meeting-summary-view";
 import { TranscriptView } from "./transcript-view";
 import { ActionView } from "./action-view";
@@ -64,7 +64,7 @@ function MeetingDetailSkeleton() {
 function ProcessingView({ status }: { status: MeetingStatus }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <span className="text-4xl mb-4">⚙️</span>
+      <Loader2 className="w-10 h-10 mb-4 animate-spin" style={{ color: "var(--text-muted)" }} />
       <h3
         className="text-lg font-semibold mb-2"
         style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}
@@ -85,7 +85,7 @@ function FailedMeetingView() {
   // 상세 응답(errorMessage)에 남겨 support/디버깅용으로 두되 UI 에 raw 로 덤프하지 않음.
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <span className="text-4xl mb-4">⚠️</span>
+      <AlertTriangle className="w-10 h-10 mb-4" style={{ color: "var(--text-muted)" }} />
       <h3
         className="text-lg font-semibold mb-2"
         style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}
@@ -137,7 +137,7 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
   if (error || !meeting) {
     return (
       <div className="p-6 flex flex-col items-center justify-center py-20 text-center">
-        <span className="text-4xl mb-4">⚠️</span>
+        <AlertTriangle className="w-10 h-10 mb-4" style={{ color: "var(--error)" }} />
         <p className="text-sm" style={{ color: "var(--error)" }}>
           회의 데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.
         </p>

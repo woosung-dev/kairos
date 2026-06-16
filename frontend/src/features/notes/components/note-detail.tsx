@@ -188,7 +188,7 @@ export function NoteDetail({ noteId }: NoteDetailProps) {
               className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md cursor-pointer text-xs font-medium transition-colors duration-150"
               style={{
                 background: "var(--accent)",
-                color: "var(--background)",
+                color: "var(--accent-foreground)",
               }}
             >
               <Check className="w-4 h-4" />

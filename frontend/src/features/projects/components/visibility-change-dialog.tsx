@@ -1,7 +1,7 @@
 // Project visibility 변경 모달 (Sprint 6 FE-T2b, 시안 1C)
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -111,7 +111,7 @@ export function VisibilityChangeDialog({
         {/* warning alert (Private 변경 시) */}
         {isPrivateChange && (
           <div
-            className="mt-3 p-3 text-xs rounded"
+            className="mt-3 p-3 text-xs rounded flex items-start gap-1.5"
             style={{
               background: "rgba(251,191,36,0.1)",
               borderLeft: "3px solid var(--warning)",
@@ -119,8 +119,11 @@ export function VisibilityChangeDialog({
               borderRadius: "var(--radius-sm)",
             }}
           >
-            ⚠️ Private 변경 시 비멤버는 즉시 접근 차단되고 AI 검색 결과에서도 제외됩니다.
-            기존 워크스페이스 멤버를 ProjectMember로 추가하려면 변경 후 멤버 패널을 사용하세요.
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--warning)" }} />
+            <span>
+              Private 변경 시 비멤버는 즉시 접근 차단되고 AI 검색 결과에서도 제외됩니다.
+              기존 워크스페이스 멤버를 ProjectMember로 추가하려면 변경 후 멤버 패널을 사용하세요.
+            </span>
           </div>
         )}
 

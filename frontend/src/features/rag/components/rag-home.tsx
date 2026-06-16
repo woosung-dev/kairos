@@ -1,5 +1,6 @@
 "use client";
 
+import { MessageSquare, Folder } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { useUIStore } from "@/store/ui";
 
@@ -50,7 +51,7 @@ export function RagHome() {
           최근 질문
         </h2>
         <EmptyState
-          icon="💬"
+          icon={<MessageSquare className="w-10 h-10" />}
           title="아직 질문이 없습니다"
           description="지식 검색으로 프로젝트에 대해 물어보세요"
         />
@@ -65,7 +66,7 @@ export function RagHome() {
           프로젝트
         </h2>
         <EmptyState
-          icon="📁"
+          icon={<Folder className="w-10 h-10" />}
           title="첫 프로젝트를 만들어보세요"
           description="프로젝트를 만들면 회의, 노트, 자료를 체계적으로 관리할 수 있습니다"
           action={{ label: "프로젝트 만들기", href: "/new" }}

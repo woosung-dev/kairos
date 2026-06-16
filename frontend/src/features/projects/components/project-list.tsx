@@ -1,5 +1,6 @@
 "use client";
 
+import { Folder } from "lucide-react";
 import { useProjects } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { ProjectCard } from "./project-card";
@@ -34,7 +35,7 @@ export function ProjectList() {
   if (projects.length === 0) {
     return (
       <EmptyState
-        icon="📁"
+        icon={<Folder className="w-10 h-10" />}
         title="프로젝트가 없습니다"
         description="첫 번째 프로젝트를 만들어 콘텐츠를 정리하세요"
         action={{ label: "프로젝트 만들기", href: "/new" }}

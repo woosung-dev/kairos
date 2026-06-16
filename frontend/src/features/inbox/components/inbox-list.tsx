@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Inbox } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { useInbox } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
@@ -65,7 +66,7 @@ export function InboxList() {
       {/* 카드 리스트 */}
       {!isLoading && filteredItems.length === 0 ? (
         <EmptyState
-          icon="📥"
+          icon={<Inbox className="w-10 h-10" />}
           title="처리할 항목이 없습니다"
           description="회의를 녹음하거나 노트를 추가하면 AI가 자동으로 분류합니다"
         />

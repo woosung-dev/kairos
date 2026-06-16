@@ -2,31 +2,40 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { LucideIcon } from "lucide-react";
+import { Search, MessageSquare, Inbox, Folder, StickyNote, Plus } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useRagStream } from "@/features/rag/hooks";
 import { OnboardingTooltip } from "@/components/onboarding/onboarding-tooltip";
 
-const CMD_GROUPS = [
+interface CmdItem {
+  icon: LucideIcon;
+  label: string;
+  shortcut: string;
+  action: string;
+}
+
+const CMD_GROUPS: { label: string; items: CmdItem[] }[] = [
   {
     label: "검색",
     items: [
-      { icon: "🔍", label: "지식 검색", shortcut: "⌘K", action: "focus" },
-      { icon: "💬", label: "AI 검색", shortcut: "?", action: "rag-mode" },
+      { icon: Search, label: "지식 검색", shortcut: "⌘K", action: "focus" },
+      { icon: MessageSquare, label: "AI 검색", shortcut: "?", action: "rag-mode" },
     ],
   },
   {
     label: "이동",
     items: [
-      { icon: "📥", label: "Inbox", shortcut: "G I", action: "navigate:/inbox" },
-      { icon: "📁", label: "프로젝트", shortcut: "G P", action: "navigate:/" },
-      { icon: "📝", label: "노트", shortcut: "G N", action: "navigate:/notes" },
-      { icon: "🔍", label: "검색 페이지", shortcut: "G S", action: "navigate:/search" },
+      { icon: Inbox, label: "Inbox", shortcut: "G I", action: "navigate:/inbox" },
+      { icon: Folder, label: "프로젝트", shortcut: "G P", action: "navigate:/" },
+      { icon: StickyNote, label: "노트", shortcut: "G N", action: "navigate:/notes" },
+      { icon: Search, label: "검색 페이지", shortcut: "G S", action: "navigate:/search" },
     ],
   },
   {
     label: "생성",
     items: [
-      { icon: "➕", label: "콘텐츠 추가", shortcut: "C", action: "navigate:/new" },
+      { icon: Plus, label: "콘텐츠 추가", shortcut: "C", action: "navigate:/new" },
     ],
   },
 ];
@@ -186,7 +195,9 @@ export function CmdK() {
                 >
                   {group.label}
                 </div>
-                {group.items.map((item) => (
+                {group.items.map((item) => {
+                  const ItemIcon = item.icon;
+                  return (
                   <button
                     key={item.label}
                     onClick={() => handleItemClick(item.action)}
@@ -200,7 +211,7 @@ export function CmdK() {
                     }}
                   >
                     <div className="flex items-center gap-3">
-                      <span>{item.icon}</span>
+                      <ItemIcon className="w-4 h-4" style={{ color: "var(--text-muted)" }} />
                       <span>{item.label}</span>
                     </div>
                     <kbd
@@ -216,7 +227,8 @@ export function CmdK() {
                       {item.shortcut}
                     </kbd>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             ))}
           </div>

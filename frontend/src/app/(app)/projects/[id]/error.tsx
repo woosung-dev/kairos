@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { Folder } from "lucide-react";
 import { trackError } from "@/lib/track-error";
 
 export default function ProjectError({
@@ -20,7 +21,7 @@ export default function ProjectError({
       className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center"
       style={{ color: "var(--text-primary)" }}
     >
-      <span className="text-5xl mb-6">📁</span>
+      <Folder className="w-12 h-12 mb-6" style={{ color: "var(--text-muted)" }} />
       <h1
         className="text-xl font-bold mb-2"
         style={{ fontFamily: "var(--font-display)" }}
