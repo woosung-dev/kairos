@@ -13,13 +13,18 @@ export function useRagStream() {
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
   const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const {
-    addMessage,
-    updateLastAssistantMessage,
-    setSourcesOnLastAssistant,
-    setIsStreaming,
-    searchFilter,
-  } = useRagStore();
+  // Sprint 29 R3 (rag-store): selector 별 구독 — 이전 전체 구독은 SSE 토큰마다 store 가
+  // 바뀔 때 useRagStream 소비자(cmd-k 포함)를 전부 re-render 시켰다. action 은 안정 식별자,
+  // searchFilter 만 데이터.
+  const addMessage = useRagStore((s) => s.addMessage);
+  const updateLastAssistantMessage = useRagStore(
+    (s) => s.updateLastAssistantMessage,
+  );
+  const setSourcesOnLastAssistant = useRagStore(
+    (s) => s.setSourcesOnLastAssistant,
+  );
+  const setIsStreaming = useRagStore((s) => s.setIsStreaming);
+  const searchFilter = useRagStore((s) => s.searchFilter);
 
   const ask = useCallback(
     async (question: string) => {

@@ -294,10 +294,14 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
   const workspaceRole = useWorkspaceStore((s) => s.workspaceRole);
 
   // Sprint 14 T-9: Inbox 카운트 정책 = 미처리(!isProcessed) 항목 수.
-  // /inbox 페이지의 "미처리" 필터 결과와 동일 source-of-truth (동일 query key 캐시 공유).
-  const { data: inboxData } = useInbox(activeWorkspaceId ?? undefined);
-  const unprocessedInboxCount =
-    inboxData?.items.filter((it) => !it.isProcessed).length ?? 0;
+  // Sprint 29 R3 (sidebar-overfetch): 전체 목록 fetch + 클라 필터(페이지 초과 시 부정확)
+  // 대신 isProcessed=false 의 서버 total 사용. total 은 페이지 크기와 무관한 서버 집계라
+  // 정확하고, pageSize=1 로 payload 도 최소화.
+  const { data: inboxData } = useInbox(activeWorkspaceId ?? undefined, {
+    isProcessed: false,
+    pageSize: 1,
+  });
+  const unprocessedInboxCount = inboxData?.total ?? 0;
 
   const renderNavItem = (item: NavItem) => {
     const isActive = pathname === item.href;
