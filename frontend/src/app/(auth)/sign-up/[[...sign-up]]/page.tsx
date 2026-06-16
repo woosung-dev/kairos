@@ -14,7 +14,9 @@ export default function SignUpPage() {
         className="max-w-md w-full rounded-lg px-4 py-3 text-center"
         style={{
           background: "var(--accent-subtle)",
-          border: "1px solid var(--accent-bd)",
+          // P1 fix (2026-06-01): --accent-bd 는 [data-theme="landing"] 에만 정의 → (auth) 테마에서
+          // 미해결로 border 미렌더. accent 기반 color-mix 로 교체(라이트/다크 공통 정의 토큰).
+          border: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)",
           borderRadius: "var(--radius-lg)",
         }}
       >

@@ -94,58 +94,58 @@ async def seed_note_with_chunks(integration_session, auth_user, personal_ws):
 async def test_embed_note_async_idempotent_when_already_embedded(
     integration_session, auth_user, personal_ws, seed_note_with_chunks
 ):
-    """BL-064: 이미 embed 된 note 에 plain_text 가 비어 있으면 early return.
+    """BL-064 + P0 fix(2026-06-01): plain_text 가 비면 early return → chunk 불변.
 
-    pipeline_service.py:40-42 의 `if not note or not note.plain_text: return` 가드.
-    실 멱등성은 embedding pipeline 내부에서 보장하지 않으므로 service 단의 가드만 확인.
-    chunk count 가 변하지 않는지 검증 — 실 OpenAI 호출은 mock 없이 plain_text 변조로 가드 진입.
+    pipeline_service 의 `if not note or not note.plain_text: return` 가드 검증.
+    P0 fix 로 embed_note_async 는 session_factory 로 fresh 세션을 생성한다(request 세션은
+    BG 실행 시 닫힘). 테스트는 integration_session 을 yield 하는 dummy factory 를 주입하고,
+    plain_text="" 가드로 OpenAI 호출 없이 early return → chunk count 불변을 검증한다.
     """
-    from sqlmodel.ext.asyncio.session import AsyncSession
     from src.embeddings.models import EmbeddingChunk
     from src.notes.models import Note
+    from src.notes.pipeline_service import NotePipelineService
     from src.notes.repository import NoteRepository
 
-    # 1. 직전 chunk count
-    count_before = (
-        await integration_session.execute(
-            select(func.count())
-            .select_from(EmbeddingChunk)
-            .where(EmbeddingChunk.source_id == seed_note_with_chunks.id)
-        )
-    ).scalar_one()
-    assert count_before == 5
+    async def _count_chunks() -> int:
+        return (
+            await integration_session.execute(
+                select(func.count())
+                .select_from(EmbeddingChunk)
+                .where(EmbeddingChunk.source_id == seed_note_with_chunks.id)
+            )
+        ).scalar_one()
 
-    # 2. plain_text 를 빈 값으로 강제 → early return guard 적용
+    assert await _count_chunks() == 5
+
+    # plain_text 를 빈 값으로 강제 → early return guard 진입
     note = await integration_session.get(Note, seed_note_with_chunks.id)
     note.plain_text = ""
     integration_session.add(note)
     await integration_session.flush()
     await integration_session.commit()
 
-    # 3. NotePipelineService.embed_note_async 직접 호출 — embedding_service mock
-    from src.notes.pipeline_service import NotePipelineService
+    # P0 fix: embed_note_async 는 session_factory() 로 fresh 세션 생성.
+    # 테스트는 integration_session 을 재사용하는 dummy async context manager 주입.
+    class _DummyCM:
+        def __init__(self, sess):
+            self._sess = sess
 
-    class _StubEmbedService:
-        def __init__(self) -> None:
-            self.embed_calls = 0
-            self.invalidate_calls = 0
+        async def __aenter__(self):
+            return self._sess
 
-        async def embed_note(self, **kwargs):
-            self.embed_calls += 1
+        async def __aexit__(self, *_args):
+            return False
 
-        async def invalidate_cache(self, *_args):
-            self.invalidate_calls += 1
-
-    stub = _StubEmbedService()
     pipeline = NotePipelineService(
         note_repo=NoteRepository(integration_session),
-        embedding_service=stub,  # type: ignore[arg-type]
+        embedding_service=None,  # type: ignore[arg-type]  # early return 이라 fresh service 미사용
         project_repo=None,  # type: ignore[arg-type]
+        session_factory=lambda: _DummyCM(integration_session),  # type: ignore[arg-type]
     )
     await pipeline.embed_note_async(seed_note_with_chunks.id, personal_ws.id)
-    # plain_text="" 가드로 early return — embed/invalidate 호출 0
-    assert stub.embed_calls == 0
-    assert stub.invalidate_calls == 0
+
+    # plain_text="" 가드로 early return → 재임베딩/삭제 없음 → chunk count 불변
+    assert await _count_chunks() == 5
 
 
 @pytest.mark.asyncio

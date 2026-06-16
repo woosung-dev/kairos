@@ -43,7 +43,7 @@
 - **Border Subtle:** #1E1E22
 - **Text Primary:** #EDEDEF
 - **Text Secondary:** #8E8E93
-- **Text Muted:** #5C5C63
+- **Text Muted:** #7A7A82
 
 ### Light Mode
 - **Background:** #FAFAFA
@@ -54,7 +54,7 @@
 - **Border Subtle:** #F0F0F0
 - **Text Primary:** #111111
 - **Text Secondary:** #6B6B73
-- **Text Muted:** #9E9EA6
+- **Text Muted:** #71717A
 
 ### Accent
 - **Primary (Dark):** #3ECFB4 — "시간의 길목" 청록. 다크 배경에서 시선을 끔.
@@ -150,7 +150,7 @@
 
 | Type | Icon (lucide-react) | Color | Background | Border | Meaning |
 |------|---------------------|-------|------------|--------|---------|
-| **Personal** | `Lock` | `text-muted` (#5C5C63 dark / #9E9EA6 light) | `bg-surface` | `border-subtle` | 잠금 / 외부 공유 안 됨 |
+| **Personal** | `Lock` | `text-muted` (#7A7A82 dark / #71717A light) | `bg-surface` | `border-subtle` | 잠금 / 외부 공유 안 됨 |
 | **Team** | `Users` | `text-accent` (#3ECFB4) | `bg-accent-subtle` (rgba(62,207,180,0.1)) | `border-accent/30` | 공유 활성 |
 
 ### Badge Spec

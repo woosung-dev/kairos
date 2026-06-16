@@ -2,6 +2,7 @@ import logging
 
 import sentry_sdk
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -160,10 +161,15 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    """BE-T5(d): 422 RequestValidationError 시 CORS 헤더 포함."""
+    """BE-T5(d): 422 RequestValidationError 시 CORS 헤더 포함.
+
+    P1 fix (2026-06-01): exc.errors() 가 custom field_validator 의 ValueError 인스턴스를
+    ctx 에 담을 수 있어 직접 직렬화 시 TypeError → 500. jsonable_encoder 로 안전 직렬화.
+    (예: POST /rag/ask {"question":"a"} → 422 정상 반환)
+    """
     response = JSONResponse(
         status_code=422,
-        content={"detail": exc.errors()},
+        content={"detail": jsonable_encoder(exc.errors())},
     )
     return _attach_cors(request, response)
 

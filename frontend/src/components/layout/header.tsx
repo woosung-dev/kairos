@@ -8,6 +8,7 @@ import { useWorkspaces } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { WorkspaceSwitcher } from "@/features/workspaces/components/WorkspaceSwitcher";
 import { useClerk, useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
 import {
   DropdownMenu,
@@ -28,6 +29,7 @@ export function Header() {
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
   const { user } = useUser();
+  const router = useRouter();
 
   const displayName = user?.fullName ?? user?.firstName ?? "User";
   const email = user?.primaryEmailAddress?.emailAddress ?? "";
@@ -146,9 +148,9 @@ export function Header() {
             <DropdownMenuItem
               className="px-3 py-2 cursor-pointer"
               onClick={() => {
-                if (wid) {
-                  window.location.href = `/workspace/${wid}/settings`;
-                }
+                // P1 fix (2026-06-01): 존재하지 않던 /workspace/{wid}/settings (404 + full reload)
+                // → SPA 클라이언트 네비게이션으로 /settings (사이드바 설정 링크와 동일 타깃).
+                router.push("/settings");
               }}
             >
               <Settings size={14} />

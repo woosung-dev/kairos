@@ -147,7 +147,9 @@
   --border-subtle: #F0F0F0;
   --text-primary: #111111;
   --text-secondary: #6B6B73;
-  --text-muted: #9E9EA6;
+  /* P1 fix (2026-06-01): #9E9EA6=2.55:1 WCAG AA 미달(nav 라벨·캡션 전역 사용).
+     #71717A≈4.6:1(on white)로 상향 — 다크(#7A7A82, S28b)와 짝 맞춤, secondary보다 옅게 유지. */
+  --text-muted: #71717A;
   --accent: #0FA889;
   --accent-hover: #0D9278;
   --accent-subtle: rgba(15,168,137,0.08);
@@ -257,7 +259,8 @@
     --border-subtle: #1E1E22;
     --text-primary: #EDEDEF;
     --text-secondary: #8E8E93;
-    --text-muted: #5C5C63;
+    /* P1 fix (2026-06-01): landing 다크 #5C5C63=2.98:1 AA 미달 → 루트 다크와 동일 #7A7A82(4.66:1). */
+    --text-muted: #7A7A82;
     --accent: #3ECFB4;
     --accent-hover: #35B39C;
     --accent-subtle: rgba(62,207,180,0.08);

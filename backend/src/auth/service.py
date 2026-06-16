@@ -37,4 +37,8 @@ class AuthService:
             "displayName": user.display_name,
             "email": user.email,
             "avatarUrl": user.avatar_url,
+            # Sprint 22 OBN-02 필드 노출 (FE onboarding funnel) — 2026-06-01 누락 보강.
+            # response_model 위임 대신 camelCase dict 유지 (UserResponse 의 id/clerkId/avatarUrl alias 부재로 인한 FE 회귀 회피).
+            "onboardingStep": user.onboarding_step,
+            "onboardedAt": user.onboarded_at.isoformat() if user.onboarded_at else None,
         }

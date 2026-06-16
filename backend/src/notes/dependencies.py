@@ -35,10 +35,15 @@ async def get_note_service(
 
 async def get_note_pipeline_service(
     session: AsyncSession = Depends(get_async_session),
+    session_factory: async_sessionmaker[AsyncSession] = Depends(get_session_factory),
 ) -> NotePipelineService:
+    # P0 fix (2026-06-01): session_factory 주입 — embed_note_async(BG task)가
+    # request-scoped 세션 대신 fresh 세션을 쓰도록 (meetings 패턴 정합).
+    # delete_note_with_cleanup / check_project_access 는 동기 await 라 request 세션 유지.
     embedding_repo = EmbeddingRepository(session)
     return NotePipelineService(
         note_repo=NoteRepository(session),
         embedding_service=EmbeddingService(embedding_repo),
         project_repo=ProjectRepository(session),
+        session_factory=session_factory,
     )
