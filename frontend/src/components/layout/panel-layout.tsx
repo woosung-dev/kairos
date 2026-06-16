@@ -40,13 +40,13 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
 
   // 워크스페이스 변경 시 역할 동기화
   useSyncWorkspaceRole(activeWorkspaceId ?? undefined);
-  const {
-    sidebarOpen,
-    ragOverlayOpen,
-    toggleRagOverlay,
-    setSidebarCollapsed,
-    setIsMobile,
-  } = useUIStore();
+  // Sprint 29 R3 (ui-store): selector 별 구독 — 이전 전체 구독은 무관한 UI state 변경
+  // (cmdK open 등)에도 layout 골격 전체를 re-render 했다.
+  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
+  const ragOverlayOpen = useUIStore((s) => s.ragOverlayOpen);
+  const toggleRagOverlay = useUIStore((s) => s.toggleRagOverlay);
+  const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed);
+  const setIsMobile = useUIStore((s) => s.setIsMobile);
   const {
     source: sourceViewerSource,
     highlights: sourceViewerHighlights,

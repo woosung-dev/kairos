@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { apiClient } from "@/lib/api-client";
 
 interface UploadState {
   isUploading: boolean;
@@ -32,28 +33,15 @@ export function usePresignedUpload(wid: string | undefined) {
 
       setState((prev) => ({ ...prev, progress: 20 }));
 
-      // 백엔드 프록시 업로드 (FE→BE→R2, CORS 불필요)
+      // 백엔드 프록시 업로드 (FE→BE→R2, CORS 불필요).
+      // Sprint 29 R3 (api-multipart): 전용 fetch 대신 apiClient(FormData 지원) 통합.
       const formData = new FormData();
       formData.append("file", file);
 
-      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
-      const res = await fetch(
-        `${apiBase}/api/v1/workspaces/${wid}/upload/file`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        }
+      const data = await apiClient<{ fileKey: string }>(
+        `/workspaces/${wid}/upload/file`,
+        { token, method: "POST", body: formData }
       );
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        throw new Error(
-          (errBody as { detail?: string }).detail ?? "파일 업로드에 실패했습니다"
-        );
-      }
-
-      const data = (await res.json()) as { fileKey: string };
       setState({ isUploading: false, progress: 100, error: null });
       return data.fileKey;
     } catch (err) {

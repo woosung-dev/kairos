@@ -14,14 +14,22 @@ class OnboardingRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def increment(self, user_id: UUID, target_step: int) -> None:
-        """target_step 이하면 no-op. target=4 면 onboarded_at = now()."""
-        await self._session.execute(
+    async def increment(self, user_id: UUID, target_step: int) -> str | None:
+        """target_step 이하면 no-op(None 반환). 변경 시 해당 user 의 clerk_id 반환.
+
+        Sprint 29 R1 (auth-cache): `RETURNING clerk_id` 로 변경 여부 + User cache key 를
+        한 쿼리로 얻어, caller(service)가 실제 변경 시에만 cache 를 무효화하도록 한다.
+        target=4 면 onboarded_at = now().
+        """
+        result = await self._session.execute(
             text(
                 "UPDATE users "
                 "SET onboarding_step = :target, "
                 "    onboarded_at = CASE WHEN :target = 4 THEN now() ELSE onboarded_at END "
-                "WHERE id = :user_id AND onboarding_step < :target"
+                "WHERE id = :user_id AND onboarding_step < :target "
+                "RETURNING clerk_id"
             ),
             {"user_id": user_id, "target": target_step},
         )
+        row = result.first()
+        return row[0] if row else None

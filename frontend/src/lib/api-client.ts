@@ -11,8 +11,14 @@ export async function apiClient<T = unknown>(
 ): Promise<T> {
   const { token, ...fetchOptions } = options ?? {};
 
+  // Sprint 29 R3 (api-multipart): FormData 본문이면 Content-Type 을 직접 지정하지 않는다.
+  // 브라우저가 multipart/form-data + boundary 를 자동 설정하므로, 강제 application/json 은
+  // 업로드를 깨뜨린다 → memory/upload 헬퍼가 apiClient 를 우회·중복하던 원인. 이제 apiClient
+  // 가 multipart 를 지원해 헬퍼 통합 가능.
+  const isFormData =
+    typeof FormData !== "undefined" && fetchOptions.body instanceof FormData;
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { FileText, Search } from "lucide-react";
 import type { TranscriptSegment } from "../types";
 
 /* ── 유틸리티 ── */
@@ -27,7 +28,7 @@ export function TranscriptView({ transcript }: TranscriptViewProps) {
   if (!transcript || transcript.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <span className="text-4xl mb-4">📝</span>
+        <FileText className="w-10 h-10 mb-4" style={{ color: "var(--text-muted)" }} />
         <h3
           className="text-lg font-semibold mb-2"
           style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}
@@ -79,12 +80,10 @@ function TranscriptContent({ transcript, searchQuery, onSearchChange }: Transcri
             borderRadius: "var(--radius-sm)",
           }}
         />
-        <span
-          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs"
+        <Search
+          className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4"
           style={{ color: "var(--text-muted)" }}
-        >
-          🔍
-        </span>
+        />
       </div>
 
       {/* 결과 수 */}

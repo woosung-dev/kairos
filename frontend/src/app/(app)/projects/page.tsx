@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Folder } from "lucide-react";
 import { useProjects } from "@/features/projects/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { ProjectCard } from "@/features/projects/components/project-card";
@@ -71,7 +71,7 @@ export default function ProjectsPage() {
       ) : isEmpty ? (
         <div data-testid="projects-empty-state">
           <EmptyState
-            icon="📁"
+            icon={<Folder className="w-10 h-10" />}
             title="프로젝트가 없습니다"
             description="첫 번째 프로젝트를 만들어 콘텐츠를 정리하세요"
             // Codex F-7 fix: /new (content add) 가 아닌 CreateProjectDialog 열기

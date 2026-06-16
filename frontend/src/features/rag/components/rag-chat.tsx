@@ -1,49 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useState, type ReactNode } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useRagStore } from "../store";
 import { useSourceViewerStore } from "@/features/sources/store";
 import { RagSources } from "./rag-sources";
-import { CitationBadge } from "./citation-badge";
+import { MarkdownMessage } from "./markdown-message";
 import { MessageActions } from "./message-actions";
 import type { RagSource } from "../types";
 import type { SourceDocument, HighlightChunk } from "@/features/sources/types";
-
-/** [1], [2] 등 인라인 출처 표기를 감지하여 CitationBadge로 변환 */
-function renderContentWithCitations(
-  content: string,
-  onCitationClick: (num: number) => void,
-  activeCitation: number | null,
-): ReactNode[] {
-  const parts: ReactNode[] = [];
-  const regex = /\[(\d+)\]/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null = null;
-
-  while ((match = regex.exec(content)) !== null) {
-    // 매치 앞 텍스트
-    if (match.index > lastIndex) {
-      parts.push(content.slice(lastIndex, match.index));
-    }
-    const citNum = parseInt(match[1], 10);
-    parts.push(
-      <CitationBadge
-        key={`cit-${match.index}`}
-        number={citNum}
-        onClick={() => onCitationClick(citNum)}
-        isActive={activeCitation === citNum}
-      />,
-    );
-    lastIndex = regex.lastIndex;
-  }
-
-  // 나머지 텍스트
-  if (lastIndex < content.length) {
-    parts.push(content.slice(lastIndex));
-  }
-
-  return parts;
-}
 
 /** RagSource → SourceDocument 변환 (snippet을 content로 사용, 추후 full doc fetch) */
 function toSourceDocument(source: RagSource): SourceDocument {
@@ -68,13 +32,24 @@ function toHighlightChunk(source: RagSource, citationNumber: number): HighlightC
 }
 
 export function RagChat() {
-  const { messages, isStreaming } = useRagStore();
+  // Sprint 29 R3 (rag-store): selector 별 구독 (전체 구독 시 searchFilter 등 무관 변경에도 re-render).
+  const messages = useRagStore((s) => s.messages);
+  const isStreaming = useRagStore((s) => s.isStreaming);
   const openSourceViewer = useSourceViewerStore((s) => s.open);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [activeCitation, setActiveCitation] = useState<number | null>(null);
 
+  // Sprint 29 R3 (rag-scroll): 매 토큰 smooth scroll 은 애니메이션 경합으로 떨림 발생 +
+  // 사용자가 위로 스크롤해 읽는 중에도 강제로 끌어내렸다. 하단 근처일 때만 자동 스크롤하고,
+  // 스트리밍 중엔 instant 로 떨림 제거.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const anchor = bottomRef.current;
+    const container = anchor?.parentElement;
+    if (!anchor || !container) return;
+    const nearBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+    if (!nearBottom) return;
+    anchor.scrollIntoView({ behavior: isStreaming ? "auto" : "smooth" });
   }, [messages, isStreaming]);
 
   const handleCitationClick = useCallback(
@@ -126,10 +101,14 @@ export function RagChat() {
               }}
             >
               {msg.role === "assistant"
-                ? renderContentWithCitations(
-                    msg.content,
-                    (num) => handleCitationClick(num, msg.sources),
-                    activeCitation,
+                ? msg.content && (
+                    <MarkdownMessage
+                      content={msg.content}
+                      onCitationClick={(num) =>
+                        handleCitationClick(num, msg.sources)
+                      }
+                      activeCitation={activeCitation}
+                    />
                   )
                 : msg.content}
               {msg.isStreaming && !msg.content && (

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUpRight } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { ArrowUpRight, Mic, StickyNote, Paperclip, Pin, Check, Pencil, Trash2, Undo2 } from "lucide-react";
 import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { useProjects } from "@/features/projects/hooks";
@@ -16,10 +17,10 @@ const SOURCE_LABELS: Record<string, string> = {
   attachment: "자료",
 };
 
-const SOURCE_ICONS: Record<string, string> = {
-  meeting: "🎙️",
-  note: "📝",
-  attachment: "📎",
+const SOURCE_ICONS: Record<string, LucideIcon> = {
+  meeting: Mic,
+  note: StickyNote,
+  attachment: Paperclip,
 };
 
 /* ── Props ── */
@@ -108,7 +109,7 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
           opacity: 0.7,
         }}
       >
-        <span className="text-sm">✅</span>
+        <Check className="w-4 h-4 shrink-0" style={{ color: "var(--success)" }} />
         <span className="text-sm flex-1" style={{ color: "var(--text-secondary)" }}>
           {item.title} &rarr;{" "}
           <strong style={{ color: "var(--accent)" }}>
@@ -117,7 +118,7 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
         </span>
         <button
           onClick={handleRevert}
-          className="text-xs px-2 py-1 rounded border transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded border transition-colors"
           style={{
             borderColor: "var(--border)",
             color: "var(--text-muted)",
@@ -126,7 +127,8 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
             minHeight: "44px",
           }}
         >
-          ↩ 되돌리기
+          <Undo2 className="w-3.5 h-3.5" />
+          되돌리기
         </button>
       </div>
     );
@@ -139,7 +141,7 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
     // F-2B v3 (codex+agy 2차 A/B fix):
     // - WCAG: container opacity 제거 → 텍스트 가독성 회복 (이전 v2 0.7 이
     //   페이지 배경과 블렌딩되어 실 대비 3.32:1 / 2.91:1 → AA 4.5:1 미달).
-    //   대신 🗑 emoji 와 line-through title 에만 개별 opacity 적용으로 시각
+    //   대신 Trash2 아이콘과 line-through title 에만 개별 opacity 적용으로 시각
     //   de-emphasis 유지.
     // - a11y: role="status" + aria-live 제거 — useDismissInbox onSuccess 의
     //   sonner toast 가 이미 "항목을 무시했습니다" announce → double 중복
@@ -153,7 +155,7 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
           borderRadius: "var(--radius-lg)",
         }}
       >
-        <span className="text-sm" aria-hidden="true" style={{ opacity: 0.6 }}>🗑</span>
+        <Trash2 className="w-4 h-4 shrink-0" aria-hidden="true" style={{ color: "var(--text-muted)", opacity: 0.6 }} />
         <span
           className="text-sm flex-1 line-through"
           style={{ color: "var(--text-muted)", opacity: 0.7 }}
@@ -184,7 +186,10 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
     >
       {/* 상단: 소스 아이콘 + 제목 */}
       <div className="flex items-start gap-3 mb-2">
-        <span className="text-lg shrink-0">{SOURCE_ICONS[item.sourceType] ?? "📌"}</span>
+        {(() => {
+          const SourceIcon = SOURCE_ICONS[item.sourceType] ?? Pin;
+          return <SourceIcon className="w-5 h-5 shrink-0" style={{ color: "var(--text-muted)" }} />;
+        })()}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
@@ -279,7 +284,7 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
         <div className="flex items-center gap-2">
           <button
             onClick={handleConfirm}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors"
             style={{
               background: "var(--accent)",
               color: "var(--background)",
@@ -288,11 +293,12 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
               minHeight: "44px",
             }}
           >
-            ✅ 확정
+            <Check className="w-4 h-4" />
+            확정
           </button>
           <button
             onClick={handleEdit}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors border"
             style={{
               borderColor: "var(--accent)",
               color: "var(--accent)",
@@ -301,12 +307,13 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
               minHeight: "44px",
             }}
           >
-            ✏️ 다른 프로젝트
+            <Pencil className="w-4 h-4" />
+            다른 프로젝트
           </button>
           <button
             onClick={handleDismiss}
             disabled={dismissMutation.isPending}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors border disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               borderColor: "var(--border)",
               color: "var(--text-muted)",
@@ -315,7 +322,8 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
               minHeight: "44px",
             }}
           >
-            🗑 무시
+            <Trash2 className="w-4 h-4" />
+            무시
           </button>
         </div>
       ) : (
@@ -323,7 +331,7 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
         <div className="flex items-center gap-2">
           <button
             onClick={handleEdit}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors border"
             style={{
               borderColor: "var(--accent)",
               color: "var(--accent)",
@@ -332,12 +340,13 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
               minHeight: "44px",
             }}
           >
-            ✏️ 수정
+            <Pencil className="w-4 h-4" />
+            수정
           </button>
           <button
             onClick={handleDismiss}
             disabled={dismissMutation.isPending}
-            className="px-3 py-1.5 rounded text-xs font-medium transition-colors border disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors border disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               borderColor: "var(--border)",
               color: "var(--text-muted)",
@@ -346,7 +355,8 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
               minHeight: "44px",
             }}
           >
-            ↩ 되돌리기
+            <Undo2 className="w-4 h-4" />
+            되돌리기
           </button>
         </div>
       )}

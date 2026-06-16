@@ -3,6 +3,7 @@
 // Sprint 23 D3 fix: 미처리 항목만 BE 에서 fetch (explicit params) + autoProcessed 그룹 제거.
 // 이전: useInbox(wid) 전체 fetch → autoProcessed (collapsed) 그룹에 dismissed 항목 표시 → 사용자 인지 혼란.
 // 이후: useInbox(wid, { isProcessed: false }) BE filter → 미처리만 list → 사용자 결정 명확.
+import { AlertTriangle, Inbox } from "lucide-react";
 import { SmartInboxItemCard } from "./inbox-item-card";
 import { useInbox } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
@@ -83,7 +84,7 @@ export function SmartInbox() {
         <div
           className="flex flex-col items-center justify-center py-16 text-center"
         >
-          <span className="text-4xl mb-4">⚠️</span>
+          <AlertTriangle className="w-10 h-10 mb-4" style={{ color: "var(--error)" }} />
           <p className="text-sm" style={{ color: "var(--error)" }}>
             데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.
           </p>
@@ -115,7 +116,7 @@ export function SmartInbox() {
       {needsReviewCount > 0 && (
         <section className="mb-8">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-base">⚠️</span>
+            <AlertTriangle className="w-4 h-4" style={{ color: "var(--warning)" }} />
             <h2
               className="text-sm font-semibold"
               style={{ color: "var(--warning)", fontFamily: "var(--font-display)" }}
@@ -145,7 +146,7 @@ export function SmartInbox() {
       {/* 비어있을 때 (미처리 0건) */}
       {needsReviewCount === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <span className="text-4xl mb-4">📥</span>
+          <Inbox className="w-10 h-10 mb-4" style={{ color: "var(--text-muted)" }} />
           <h3
             className="text-lg font-semibold mb-2"
             style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}

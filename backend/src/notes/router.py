@@ -116,6 +116,11 @@ async def update_note(
         content=data.content,
         project_id=pid,
     )
+    # Sprint 29 R1 (notes-stale): project_id 변경 시 EmbeddingChunk.project_id 동기화 +
+    # old/new SemanticCache 무효화 (content 미변경 시 embed_note_async 가 실행되지 않아
+    # chunk.project_id 가 stale 로 남아 RAG project-scope 필터가 틀리는 문제 해소).
+    if data.project_id is not None:
+        await pipeline.sync_note_project_id(note_id, workspace_id)
     if data.content is not None:
         background_tasks.add_task(pipeline.embed_note_async, note_id, workspace_id)
     return result

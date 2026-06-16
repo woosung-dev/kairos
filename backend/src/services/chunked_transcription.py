@@ -110,7 +110,9 @@ async def _whisper_transcribe_single(audio_path: str) -> list[dict]:
     """
     from src.services.transcription import TranscriptionService
 
-    audio_bytes = Path(audio_path).read_bytes()
+    # Sprint 29 R1 (svc-blocking): 동기 디스크 I/O 를 스레드로 오프로드 — async 함수 내
+    # Path.read_bytes() 가 event loop 를 블로킹(병렬 chunk gather 직렬화)하는 것 방지.
+    audio_bytes = await asyncio.to_thread(Path(audio_path).read_bytes)
     filename = Path(audio_path).name
     service = TranscriptionService()
     segments, _ = await service.transcribe(audio_bytes, filename)

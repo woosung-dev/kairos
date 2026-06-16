@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, AlertTriangle, Mic, StickyNote, Rocket } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -147,7 +147,7 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
   if (projectError || !project) {
     return (
       <div className="p-6 flex flex-col items-center justify-center py-20 text-center">
-        <span className="text-4xl mb-4">⚠️</span>
+        <AlertTriangle className="w-10 h-10 mb-4" style={{ color: "var(--error)" }} />
         <p className="text-sm" style={{ color: "var(--error)" }}>
           프로젝트 데이터를 불러올 수 없습니다.
         </p>
@@ -462,7 +462,7 @@ function MeetingCard({ meeting }: { meeting: Meeting }) {
       }}
     >
       <div className="flex items-start gap-3">
-        <span className="text-base shrink-0 mt-0.5">🎙️</span>
+        <Mic className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--text-muted)" }} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
@@ -504,7 +504,7 @@ function NoteCard({ note }: { note: Note }) {
       }}
     >
       <div className="flex items-start gap-3">
-        <span className="text-base shrink-0 mt-0.5">📝</span>
+        <StickyNote className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--text-muted)" }} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
@@ -586,7 +586,7 @@ function ActionRow({ action, onToggle }: { action: ActionItem; onToggle: () => v
 function OnboardingView() {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
-      <span className="text-5xl mb-6">🚀</span>
+      <Rocket className="w-12 h-12 mb-6" style={{ color: "var(--text-muted)" }} />
       <h2
         className="text-xl font-bold mb-2"
         style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}
@@ -607,10 +607,12 @@ function OnboardingView() {
             minHeight: "44px",
             display: "inline-flex",
             alignItems: "center",
+            gap: "0.5rem",
             cursor: "pointer",
           }}
         >
-          🎙️ 회의 녹음
+          <Mic className="w-4 h-4" />
+          회의 녹음
         </a>
         <a
           href="/notes"
@@ -622,10 +624,12 @@ function OnboardingView() {
             minHeight: "44px",
             display: "inline-flex",
             alignItems: "center",
+            gap: "0.5rem",
             cursor: "pointer",
           }}
         >
-          📝 노트 작성
+          <StickyNote className="w-4 h-4" />
+          노트 작성
         </a>
       </div>
     </div>

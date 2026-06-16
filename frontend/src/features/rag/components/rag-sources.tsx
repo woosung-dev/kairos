@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Paperclip, AlertTriangle } from "lucide-react";
 import type { RagSource } from "../types";
 
 interface RagSourcesProps {
@@ -30,7 +31,10 @@ export function RagSources({ sources }: RagSourcesProps) {
         className="flex items-center gap-1 text-caption mb-1"
         style={{ color: "var(--text-muted)" }}
       >
-        <span>📎 소스 {sources.length}건</span>
+        <span className="inline-flex items-center gap-1">
+          <Paperclip className="w-3.5 h-3.5" />
+          소스 {sources.length}건
+        </span>
         <span>{isExpanded ? "▾" : "▸"}</span>
       </button>
 
@@ -66,8 +70,9 @@ export function RagSources({ sources }: RagSourcesProps) {
                 </span>
               )}
               {source.freshness === "stale" && (
-                <span style={{ color: "var(--warning)" }}>
-                  ⚠️ {FRESHNESS_LABELS.stale}
+                <span className="inline-flex items-center gap-1" style={{ color: "var(--warning)" }}>
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  {FRESHNESS_LABELS.stale}
                 </span>
               )}
               {source.freshness === "normal" && (

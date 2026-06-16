@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Mic, StickyNote, CheckCircle2, Search, FileText } from "lucide-react";
 
 import {
   AlertDialog,
@@ -60,11 +60,11 @@ interface ProjectDetailProps {
   projectId: string;
 }
 
-const STAT_ITEMS = [
-  { label: "회의", value: 0, icon: "🎙️" },
-  { label: "노트", value: 0, icon: "📝" },
-  { label: "액션", value: 0, icon: "✅" },
-  { label: "AI 검색", value: 0, icon: "🔍" },
+const STAT_ITEMS: { label: string; value: number; icon: React.ReactNode }[] = [
+  { label: "회의", value: 0, icon: <Mic className="w-4 h-4" /> },
+  { label: "노트", value: 0, icon: <StickyNote className="w-4 h-4" /> },
+  { label: "액션", value: 0, icon: <CheckCircle2 className="w-4 h-4" /> },
+  { label: "AI 검색", value: 0, icon: <Search className="w-4 h-4" /> },
 ];
 
 export function ProjectDetail({ projectId }: ProjectDetailProps) {
@@ -213,7 +213,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
             }}
           >
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-base">{stat.icon}</span>
+              <span style={{ color: "var(--text-muted)" }}>{stat.icon}</span>
               <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                 {stat.label}
               </span>
@@ -247,7 +247,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
 
       {/* 콘텐츠 리스트 (빈 상태) */}
       <EmptyState
-        icon="📄"
+        icon={<FileText className="w-10 h-10" />}
         title="콘텐츠를 추가하세요"
         description="회의, 노트, 자료를 추가하면 여기에 표시됩니다"
         action={{ label: "콘텐츠 추가", href: "/new" }}

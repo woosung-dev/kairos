@@ -169,12 +169,15 @@ async def test_add_member_workspace_mismatch_404(integration_session: AsyncSessi
 
 
 async def test_add_member_duplicate_409(integration_session: AsyncSession):
-    """시나리오 5: 동일 멤버 중복 추가 → IntegrityError(UniqueConstraint) 발생 확인.
+    """시나리오 5: 동일 멤버 중복 추가 → AlreadyExistsError(409) + 세션 미오염.
 
-    service.add_member 는 DB 레벨 UniqueConstraint 위반을 HTTPException(409)로 래핑하지 않음.
-    실제로는 IntegrityError(또는 asyncpg.UniqueViolationError)가 발생.
-    이 테스트는 두 번째 add_member 호출이 예외를 발생시키는 것만 확인.
+    Sprint 29 R1 (projects-500): 이전엔 IntegrityError 가 service 를 통과해 500 으로
+    노출됐다. 이제 service.add_member 가 IntegrityError 를 catch + rollback 후
+    AlreadyExistsError(409) 로 래핑한다. rollback 으로 request 세션이 poison 되지
+    않아 후속 쿼리가 정상 동작해야 한다.
     """
+    from src.common.exceptions import AlreadyExistsError
+
     owner_id = await _create_user(integration_session)
     user_id = await _create_user(integration_session)
 
@@ -182,29 +185,24 @@ async def test_add_member_duplicate_409(integration_session: AsyncSession):
     await _create_ws_member(integration_session, ws.id, user_id)
     project = await _create_project(integration_session, ws.id, owner_id)
 
-    from src.projects.models import ProjectMember
-    from sqlalchemy.exc import IntegrityError
+    service = _make_service(integration_session)
 
-    # workspace_id 를 포함하여 직접 첫 번째 멤버 삽입
-    first_member = ProjectMember(
-        project_id=project.id,
-        user_id=user_id,
-        workspace_id=ws.id,
-        role="member",
+    # 1차 추가 — 정상
+    first = await service.add_member(
+        workspace_id=ws.id, project_id=project.id, user_id=user_id
     )
-    integration_session.add(first_member)
-    await integration_session.flush()
+    assert first["userId"] == str(user_id)
 
-    # 두 번째 삽입 — 동일 (project_id, user_id) UniqueConstraint 위반 기대
-    second_member = ProjectMember(
-        project_id=project.id,
-        user_id=user_id,
-        workspace_id=ws.id,
-        role="member",
-    )
-    integration_session.add(second_member)
-    with pytest.raises(IntegrityError):
-        await integration_session.flush()
+    # 2차 추가 — 동일 (project_id, user_id) → 409 (500 아님)
+    with pytest.raises(AlreadyExistsError) as exc:
+        await service.add_member(
+            workspace_id=ws.id, project_id=project.id, user_id=user_id
+        )
+    assert exc.value.status_code == 409
+
+    # rollback 으로 세션이 살아있어야 함 (poison 아님) — 후속 쿼리 정상
+    members = await service.list_members(ws.id, project.id)
+    assert len(members) == 1
 
 
 async def test_get_project_workspace_mismatch_404(integration_session: AsyncSession):

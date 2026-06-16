@@ -1,5 +1,5 @@
 // Sprint 15 Memory 도메인 API — capture / recall / detail
-import { apiClient, API_BASE_URL } from "@/lib/api-client";
+import { apiClient } from "@/lib/api-client";
 import type {
   MemoryCreateResponse,
   MemoryDetail,
@@ -16,31 +16,9 @@ export const memoryKeys = {
     [...memoryKeys.all, "recall", wid, q] as const,
 };
 
-// --- 내부 헬퍼: FormData 업로드용 raw fetch ---
-// apiClient는 Content-Type: application/json을 강제하므로 multipart를 못 보낸다.
-// upload/hooks.ts와 동일한 패턴으로 직접 fetch 호출.
-async function postFormData<T>(
-  token: string,
-  path: string,
-  formData: FormData
-): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}/api/v1${path}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  });
-  if (!res.ok) {
-    const errBody = await res
-      .json()
-      .catch(() => ({ detail: "요청 실패" }));
-    throw new Error(
-      (errBody as { detail?: string }).detail ?? `HTTP ${res.status}`
-    );
-  }
-  return res.json() as Promise<T>;
-}
-
 // --- API 함수 ---
+// Sprint 29 R3 (api-multipart): apiClient 가 FormData 본문을 지원하므로 전용 postFormData
+// 헬퍼 제거 — multipart 도 apiClient 단일 경로로 통합(에러 처리·base URL 일관).
 
 /**
  * 텍스트 메모 capture — multipart/form-data text 필드 전송.
@@ -53,10 +31,9 @@ export async function captureText(
 ): Promise<MemoryCreateResponse> {
   const fd = new FormData();
   fd.append("text", text);
-  return postFormData<MemoryCreateResponse>(
-    token,
+  return apiClient<MemoryCreateResponse>(
     `/workspaces/${workspaceId}/memory`,
-    fd
+    { token, method: "POST", body: fd }
   );
 }
 
@@ -72,10 +49,9 @@ export async function captureVoice(
 ): Promise<MemoryCreateResponse> {
   const fd = new FormData();
   fd.append("audio", blob, filename);
-  return postFormData<MemoryCreateResponse>(
-    token,
+  return apiClient<MemoryCreateResponse>(
     `/workspaces/${workspaceId}/memory`,
-    fd
+    { token, method: "POST", body: fd }
   );
 }
 

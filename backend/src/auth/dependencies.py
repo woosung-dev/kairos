@@ -175,6 +175,13 @@ async def verify_clerk_token(authorization: str = Header(default="")) -> dict:
         claims = jwt.decode(token, signing_key.key, **decode_kwargs)
         # Clerk JWT의 sub 클레임 = Clerk 사용자 ID
         result = {"sub": claims["sub"]}
+        # Sprint 29 R1 (auth-claim): name/email claim 보존. 이전엔 sub 만 남겨 lazy seed
+        # (get_current_user)의 claims.get("name"/"email") 이 항상 fallback("사용자"/"")로
+        # 동작 → 신규 user 이름/이메일 누락. JWT 에 해당 claim 이 있으면 사용, 없으면 caller
+        # 의 fallback 유지(현 동작 보존). claim 노출은 Clerk JWT Template 설정에 의존(외부).
+        for optional_key in ("name", "email"):
+            if optional_key in claims:
+                result[optional_key] = claims[optional_key]
         # Codex F-1 fix: token exp 를 cache TTL 상한으로 (만료된 token cache hit 차단)
         _jwt_cache_set(cache_key, result, token_exp=claims.get("exp"))
         return result

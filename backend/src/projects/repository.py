@@ -201,6 +201,19 @@ class ProjectRepository:
         project = await self.find_by_id(project_id, workspace_id)
         if project is None:
             raise ProjectNotFoundError()
+        # Sprint 29 R1 (inbox-IB5): 재분류 멱등성 — 동일 (meeting_id, project_id) 링크가
+        # 이미 있으면 no-op 으로 기존 행 반환. uq_meeting_project 위반(IntegrityError → 500)
+        # 회피 + IB-5 idempotent 불변식 충족. meeting↔project 는 many-to-many 이므로
+        # 같은 meeting 의 타 프로젝트 링크는 정상 생성된다.
+        existing = (await self.session.exec(
+            select(MeetingProjectLink).where(
+                MeetingProjectLink.meeting_id == meeting_id,
+                MeetingProjectLink.project_id == project_id,
+                MeetingProjectLink.workspace_id == workspace_id,
+            )
+        )).one_or_none()
+        if existing is not None:
+            return existing
         link = MeetingProjectLink(
             meeting_id=meeting_id, project_id=project_id, workspace_id=workspace_id
         )

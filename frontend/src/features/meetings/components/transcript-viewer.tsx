@@ -1,5 +1,6 @@
 "use client";
 
+import { Mic } from "lucide-react";
 import type { TranscriptSegment } from "../types";
 import { EmptyState } from "@/components/empty-state";
 
@@ -17,7 +18,7 @@ export function TranscriptViewer({ segments }: TranscriptViewerProps) {
   if (!segments || segments.length === 0) {
     return (
       <EmptyState
-        icon="🎙️"
+        icon={<Mic className="w-10 h-10" />}
         title="트랜스크립트가 아직 없습니다"
         description="음성 인식이 완료되면 화자별 트랜스크립트가 표시됩니다"
       />

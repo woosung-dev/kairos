@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from src.common.exceptions import AlreadyExistsError
 from src.projects.exceptions import (
     CrossWorkspaceMemberError,
     ProjectNotFoundError,
@@ -203,7 +204,16 @@ class ProjectService:
         ws_member = await self.ws_repo.find_member(workspace_id, user_id)
         if ws_member is None:
             raise CrossWorkspaceMemberError()
-        member = await self.repo.add_member(project_id, project.workspace_id, user_id, role)
+        # Sprint 29 R1 (projects-500): 동일 (project_id, user_id) 중복은 uq_project_member
+        # 위반 → 이전엔 IntegrityError 가 통과해 500. asyncpg+greenlet 에선 flush 실패 후
+        # try/except 가 connection autorollback 의 MissingGreenlet 을 유발하므로,
+        # 코드베이스 idiom(pre-check / ON CONFLICT, auth·memory repo 정합)대로 사전 검사.
+        # is_member 는 헌법 I-9 workspace_id 필터 포함 → cross-tenant 안전.
+        if await self.repo.is_member(project_id, user_id, project.workspace_id):
+            raise AlreadyExistsError("프로젝트 멤버")
+        member = await self.repo.add_member(
+            project_id, project.workspace_id, user_id, role
+        )
         await self.repo.commit()
         return {
             "id": str(member.id),

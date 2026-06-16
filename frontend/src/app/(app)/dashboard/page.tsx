@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Building2, Mic, StickyNote, Inbox, Folder } from "lucide-react";
 import { useWorkspaces, useCreateWorkspace } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { EmptyState } from "@/components/empty-state";
@@ -144,7 +145,7 @@ export default function DashboardPage() {
     return (
       <div className="p-6">
         <EmptyState
-          icon="🏢"
+          icon={<Building2 className="w-10 h-10" />}
           title="워크스페이스를 만들어주세요"
           description="워크스페이스를 만들면 회의 녹음, 프로젝트 관리를 시작할 수 있습니다"
         />
@@ -219,10 +220,10 @@ export default function DashboardPage() {
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { icon: "🎙️", label: "회의 추가", href: "/new" },
-            { icon: "📝", label: "노트", href: "/notes" },
-            { icon: "📥", label: "Inbox", href: "/inbox" },
-            { icon: "📁", label: "프로젝트", href: "/projects" },
+            { icon: <Mic className="w-6 h-6" />, label: "회의 추가", href: "/new" },
+            { icon: <StickyNote className="w-6 h-6" />, label: "노트", href: "/notes" },
+            { icon: <Inbox className="w-6 h-6" />, label: "Inbox", href: "/inbox" },
+            { icon: <Folder className="w-6 h-6" />, label: "프로젝트", href: "/projects" },
           ].map((item) => (
             <a
               key={item.label}
@@ -240,7 +241,7 @@ export default function DashboardPage() {
                 (e.currentTarget.style.background = "transparent")
               }
             >
-              <span className="text-2xl">{item.icon}</span>
+              {item.icon}
               <span>{item.label}</span>
             </a>
           ))}
