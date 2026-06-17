@@ -434,3 +434,99 @@ async def test_promote_note_no_plain_text_no_chunk_rejected(
         json={"targetWorkspaceId": str(team_ws.id)},
     )
     assert response.status_code == 400
+
+
+# ── QA-0617-C: chunk-COPY 분기 chunkCount 회귀 가드 ──
+
+
+@pytest_asyncio.fixture
+async def seed_note_l1_l2_chunks(integration_session, auth_user, personal_ws):
+    """real pipeline 구조 재현: L1(parent=None) 1건 + L2(parent=L1) 1건 seed.
+
+    embed_note() 가 만드는 계층 구조 (L1=노트 전체 / L2=문단, 검색 대상) 와 동일.
+    chunk-COPY 분기 (_bg_promote_embed_note) 의 L1/L2 2-pass 복제 경로를 탄다.
+    """
+    from src.embeddings.models import EmbeddingChunk
+    from src.notes.models import Note
+
+    note = Note(
+        workspace_id=personal_ws.id,
+        project_id=None,
+        title="계층 청크 노트",
+        content={"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "본문 문단 하나"}]}]},
+        plain_text="본문 문단 하나",
+        created_by_id=auth_user.id,
+    )
+    integration_session.add(note)
+    await integration_session.flush()
+
+    level1 = EmbeddingChunk(
+        workspace_id=personal_ws.id,
+        project_id=None,
+        source_id=note.id,
+        source_type="note",
+        chunk_text="본문 문단 하나",
+        chunk_index=0,
+        chunk_level=1,
+        parent_chunk_id=None,
+        embedding=[0.0] * 1536,
+        metadata_json={"title": "계층 청크 노트"},
+    )
+    integration_session.add(level1)
+    await integration_session.flush()
+
+    level2 = EmbeddingChunk(
+        workspace_id=personal_ws.id,
+        project_id=None,
+        source_id=note.id,
+        source_type="note",
+        chunk_text="본문 문단 하나",
+        chunk_index=0,
+        chunk_level=2,
+        parent_chunk_id=level1.id,
+        embedding=[0.0] * 1536,
+        metadata_json={"title": "계층 청크 노트"},
+    )
+    integration_session.add(level2)
+    await integration_session.flush()
+    await integration_session.commit()
+    return note
+
+
+@pytest.mark.asyncio
+async def test_promote_note_with_chunks_copy_reports_chunk_count(
+    notes_client,
+    integration_session,
+    personal_ws,
+    team_ws,
+    seed_note_l1_l2_chunks,
+):
+    """QA-0617-C 회귀: chunk-COPY 분기로 promote 시 embedding-status 의 chunkCount > 0.
+
+    source note 가 이미 L1+L2 chunk 를 가지면 _bg_promote_embed_note 가 target ws 로
+    복제한다 (RAG 검색 가능). 복제 chunk 가 실제로 존재하는데도 count_note_chunks /
+    GET embedding-status 가 chunkCount=0 을 반환하면 안 된다.
+    """
+    from src.notes.repository import NoteRepository
+
+    response = await notes_client.post(
+        f"/api/v1/workspaces/{personal_ws.id}/notes/{seed_note_l1_l2_chunks.id}/promote",
+        json={"targetWorkspaceId": str(team_ws.id)},
+    )
+    assert response.status_code == 202, response.text
+    body = response.json()
+    new_note_id = uuid.UUID(body["new_note_id"])
+
+    # BG chunk-copy 완료 후 — repo 직접 count 가 복제 chunk 를 세어야 한다.
+    repo = NoteRepository(integration_session)
+    count = await repo.count_note_chunks(new_note_id, team_ws.id)
+    assert count >= 1, f"복제 chunk 가 count 되지 않음: count={count}"
+
+    # embedding-status endpoint 도 chunkCount > 0 (status=completed) 반환해야 한다.
+    status_resp = await notes_client.get(
+        f"/api/v1/workspaces/{team_ws.id}/notes/{new_note_id}/embedding-status",
+    )
+    assert status_resp.status_code == 200, status_resp.text
+    status_body = status_resp.json()
+    assert status_body["status"] == "completed", status_body
+    assert status_body["chunkCount"] >= 1, status_body

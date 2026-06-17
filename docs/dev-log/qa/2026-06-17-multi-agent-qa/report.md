@@ -24,6 +24,8 @@
 | **QA-0617-E** | P3 | workspaces(i18n) | `PersonalWorkspaceProtected` 메시지 "초대**을(를)** 수행할 수 없습니다" — 한국어 조사 플레이스홀더 `을(를)` 노출 | BL 등재 |
 | **QA-0617-F** | P3 | workspaces/members | 멤버 목록 API 가 `email` 빈 문자열 반환(표시 공백) — seed 데이터 displayName/email 미설정 잔재 | BL 등재 |
 
+> **Evaluator 후속 (stacked PR `qa/2026-06-17-remaining-defects` → `qa/2026-06-17-team-qa-fixes`)**: Implementer(별도 서브에이전트) + 어드버서리얼 재현으로 5건 처리. **A/D/E = 진짜 결함 수정**, **C/F = 코드 버그 반증**(C=probe 타이밍 아티팩트, 실파이프라인 재현 시 count 정상 / F=lazy-seed 유저 실 데이터, 직렬화 경로 정상) — 회귀 가드 테스트만 추가. 상세 = `docs/REFACTORING-BACKLOG.md` BL-QA0617-*.
+
 ### QA-0617-A 상세 (P1, FIXED)
 - **근본 원인**: `backend/src/notes/service.py` `_bg_regenerate_embed_with_audit`(needs_embed_regenerate 분기)가 `NotePipelineService(...)` 를 **`session_factory` 없이** 생성 → `embed_note_async`(`pipeline_service.py:52`)가 `self.session_factory is None` → `RuntimeError` → except → audit `"failed"`.
 - **라이브 증거**: 개인 노트 생성 직후 팀 승격 → embedding-status `{status:"failed", chunkCount:0}`(4회 폴링 안정) + 팀 RAG가 해당 콘텐츠(MAGENTA) **미검색**. 대조군(임베딩 완료 후 승격)은 정상(CYAN 검색됨) → 버그는 **regenerate 분기에만 격리**(meeting/memory promote는 `session_factory()` 직접 사용 → 무영향).
