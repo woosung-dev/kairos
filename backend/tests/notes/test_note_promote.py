@@ -343,6 +343,64 @@ async def test_promote_note_chunk_zero_plain_text_schedules_embed(
 
 
 @pytest.mark.asyncio
+async def test_promote_note_chunk_zero_regenerates_embedding_real_path(
+    notes_client,
+    integration_session,
+    personal_ws,
+    team_ws,
+    seed_note_chunk_zero_with_plain_text,
+    monkeypatch,
+):
+    """QA P1 회귀: chunk 0 + plain_text promote 시 BG 재임베딩이 real path 로 완료되어야 한다.
+
+    기존 test_promote_note_chunk_zero_plain_text_schedules_embed 는 embed_note_async 자체를
+    noop monkeypatch 해 버그(`_bg_regenerate_embed_with_audit` 가 session_factory 미전달로
+    RuntimeError) 를 가린다. 본 테스트는 embed_note_async / NotePipelineService 를 mock 하지
+    않고 real path 를 끝까지 실행 — OpenAI 호출 seam(generate_embeddings) 만 더미 1536d
+    halfvec 로 차단한다. audit 가 "completed" 가 되고 실 EmbeddingChunk 가 생성되는지 검증.
+    """
+    from src.common.promote_models import ItemPromotionAudit
+    from src.embeddings.models import EmbeddingChunk
+
+    # OpenAI 호출 seam 만 차단 — embed_note_async / NotePipelineService 는 real path.
+    async def _dummy_generate(self, texts):
+        return [[0.0] * 1536 for _ in texts]
+
+    monkeypatch.setattr(
+        "src.embeddings.service.EmbeddingService.generate_embeddings",
+        _dummy_generate,
+    )
+
+    response = await notes_client.post(
+        f"/api/v1/workspaces/{personal_ws.id}/notes/{seed_note_chunk_zero_with_plain_text.id}/promote",
+        json={"targetWorkspaceId": str(team_ws.id)},
+    )
+    assert response.status_code == 202, response.text
+    body = response.json()
+    new_note_id = uuid.UUID(body["new_note_id"])
+    audit_id = uuid.UUID(body["audit_id"])
+
+    # (a) audit 가 "failed" 가 아니라 "completed" 로 전환되어야 한다 (버그면 "failed").
+    audit = (await integration_session.execute(
+        select(ItemPromotionAudit).where(ItemPromotionAudit.id == audit_id)
+    )).scalar_one()
+    await integration_session.refresh(audit)
+    assert audit.embedding_status == "completed", (
+        f"BG 재임베딩 real path 실패: embedding_status={audit.embedding_status}"
+    )
+
+    # (b) 승격된 note 가 target ws 에 >= 1 EmbeddingChunk 를 가져야 한다.
+    chunk_count = (await integration_session.execute(
+        select(EmbeddingChunk).where(
+            EmbeddingChunk.source_type == "note",
+            EmbeddingChunk.source_id == new_note_id,
+            EmbeddingChunk.workspace_id == team_ws.id,
+        )
+    )).scalars().all()
+    assert len(chunk_count) >= 1, "승격 note 에 EmbeddingChunk 가 생성되지 않음"
+
+
+@pytest.mark.asyncio
 async def test_promote_note_chunk_n_lifecycle_pending(
     notes_client,
     personal_ws,

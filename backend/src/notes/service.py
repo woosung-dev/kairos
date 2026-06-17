@@ -532,10 +532,13 @@ async def _bg_regenerate_embed_with_audit(
         try:
             # Sprint 24 Gemini P2 fix: 새 session 으로 fresh NotePipelineService 인스턴스 생성.
             # 본 wrapper 의 session 만 사용 — request-scoped session pool 점유 방지.
+            # QA fix (2026-06-17): session_factory 미전달 시 embed_note_async 가 RuntimeError →
+            # audit "failed" → 승격 note 미임베딩(RAG 비가시). session_factory 전달로 해소.
             bg_pipeline = NotePipelineService(
                 note_repo=NoteRepository(session),
                 embedding_service=EmbeddingService(EmbeddingRepository(session)),
                 project_repo=ProjectRepository(session),
+                session_factory=session_factory,
             )
             # plain_text fallback 가드 (pipeline_service.py:41) 가 plain_text 부재 시 early return —
             # promote 흐름에서 plain_text 존재 확인됨, 정상 신규 embedding 생성.
