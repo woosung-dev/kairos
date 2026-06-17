@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import delete, func, select, update
+from sqlmodel import delete, func, select, text, update
 
 from src.workspaces.models import Workspace, WorkspaceInvite, WorkspaceMember
 
@@ -85,9 +85,33 @@ class WorkspaceRepository:
             )
         )).all())
 
-    async def add_member(self, member: WorkspaceMember) -> WorkspaceMember:
-        self.session.add(member)
-        await self.session.flush()
+    async def add_member(self, member: WorkspaceMember) -> WorkspaceMember | None:
+        """멤버 추가 (race-safe). 이미 (workspace_id, user_id) 멤버면 None 반환.
+
+        QA-0617-D fix: 기존 add+flush 는 동시 INSERT 시 uq_workspace_member UNIQUE
+        위반 → 처리 안 된 IntegrityError → HTTP 500. asyncpg+greenlet 에서는
+        flush 후 try/except IntegrityError 가 MissingGreenlet 으로 전파되므로
+        (feedback_asyncpg_greenlet_precheck) ON CONFLICT DO NOTHING RETURNING 으로
+        race backstop. RETURNING 이 row 를 내면 INSERT 성공, 없으면 이미 멤버(충돌)
+        → caller 가 None 을 idempotent/409 로 처리.
+        """
+        row = (await self.session.exec(
+            text(
+                """
+                INSERT INTO workspace_members (id, workspace_id, user_id, role)
+                VALUES (:id, :workspace_id, :user_id, :role)
+                ON CONFLICT (workspace_id, user_id) DO NOTHING
+                RETURNING id
+                """
+            ).bindparams(
+                id=member.id,
+                workspace_id=member.workspace_id,
+                user_id=member.user_id,
+                role=member.role,
+            )
+        )).one_or_none()
+        if row is None:
+            return None
         return member
 
     async def update_member_role(
