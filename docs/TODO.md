@@ -29,6 +29,10 @@
 
 ## Next Actions
 
+> **2026-06-17 멀티 에이전트 팀 QA 후속** (`docs/dev-log/qa/2026-06-17-multi-agent-qa/report.md`)
+- [ ] **(선택) 풍부한 음성 샘플 1개 확보** — 알려진 트랜스크립트 + 명명된 사실 2개 이상. 현재 픽스처는 무음 10초 webm + test.m4a 뿐 → 회의 오디오 파이프라인의 **콘텐츠** 검증(transcription/화자분리/요약 품질) 갭. 텍스트 캡처로 RAG 경로는 검증 완료(오디오는 기계동작만).
+- [ ] **(선택) 전용 admin/viewer Clerk dev 계정 발급** — 현재 2계정(owner d@e.com + member a@e.com)으로 role 변경하며 4 role 전수했으나, 동시 다중 role 라이브 시나리오엔 전용 계정이 편함. `frontend/.env.local` QA_LOCAL_ADMIN_*/QA_LOCAL_VIEWER_* 추가.
+
 > Sprint 25 moonlit-sutton 완료 — PR draft 진입 (2026-05-21). 다음 Sprint 진입 계획은 Recently Completed 섹션 참조.
 
 ### 📋 사용자 작업 대기

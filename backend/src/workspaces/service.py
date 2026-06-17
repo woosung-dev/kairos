@@ -146,7 +146,12 @@ class WorkspaceService:
             user_id=user.id,
             role="member",
         )
-        member = await self.repo.add_member(member)
+        # add_member 는 race-safe(ON CONFLICT) — 동시 추가로 이미 멤버면 None.
+        # 사전체크와 동일 semantics 로 409 (MemberAlreadyExistsError).
+        inserted = await self.repo.add_member(member)
+        if inserted is None:
+            raise MemberAlreadyExistsError()
+        member = inserted
         await self.repo.commit()
 
         return {

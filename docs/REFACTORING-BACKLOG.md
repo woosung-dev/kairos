@@ -15,6 +15,25 @@
 
 ---
 
+## BL-QA0617-C — notes embedding-status `chunkCount` 오집계 (승격 노트) ✅ **반증 (코드 버그 아님, 2026-06-17 stacked PR)**
+
+**결론**: Implementer 어드버서리얼 조사 + 실파이프라인 재현 결과 **코드 정상**. `_bg_promote_embed_note`(`notes/service.py:433,451`)가 복제 chunk에 `source_id=new_note_id` 설정, `count_note_chunks`(`notes/repository.py:108-116`)도 `source_id == note_id` 필터 → 두 컬럼 일치, 실파이프라인 promote 시 count=2 정상 반환. 라이브에서 본 `chunkCount:0`은 **probe 타이밍 아티팩트**(getEmbeddingStatus는 FE 미사용 — 직접 API 폴링이 BG copy commit 전/소스 id 대상으로 실행). **회귀 가드 테스트만 추가**(`test_promote_note_with_chunks_copy_reports_chunk_count` — 가설된 source_id 회귀를 방지). 코드 변경 없음.
+
+## BL-QA0617-D — 동시 invite-accept → 500 (graceful 처리 부재) ✅ **FIXED (2026-06-17 stacked PR)**
+
+**근거**: 2026-06-17 팀 QA(QA-0617-D). 동일 사용자가 같은 초대 코드로 accept를 **동시 2건** 호출 시 하나가 **HTTP 500**(`accept_invite` 의 `find_member` pre-check 후 `add_member` INSERT — 둘 다 pre-check 통과 → 하나가 `uq_workspace_member` UNIQUE 위반 → 미처리 IntegrityError). 라이브 재현 `[500,200]`, membership=1.
+**fix**: `WorkspaceRepository.add_member` 를 `INSERT ... ON CONFLICT (workspace_id,user_id) DO NOTHING RETURNING` 로 race-safe 화(`WorkspaceMember|None` 반환). `accept_invite`/`service.add_member` 가 None → `MemberAlreadyExistsError`(409). pre-check는 fast path 유지, ON CONFLICT가 race backstop. flush+except 금지(`feedback_asyncpg_greenlet_precheck`). 실DB 동시성 회귀 테스트(`test_accept_invite_concurrent.py`: 동시 2건 → 1 ok + 1 MemberAlreadyExistsError, 500/IntegrityError/MissingGreenlet 0, membership=1).
+
+## BL-QA0617-E — `PersonalWorkspaceProtected` 메시지 조사 플레이스홀더 ✅ **FIXED (2026-06-17 stacked PR)**
+
+**근거**: 2026-06-17 팀 QA(QA-0617-E). I-19 차단 메시지 "초대**을(를)** 수행할 수 없습니다" — `{action}을(를)` 템플릿이 한국어 받침 조사 미처리. **fix**: `_object_particle(word)` 헬퍼(Hangul `(ord(last)-0xAC00)%28 != 0` → 받침有 "을"/無 "를", 비-Hangul "를" fallback) — `exceptions.py:41`. 메시지 → "개인 워크스페이스에는 초대를 수행할 수 없습니다". 단위 테스트 9 케이스(`test_exceptions_particle.py`).
+
+## BL-QA0617-F — 멤버 목록 API `email` 빈 문자열 ✅ **반증 (코드 버그 아님, seed 데이터, 2026-06-17 stacked PR)**
+
+**결론**: `invite_service.py:list_members` 는 이미 `"email": user.email if user else None` 로 User.email 직렬화 — 직렬화 경로 정상. 라이브 빈 email 은 **lazy-seed 유저의 실제 seed 데이터**(`auth/dependencies.py` 가 Clerk JWT email claim 부재 시 `email=""`). 코드가 실 User.email(빈 값 포함)을 정직하게 반환 — fabricate 금지. **가드 테스트만 추가**(`test_list_members_email.py` — User.email 와이어링 lock-in). 진짜 데이터 위생 이슈는 [[project_sprint28_fullsweep_qa_done]] BL-DATA-HYGIENE-SEED(Clerk JWT 템플릿) 소관(GA 연기).
+
+---
+
 ## BL-S27c-1 — `get_current_user` lazy seed race condition fix ★★★ (P0)
 
 **현 상태**: `backend/src/auth/dependencies.py:160-169` 의 User INSERT 가 race-unsafe. Dashboard 첫 진입 시 FE 가 5+ API 동시 호출 → 각 transaction 이 `find_by_clerk_id`=None → 동시 INSERT → 1개 성공 + 나머지 IntegrityError `duplicate key value violates unique constraint "ix_users_clerk_id"` → 500.

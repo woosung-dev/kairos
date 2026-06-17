@@ -180,13 +180,19 @@ class InviteService:
         if existing is not None:
             raise MemberAlreadyExistsError()
 
-        # 멤버 추가
+        # 멤버 추가 (race-safe: ON CONFLICT DO NOTHING).
+        # 사전체크(find_member)는 fast path — 동시 수락 race 는 add_member 가 backstop.
+        # None 반환 = 동시 수락 중 다른 쪽이 먼저 INSERT (이미 멤버) → 사전체크와
+        # 동일 semantics 로 409 (MemberAlreadyExistsError). NEVER 500/IntegrityError.
         member = WorkspaceMember(
             workspace_id=invite.workspace_id,
             user_id=user_id,
             role=invite.role,
         )
-        member = await self.repo.add_member(member)
+        inserted = await self.repo.add_member(member)
+        if inserted is None:
+            raise MemberAlreadyExistsError()
+        member = inserted
 
         # 사용 횟수 증가 (Sprint 19 PR #1 C12: invite.workspace_id 명시 전달)
         await self.repo.increment_invite_use_count(invite.id, invite.workspace_id)
