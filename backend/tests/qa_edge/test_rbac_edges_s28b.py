@@ -479,9 +479,12 @@ async def test_interleave_dup_blocked_by_unique_constraint(concurrent_engine):
     """회귀 가드 (BUG-WS-MEMBER-UNIQUE FIX) — 멀티워커 인터리브 중복을 DB UNIQUE 가 차단.
 
     별개 트랜잭션 2개의 find_member 가 둘 다 None 을 본 뒤(app-level 가드 우회) 각각
-    INSERT 를 시도해도, (workspace_id, user_id) UNIQUE 제약이 두 번째 commit 을
-    IntegrityError 로 차단한다. 이전엔 제약 부재로 2 row 가 생겼던 멀티워커 race 가
-    이제 1 row 로 보장된다.
+    INSERT 를 시도해도, (workspace_id, user_id) UNIQUE 제약이 중복을 차단해 1 row 만
+    남는다. 이전엔 제약 부재로 2 row 가 생겼던 멀티워커 race 가 이제 1 row 로 보장된다.
+
+    QA-0617-D fix: add_member 는 이제 ON CONFLICT DO NOTHING RETURNING 으로 race-safe —
+    충돌 시 IntegrityError 를 던지지 않고 None 을 반환(graceful, 500 회피). UNIQUE
+    제약은 여전히 1 row 를 보장한다.
     """
     sm = async_sessionmaker(
         concurrent_engine, class_=AsyncSession, expire_on_commit=False
@@ -514,18 +517,23 @@ async def test_interleave_dup_blocked_by_unique_constraint(concurrent_engine):
         # 두 트랜잭션 모두 INSERT 이전에 find_member 수행 → 둘 다 None
         assert await repo1.find_member(ws_id, target_id) is None
         assert await repo2.find_member(ws_id, target_id) is None
-        # 이제 각자 add_member + commit — 두 번째 commit 이 UNIQUE 로 차단되어야 함(FIX)
-        await repo1.add_member(
+        # 첫 INSERT 는 성공 — member row 반환
+        inserted1 = await repo1.add_member(
             WorkspaceMember(workspace_id=ws_id, user_id=target_id, role="member")
         )
+        assert inserted1 is not None
         await s1.commit()
-        # repo2.add_member 가 flush 하는 시점에 UNIQUE 위반 → IntegrityError
-        # (s1 의 row 가 이미 commit 되어 visible). 멀티워커 인터리브 중복 차단.
-        with pytest.raises(IntegrityError):
-            await repo2.add_member(
-                WorkspaceMember(workspace_id=ws_id, user_id=target_id, role="member")
-            )
-        await s2.rollback()
+        # QA-0617-D: repo2.add_member 는 ON CONFLICT DO NOTHING 으로 race-safe —
+        # s1 의 row 가 commit 되어 visible 하므로 충돌 → IntegrityError 가 아니라 None 반환.
+        # 멀티워커 인터리브 중복을 graceful 하게 차단 (500/IntegrityError 없음).
+        inserted2 = await repo2.add_member(
+            WorkspaceMember(workspace_id=ws_id, user_id=target_id, role="member")
+        )
+        assert inserted2 is None, (
+            "동시 INSERT 충돌은 ON CONFLICT DO NOTHING 으로 None 반환해야 함 "
+            "(IntegrityError raise 금지)"
+        )
+        await s2.commit()
 
     async with sm() as verify:
         rows = (
