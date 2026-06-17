@@ -36,6 +36,7 @@ export function RagInput({ onSubmit }: RagInputProps) {
       >
         <input
           type="text"
+          data-testid="rag-input"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -45,6 +46,7 @@ export function RagInput({ onSubmit }: RagInputProps) {
           style={{ color: "var(--text-primary)" }}
         />
         <button
+          data-testid="rag-submit"
           onClick={handleSubmit}
           disabled={!query.trim() || isStreaming}
           className="px-3 py-1.5 rounded text-xs font-medium transition-colors"

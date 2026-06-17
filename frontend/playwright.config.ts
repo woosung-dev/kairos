@@ -17,6 +17,10 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = Number(process.env.E2E_PORT ?? 3003);
 const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
+// 멀티계정 팀 spine 회귀 스위트 (e2e/tests/team/*) 는 owner+member 2계정 storageState +
+// 로컬 BE(:8000) 시드가 필요해 E2E_RUN_TEAM=true 일 때만 활성. 미설정 시 일반 e2e 무영향.
+const RUN_TEAM = process.env.E2E_RUN_TEAM === "true";
+
 export default defineConfig({
   testDir: "./e2e",
   // Multi-Agent QA spec (qa-*.spec.ts) 은 로컬 수동 QA 전용 — seed DB / JWT /
@@ -47,6 +51,9 @@ export default defineConfig({
       // override 하므로 여기에도 명시 (Playwright 동작).
       testIgnore: [
         /security-headers\.spec\.ts/,
+        // 팀 spine 스펙은 gated `team` project(E2E_RUN_TEAM=true) 에서만 실행 —
+        // owner/member storageState 가 team-setup 에서만 생성되므로 chromium 에서 제외.
+        /tests[\\/]team[\\/]/,
         ...(process.env.CI ? [/qa-.*\.spec\.ts/] : []),
       ],
       use: {
@@ -79,6 +86,28 @@ export default defineConfig({
         },
       },
     },
+    // 멀티계정 팀 spine 회귀 (E2E_RUN_TEAM=true). team-setup 이 owner.json/member.json/
+    // team-fixtures.json 생성 → team project 가 fixture 로 컨텍스트별 storageState 주입.
+    // fullyParallel:false + 실행 시 --workers=1 → 공유 team ws role-mutation race 차단.
+    ...(RUN_TEAM
+      ? [
+          {
+            name: "team-setup",
+            testMatch: /team\.setup\.ts/,
+          },
+          {
+            name: "team",
+            testMatch: /e2e\/tests\/team\/.*\.spec\.ts/,
+            fullyParallel: false,
+            use: {
+              ...devices["Desktop Chrome"],
+              // 컨텍스트별 storageState 는 fixture 가 주입 — top-level storageState 없음.
+              launchOptions: { args: ["--disable-web-security"] },
+            },
+            dependencies: ["team-setup"],
+          },
+        ]
+      : []),
   ],
 
   // CI가 아닌 환경에서만 dev 서버 자동 기동.

@@ -27,6 +27,7 @@ export function RagSources({ sources }: RagSourcesProps) {
   return (
     <div className="pl-3">
       <button
+        data-testid="rag-sources"
         onClick={() => setIsExpanded(!isExpanded)}
         className="flex items-center gap-1 text-caption mb-1"
         style={{ color: "var(--text-muted)" }}

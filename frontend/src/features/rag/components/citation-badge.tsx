@@ -40,6 +40,7 @@ export function CitationBadge({ number, onClick, isActive = false }: CitationBad
   return (
     <button
       type="button"
+      data-testid={`citation-badge-${number}`}
       onClick={onClick}
       className="inline-flex items-center justify-center align-top cursor-pointer transition-colors"
       style={{

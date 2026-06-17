@@ -79,6 +79,7 @@ export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
+        data-testid="workspace-switcher"
         className="flex items-center gap-2 px-2 py-1 rounded-md transition-colors hover:opacity-80 cursor-pointer outline-none"
         style={{
           background: "transparent",
@@ -125,6 +126,7 @@ export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
           return (
             <DropdownMenuItem
               key={ws.id}
+              data-testid={`workspace-switcher-item-${ws.id}`}
               className="px-3 py-2 cursor-pointer flex items-center gap-2"
               onClick={() => handleSwitch(ws.id)}
               title={suffix ? `${ws.name} (생성: ${ws.createdAt.slice(0, 10)})` : ws.name}
