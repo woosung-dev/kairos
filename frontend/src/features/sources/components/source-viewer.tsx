@@ -173,6 +173,7 @@ export function SourceViewer({
 
   return (
     <div
+      data-testid="rag-source-viewer"
       className="flex flex-col h-full"
       style={{ background: "var(--background)" }}
     >

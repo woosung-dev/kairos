@@ -27,6 +27,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
   return (
     <a
       href={`/projects/${project.id}`}
+      data-testid={`project-card-${project.id}`}
       className="block p-4 rounded border transition-colors"
       style={{
         background: "var(--surface)",
