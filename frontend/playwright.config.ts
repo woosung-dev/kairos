@@ -51,6 +51,9 @@ export default defineConfig({
       // override 하므로 여기에도 명시 (Playwright 동작).
       testIgnore: [
         /security-headers\.spec\.ts/,
+        // 팀 spine 스펙은 gated `team` project(E2E_RUN_TEAM=true) 에서만 실행 —
+        // owner/member storageState 가 team-setup 에서만 생성되므로 chromium 에서 제외.
+        /tests[\\/]team[\\/]/,
         ...(process.env.CI ? [/qa-.*\.spec\.ts/] : []),
       ],
       use: {
