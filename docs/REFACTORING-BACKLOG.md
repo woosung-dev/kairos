@@ -15,6 +15,24 @@
 
 ---
 
+## BL-QA0617-C — notes embedding-status `chunkCount` 오집계 (승격 노트) ★ (P2)
+
+**근거**: 2026-06-17 멀티 에이전트 팀 QA(`docs/dev-log/qa/2026-06-17-multi-agent-qa/report.md` QA-0617-C). 임베딩 완료된 노트를 팀으로 승격(chunk 복제 분기) 시 `GET .../notes/{id}/embedding-status` 가 `{status:"completed", chunkCount:0}` 반환. 실제로는 복제 chunk가 존재하고 팀 RAG 검색도 정상(라이브 CYAN 검색됨). `backend/src/notes/repository.py:count_note_chunks` 의 카운트 쿼리가 복제된 EmbeddingChunk의 참조(note_id/source 참조)와 불일치 추정. **표시 전용 결함**(기능 정상). fix = count 쿼리가 복제 chunk를 포함하도록 정합 + 회귀 테스트.
+
+## BL-QA0617-D — 동시 invite-accept → 500 (graceful 처리 부재) ★ (P2)
+
+**근거**: 2026-06-17 팀 QA(QA-0617-D). 동일 사용자가 같은 초대 코드로 accept를 **동시 2건** 호출 시 하나가 **HTTP 500**(`workspaces/invite_service.py:accept_invite` 의 `find_member` pre-check(179) 후 `add_member` INSERT(189) — 동시 요청 둘 다 pre-check 통과 → 하나가 `uq_workspace_member` UNIQUE 위반 → 미처리 IntegrityError). UNIQUE 제약이 중복 membership은 차단(데이터 안전, 라이브 membership=1 확인)하나 graceful 409/idempotent 아님. 트리거 = 수락 버튼 더블클릭/클라이언트 retry. fix = `INSERT ... ON CONFLICT (workspace_id, user_id) DO NOTHING` idiom 후 기존 멤버 재조회→idempotent 반환 (`feedback_asyncpg_greenlet_precheck`: flush+except 금지). 실DB 동시성 회귀 테스트.
+
+## BL-QA0617-E — `PersonalWorkspaceProtected` 메시지 조사 플레이스홀더 ★ (P3)
+
+**근거**: 2026-06-17 팀 QA(QA-0617-E). I-19 차단 메시지 "초대**을(를)** 수행할 수 없습니다" — `{action}을(를)` 템플릿이 한국어 받침 조사 미처리(초대=받침無→"를"). fix = 받침 판정 헬퍼 또는 액션별 완성 문구. `backend/src/workspaces/exceptions.py` 또는 메시지 생성 지점.
+
+## BL-QA0617-F — 멤버 목록 API `email` 빈 문자열 ★ (P3)
+
+**근거**: 2026-06-17 팀 QA(QA-0617-F). `GET .../members` 응답의 `email` 이 빈 문자열(`""`). Sprint 28 `seed-email/displayName="사용자"` 잔재와 동일 클래스 — 멤버 표시명/이메일이 비어 UI 식별 곤란. fix = members 응답이 User.email/display_name 조인 채움 + seed 데이터 정합.
+
+---
+
 ## BL-S27c-1 — `get_current_user` lazy seed race condition fix ★★★ (P0)
 
 **현 상태**: `backend/src/auth/dependencies.py:160-169` 의 User INSERT 가 race-unsafe. Dashboard 첫 진입 시 FE 가 5+ API 동시 호출 → 각 transaction 이 `find_by_clerk_id`=None → 동시 INSERT → 1개 성공 + 나머지 IntegrityError `duplicate key value violates unique constraint "ix_users_clerk_id"` → 500.
