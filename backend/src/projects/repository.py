@@ -93,6 +93,13 @@ class ProjectRepository:
         # CAND-B fix — ProjectMember 매핑 + 현 워크스페이스 멤버 동시 충족 시에만 private 노출.
         # orphan ProjectMember 잔재(워크스페이스 제거 후 미정리)가 list 에서 private 을
         # 되살리지 못하도록 차단.
+        #
+        # codex P2 fix — WorkspaceMember 검사를 중첩 exists() 가 아닌 *같은* exists() 안에
+        # 펼쳐 외부 Project 행에 상관(correlate)시킨다. 중첩 exists() 안에서
+        # Project.workspace_id 를 참조하면 SQLAlchemy 가 서브쿼리 FROM 절에 새 projects
+        # 테이블을 생성해 상관관계가 끊긴다 (요청자가 아무 워크스페이스 멤버이기만 하면
+        # 가드가 참이 되는 LIST 누출). 단일 join 으로 wm.workspace_id = 외부 Project 의
+        # workspace_id 를 직접 묶는다.
         from src.workspaces.models import WorkspaceMember
 
         member_exists = (
@@ -101,12 +108,8 @@ class ProjectRepository:
                 and_(
                     ProjectMember.project_id == Project.id,
                     ProjectMember.user_id == requester_user_id,
-                    exists().where(
-                        and_(
-                            WorkspaceMember.workspace_id == Project.workspace_id,
-                            WorkspaceMember.user_id == requester_user_id,
-                        )
-                    ),
+                    WorkspaceMember.workspace_id == Project.workspace_id,
+                    WorkspaceMember.user_id == requester_user_id,
                 )
             )
         )
