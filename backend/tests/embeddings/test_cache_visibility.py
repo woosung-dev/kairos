@@ -16,6 +16,7 @@ from src.auth.models import User
 from src.embeddings.models import EmbeddingChunk, SemanticCache
 from src.embeddings.repository import EmbeddingRepository
 from src.projects.models import Project, ProjectMember
+from src.workspaces.models import WorkspaceMember
 
 
 def _make_vec(seed: int, dim: int = 1536) -> list[float]:
@@ -147,6 +148,14 @@ async def test_cache_hit_visibility_member_with_mapping(
     )
     integration_session.add(mapped)
     await integration_session.flush()
+    # CAND-B: 정당한 매핑 멤버는 워크스페이스 멤버이기도 하다 (gate 가 둘 다 요구).
+    integration_session.add(
+        WorkspaceMember(
+            workspace_id=team_ws.id,
+            user_id=mapped.id,
+            role="member",
+        )
+    )
     integration_session.add(
         ProjectMember(
             project_id=p_private.id,
