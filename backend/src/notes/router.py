@@ -48,7 +48,12 @@ async def get_note(
     member: WorkspaceMember = Depends(require_viewer),
     service: NoteService = Depends(get_note_service),
 ):
-    return await service.get_note(note_id, workspace_id)
+    return await service.get_note(
+        note_id,
+        workspace_id,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
+    )
 
 
 @router.get("/{note_id}/export")
@@ -60,7 +65,11 @@ async def export_note(
     service: NoteService = Depends(get_note_service),
 ):
     content, filename, media_type = await service.export_note(
-        note_id, workspace_id, format
+        note_id,
+        workspace_id,
+        format,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
     )
     encoded = quote(filename)
     return Response(

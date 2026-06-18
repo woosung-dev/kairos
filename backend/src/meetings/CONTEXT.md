@@ -107,13 +107,17 @@ POST   /{id}/promote      cross-workspace 복제 (I-18, 202 + BG embedding 복�
 
 - 인증/인가: 모든 endpoint 가 `require_member` (POST) 또는 `require_viewer` (GET/PATCH) 의존성 통과 — workspace 비멤버 접근 403
 - service / repository: 모든 호출 시 path `workspace_id` 필수 전달 (헌법 I-9)
-  - `service.get_meeting_detail(meeting_id, workspace_id)`
-  - `service.export_meeting(meeting_id, workspace_id, fmt)`
+  - `service.get_meeting_detail(meeting_id, workspace_id, requester_user_id=, requester_role=)`
+  - `service.export_meeting(meeting_id, workspace_id, fmt, requester_user_id=, requester_role=)`
   - `service.get_meeting_status(meeting_id, workspace_id)`
   - `repository.find_by_id(meeting_id, workspace_id)` / `get_segments` / `get_summary` (read)
   - `repository.update_status(meeting_id, workspace_id, status, error_message=None)` (write)
   - `repository.set_has_transcript(meeting_id, workspace_id, value)` / `set_has_summary`
   - `repository.save_segments(meeting_id, workspace_id, segments)` / `save_summary`
+- project visibility 게이트 (CAND-A, visibility-residue IDOR fix):
+  - `get_meeting_detail` / `export_meeting` 가 회의에 연결된 project(`MeetingProjectLink`) visibility 를 검증 (트랜스크립트/요약/export 누출 차단)
+  - 규칙: 링크 0개 → 워크스페이스 멤버 OK / 접근 가능한 연결 project 1개라도 있으면 OK / 전부 접근 불가(private 비-멤버·draft 비-작성자)면 404 / admin·owner 우회
+  - `requester_role` 미전달(None) = 내부/특권 호출 → 게이트 skip (하위호환)
 - Pipeline 진입점 (Codex F-1 Critical):
   - `pipeline.process_meeting(meeting_id, workspace_id)`
   - `pipeline.capture_text(meeting_id, workspace_id, transcript_text)`

@@ -134,13 +134,58 @@ class NoteService:
             "hasNext": page * page_size < total,
         }
 
+    async def _verify_note_visibility(
+        self,
+        note: Note,
+        requester_user_id: uuid.UUID | None,
+        requester_role: str | None,
+    ) -> None:
+        """CAND-A: note 의 owning project visibility 게이트 (get_project 정합).
+
+        require_viewer/member 만으론 private/draft project 노트가 비-ProjectMember 에게
+        노출된다 (visibility-residue IDOR). project-detail 과 동일 규칙으로 게이트:
+        - admin/owner: 우회 (모든 visibility)
+        - project_id=None: 워크스페이스 멤버 누구나 OK
+        - draft: 작성자(created_by_id)만, 그 외 404
+        - private: ProjectMember 매핑된 사람만, 그 외 404
+
+        requester_role 미전달(None) = 내부/특권 호출 → 게이트 skip (하위호환).
+        """
+        if requester_role is None:
+            return
+        if requester_role in ("admin", "owner"):
+            return
+        if note.project_id is None:
+            return
+        if self.project_repo is None:
+            raise RuntimeError("project_repo 필수 (CAND-A visibility 검증)")
+        project = await self.project_repo.find_by_id(
+            note.project_id, note.workspace_id
+        )
+        if project is None:
+            # cross-tenant 또는 dangling project → fail-closed 404
+            raise NoteNotFoundError()
+        if project.visibility == "draft":
+            if project.created_by_id != requester_user_id:
+                raise NoteNotFoundError()
+        elif project.visibility == "private":
+            if requester_user_id is None or not await self.project_repo.is_member(
+                note.project_id, requester_user_id, note.workspace_id
+            ):
+                raise NoteNotFoundError()
+
     async def get_note(
-        self, note_id: uuid.UUID, workspace_id: uuid.UUID
+        self,
+        note_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
-        """헌법 I-9 (Codex F-1): workspace_id 필수."""
+        """헌법 I-9 (Codex F-1): workspace_id 필수. CAND-A: project visibility 게이트."""
         note = await self.repo.find_by_id(note_id, workspace_id)
         if note is None:
             raise NoteNotFoundError()
+        await self._verify_note_visibility(note, requester_user_id, requester_role)
         return self._to_dict(note)
 
     async def update_note(
@@ -182,12 +227,18 @@ class NoteService:
         await self.repo.commit()
 
     async def export_note(
-        self, note_id: uuid.UUID, workspace_id: uuid.UUID, fmt: str
+        self,
+        note_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        fmt: str,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> tuple[str, str, str]:
-        """노트 내보내기. (content, filename, media_type) 반환."""
+        """노트 내보내기. (content, filename, media_type) 반환. CAND-A: visibility 게이트."""
         note = await self.repo.find_by_id(note_id, workspace_id)
         if note is None:
             raise NoteNotFoundError()
+        await self._verify_note_visibility(note, requester_user_id, requester_role)
 
         title = note.title or "Untitled"
 

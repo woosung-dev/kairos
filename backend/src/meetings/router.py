@@ -89,7 +89,12 @@ async def get_meeting(
     member: WorkspaceMember = Depends(require_viewer),
     service: MeetingService = Depends(get_meeting_service),
 ):
-    return await service.get_meeting_detail(meeting_id, workspace_id)
+    return await service.get_meeting_detail(
+        meeting_id,
+        workspace_id,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
+    )
 
 
 @router.get("/{meeting_id}/export")
@@ -101,7 +106,11 @@ async def export_meeting(
     service: MeetingService = Depends(get_meeting_service),
 ):
     content, filename, media_type = await service.export_meeting(
-        meeting_id, workspace_id, format
+        meeting_id,
+        workspace_id,
+        format,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
     )
     encoded = quote(filename)
     return Response(

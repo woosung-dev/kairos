@@ -105,13 +105,69 @@ class MeetingService:
             "hasNext": page * page_size < total,
         }
 
+    async def _verify_meeting_visibility(
+        self,
+        meeting_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None,
+        requester_role: str | None,
+    ) -> None:
+        """CAND-A: 회의에 연결된 project visibility 게이트 (get_project 정합).
+
+        require_viewer 만으론 private/draft project 에 연결된 회의의 트랜스크립트/요약/
+        export 가 비-ProjectMember 에게 노출된다 (visibility-residue IDOR).
+
+        회의는 MeetingProjectLink 로 N개 project 와 연결될 수 있다. 규칙:
+        - admin/owner: 우회
+        - project 링크 0개: 워크스페이스 멤버 누구나 OK (프로젝트 미연결 = 미제한)
+        - 링크된 project 중 접근 가능한 것이 1개라도 있으면 OK
+        - 링크된 project 가 전부 접근 불가(private 비-멤버 / draft 비-작성자)면 404
+
+        requester_role 미전달(None) = 내부/특권 호출 → 게이트 skip (하위호환).
+        """
+        if requester_role is None:
+            return
+        if requester_role in ("admin", "owner"):
+            return
+        if self.project_repo is None:
+            raise RuntimeError("project_repo 필수 (CAND-A visibility 검증)")
+        linked = await self.project_repo.find_projects_by_meeting(
+            meeting_id, workspace_id
+        )
+        if not linked:
+            # 프로젝트 미연결 = 워크스페이스 레벨 (미제한)
+            return
+        for project in linked:
+            if project.visibility == "public":
+                return
+            if project.visibility == "draft":
+                if project.created_by_id == requester_user_id:
+                    return
+            elif project.visibility == "private":
+                if requester_user_id is not None and await self.project_repo.is_member(
+                    project.id, requester_user_id, workspace_id
+                ):
+                    return
+        # 접근 가능한 연결 project 없음 → fail-closed 404
+        raise MeetingNotFoundError()
+
     async def get_meeting_detail(
-        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID
+        self,
+        meeting_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
-        """회의 상세 (요약 + 트랜스크립트 포함). 헌법 I-9 workspace_id 필수 (Codex F-1)."""
+        """회의 상세 (요약 + 트랜스크립트 포함). 헌법 I-9 workspace_id 필수 (Codex F-1).
+
+        CAND-A: 연결된 project visibility 게이트 (비-ProjectMember 누출 차단).
+        """
         meeting = await self.repo.find_by_id(meeting_id, workspace_id)
         if meeting is None:
             raise MeetingNotFoundError()
+        await self._verify_meeting_visibility(
+            meeting_id, workspace_id, requester_user_id, requester_role
+        )
 
         segments = await self.repo.get_segments(meeting_id, workspace_id)
         summary = await self.repo.get_summary(meeting_id, workspace_id)
@@ -168,12 +224,23 @@ class MeetingService:
         }
 
     async def export_meeting(
-        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID, fmt: str
+        self,
+        meeting_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        fmt: str,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> tuple[str, str, str]:
-        """회의 내보내기 (content, filename, media_type). 헌법 I-9 workspace_id 필수 (Codex F-1)."""
+        """회의 내보내기 (content, filename, media_type). 헌법 I-9 workspace_id 필수 (Codex F-1).
+
+        CAND-A: 연결된 project visibility 게이트 (비-ProjectMember 누출 차단).
+        """
         meeting = await self.repo.find_by_id(meeting_id, workspace_id)
         if meeting is None:
             raise MeetingNotFoundError()
+        await self._verify_meeting_visibility(
+            meeting_id, workspace_id, requester_user_id, requester_role
+        )
 
         segments = await self.repo.get_segments(meeting_id, workspace_id)
         summary = await self.repo.get_summary(meeting_id, workspace_id)
@@ -187,7 +254,12 @@ class MeetingService:
             content = self._to_markdown(meeting, summary, segments, actions)
             return content, f"{meeting.title}.md", "text/markdown; charset=utf-8"
         else:
-            detail = await self.get_meeting_detail(meeting_id, workspace_id)
+            detail = await self.get_meeting_detail(
+                meeting_id,
+                workspace_id,
+                requester_user_id=requester_user_id,
+                requester_role=requester_role,
+            )
             detail["actionItems"] = [
                 {
                     "title": a.title,
