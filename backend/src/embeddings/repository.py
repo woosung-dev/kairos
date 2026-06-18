@@ -158,10 +158,14 @@ class EmbeddingRepository:
         - admin/owner role : 모든 visibility 통과
         - public project : 통과
         - draft project : created_by_id == requester 일 때만 통과
-        - private project : ProjectMember 매핑 있을 때만 통과
+        - private project : ProjectMember 매핑 있고 + 현 워크스페이스 멤버일 때만 통과
 
         ISSUE-040 fix — 이전엔 workspace_id + (optional)project_id 만 필터 →
         member 가 global RAG 쿼리 시 private project 의 chunks 가 응답에 포함.
+
+        CAND-B fix — private 분기에 workspace_members EXISTS 가드 추가. 워크스페이스에서
+        제거된 멤버의 orphan ProjectMember 행이 잔재로 남아도 private chunk 접근을
+        되찾지 못하도록 차단 (offboard→re-invite privilege residue).
         """
         return """
             AND (
@@ -176,6 +180,11 @@ class EmbeddingRepository:
                         OR (p.visibility = 'private' AND EXISTS (
                             SELECT 1 FROM project_members pm
                             WHERE pm.project_id = p.id AND pm.user_id = :req_uid
+                              AND EXISTS (
+                                SELECT 1 FROM workspace_members wm
+                                WHERE wm.workspace_id = p.workspace_id
+                                  AND wm.user_id = :req_uid
+                              )
                         ))
                       )
                 )
@@ -434,7 +443,10 @@ class EmbeddingRepository:
         - chunk.project_id IS NULL → 통과
         - project.visibility = 'public' → 통과
         - project.visibility = 'draft' AND created_by_id = requester → 통과
-        - project.visibility = 'private' AND ProjectMember 매핑 → 통과
+        - project.visibility = 'private' AND ProjectMember 매핑 + 현 워크스페이스 멤버 → 통과
+
+        CAND-B fix — private 분기에 workspace_members EXISTS 가드를 추가해
+        _visibility_filter_sql 와 동일하게 유지 (orphan ProjectMember 잔재 차단).
         """
         if not chunk_ids:
             return True
@@ -454,6 +466,11 @@ class EmbeddingRepository:
                     OR (p.visibility = 'private' AND EXISTS (
                       SELECT 1 FROM project_members pm
                       WHERE pm.project_id = p.id AND pm.user_id = :req_uid
+                        AND EXISTS (
+                          SELECT 1 FROM workspace_members wm
+                          WHERE wm.workspace_id = p.workspace_id
+                            AND wm.user_id = :req_uid
+                        )
                     ))
                   )
               )

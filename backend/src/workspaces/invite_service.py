@@ -272,6 +272,10 @@ class InviteService:
             raise CannotModifyOwnerError()
 
         await self.repo.remove_member(member_id, workspace_id)
+        # CAND-B fix: 워크스페이스 제거 시 해당 유저의 private project 매핑(ProjectMember)도
+        # revoke. 잔재 행이 남으면 re-invite 된 plain member 가 private project 접근/RAG 를
+        # 되찾는 privilege residue 가 발생한다 (PROBE-SENTINEL-03).
+        await self.repo.delete_project_members_for_user(workspace_id, member.user_id)
         await self.repo.commit()
 
         # BUG-RBAC-CACHE-STALE fix: 멤버 제거 즉시 반영 — RBAC in-process 캐시 무효화.

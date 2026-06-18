@@ -138,6 +138,26 @@ class WorkspaceRepository:
             )
         )
 
+    async def delete_project_members_for_user(
+        self, workspace_id: uuid.UUID, user_id: uuid.UUID
+    ) -> None:
+        """CAND-B fix — 워크스페이스 제거 시 해당 유저의 ProjectMember 잔재 정리.
+
+        project_members 테이블은 projects 도메인 소유이므로 모델 import 없이
+        workspace_id + user_id 로 스코프된 raw DELETE 로 잔재를 제거한다.
+        gate(visibility filter)에 workspace_members EXISTS 가드가 있어 보안은
+        이미 닫혀 있지만, 잔재 행 자체를 남기지 않아 불변식(제거 시 ProjectMember 도
+        revoke)을 충족한다.
+        """
+        await self.session.exec(
+            text(
+                """
+                DELETE FROM project_members
+                WHERE workspace_id = :workspace_id AND user_id = :user_id
+                """
+            ).bindparams(workspace_id=workspace_id, user_id=user_id)
+        )
+
     # --- 초대 링크 (Sprint 19 PR #1 C12: workspace_id 강제) ---
 
     async def save_invite(self, invite: WorkspaceInvite) -> WorkspaceInvite:

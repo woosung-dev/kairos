@@ -90,12 +90,23 @@ class ProjectRepository:
         if requester_user_id is None:
             return stmt.where(Project.visibility == "public")
         # member/viewer: public + draft(creator) + private(ProjectMember)
+        # CAND-B fix — ProjectMember 매핑 + 현 워크스페이스 멤버 동시 충족 시에만 private 노출.
+        # orphan ProjectMember 잔재(워크스페이스 제거 후 미정리)가 list 에서 private 을
+        # 되살리지 못하도록 차단.
+        from src.workspaces.models import WorkspaceMember
+
         member_exists = (
             exists()
             .where(
                 and_(
                     ProjectMember.project_id == Project.id,
                     ProjectMember.user_id == requester_user_id,
+                    exists().where(
+                        and_(
+                            WorkspaceMember.workspace_id == Project.workspace_id,
+                            WorkspaceMember.user_id == requester_user_id,
+                        )
+                    ),
                 )
             )
         )
@@ -135,11 +146,28 @@ class ProjectRepository:
         user_id: uuid.UUID,
         workspace_id: uuid.UUID,
     ) -> bool:
-        """헌법 I-9 (Codex F-1): is_member 도 workspace_id 필터."""
+        """헌법 I-9 (Codex F-1): is_member 도 workspace_id 필터.
+
+        CAND-B fix — ProjectMember 행이 있어도 현 워크스페이스 멤버가 아니면 False.
+        워크스페이스에서 제거된 멤버의 orphan ProjectMember 잔재가 private project
+        접근을 되찾지 못하도록 차단 (offboard→re-invite privilege residue).
+        """
+        from src.workspaces.models import WorkspaceMember
+
+        ws_member = (
+            exists()
+            .where(
+                and_(
+                    WorkspaceMember.workspace_id == workspace_id,
+                    WorkspaceMember.user_id == user_id,
+                )
+            )
+        )
         stmt = select(ProjectMember.id).where(
             ProjectMember.project_id == project_id,
             ProjectMember.user_id == user_id,
             ProjectMember.workspace_id == workspace_id,
+            ws_member,
         )
         return (await self.session.exec(stmt)).one_or_none() is not None
 
