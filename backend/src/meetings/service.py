@@ -98,6 +98,26 @@ class MeetingService:
         metadata/존재성이 비-ProjectMember 에게 노출되지 않도록 제외.
         requester_role 미전달(None) = 내부/파이프라인 호출 → 게이트 skip (하위호환).
         """
+        # CAND-A completeness round 2 (codex): projectId 필터 시 그 프로젝트 자체가
+        # 접근 가능해야 한다. 비접근 private-B 로 필터하면 cross-link 회의(public-A +
+        # private-B)가 노출돼 B 링크 존재성이 누출된다. 접근 불가 projectId → 빈 결과.
+        if (
+            project_id is not None
+            and requester_role is not None
+            and requester_role not in ("admin", "owner")
+            and self.project_repo is not None
+        ):
+            target = await self.project_repo.find_by_id(project_id, workspace_id)
+            if target is None or not await self._is_project_accessible(
+                target, requester_user_id, requester_role, workspace_id
+            ):
+                return {
+                    "items": [],
+                    "total": 0,
+                    "page": page,
+                    "pageSize": page_size,
+                    "hasNext": False,
+                }
         offset = (page - 1) * page_size
         meetings = await self.repo.find_by_workspace(
             workspace_id,
@@ -121,6 +141,34 @@ class MeetingService:
             "pageSize": page_size,
             "hasNext": page * page_size < total,
         }
+
+    async def _is_project_accessible(
+        self,
+        project,
+        requester_user_id: uuid.UUID | None,
+        requester_role: str | None,
+        workspace_id: uuid.UUID,
+    ) -> bool:
+        """단일 project 가 requester 에게 접근 가능한지 (get_project visibility 규칙).
+
+        CAND-A completeness round 2 (codex): 다중 링크 회의에서 접근 가능한 링크가
+        하나 있어도 *접근 불가* private/draft 링크의 존재/메타는 가려야 한다.
+        """
+        if requester_role is None or requester_role in ("admin", "owner"):
+            return True
+        if project.visibility == "public":
+            return True
+        if project.visibility == "draft":
+            return project.created_by_id == requester_user_id
+        if project.visibility == "private":
+            return (
+                requester_user_id is not None
+                and self.project_repo is not None
+                and await self.project_repo.is_member(
+                    project.id, requester_user_id, workspace_id
+                )
+            )
+        return False
 
     async def _verify_meeting_visibility(
         self,
@@ -215,6 +263,16 @@ class MeetingService:
         # Sprint 19 PR #1 C9 (Codex F-1): workspace_id 명시 전달
         if self.project_repo is not None:
             linked = await self.project_repo.find_projects_by_meeting(meeting_id, workspace_id)
+            # CAND-A completeness round 2 (codex): 접근 가능한 linked project 만 노출.
+            # 한 링크로 회의 접근이 허용돼도 접근 불가 private/draft 링크의 id/title/
+            # visibility 메타가 detail JSON 으로 새면 안 된다.
+            visible_linked = [
+                p
+                for p in linked
+                if await self._is_project_accessible(
+                    p, requester_user_id, requester_role, workspace_id
+                )
+            ]
             result["projects"] = [
                 {
                     "id": str(p.id),
@@ -222,7 +280,7 @@ class MeetingService:
                     "status": p.status,
                     "visibility": p.visibility,
                 }
-                for p in linked
+                for p in visible_linked
             ]
         else:
             result["projects"] = []

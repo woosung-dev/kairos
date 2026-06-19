@@ -1035,3 +1035,83 @@ class TestCandECacheBypass:
         repo.vector_search.assert_not_awaited()
         done = next(e for e in events if e["event"] == "done")
         assert json.loads(done["data"])["cached"] is True
+
+
+# --- MEETINGS multi-link (M2M) visibility — CAND-A completeness round 2 (codex) ---
+
+
+class TestMeetingMultiLinkVisibilityIDOR:
+    """회의가 public + private 프로젝트에 동시 링크된 경우: public 링크로 접근은
+    허용하되, 비-멤버에게 private 링크의 존재/메타(list projectId 필터·detail projects)는
+    노출하지 않아야 한다 (codex 재검증 finding)."""
+
+    SECRET = "NONCE-MMULTI-9c2f"
+
+    async def _seed(self, session: AsyncSession):
+        owner = await _create_user(session, "mm-owner")
+        outsider = await _create_user(session, "mm-outsider")
+        ws = await _create_team_ws(session, owner)
+        await _add_ws_member(session, ws, outsider, "member")
+        pub = await _create_project(session, ws, owner, "public")
+        priv = await _create_project(session, ws, owner, "private")
+        # public 에 링크된 회의 생성 후 private 에도 추가 링크 (cross-link).
+        meeting = await _create_meeting_in_project(session, ws, pub, owner, self.SECRET)
+        from src.projects.models import MeetingProjectLink
+
+        session.add(
+            MeetingProjectLink(meeting_id=meeting.id, project_id=priv.id, workspace_id=ws)
+        )
+        await session.flush()
+        return owner, outsider, ws, pub, priv, meeting
+
+    @pytest.mark.asyncio
+    async def test_list_filtered_by_inaccessible_private_returns_empty(
+        self, integration_session: AsyncSession
+    ):
+        owner, outsider, ws, pub, priv, meeting = await self._seed(integration_session)
+        service = _meeting_service(integration_session)
+        # 비-멤버가 private projectId 로 필터 → cross-link 회의 노출 금지 (빈 결과).
+        result = await service.list_meetings(
+            ws, project_id=priv.id, requester_user_id=outsider, requester_role="member"
+        )
+        assert result["items"] == []
+        assert result["total"] == 0
+
+    @pytest.mark.asyncio
+    async def test_list_filtered_by_public_includes_meeting(
+        self, integration_session: AsyncSession
+    ):
+        owner, outsider, ws, pub, priv, meeting = await self._seed(integration_session)
+        service = _meeting_service(integration_session)
+        # public 링크로 필터하면 정상 노출 (over-block 회귀 방지).
+        result = await service.list_meetings(
+            ws, project_id=pub.id, requester_user_id=outsider, requester_role="member"
+        )
+        ids = {i["id"] for i in result["items"]}
+        assert str(meeting.id) in ids
+
+    @pytest.mark.asyncio
+    async def test_detail_hides_inaccessible_linked_project(
+        self, integration_session: AsyncSession
+    ):
+        owner, outsider, ws, pub, priv, meeting = await self._seed(integration_session)
+        service = _meeting_service(integration_session)
+        # public 링크로 detail 접근은 허용되지만 private 링크 메타는 가려져야 함.
+        result = await service.get_meeting_detail(
+            meeting.id, ws, requester_user_id=outsider, requester_role="member"
+        )
+        proj_ids = {p["id"] for p in result["projects"]}
+        assert str(pub.id) in proj_ids
+        assert str(priv.id) not in proj_ids
+
+    @pytest.mark.asyncio
+    async def test_owner_detail_sees_all_links(
+        self, integration_session: AsyncSession
+    ):
+        owner, outsider, ws, pub, priv, meeting = await self._seed(integration_session)
+        service = _meeting_service(integration_session)
+        result = await service.get_meeting_detail(
+            meeting.id, ws, requester_user_id=owner, requester_role="owner"
+        )
+        proj_ids = {p["id"] for p in result["projects"]}
+        assert str(pub.id) in proj_ids and str(priv.id) in proj_ids
