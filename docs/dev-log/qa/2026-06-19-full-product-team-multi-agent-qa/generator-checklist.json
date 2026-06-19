@@ -1,0 +1,822 @@
+[
+ {
+  "id": "SENTINEL-01",
+  "area": "GET /api/v1/workspaces/{ws}/notes/{id} and /notes/{id}/export (FE /notes/[id])",
+  "hypothesis": "Note read/export enforces only workspace_id + require_viewer with NO project-visibility check. A note attached to a private/draft project is fully readable/exportable by any workspace viewer/member who is NOT a ProjectMember — unlike Project detail which DOES enforce visibility (projects/service.py get_project). This is a visibility-residue IDOR variation not covered by T1-T18 (which test project/RAG visibility, not the note/meeting read surface).",
+  "repro_steps": "1) owner d@e.com: create a project, set visibility=private (do NOT add a@e.com as ProjectMember). 2) owner creates a Note inside that private project with sensitive text. 3) Confirm member a@e.com (role member) canNOT see the project on /projects (visibility filter hides it). 4) As a@e.com, capture/guess the note id (e.g. from owner's earlier shared link, or list /notes which has no visibility filter) and navigate to /notes/<id>, then call GET .../notes/<id>/export?format=md. Observe whether full private note content is returned (200 with body) instead of 404.",
+  "expected": "Member who is not a ProjectMember of the private/draft project should get 404 on both note GET and export, mirroring project-level visibility enforcement.",
+  "suspected_defect": "200 + full private note body/markdown leaks to non-member; cross-member confidential content disclosure.",
+  "priority": "P0",
+  "grounding": "backend/src/notes/service.py:137-144 (get_note: only workspace_id), :184-207 (export_note: no visibility), notes/router.py:44-70 (require_viewer only); contrast projects/service.py:136-159 which enforces draft/private. notes/repository.py find_by_id filters only workspace_id."
+ },
+ {
+  "id": "SENTINEL-02",
+  "area": "GET /api/v1/workspaces/{ws}/meetings/{id} and /meetings/{id}/export (FE /meetings/[id])",
+  "hypothesis": "Same visibility-residue as SENTINEL-01 but for meetings: get_meeting_detail / export_meeting only check workspace_id + require_viewer. A meeting linked only to a private project (or whose transcript is sensitive) is readable/exportable by any viewer regardless of ProjectMember mapping. Meeting transcript leak is higher-impact (verbatim speech).",
+  "repro_steps": "1) owner d@e.com: create private project, link a completed meeting (with transcript+summary) to it via meeting->projects. 2) member a@e.com is NOT a ProjectMember. 3) As a@e.com GET .../meetings/<id> and .../meetings/<id>/export?format=md. Observe full transcript/summary returned.",
+  "expected": "Non-ProjectMember should receive 404 for meeting detail/export when the meeting is only reachable through a private project they cannot access.",
+  "suspected_defect": "Full transcript + summary + action items disclosed to a workspace member who has no project access.",
+  "priority": "P0",
+  "grounding": "backend/src/meetings/router.py:85-111 (get_meeting + export, require_viewer only); meetings/service.py:117-205 get_meeting_detail/_to_markdown have no visibility branch. No project-visibility join anywhere in meeting read path."
+ },
+ {
+  "id": "SENTINEL-03",
+  "area": "DELETE /members/{id} then re-invite — orphan ProjectMember residue (private-project RAG visibility)",
+  "hypothesis": "Removing a WorkspaceMember (invite_service.remove_member -> repository.remove_member) deletes ONLY the workspace_members row; it does NOT delete the user's ProjectMember rows (no DB cascade, no app cleanup). The RAG/visibility private-project check (_visibility_filter_sql) only verifies project_members.user_id, with no WorkspaceMember join. So if the removed user is later re-invited as a plain member, the stale ProjectMember row silently re-grants access to a private project they were never re-added to.",
+  "repro_steps": "1) owner d@e.com adds a@e.com as ProjectMember of a PRIVATE project P. 2) owner removes a@e.com from the workspace (Members tab -> remove). 3) owner re-invites a@e.com via a fresh invite link (role=member) and a@e.com accepts. 4) As a@e.com, open /projects (does P appear?) and run RAG ask on the workspace; check whether chunks from private project P surface, and whether GET /projects/P returns 200. Owner never re-added a@e.com to P.",
+  "expected": "After workspace removal, the user's ProjectMember rows should be revoked. On re-invite as member, they must NOT regain private-project P access until explicitly re-added as ProjectMember.",
+  "suspected_defect": "Stale ProjectMember row resurrects private-project visibility (project visible, RAG returns private chunks) without re-authorization.",
+  "priority": "P0",
+  "grounding": "backend/src/workspaces/repository.py:130-139 remove_member deletes only WorkspaceMember; invite_service.py:261-280 remove_member has no ProjectMember cleanup; projects/models.py:54-78 ProjectMember has FK to projects/workspaces but no ON DELETE from workspace_members; embeddings/repository.py:166-183 _visibility_filter_sql private branch only checks project_members.user_id."
+ },
+ {
+  "id": "SENTINEL-04",
+  "area": "Semantic cache visibility residue after project visibility flip (public -> private)",
+  "hypothesis": "SemanticCache stores a max_visibility snapshot at write time; find_similar_cache uses max_visibility=='public' as a fast-path that SKIPS the per-chunk _all_chunks_visible re-check for non-admins. If a project's visibility is changed public->private AFTER a cache entry was created (TTL 7d), the cached row keeps max_visibility='public' and a non-member member will still be served the cached answer containing now-private content.",
+  "repro_steps": "1) owner d@e.com: create project P visibility=public with a note containing a distinctive secret phrase; wait for embedding. 2) member a@e.com (not ProjectMember): RAG ask a question that hits P's content so a cache entry is written (done event cached:false, then re-ask to confirm cached:true). 3) owner PATCHes P visibility to private (does NOT delete caches). 4) a@e.com re-asks the SAME question within 7d. Observe whether the cached answer + sources containing the secret phrase are still returned (search_results event chunks).",
+  "expected": "Visibility change to private should invalidate or bypass the stale public-marked cache; non-member must not receive the now-private cached content.",
+  "suspected_defect": "cache fast-path serves stale public-marked answer/sources after the underlying project became private — visibility downgrade not propagated to SemanticCache.max_visibility.",
+  "priority": "P1",
+  "grounding": "backend/src/embeddings/repository.py:376-385 (is_admin/max_vis fast-path skips _all_chunks_visible when max_vis=='public'); compute_max_visibility:393-423 snapshots at store; projects update_project (service.py:239-268) changes visibility with NO delete_caches call; rag/service.py:202-223 stores max_vis once."
+ },
+ {
+  "id": "SENTINEL-05",
+  "area": "RAG citation [N] -> SourceViewer mapping (FE /search)",
+  "hypothesis": "Citation badges are rendered for ANY [N] the model emits (markdown-message.tsx regex /\\[(\\d+)\\]/g), but handleCitationClick does sources?.[num-1] (positional). When Gemini hallucinates an out-of-range citation (e.g. [7] with only 3 sources) the badge is clickable but does nothing (silent dead click, no toast/error). When the model's [N] numbering does not match RRF source order, clicking [2] opens the WRONG source document. Both degrade trust in AI grounding.",
+  "repro_steps": "1) Seed workspace with 2-3 distinct notes/meetings so RAG returns 3 sources. 2) On /search ask a broad question; in the streamed answer find an inline [N]. 3) Click each [N] badge: verify each opens the SourceViewer panel for the correctly-numbered source (compare badge number vs the source list order in RagSources). 4) Specifically hunt for a [N] where N exceeds the source count (hallucinated citation): click it and observe no viewer opens and no user feedback. 5) Cross-check that the highlighted text in SourceViewer actually contains the claim.",
+  "expected": "Every clickable [N] maps to a real source; out-of-range citations are either suppressed or give clear feedback; clicked source matches the cited number.",
+  "suspected_defect": "Dead/no-op citation clicks for hallucinated [N]; mismatched source opens; user cannot verify grounding.",
+  "priority": "P1",
+  "grounding": "frontend/src/features/rag/components/markdown-message.tsx:22-40 (renders badge for any digit); rag-chat.tsx:55-69 handleCitationClick uses sources?.[num-1] with no bounds feedback; toHighlightChunk:25-32 always highlights full snippet (offset 0..len)."
+ },
+ {
+  "id": "SENTINEL-06",
+  "area": "Audio meeting pipeline content quality (STT -> diarization -> Gemini summary -> action extraction)",
+  "hypothesis": "The high-priority gap: distill content quality has never been live-validated. Status enum is uploading|transcribing|analyzing|completed|failed. Risks: diarization speaker labels wrong/merged, summary hallucination (claims not in transcript), action items mis-extracted or duplicated, or status stuck (polling never reaches completed). Also failed status surfaces error_message in detail (S28b) — verify it is human-readable, not a stack trace.",
+  "repro_steps": "1) owner d@e.com: on /new upload a real short multi-speaker audio clip (2-3 speakers, known content). 2) Poll GET .../meetings/<id>/status until completed (or observe stuck/failed). 3) On /meetings/<id> inspect: (a) transcript speaker labels vs reality, (b) summary text — fact-check each key decision/topic against transcript for hallucination, (c) action items — count, assignee correctness, duplicates. 4) Separately upload a corrupt/empty audio and verify status->failed with a clear Korean error_message (not a raw exception/traceback).",
+  "expected": "Completed within reasonable time; transcript+diarization roughly faithful; summary grounded (no invented decisions); actions deduplicated; failure path shows friendly error_message.",
+  "suspected_defect": "Summary hallucination, wrong/merged speakers, missing or duplicated actions, status stuck on analyzing, or raw exception leaked in error_message.",
+  "priority": "P1",
+  "grounding": "backend/src/meetings/models.py:24 status enum; meetings/service.py:117-205 get_meeting_detail surfaces transcript/summary/actions; :120-122 S28b error_message exposure; common/prompts.py centralizes the summary/action prompts (I-3 gemini-3.1-flash-lite fixed)."
+ },
+ {
+  "id": "SENTINEL-07",
+  "area": "Inbox classification accuracy + ws-scoped threshold boundary (POST /inbox/{id}/classify, settings inbox_threshold)",
+  "hypothesis": "Inbox auto-classification confidence vs workspace inbox_threshold (default 0.9, owner-tunable 0.5-1.0) has not been live-validated for accuracy. Edge: items with ai_confidence just below threshold should require manual classify; just above should auto-suggest. Lowering threshold to 0.5 may flood inbox with low-quality auto-suggestions; raising to 1.0 may make nothing auto-classify. Also verify classify rejects cross-workspace project_ids (404) and that a member (not just owner) can classify.",
+  "repro_steps": "1) owner d@e.com: /settings set inbox_threshold to 0.5, generate inbox items (via note/meeting distill), inspect /inbox aiConfidence + aiSuggestedProject quality. 2) Raise threshold to 1.0, generate more items, observe suggestion behavior changes. 3) As member a@e.com classify an inbox item into a valid project (should 200) and into a project_id from a DIFFERENT workspace (should 404 ProjectNotFoundError). 4) Judge suggestion accuracy: do suggested projects/tags make semantic sense vs the source content?",
+  "expected": "Threshold meaningfully gates suggestions; cross-ws project_id in classify -> 404; suggestions are semantically reasonable; member role can classify.",
+  "suspected_defect": "Threshold has no observable effect, low-quality/irrelevant suggestions, cross-ws classify leaks/links, or confusing empty-state copy.",
+  "priority": "P1",
+  "grounding": "backend/src/inbox/service.py:81-139 classify verifies each project via find_by_id(workspace_id) -> ProjectNotFoundError on cross-tenant; workspaces/schemas.py:75 threshold bounds; workspaces/router.py:46-53 require_owner for settings; inbox/router.py:36-45 classify require_member."
+ },
+ {
+  "id": "SENTINEL-08",
+  "area": "Viewer write-block LIVE across create/edit/promote/classify (4role x action matrix uncovered cells)",
+  "hypothesis": "viewer role must be blocked from all write actions (create/edit project/note/meeting, promote, classify, add ProjectMember, visibility PATCH). T1-T18 covered invite/remove/role-change/audit boundaries but NOT the full create/edit/promote/classify x viewer cells live. Risk: a 403 is returned by BE but FE still shows enabled buttons (then errors), or some endpoint mistakenly uses require_viewer where require_member is intended.",
+  "repro_steps": "1) owner d@e.com demotes a@e.com to viewer (verify cache invalidation immediate). 2) As a@e.com attempt each: POST /projects (create), PATCH /projects/{id}, POST /notes, PATCH /notes/{id}, POST /inbox/{id}/classify, POST /notes/{id}/promote, POST /meetings/{id}/promote, POST /projects/{id}/members, PATCH /projects/{id} with visibility. 3) For each: record BE status (expect 403) AND whether FE exposed an actionable button (UI should hide/disable). 4) Confirm /new page does not let a viewer submit.",
+  "expected": "All write/promote/classify actions return 403 for viewer; FE hides or disables the controls (no dead enabled buttons); promote_helpers also rejects viewer target role.",
+  "suspected_defect": "Any write endpoint accepting viewer (privilege gap), or FE showing enabled write controls to viewers producing confusing errors / console.error.",
+  "priority": "P1",
+  "grounding": "backend/src/auth/rbac.py:99-105 RoleChecker level gate; projects/router.py:80-116 require_member for create/update + :106 visibility admin-only; inbox/router.py:41 classify require_member; notes/router.py:78,154 require_member; common/promote_helpers.py:88-95 viewer target rejected."
+ },
+ {
+  "id": "SENTINEL-09",
+  "area": "Invite max_uses exhaustion + expiry boundary (POST /invites, POST accept /invite/{code})",
+  "hypothesis": "accept_invite deactivates the invite when use_count+1 >= max_uses, but the use_count increment and the _validate_invite check (use_count >= max_uses) are non-atomic across concurrent accepts. Two simultaneous accepts of a max_uses=1 invite could both pass _validate_invite (both see use_count=0) before either increments — potentially admitting 2 members on a single-use invite. Also verify expired invite (expires_at past) gives a clean isValid=false on /invite/{code} and 403/400 on accept, not a 500.",
+  "repro_steps": "1) owner d@e.com creates an invite with maxUses=1, expiresInDays=1. 2) Have TWO browser contexts (a@e.com + a fresh third account if available, else simulate via rapid double-submit) accept the SAME code near-simultaneously; check whether both become members (use_count over-run) or the second correctly gets 'used up'/already-member. 3) Create an invite, manually let it expire (or set short expiry) and verify /invite/{code} info shows isValid=false with Korean reason and accept returns InviteExpiredError (not 500). 4) Accept twice with the same account -> MemberAlreadyExistsError (409), not 500.",
+  "expected": "Single-use invite admits at most one new member even under concurrency; expired/exhausted invites give clean validation errors; double-accept by same user is a clean 409.",
+  "suspected_defect": "max_uses over-run under concurrency (2 members on max_uses=1), or 500/IntegrityError on race instead of graceful 409.",
+  "priority": "P2",
+  "grounding": "backend/src/workspaces/invite_service.py:159-210 accept_invite (_validate_invite check at :167 then increment at :198, deactivate at :201-202 — TOCTOU window); :284-293 _validate_invite checks use_count>=max_uses; add_member ON CONFLICT backstops duplicate same-user but not distinct concurrent users on max_uses=1."
+ },
+ {
+  "id": "SENTINEL-10",
+  "area": "Cross-workspace ProjectMember add (I-17) and personal-ws isolation (I-19) edge variants",
+  "hypothesis": "add ProjectMember (require_admin) must reject adding a user who is NOT a WorkspaceMember of that ws (CrossWorkspaceMemberError 403) and reject add to personal ws (PersonalWorkspaceProtected). Edge variant: admin of team ws A tries to add a userId who is a member of ws B but not ws A -> must 403, not silently succeed. Also: can an admin add a ProjectMember to a DRAFT project (visibility=draft, creator-only) — does that leak draft access to a non-creator via ProjectMember, contradicting the draft 'creator-only, admin/owner do NOT bypass' invariant?",
+  "repro_steps": "1) owner d@e.com (ws A admin). Get a userId that exists in ws B but is not in ws A. POST /workspaces/A/projects/{P}/members with that userId -> expect 403 CrossWorkspaceMemberError. 2) In a personal workspace, attempt POST .../projects/{P}/members -> expect PersonalWorkspaceProtected. 3) Create a DRAFT project owned by a@e.com (member). As owner d@e.com (admin) add a THIRD user as ProjectMember of that draft project; then as that third user check GET /projects/{P} — does ProjectMember grant access to a draft project that should be creator-only? 4) Confirm I-17: add member with project_id from a different ws -> 404.",
+  "expected": "Cross-ws user add -> 403; personal ws -> protected; ProjectMember should be meaningful only for private projects (draft is creator-only) — adding a member to a draft must not silently grant draft read access bypassing the creator-only rule.",
+  "suspected_defect": "Cross-ws member admitted, or ProjectMember on a draft project grants non-creator read access (visibility invariant inconsistency between draft and private).",
+  "priority": "P2",
+  "grounding": "backend/src/projects/service.py:182-224 add_member (CrossWorkspaceMemberError at :206, personal block :202); router.py:133-147 require_admin; _visibility_filter_sql:166-183 private uses ProjectMember but draft uses created_by_id only — adding ProjectMember to a draft project has no effect on draft access path, worth confirming UI doesn't imply otherwise."
+ },
+ {
+  "id": "SENTINEL-11",
+  "area": "Onboarding 0->4 live signup + step gating (GET /users/me/onboarding, OnboardingBanner)",
+  "hypothesis": "Onboarding step advances are wired across separate hooks (lazy-seed step1 in get_current_user, project create step2, meeting distill step3, first RAG step4) but with a 60s User cache and graceful try/except that swallows failures. Risks: step does not advance because the increment is swallowed (warning-only) or stale due to invalidate_user_cache not being called; OnboardingBanner shows wrong step or never disappears at step4; a fresh signup hits a blank/broken dashboard before step1 seed completes.",
+  "repro_steps": "1) Sign up a BRAND NEW account (fresh email) live via /sign-up. 2) Immediately observe /dashboard: does it render (workspace seeded) or error/empty? Check OnboardingBanner shows step ~1. 3) Create first project -> banner advances to step2 (may lag up to 60s due to User cache — note the delay). 4) Distill a meeting/note -> step3. 5) Do first RAG ask on /search -> step4, banner should disappear. 6) At each step capture console for errors and confirm GET /users/me/onboarding step matches UI.",
+  "expected": "New signup lands on a working dashboard; banner steps advance 1->4 and disappear at 4; no console.error; cache lag (<=60s) is acceptable but UI should not show contradictory state.",
+  "suspected_defect": "Step stuck (swallowed increment), banner never clears at step4, stale step from User cache, or blank/erroring dashboard on first load.",
+  "priority": "P2",
+  "grounding": "backend/src/auth/dependencies.py:308-321 step1 increment in try/except (swallowed), :231-251 60s User cache + invalidate_user_cache; projects/service.py:81-90 step2 graceful; rag/service.py:28-43 step4 graceful commit; onboarding GET endpoint reads onboarding_step."
+ },
+ {
+  "id": "SENTINEL-12",
+  "area": "Export UTF-8 filename + content integrity (GET /notes/{id}/export, /meetings/{id}/export)",
+  "hypothesis": "Export sets Content-Disposition: attachment; filename*=UTF-8''<quoted title>. Edge: a note/meeting title containing Korean, emoji, slashes, quotes, or newlines may produce a broken/garbled downloaded filename or a header-injection-shaped value. Also MD export embeds title and plain_text without escaping — a title with markdown/control chars could corrupt the .md; JSON export uses ensure_ascii=false so must remain valid UTF-8.",
+  "repro_steps": "1) owner d@e.com: create a note titled with mixed content e.g. 'Q3 회의/계획 \"중요\" 😀\\n2nd line'. 2) GET .../notes/<id>/export?format=md and ?format=json (download via browser). 3) Inspect the saved filename (is it readable, no broken percent-encoding, no truncation at the slash) and open both files: MD heading correct, JSON parses as valid UTF-8 with the title intact. 4) Repeat for a meeting export with a Korean+emoji title.",
+  "expected": "Filename is correctly UTF-8 percent-encoded and renders readably across browsers; downloaded MD/JSON content is intact and valid; no header anomalies from special chars.",
+  "suspected_defect": "Garbled/truncated download filename, invalid JSON, or corrupted markdown when title has CJK/emoji/special characters.",
+  "priority": "P3",
+  "grounding": "backend/src/notes/router.py:65-70 quote(filename) + filename*=UTF-8''; notes/service.py:194-207 builds f'{title}.md'/.json with no sanitization; meetings/router.py:106-111 same pattern."
+ },
+ {
+  "id": "CURIOUS-01",
+  "area": "RAG /search — SemanticCache source_type filter bypass",
+  "hypothesis": "find_similar_cache ignores source_type entirely; cache store is gated only by is_time_filtered. A cached answer/sources from a no-filter (or meeting-filtered) query gets returned to a query that explicitly filters sourceType=note (and vice versa), so the source-type filter is silently ignored on a cache hit. This is the exact analog of the time_range cache-skip fix (service.py:71) that was NOT applied to source_type.",
+  "repro_steps": "As owner d@e.com: in the team workspace ensure both a meeting and a note exist and are embedded. Go to /search. Set 유형 = 모든 유형 and ask a distinctive question that both the note and meeting would answer (e.g. 'Sprint 15 wedge 결정'). Note the sources list (mix of note+meeting). Within 7 days (cache TTL) ask the SAME (or near-identical, >0.93 similar) question again but set 유형 = 노트. Observe the returned sources/answer.",
+  "expected": "With 유형=노트, only note-sourced chunks should appear; meeting sources must be excluded. The answer should be regenerated against note-only context.",
+  "suspected_defect": "Cache hit returns the previously cached answer + meeting+note sources despite 노트 filter; meeting content leaks into a note-scoped query and the source-type filter has no effect. done event shows cached:true.",
+  "priority": "P1",
+  "grounding": "backend/src/rag/service.py:71-80 (is_time_filtered gate, source_type NOT considered for cache) + :202-223 (save_cache gated only by is_time_filtered); backend/src/embeddings/repository.py:331-339 (find_similar_cache signature has no source_type param)"
+ },
+ {
+  "id": "CURIOUS-02",
+  "area": "RAG citation [N] -> SourceViewer index mapping",
+  "hypothesis": "Citation clicks map by raw array index sources[num-1]. The Gemini prompt numbers up to 10 sources ([소스 1..N]) but the model can emit a citation number larger than the source count (hallucinated [11]/[15]) or cite a number that the truncated 200-char snippet doesn't actually support. Clicking such a citation does sources[num-1] = undefined -> silent no-op (viewer never opens), giving the user a dead/un-actionable citation.",
+  "repro_steps": "As owner d@e.com in a team workspace with several embedded sources, go to /search and ask a broad question that yields many sources and a long answer with multiple [N] citations. Click each [N] in the rendered answer. Specifically look for any [N] where N exceeds the count shown in the sources list, or where the opened SourceViewer content does not contain the cited claim. Also check console for errors.",
+  "expected": "Every rendered [N] citation should open the SourceViewer to a source that actually grounds the adjacent claim; no citation should be a no-op, and N should never exceed the number of returned sources.",
+  "suspected_defect": "A citation [N] with N > sources.length does nothing on click (handleCitationClick reads undefined and returns silently); or the opened source's 200-char snippet doesn't support the cited sentence (grounding/citation-mapping mismatch).",
+  "priority": "P1",
+  "grounding": "frontend/src/features/rag/components/rag-chat.tsx:55-69 (handleCitationClick uses sources?.[num-1], no bounds guard); backend/src/rag/service.py:303 (text truncated chunk_text[:200]) + :313-331 (_format_sources_for_prompt numbers [소스 i] from enriched order)"
+ },
+ {
+  "id": "CURIOUS-03",
+  "area": "Inbox classify/confirm — '되돌리기' false-revert + persistence",
+  "hypothesis": "handleConfirm persists the classify (classifyMutation sets is_processed=true on BE + invalidates cache), but the confirmed-state '되돌리기' button only does setStatus('idle') locally and never calls any un-classify/un-process API. So 되돌리기 is a false affordance: the item stays processed in the DB. After reload the item is gone from the unprocessed list regardless of revert.",
+  "repro_steps": "As owner d@e.com, ensure an inbox item with an AI-suggested project exists (create a meeting/note that distills into an inbox suggestion, or use seeded data). On /inbox click 확정 on an item -> it collapses to the confirmed row with '되돌리기'. Click '되돌리기' -> card returns to action buttons. Now hard-reload /inbox. Observe whether the item reappears in 확인 필요.",
+  "expected": "If 되돌리기 is offered, it should actually undo the classification (item returns to unprocessed and reappears after reload); otherwise the button should not be shown after a persisted confirm.",
+  "suspected_defect": "Item does NOT reappear after reload (already is_processed=true in BE), so '되돌리기' silently lied — user believes they undid the action but the project link/processed flag persists. Same issue for the confirmed->되돌리기 path after handleClassifyToSelected.",
+  "priority": "P2",
+  "grounding": "frontend/src/features/inbox/components/inbox-item-card.tsx:60-71 (handleConfirm calls classifyMutation) + :87-89 (handleRevert only setStatus('idle')) + :119-132 (revert button); backend/src/inbox/service.py:106-108,135 (classify sets is_processed=True, commits)"
+ },
+ {
+  "id": "CURIOUS-04",
+  "area": "Promote modal — 202 'in-progress' UX honesty (meeting/memory not RAG-searchable yet)",
+  "hypothesis": "For meeting/memory/inbox/action the modal shows a success toast ('...을(를) 팀에 복사 중…') and closes immediately on 202, but embedding copy runs in a BG task (pending->processing->completed). Only note polls. So a user promotes a meeting to the team, the toast implies done, but the promoted item is NOT yet RAG-searchable in the target ws until the BG task finishes (and could end as 'failed' or 'n/a' with no UI signal).",
+  "repro_steps": "As owner d@e.com, open a completed+embedded meeting detail, click 워크스페이스 이동, pick the team ws, confirm. Observe the toast/modal behavior (immediate close). Immediately switch to the target team ws as member a@e.com and run a /search RAG query that should match the promoted meeting. Re-run the query ~10-20s later. Compare results.",
+  "expected": "Either the UI should communicate that embedding is still in progress (like the note polling path), or the promoted meeting should be searchable promptly; the user should not be misled that copy is fully complete.",
+  "suspected_defect": "Toast says copy succeeded and modal closes, but the promoted meeting is absent from team RAG for the BG-task window; if the BG embed copy fails the audit goes 'failed' with zero user-facing feedback -> permanently unsearchable with no error shown.",
+  "priority": "P2",
+  "grounding": "frontend/src/components/shared/ItemPromoteModal.tsx:174-240 (only itemType==='note' polls embedding-status; others toast+close immediately) ; backend/src/meetings/service.py:411-425 (meeting promote schedules _bg_promote_embed_meeting, returns embedding_pending)"
+ },
+ {
+  "id": "CURIOUS-05",
+  "area": "Meeting promote — failed-status meeting promotable + button visible",
+  "hypothesis": "Meeting promote allows source.status in ('completed','failed') (service.py:305). The detail page hides the export button on failed/processing but ALWAYS shows the 워크스페이스 이동 (promote) button. So a user can promote a FAILED meeting to the team; it lands with status=failed + copied error_message and the BG embed finds 0 chunks -> audit 'n/a' (silent success). The team now has a junk failed meeting.",
+  "repro_steps": "As owner d@e.com, create a meeting that fails (upload an invalid/tiny audio file via /new, or use a known-failed meeting). Open its detail (shows 실패 / FailedMeetingView). The 워크스페이스 이동 button is still present. Click it and promote to the team ws. Then as member a@e.com in the team ws open /meetings and the promoted meeting detail.",
+  "expected": "Either promote of a failed (un-analyzed, zero-content) meeting should be blocked/hidden, or the resulting team item should clearly explain it is a failed copy. It should not silently create an empty failed meeting in the team.",
+  "suspected_defect": "A failed meeting with no transcript/summary/chunks is copied into the team as status=failed; team members see a meaningless failed meeting, audit embedding_status='n/a', and no RAG content. The promote button on a failed meeting is misleading.",
+  "priority": "P2",
+  "grounding": "backend/src/meetings/service.py:305-317 (failed allowed, chunk preflight skipped for failed) ; frontend/src/features/meetings/components/meeting-detail.tsx:190-209 (export gated to completed, promote button always rendered) + :249-253 (FailedMeetingView)"
+ },
+ {
+  "id": "CURIOUS-06",
+  "area": "Note/Meeting export — filename from raw title (slash, empty, newline)",
+  "hypothesis": "Export filename is built from the raw title: notes use `{title}.md` with 'Untitled' fallback, but meetings use `{meeting.title}.md` with NO empty fallback. A title containing '/' or control chars, or an empty meeting title, produces a broken/odd Content-Disposition. FE triggerDownload also builds `${noteTitle||'Untitled'}.${ext}` from the title independently. quote() encodes the whole filename including slashes so '/' becomes %2F (filename with literal %2F) rather than a clean name.",
+  "repro_steps": "As owner d@e.com create a note titled 'A/B 결정: 요약\\n2026' (include a forward slash and ideally a newline) with content, let it embed. Open the note, click 내보내기 -> Markdown and JSON. Inspect the downloaded filename. Repeat for a meeting: create a text-capture meeting with title '회의/긴급' and after completion export it. Also test a meeting whose title is empty/whitespace if creatable.",
+  "expected": "Downloaded filename should be a clean, valid filename (slashes sanitized, non-empty), UTF-8 Korean preserved, no literal %2F or stray dot-only names.",
+  "suspected_defect": "Filename becomes 'A%2FB 결정...md' or contains an encoded newline; an empty meeting title yields '.md' (dotfile). Korean is fine via filename*=UTF-8'' but slash/empty handling is not sanitized.",
+  "priority": "P3",
+  "grounding": "backend/src/notes/service.py:192-207 (title with 'Untitled' fallback, no slash sanitize) ; backend/src/meetings/service.py:186-202 (f'{meeting.title}.md' NO empty fallback) ; backend/src/notes/router.py:65-69 + meetings/router.py:106-110 (quote(filename) whole-string encode); frontend/src/features/notes/components/export-button.tsx:30 (FE builds filename from title independently)"
+ },
+ {
+  "id": "CURIOUS-07",
+  "area": "Promote modal — single-team workspace 'no target' dead-end",
+  "hypothesis": "teamOptions filters out personal AND the current sourceWorkspaceId. If the user has exactly one team workspace and they are currently IN that team ws viewing an item, the dropdown shows '팀 워크스페이스가 없어요' and the confirm button is permanently disabled. The promote button is still rendered/clickable, opening a modal that can do nothing — a dead-end the user reached by clicking an affordance.",
+  "repro_steps": "As member a@e.com whose only workspaces are personal + one team: switch active ws to the team ws. Open any item there (note/meeting/inbox) and click 워크스페이스 이동. Observe the dropdown content and the confirm button state. Then repeat for owner d@e.com in the same single-team scenario.",
+  "expected": "Either the promote affordance should be hidden/disabled when there is no valid target team ws, or the modal should clearly guide the user (e.g. 'create another team workspace to move this'). It should not present an actionable button that opens an unusable modal.",
+  "suspected_defect": "Modal opens with '팀 워크스페이스가 없어요' and a disabled '팀으로 올리기' button — a confusing dead-end with no guidance, reachable from an always-visible promote button.",
+  "priority": "P3",
+  "grounding": "frontend/src/components/shared/ItemPromoteModal.tsx:121-123 (teamOptions filter excludes personal + source) + :246-250 (isDisabled when teamOptions.length===0) + :290-292 ('팀 워크스페이스가 없어요'); promote buttons rendered unconditionally e.g. meeting-detail.tsx:194-209, inbox-item-card.tsx:208-227"
+ },
+ {
+  "id": "CURIOUS-08",
+  "area": "/new — 'attachment' (자료 업로드) stub dead-end + onboarding implication",
+  "hypothesis": "On /new the 자료 업로드 card renders only a placeholder '자료 업로드는 곧 제공됩니다' with no upload action. A user who came to /new specifically to add a document/PDF hits a dead end. This is an explicitly unfinished flow surfaced as a first-class option (equal visual weight to the working 회의/노트 cards).",
+  "repro_steps": "As owner d@e.com go to /new. Click the 자료 업로드 card. Observe the body. Check whether any upload UI/CTA appears and whether the user can do anything. Also test on mobile width 375px to confirm the dead-end card layout. Capture console for errors.",
+  "expected": "An unfinished feature should either be hidden, visually de-emphasized as coming-soon, or offer an alternative action — not presented as a co-equal selectable option that leads to a do-nothing placeholder.",
+  "suspected_defect": "자료 업로드 is selectable like the other two but only shows a static '곧 제공됩니다' message with no escape/CTA; a real user wanting to upload a PDF is stuck and may think the product is broken.",
+  "priority": "P3",
+  "grounding": "frontend/src/app/(app)/new/page.tsx:25-29 (attachment card description promises upload) + :483-497 (placeholder only, '자료 업로드는 곧 제공됩니다')"
+ },
+ {
+  "id": "CURIOUS-09",
+  "area": "RAG 'no relevant info' empty-answer state + caching correctness",
+  "hypothesis": "When RRF fusion is empty, the service yields a fixed '제공된 소스에서 관련 정보를 찾지 못했습니다.' answer with sourceCount 0 and does NOT cache it (good). But when sources exist yet Gemini returns an empty/whitespace answer, it skips cache (line 193) — however the user sees no answer text at all (only sources), with no explicit 'no answer' messaging. Edge: an off-topic question in a populated workspace may return sources but a blank answer bubble.",
+  "repro_steps": "As owner d@e.com in a populated team ws go to /search. (a) Ask a totally unrelated question (e.g. 'What is the boiling point of mercury?') -> expect the no-info message. (b) Ask a question that retrieves sources but where Gemini may decline/return empty. Observe whether an empty assistant bubble renders, whether sources show with no answer, and whether console errors appear. Re-ask (a) to confirm it is not cached/served stale.",
+  "expected": "Empty/no-info responses should render clear user-facing messaging (not a blank bubble), should not be cached, and the sources panel should not appear orphaned without an answer.",
+  "suspected_defect": "Sources render but the answer bubble is empty (no 'no answer' copy), or the no-info case is inconsistent vs the sources-but-empty case; possible blank assistant message with citation affordance pointing nowhere.",
+  "priority": "P3",
+  "grounding": "backend/src/rag/service.py:136-148 (empty fused -> fixed message, sourceCount 0, no cache) + :192-200 (empty answer -> done with sources but skip cache, no explicit message) ; frontend/src/features/rag/components/rag-chat.tsx:103-119 (assistant bubble only renders msg.content; empty content -> nothing)"
+ },
+ {
+  "id": "CURIOUS-10",
+  "area": "Onboarding step monotonicity — banner dismissal logic across steps",
+  "hypothesis": "increment_step(user_id, target) is monotonic and only advances if target > current. Steps are advanced out-of-order by different events: step1 (ws create / lazy seed), step2 (first project), step3 (meeting distill done), step4 (first RAG ask). A member who joins an existing team (no ws create of their own) and immediately does a RAG ask could jump current step to 4 while skipping the visible step2/step3 work — OnboardingBanner is conditional on step<4, so the banner may show wrong progress or vanish prematurely.",
+  "repro_steps": "Create a fresh member account (or use a@e.com reset). As a@e.com accept an invite to d@e.com's team (no personal ws create flow beyond lazy seed -> step1). Without creating a project or distilling a meeting, go to /search and do one RAG ask. Re-check GET /api/v1/users/me/onboarding (or the OnboardingBanner) — observe the step value and which checklist items show complete/incomplete.",
+  "expected": "Onboarding step/banner should reflect a coherent progression; doing a RAG ask should not mark earlier steps (project/meeting) as done if the user never did them, and the banner state should be internally consistent.",
+  "suspected_defect": "RAG ask jumps onboarding_step to 4 (banner disappears, isCompleted=true) even though the user never created a project or distilled a meeting — the banner's per-step checkmarks (if derived from step number) become inconsistent, or the banner vanishes mid-onboarding.",
+  "priority": "P2",
+  "grounding": "backend/src/onboarding/service.py:22-35 (increment_step monotonic, only advances) + :57 (isCompleted = step>=4) ; backend/src/rag/service.py:28-43 (step=4 on first RAG, cache-hit path too at :95) ; backend/src/auth/dependencies.py:308-320 (lazy seed -> step=1)"
+ },
+ {
+  "id": "CURIOUS-11",
+  "area": "Pagination contract — page beyond total + hasNext correctness",
+  "hypothesis": "All list endpoints clamp page_size to le=100, ge=1 and page ge=1, and compute hasNext = page*page_size < total. There is no upper bound on page, so requesting a page far past the data returns items:[] with the requested (large) page echoed and hasNext=false — but the FE list hooks pass a fixed page (often 1) and may not expose pagination at all, so items beyond page 1 (>20 items) could be silently unreachable in the UI.",
+  "repro_steps": "As owner d@e.com in a workspace, create >20 notes (or actions) so total exceeds one page. Open /notes (or /actions) and check whether any pagination/load-more control exists and whether items 21+ are reachable. Then via direct API (browser devtools/network) call GET /api/v1/workspaces/{ws}/notes?page=999 and inspect the response shape (items empty, total correct, hasNext false). Also try page_size=0 and page_size=500 to confirm 422 validation.",
+  "expected": "Either the FE exposes pagination so all items are reachable, or the list is virtualized/infinite. API should return total accurately, hasNext correctly, and reject page_size<1 or >100 with 422.",
+  "suspected_defect": "FE useMeetings/useNotes default to page=1 with no UI to advance -> items beyond 20 are invisible to users despite total>20; OR hasNext is true on the exact-boundary case but no control consumes it. (Validation bounds themselves look correct — focus on the FE reachability gap.)",
+  "priority": "P2",
+  "grounding": "backend/src/notes/router.py:33-34 + meetings/router.py:76-77 + actions/router.py:30-31 + inbox/router.py:23-24 (page ge=1, page_size 1..100, no page upper bound) ; backend/src/notes/service.py:115-135 (hasNext = page*page_size<total) ; frontend/src/features/meetings/hooks.ts:21-37 (useMeetings hardcodes page param, list keyed without page advance)"
+ },
+ {
+  "id": "CURIOUS-12",
+  "area": "Note/Meeting promote — duplicate promote / idempotency (data race)",
+  "hypothesis": "Promote endpoints have no idempotency guard: each POST clones a new item + new audit row. Double-clicking 팀으로 올리기 (or re-opening the modal and confirming again) creates duplicate copies in the target ws. The modal disables confirm only while isPending/isPolling, but after the first promote closes the modal, re-opening and confirming again duplicates. For meeting, this also re-clones ActionItems each time.",
+  "repro_steps": "As owner d@e.com promote an embedded note to the team ws (confirm once). Re-open the same note's 워크스페이스 이동 modal and confirm to the same team ws again. Switch to the team ws and check /notes (or /meetings) for duplicate copies. For meeting, also check the action tab for duplicated action items. Optionally fire two rapid promote POSTs via devtools to test the in-flight race.",
+  "expected": "Promoting the same source to the same target twice should either be prevented/deduped, or clearly create-once; duplicates should not silently accumulate (especially duplicate ActionItem rows for meetings).",
+  "suspected_defect": "Each confirm creates another full clone + audit row in the target ws; the team ends up with N copies of the same note/meeting and N*actionItems, with no dedup. No 'already promoted' signal.",
+  "priority": "P2",
+  "grounding": "backend/src/notes/service.py:225-346 (promote always creates new_note + audit, no existing-promotion check) ; backend/src/meetings/service.py:259-425 (always clones + clone_action_items_for_promote each call) ; frontend/src/components/shared/ItemPromoteModal.tsx:246-255 (confirm only disabled during pending/polling, re-openable after close)"
+ },
+ {
+  "id": "CASUAL-01",
+  "area": "/search (RAG ask) — Gemini error / empty-answer SSE event",
+  "hypothesis": "useRagStream의 SSE 파서 switch 가 thinking/search_results/answer/done 4개 이벤트만 처리하고 BE가 보내는 event:error 케이스가 없다. Gemini 스트리밍 실패(service.py:176-185) 또는 빈 답변(service.py:193-199) 시 BE는 error 메시지 또는 answer 토큰 없는 done만 emit → FE는 이를 무시하고 빈 assistant 버블만 남긴다. 사용자에겐 '아무 일도 안 일어남'으로 보인다.",
+  "repro_steps": "owner d@e.com 로그인 → /search → SearchScope 유형 필터를 '노트'로 두고 워크스페이스에 노트가 0건인 상태(혹은 매우 짧은 무의미한 질문 'asdfqwer zxcv')를 반복 전송. answer 토큰이 비거나 Gemini가 graceful-degrade 하는 케이스를 노린다. 전송 후 assistant 버블이 빈 회색 박스로 남는지, 에러 안내 문구('질문을 처리할 수 없습니다')가 화면에 표시되는지 관찰. browser_console_messages 로 파싱 무시 흔적 확인.",
+  "expected": "BE가 error/빈-done을 보내면 FE는 '질문을 처리할 수 없습니다. 다시 시도해주세요' 같은 안내를 assistant 버블에 표시해야 한다.",
+  "suspected_defect": "빈 회색 assistant 버블만 남고 에러/안내 카피가 전혀 노출되지 않음 (silent failure).",
+  "priority": "P1",
+  "grounding": "frontend/src/features/rag/hooks.ts:87-106 (switch 에 case \"error\" 없음); backend/src/rag/service.py:176-189 (event:error emit); service.py:193-199 (빈 답변 시 answer 토큰 없이 done); frontend/src/features/rag/components/rag-chat.tsx:114 (cursor는 isStreaming일 때만, done 후 빈 content면 아무것도 안 그림)"
+ },
+ {
+  "id": "CASUAL-02",
+  "area": "전역 promote — 용어 일관성 + 한국어 조사 보간 버그",
+  "hypothesis": "동일한 'promote(I-18 clone)' 액션이 화면마다 다른 용어로 노출된다: 모달 제목 '팀으로 올리기', inbox 카드 버튼/aria '워크스페이스 이동', meeting 상세 버튼 '워크스페이스 이동', 성공 토스트 '복사 중'. 게다가 성공 토스트가 `${ITEM_LABEL}을(를)` 로 조사를 하드코딩해 '메모을(를)', '노트을(를)', '회의을(를)', '액션을(를)' 처럼 받침 없는 단어에 '을(를)' 리터럴이 그대로 노출된다.",
+  "repro_steps": "owner d@e.com → 팀 워크스페이스 1개 + 개인 ws 1개 보유 상태. /inbox 에서 항목 카드 우상단 ArrowUpRight(aria '워크스페이스 이동') 클릭 → 모달 제목이 '팀으로 올리기'인지 대조. 대상 팀 선택 후 '팀으로 올리기' 확인 → sonner 토스트가 '메모을(를) 팀에 복사 중…' 처럼 '을(를)' 리터럴을 노출하는지 캡처. /meetings/{id} 의 '워크스페이스 이동' 버튼도 같은 토스트 경로인지 확인.",
+  "expected": "한 액션은 한 용어로 통일(예: '팀으로 올리기')되고, 조사는 받침 유무에 따라 '를'로 자연스럽게 표기되어야 한다('메모를 팀에 복사 중').",
+  "suspected_defect": "토스트에 '메모을(를)/노트을(를)/회의을(를)/액션을(를)' 리터럴 노출 + 동일 기능 3가지 명칭(올리기/이동/복사) 혼재로 신규 사용자 혼란.",
+  "priority": "P1",
+  "grounding": "frontend/src/components/shared/ItemPromoteModal.tsx:237 (`${ITEM_LABEL[itemType]}을(를) 팀에 복사 중…`), :77-83 (ITEM_LABEL 메모/회의/노트/Inbox 항목/액션 모두 받침 없음), :268 (제목 '팀으로 올리기'); frontend/src/features/inbox/components/inbox-item-card.tsx:222-223 ('워크스페이스 이동'); frontend/src/features/meetings/components/meeting-detail.tsx:205-208 ('워크스페이스 이동')"
+ },
+ {
+  "id": "CASUAL-03",
+  "area": "CmdK 팔레트 — dead-click + 잘못된 네비게이션 + 가짜 단축키",
+  "hypothesis": "CmdK 명령 목록에 죽은/잘못된 항목이 있다: '지식 검색' 항목 action='focus' 인데 handleItemClick 에 'focus' 분기가 없어 팔레트만 닫히고 아무 동작 안 함. '프로젝트' 항목은 action='navigate:/' 인데 (app) 라우트 그룹에 root page.tsx 가 없어 /projects 가 아닌 랜딩/엉뚱한 곳으로 간다. 또 'G I','G P','C' 등 단축키 표기가 실제로 바인딩돼 있지 않다(⌘K/Esc/? 만 동작).",
+  "repro_steps": "owner d@e.com → /dashboard 에서 ⌘K(또는 검색 박스 클릭)로 팔레트 오픈 → '검색' 그룹의 '지식 검색' 클릭 → 팔레트가 그냥 닫히고 아무 페이지 이동/포커스 없음 확인(dead-click). 다시 오픈 → '이동' 그룹의 '프로젝트' 클릭 → 주소창이 /projects 가 아니라 / 로 가는지(랜딩 또는 404/redirect) 확인. 표기된 'G P' 를 실제 키보드로 눌러보고 무반응 확인.",
+  "expected": "'지식 검색'은 검색 페이지/입력 포커스로, '프로젝트'는 /projects 로 이동해야 하며, 표시된 단축키는 실제 동작하거나 표기를 제거해야 한다.",
+  "suspected_defect": "'지식 검색' dead-click, '프로젝트' 오네비게이션(/ → projects 아님), 미바인딩 단축키 가짜 affordance.",
+  "priority": "P2",
+  "grounding": "frontend/src/components/layout/cmd-k.tsx:22 (지식 검색 action:'focus'), :122-133 (handleItemClick 에 'focus' 케이스 없음), :30 (프로젝트 action:'navigate:/'); app/(app) 디렉토리에 page.tsx 부재(error.tsx/layout.tsx/loading.tsx 만 존재)"
+ },
+ {
+  "id": "CASUAL-04",
+  "area": "다크 모드 — 테마 attribute 불일치로 shadcn dark: 유틸리티 무력화",
+  "hypothesis": "ThemeProvider 가 attribute='data-theme' 로 설정돼 html에 data-theme='dark' 를 붙이는데, globals.css 의 @custom-variant dark 는 '.dark' 클래스 조상(&:is(.dark *))을 기준으로 한다. 둘이 불일치하므로 button/badge/input 등 shadcn 컴포넌트의 dark:bg-input/30, dark:hover:* 같은 dark: 유틸리티가 다크 기본 테마에서도 절대 활성화되지 않는다 → 다크 배경 위에 라이트용 base 스타일이 적용돼 outline/destructive 버튼·입력·드롭다운의 대비/배경이 어색하게 보인다.",
+  "repro_steps": "owner d@e.com → 기본(다크) 상태에서 shadcn 기반 표면을 순회: /settings 또는 멤버 영역의 DropdownMenuTrigger, ItemPromoteModal 의 outline/ghost 버튼, invite/[code] 의 Card/Badge/Button(secondary). browser_evaluate 로 document.documentElement 의 data-theme/class 확인(class 'dark' 없음 예상). 동일 요소를 라이트로 토글(/settings 테마 토글) 후 비교. 다크에서 input/outline-button 배경이 의도된 dark:bg-input/30 이 아닌 라이트 base 로 렌더되는지 스크린샷 대조.",
+  "expected": "다크 테마에서 shadcn 컴포넌트의 dark: 변형이 적용돼 입력/버튼 배경·테두리가 다크 팔레트에 정합해야 한다.",
+  "suspected_defect": "data-theme(next-themes) vs .dark 클래스(CSS variant) 불일치로 dark: 유틸리티 전면 무력화 → 다크 모드 일부 컴포넌트 시각 깨짐.",
+  "priority": "P2",
+  "grounding": "frontend/src/components/layout/theme-provider.tsx:8 (attribute=\"data-theme\"); frontend/src/app/globals.css:5 (@custom-variant dark (&:is(.dark *))); components/ui/button.tsx:15-21 + input.tsx:12 + badge.tsx:16-20 (dark:bg-input/30 등 .dark 클래스 의존 유틸리티)"
+ },
+ {
+  "id": "CASUAL-05",
+  "area": "/search SourceViewer — '내보내기' 버튼 dead-click + citation 인덱스 초과 silent no-op",
+  "hypothesis": "citation [N] 클릭 시 sources?.[num-1] 로 매핑하는데 모델이 sources 개수보다 큰 [N](예 [5])을 emit 하면 source=undefined 라 SourceViewer 가 열리지 않고 클릭이 silent 무반응이다. 또 SourceViewer 헤더의 '내보내기'(ExternalLink) 버튼은 onClick 핸들러가 없어 클릭해도 아무 동작 안 하는 dead button. citation 색상도 1~3만 정의돼 [4]+ 는 회색 default 로 시각적 구분이 사라진다.",
+  "repro_steps": "owner d@e.com → 워크스페이스에 회의/노트 4~5개 이상 채워 RAG 답변이 [4],[5] 인용을 emit 하도록 유도(여러 소스 인용되는 광범위 질문). 답변의 [4]/[5] 배지 클릭 → SourceViewer 가 열리는지/무반응인지 확인. 정상 [1] 클릭으로 SourceViewer 오픈 후 헤더의 '내보내기'(ExternalLink) 아이콘 클릭 → 아무 반응 없음(dead-click) 확인. [1][2][3] 와 [4][5] 배지 색상 동일(회색) 여부 캡처.",
+  "expected": "존재하지 않는 인용 배지는 비활성/안내, '내보내기' 버튼은 실제 내보내기 동작 또는 제거, 인용 색상은 일관된 시각 구분을 제공해야 한다.",
+  "suspected_defect": "[N>sources] 클릭 silent no-op, SourceViewer '내보내기' dead button, [4]+ 인용 색상 구분 소실.",
+  "priority": "P2",
+  "grounding": "frontend/src/features/rag/components/rag-chat.tsx:55-69 (sources?.[num-1] undefined 시 무동작); frontend/src/features/sources/components/source-viewer.tsx:227-240 (ExternalLink 버튼 onClick 없음); frontend/src/features/rag/components/citation-badge.tsx:10-35 (CITATION_COLORS 1~3 만 정의, DEFAULT 회색)"
+ },
+ {
+  "id": "CASUAL-06",
+  "area": "랜딩(/) CTA — 미구현 기능 과대 카피",
+  "hypothesis": "랜딩 CTA가 'Google 워크스페이스 연동'과 '팀 초대 무제한', '5분 설정', '첫 인사이트 24시간 이내'를 약속하지만, 메모리상 Clerk webhook SKIP/외부 user 0명/Google Workspace 연동 미배포 상태다. 신규 방문자에게 미구현 기능을 확정 약속하는 첫인상 카피 불일치.",
+  "repro_steps": "비로그인 상태로 / 방문 → 최하단 CTA 섹션 카피 캡처: 'Google 워크스페이스 연동 · 팀 초대 무제한', '베타 무료 · 신용카드 불필요 · 5분 설정', '팀의 첫 인사이트는 24시간 이내에'. 이어서 sign-up → 실제 온보딩 흐름(워크스페이스 생성/초대)에 Google 연동 진입점이 존재하는지 대조. /pricing 의 동일/상충 카피도 교차 확인.",
+  "expected": "랜딩 카피의 약속은 실제 제품 기능과 일치해야 한다(미구현은 '예정' 표기 또는 제거).",
+  "suspected_defect": "Google 워크스페이스 연동 등 미배포 기능을 확정 약속 → 신규 사용자 기대-현실 괴리.",
+  "priority": "P2",
+  "grounding": "frontend/src/components/landing/cta-section.tsx:48-51 (베타무료/5분설정/24시간), :79 ('Google 워크스페이스 연동 · 팀 초대 무제한'); 메모 project_team_qa_20260617_done.md + ADR-022 Clerk webhook SKIP"
+ },
+ {
+  "id": "CASUAL-07",
+  "area": "/new — 정보구조 혼란 + coming-soon 데드엔드 + 입력 검증 공백",
+  "hypothesis": "'콘텐츠 추가' 3카드 IA가 신규 사용자에게 혼란: '회의 녹음' 카드 안에 '텍스트로 입력' 탭이 있어 텍스트가 '회의'로 생성되고, '노트 작성' 카드는 인라인 작성 없이 /notes 로 리다이렉트만, '자료 업로드' 카드는 '곧 제공됩니다' 데드엔드. 또 오디오 업로드는 클라이언트 측 파일 크기/형식 검증이 없고 파일 크기를 항상 KB로 표기(50MB가 51200.0 KB).",
+  "repro_steps": "member a@e.com(또는 owner) → /new. 3카드 클릭 순회: '자료 업로드' 선택 시 '자료 업로드는 곧 제공됩니다' 데드엔드 노출 확인. '노트 작성' 선택 → 인라인 폼 없이 '빠른 메모 열기' 버튼만 → /notes 이동 확인. '회의 녹음' → '텍스트로 입력' 탭에서 50자 텍스트로 '회의'가 생성되는 IA 모순 관찰. 오디오 탭에서 비오디오/초대형 파일(예: 큰 이미지)을 선택 → 클라이언트 사전 검증 없이 업로드 시도되고 표기가 'NNNN.0 KB'로 MB 미환산인지 캡처.",
+  "expected": "미구현 카드는 비활성/숨김, 텍스트=회의 IA는 라벨 정합, 파일은 업로드 전 크기/형식 검증 + 사람이 읽는 크기(MB) 표기.",
+  "suspected_defect": "coming-soon 데드엔드 노출, 텍스트가 '회의'로 생성되는 라벨 혼란, 사전 검증 없는 업로드 + KB-only 크기 표기.",
+  "priority": "P2",
+  "grounding": "frontend/src/app/(app)/new/page.tsx:484-497 ('자료 업로드는 곧 제공됩니다'), :443-481 ('노트 작성'→/notes 리다이렉트), :341-438 ('텍스트로 입력' 탭이 meeting 생성), :269 ((file.size/1024).toFixed(1) KB 고정), :245-251 (accept 외 사전 검증 없음)"
+ },
+ {
+  "id": "CASUAL-08",
+  "area": "전역 콘솔 에러 0 검증 — 18 라우트 sweep (다크/라이트, 375/768/desktop)",
+  "hypothesis": "각 라우트 진입/상호작용 시 console.error 0 이어야 하나, SSE 파서 무시(JSON 파싱 실패 catch), 빈 상태 렌더, useMeetingDetail 폴링, hydration(suppressHydrationWarning), 외부 폰트(fontshare/jsdelivr) 로드, RAG citation 클릭 등에서 React 경고/네트워크 에러가 누수될 수 있다.",
+  "repro_steps": "owner d@e.com 로그인 상태에서 browser_console_messages 를 비운 뒤 라우트를 순회: /dashboard /inbox /memory /search /notes /notes/[id] /meetings/[id] /projects /projects/[id] /actions /new /settings /admin/recall-metrics 및 public / /pricing /sign-in /invite/[code]. 각 페이지에서 핵심 상호작용 1회(RAG 질문 전송, citation 클릭, promote 모달 오픈, 테마 토글, 탭 전환). 각 라우트마다 console.error/console.warn(React key/hydration/act 경고 포함)를 수집. NOISE FILTER(Clerk accounts.dev CSP, 오디오 probe 4xx/5xx, Sentry/GA/favicon, OPTIONS preflight)는 제외. 동일 sweep 을 375px·768px·desktop, 다크·라이트 각각 반복.",
+  "expected": "NOISE FILTER 제외 후 모든 라우트에서 console.error 0건, hydration/React key 경고 0건.",
+  "suspected_defect": "특정 라우트(특히 /search SSE, /meetings/[id] 폴링, /notes/[id] Tiptap, citation 클릭)에서 React 경고 또는 처리되지 않은 에러 누수.",
+  "priority": "P1",
+  "grounding": "frontend/src/features/rag/hooks.ts:107-109 (JSON 파싱 실패 silent catch); frontend/src/app/layout.tsx:34 (suppressHydrationWarning) + :38-50 (외부 폰트 link); frontend/src/features/meetings/hooks.ts:53-59 (refetchInterval 폴링)"
+ },
+ {
+  "id": "CASUAL-09",
+  "area": "반응형 375px — /dashboard ⌘K, /new 탭, /meetings/[id] 헤더, promote select",
+  "hypothesis": "모바일 375px 에서 데스크톱 전제 UI가 깨진다: ⌘K 글리프(Mac 전용, 모바일 키보드 없음)가 그대로 노출, /new 의 '오디오/직접 녹음/텍스트' 3탭과 회의 상세 헤더(제목+상태배지+내보내기+'워크스페이스 이동' 버튼)가 좁은 폭에서 줄바꿈/overflow, RAG 답변 버블 max-w-[85%] + citation super-script 정렬, promote 모달 select(h-11)와 버튼 가독성.",
+  "repro_steps": "owner d@e.com → browser_resize 375x812. /dashboard: ⌘K 박스가 모바일에서 의미 전달되는지/overflow 없는지 확인. /new: 3탭 줄바꿈/가로 스크롤 여부 캡처. /meetings/{completed-id}: 헤더의 제목+상태배지+'내보내기'+'워크스페이스 이동'이 한 줄에서 겹치거나 잘리는지 확인. /search: 긴 한글 답변 버블 + [N] 배지 baseline 정렬 확인. promote 모달 오픈 후 select/버튼 터치 타깃(44px) 점검. 동일 항목 768px 도 반복.",
+  "expected": "375/768 에서 모든 핵심 화면이 가로 스크롤/overflow/겹침 없이 읽히고 터치 타깃 44px 이상이어야 한다.",
+  "suspected_defect": "⌘K 모바일 무의미, 회의 헤더 버튼 겹침/줄바꿈, 다탭/긴 한글 버블 overflow.",
+  "priority": "P2",
+  "grounding": "frontend/src/app/(app)/dashboard/page.tsx:195-205 (⌘K kbd, 모바일 대체 없음); frontend/src/features/meetings/components/meeting-detail.tsx:171-210 (헤더 flex 한 줄에 4요소); frontend/src/app/(app)/new/page.tsx:188-217 (3탭 flex); frontend/src/features/rag/components/rag-chat.tsx:92 (max-w-[85%])"
+ },
+ {
+  "id": "CASUAL-10",
+  "area": "WCAG AA 대비 — 다크/라이트 토큰 실측 (text-muted, accent-on-surface, citation/배지)",
+  "hypothesis": "코드 주석상 일부 토큰은 AA 보정됐지만(landing #94A3B8 등), 실제 합성된 대비는 미검증인 조합이 남아있다: 다크 text-muted #7A7A82(4.66:1 주장) on var(--surface)#141416(배경 아님)이면 비율 달라짐, citation 배지 active 시 accent 배경+background 텍스트, accent-subtle 위 accent 텍스트(AI 추천 칩), warning 배지(rgba(251,191,36,0.1) 위 warning) 등.",
+  "repro_steps": "owner d@e.com → 다크/라이트 각각에서 browser_evaluate 로 다음 요소의 computed color/background 추출 후 대비 계산: (1) /inbox AI 추천 칩 'AI 추천:' (var(--accent) on var(--accent-subtle)), (2) /search citation 배지 [1] 비활성/활성 상태, (3) 전역 nav/캡션 text-muted on 실제 부모 배경(surface vs background), (4) /inbox '확인 필요' warning 배지, (5) meeting 상태배지(STT 처리 중 등 warning on rgba). 각 조합이 일반 텍스트 4.5:1 / 대형 3:1 미달인지 기록.",
+  "expected": "모든 텍스트/배지 조합이 WCAG AA(일반 4.5:1, 대형 3:1)를 충족해야 한다.",
+  "suspected_defect": "accent-subtle 위 accent 텍스트(특히 라이트 accent #0FA889 on 8% 틴트) 또는 surface 위 text-muted 일부 조합 AA 미달.",
+  "priority": "P2",
+  "grounding": "frontend/src/app/globals.css:68 (다크 text-muted #7A7A82 'on #0A0A0B' 기준 주석 — surface 배경엔 미검증), :153-155 (라이트 accent #0FA889 + accent-subtle 8%); frontend/src/features/inbox/components/inbox-item-card.tsx:256-269 (accent on accent-subtle 칩); frontend/src/features/rag/components/citation-badge.tsx:53-54 (active accent bg)"
+ },
+ {
+  "id": "CASUAL-11",
+  "area": "/invite/[code] — 역할 배지 비현지화 영문 enum + 수락 후 / 리다이렉트",
+  "hypothesis": "초대 수락 화면 배지가 백엔드 role enum(member/admin/viewer)을 영문 그대로 '{role} 역할로 참여'로 렌더 → 'member 역할로 참여'처럼 한영 혼용 어색 카피. 또 수락 성공 시 router.push('/') 하는데 (app) root page.tsx 부재로 의도된 대시보드가 아닌 랜딩/리다이렉트로 갈 수 있다.",
+  "repro_steps": "owner d@e.com → /settings(또는 멤버 관리)에서 member 초대 링크 생성 → 시크릿/2번째 계정 a@e.com 로 /invite/{code} 접속(아직 미가입/미참여 상태) → 배지가 'member 역할로 참여' 처럼 영문 enum 노출되는지 캡처. '참여하기' 수락 → 이동한 주소가 /dashboard 인지 / (랜딩) 인지 관찰. 만료/무효 코드(/invite/invalidxxxx)도 접속해 에러 카피 명확성 확인.",
+  "expected": "역할은 '멤버/관리자/뷰어'로 현지화되고, 수락 후 명확히 대시보드로 진입해야 한다.",
+  "suspected_defect": "'member 역할로 참여' 영문 enum 노출 + 수락 후 / 리다이렉트가 의도된 대시보드와 다름.",
+  "priority": "P2",
+  "grounding": "frontend/src/app/invite/[code]/page.tsx (배지 `{info.role} 역할로 참여`), :27-29 (onSuccess router.push('/')); app/(app) 에 page.tsx 부재"
+ },
+ {
+  "id": "CASUAL-12",
+  "area": "멤버 아바타 a11y + 워크스페이스 생성 모달 a11y(focus trap/Esc/role)",
+  "hypothesis": "멤버 아바타가 이니셜 1글자 div(이미지/aria 없음)라 스크린리더가 맥락 없는 단일 문자만 읽는다. 또 대시보드의 CreateWorkspaceDialog 가 손수 만든 div 오버레이로 role='dialog'/aria-modal 없음, Esc 미지원(오버레이 클릭/취소만), focus trap 없음 → 키보드/스크린리더 사용자 접근성 결함.",
+  "repro_steps": "owner d@e.com → 멤버 목록 화면에서 browser_snapshot(accessibility tree)으로 아바타 노드가 의미 있는 이름(예: 'D@e.com 아바타')을 갖는지/단일 문자만 노출되는지 확인. 다음으로 워크스페이스 0개 상태(또는 '워크스페이스 만들기' 진입)에서 CreateWorkspaceDialog 오픈 → Tab 으로 포커스가 모달 밖으로 새는지, Esc 로 닫히는지, 스냅샷에 dialog role/aria-modal 이 있는지 확인.",
+  "expected": "아바타는 접근 가능한 이름 제공, 모달은 role='dialog'+aria-modal, focus trap, Esc 닫기를 지원해야 한다(ItemPromoteModal/shadcn Dialog 와 동일 수준).",
+  "suspected_defect": "아바타 SR 맥락 부재 + 손수 만든 워크스페이스 생성 모달의 dialog 시맨틱/Esc/focus trap 누락.",
+  "priority": "P3",
+  "grounding": "frontend/src/features/members/components/member-list.tsx:107-117 (이니셜 div, aria/role 없음); frontend/src/app/(app)/dashboard/page.tsx:37-105 (CreateWorkspaceDialog: div 오버레이, role/aria-modal/Esc/focus-trap 없음 — onClick overlay+취소만)"
+ },
+ {
+  "id": "POWER-01",
+  "area": "GET /api/v1/workspaces/{ws}/action-items?priority=&projectId= (compound filter pagination)",
+  "hypothesis": "list_action_items applies status+priority+project_id to the items query (find_by_workspace) but computes total via count_by_workspace which ONLY accepts status. So total/hasNext are over-counted whenever priority OR projectId is set without status — the filtered result page disagrees with the reported total, breaking pagination math.",
+  "repro_steps": "As owner d@e.com in a team workspace, seed >25 action items where e.g. only 3 are priority=high (spread across pages by created_at). Hit the API directly (DevTools or browser_evaluate fetch) GET .../action-items?priority=high&pageSize=20&page=1 with the Clerk bearer token. Observe response.total and response.hasNext vs the actual number of returned items. Repeat with ?projectId={someProjectId}. Compare total to the real filtered count (page through all). Also try ?status=todo&priority=high to confirm status-only counting still drifts when priority narrows further.",
+  "expected": "total and hasNext must reflect the SAME filter set (status+priority+project_id) as the items list; paging past page 1 should stop exactly when filtered items are exhausted.",
+  "suspected_defect": "total is inflated (counts all status-matching rows ignoring priority/project) → hasNext=true when there is no next page → empty/duplicate page on page 2, or a 'load more' that yields nothing.",
+  "priority": "P1",
+  "grounding": "backend/src/actions/service.py:136 total = count_by_workspace(workspace_id, status=status) (no priority/project_id); backend/src/actions/repository.py:47-58 count_by_workspace signature only (workspace_id, status); find_by_workspace at repository.py:36-42 applies all three filters; hasNext at service.py:143 page*page_size<total"
+ },
+ {
+  "id": "POWER-02",
+  "area": "/notes/[id] export → frontend triggerDownload filename (UTF-8 / special chars)",
+  "hypothesis": "BE correctly RFC5987-encodes the filename via quote() into Content-Disposition (filename*=UTF-8''...), but the FE export-button IGNORES that header and builds the saved filename client-side from the in-memory noteTitle prop as `${noteTitle || 'Untitled'}.md`. A title containing '/' (path sep), '\\n', emoji, or very long text yields a broken or truncated local filename, and the server's careful UTF-8 encoding is never used.",
+  "repro_steps": "As owner d@e.com create a note titled e.g. '2026/06 회의 / 결정사항 🚀' (include a forward slash and emoji). Open /notes/{id}, click 내보내기 → Markdown. Inspect the downloaded file name (browser_evaluate to read the <a download> attr, or observe the save dialog). Then call the BE directly GET .../notes/{id}/export?format=md and read the Content-Disposition header. Compare the two filenames.",
+  "expected": "Saved filename should be a valid, non-truncated UTF-8 name derived from the title (slashes sanitized), consistent with the server Content-Disposition.",
+  "suspected_defect": "Client filename uses raw title with '/' → OS interprets as path / drops to last segment, or emoji/long titles produce an unusable filename; server's filename*=UTF-8'' header is discarded.",
+  "priority": "P2",
+  "grounding": "frontend/src/features/notes/components/export-button.tsx:31 triggerDownload(blob, `${noteTitle || 'Untitled'}.${ext}`) (uses prop, not header); backend/src/notes/router.py:65-69 quote(filename)+Content-Disposition filename*=UTF-8''; service export_note filename=`{title}.md` notes/service.py:196"
+ },
+ {
+  "id": "POWER-03",
+  "area": "Workspace switcher + open detail route (/notes/[id], /meetings/[id], /projects/[id])",
+  "hypothesis": "WorkspaceSwitcher.handleSwitch only sets activeWorkspaceId + invalidates ws-scoped queries; it does NOT navigate away from a detail route. If the user is on /notes/{idFromWsA} and switches to wsB, the note-detail query refetches GET .../workspaces/{wsB}/notes/{idFromWsA} which is cross-tenant → 404. The page should show a graceful empty/error state, not a console.error storm or a stuck spinner.",
+  "repro_steps": "As owner d@e.com (member of 2 team workspaces A and B, or personal+team), open a note that exists in workspace A at /notes/{idA}. With the note detail visible, use the WorkspaceSwitcher to switch to workspace B. Observe: does the page show an error/empty state, redirect, or hang? Capture console for errors. Repeat for /meetings/{idA} and /projects/{idA}. Then switch back to A and confirm the note re-renders.",
+  "expected": "After switching ws while on a cross-ws detail, the UI shows a friendly '찾을 수 없음' state (it has error branches) without console.error noise, and switching back restores the content.",
+  "suspected_defect": "Unhandled 404 → React Query error toast/console.error, infinite loading spinner, or a flash of stale data from the wrong workspace before invalidation lands.",
+  "priority": "P1",
+  "grounding": "frontend/src/features/workspaces/components/WorkspaceSwitcher.tsx:58-64 handleSwitch (no router.push, only invalidate); note-detail.tsx:130 `if (error || !note)` error branch; meeting-detail.tsx:137 error branch; cross-tenant 404 enforced by find_by_id(workspace_id) (I-9)"
+ },
+ {
+  "id": "POWER-04",
+  "area": "Inbox promote LIVE (POST .../inbox/{id}/promote) → target ws classify usability",
+  "hypothesis": "Inbox promote intentionally resets the clone to source_type='attachment', source_id=new random UUID, ai_suggested_project_id=None, is_processed=False. So a meeting-derived inbox item that was promoted loses its meeting linkage AND its AI project suggestion in the target ws. The target-ws user sees a bare 'attachment' inbox item with no AI suggestion and cannot classify it back to a meeting. Verify the clone exists, source is preserved (I-18 tombstone), audit row shows embedding_status='n/a', and assess the UX degradation.",
+  "repro_steps": "As owner d@e.com in team workspace A, find/create an inbox item that has an AI-suggested project (ai_suggested_project_id set, source_type='meeting'). POST promote to workspace B (where d is also member). In workspace B /inbox, observe the cloned item: its sourceType, whether the AI project suggestion appears, whether '확정' auto-classifies or forces the picker. Back in workspace A confirm the original inbox item is unchanged (still present, AI suggestion intact). Open Settings → Audit tab in B and confirm an 'inbox' audit row with embedding_status n/a.",
+  "expected": "Clone preserved with source intact (I-18); audit visible; AND target-ws user gets a usable item — but note the suggestion/linkage loss may be confusing UX that needs a copy hint.",
+  "suspected_defect": "Promoted inbox item in B has no AI suggestion, sourceType silently flipped to 'attachment', is_processed reset — user is confused why the item looks different / why there's no project recommendation; no UI copy explains the reset.",
+  "priority": "P2",
+  "grounding": "backend/src/inbox/service.py:220-231 new_item source_type='attachment', source_id=uuid4(), ai_suggested_project_id=None, is_processed=False; audit embedding_status='n/a' service.py:243; FE inbox-item-card.tsx:61 confirm uses ai-suggested project or opens picker"
+ },
+ {
+  "id": "POWER-05",
+  "area": "Meeting promote LIVE (POST .../meetings/{id}/promote) → searchability + ActionItem clone",
+  "hypothesis": "Meeting promote clones the meeting (status preserved), BG-copies embedding chunks (pending→completed), and clone_action_items_for_promote re-clones ActionItems with assignee reset to None if assignee not a target-ws member, project_id=None. Risks: (a) action_item_count is set to 0 then patched to cloned count — if the BG/flush ordering races, the target meeting shows wrong count; (b) a meeting with status='completed' but ZERO embedding chunks is rejected (MeetingPromoteNotEmbeddedError) — verify the error is surfaced to the user clearly; (c) after promote, the cloned meeting must become RAG-searchable in target ws once embedding_status=completed.",
+  "repro_steps": "As owner d@e.com: (1) Take a completed meeting WITH transcript+chunks+action items in ws A; promote to ws B. In B /meetings/{newId} confirm transcript, summary, and the SAME action items appear (action tab count matches), assignees that aren't B-members are blank. Poll embedding status until completed, then run a RAG ask in B that should hit the meeting content and confirm it surfaces as a citation. (2) Find/create a meeting still 'processing'/'transcribing' and attempt promote → expect a clear non-terminal error toast (MeetingPromoteNonTerminalError). (3) If possible, a 'completed' meeting with no chunks → expect MeetingPromoteNotEmbeddedError surfaced, not a silent success.",
+  "expected": "Cloned meeting fully usable in B with correct actionItemCount, blanked cross-ws assignees, RAG-searchable after embedding completes; non-terminal/not-embedded meetings rejected with a user-readable message.",
+  "suspected_defect": "actionItemCount mismatch on target; cloned meeting never becomes RAG-searchable (BG copy silently n/a); non-terminal/not-embedded rejection shows a raw 4xx with no friendly copy.",
+  "priority": "P1",
+  "grounding": "backend/src/meetings/service.py:305-317 non-terminal + not-embedded preflight; clone_action_items_for_promote at promote_helpers.py:138-221 (assignee None reset l.204-209, project_id None); service.py:351 action_item_count=0 then l.391 patched; _bg_promote_embed_meeting service.py:431-470 pending→completed/n-a"
+ },
+ {
+  "id": "POWER-06",
+  "area": "RAG citation [N] → SourceViewer highlight offset correctness",
+  "hypothesis": "The 2026-06-18 'chunk-offset highlighting' fix is undermined: rag-chat.toHighlightChunk hardcodes startOffset:0, endOffset:source.text.length (the 200-char snippet length), but SourceViewer.useFullSourceContent loads the FULL transcript/note plainText. renderHighlightedContent then highlights characters [0 .. snippetLen] of the FULL document — i.e. it highlights the document HEADER, not the actual cited passage. So clicking citation [N] scrolls to / highlights the wrong region.",
+  "repro_steps": "As owner d@e.com (or member a@e.com) go to /search in a workspace with a long meeting transcript or long note. Ask a question whose answer cites a passage from the MIDDLE/END of the document. Click the inline [N] citation. Observe the SourceViewer: does it scroll to and highlight the actual cited sentence, or does it highlight the first ~200 chars (the top) of the full transcript regardless of where the cited content is? Compare the highlighted text to the snippet shown in the sources list.",
+  "expected": "SourceViewer should highlight the actual cited chunk text within the full document at its true offset.",
+  "suspected_defect": "Highlight always lands on the top of the document (offsets 0..snippetLen against full text), not the cited passage; auto-scroll goes to the header → citation→source mapping visually wrong.",
+  "priority": "P1",
+  "grounding": "frontend/src/features/rag/components/rag-chat.tsx:25-32 toHighlightChunk startOffset:0 endOffset:source.text.length; source-viewer.tsx:110-129 useFullSourceContent returns FULL transcript/plainText; renderHighlightedContent slices content by those offsets (source-viewer.tsx ~38-84); snippet is chunk_text[:200] backend rag/service.py:303"
+ },
+ {
+  "id": "POWER-07",
+  "area": "RAG citation [N] click when LLM cites index > returned source count",
+  "hypothesis": "RagChat.handleCitationClick maps [N] to sources[num-1]; if the LLM emits a citation number greater than the number of returned sources (fused top_n=10; the model can hallucinate [11]+ or cite a non-existent source), source is undefined and the click is a silent no-op (nothing opens, no feedback). Also if the answer contains [0] it maps to sources[-1] (last source) — a wrong mapping.",
+  "repro_steps": "As owner d@e.com on /search, ask a broad question that yields an answer with several [N] citations. In DevTools, locate the assistant message; if any rendered [N] exceeds msg.sources.length, click it and observe (nothing happens). To force the edge deterministically, use browser_evaluate to call handleCitationClick-equivalent: click a CitationBadge for a number you know exceeds source count (or craft a question on sparse data so the model over-cites). Also test a [0] if it ever appears. Observe whether the UI gives any feedback for an unmapped citation.",
+  "expected": "An unmapped/out-of-range citation click should be a no-op WITHOUT being misleading; ideally the badge for a non-existent source shouldn't be clickable or should toast 'source unavailable'. [0] must not map to the last source.",
+  "suspected_defect": "Click on out-of-range [N] does nothing (dead UI, no feedback); [0] (if emitted) opens the WRONG (last) source due to sources[-1] JS negative indexing.",
+  "priority": "P2",
+  "grounding": "frontend/src/features/rag/components/rag-chat.tsx:55-67 source = sources?.[num-1]; if(source) open — no else branch; markdown-message.tsx:22-39 parseInt regex \\[(\\d+)\\] makes every numeric badge clickable; backend fused top_n=10 rag/service.py:134"
+ },
+ {
+  "id": "POWER-08",
+  "area": "Action promote LIVE (POST .../action-items/{id}/promote) → orphan reset",
+  "hypothesis": "Action promote clones the ActionItem with meeting_id=None, project_id=None, assignee_id=None ALWAYS (not just when cross-ws). So a promoted action loses its project linkage and assignee even if an equivalent project/member exists in the target ws. Combined with /actions redirecting to /inbox, the promoted action may be hard to find in the target ws. Verify clone+source preservation+audit, and assess discoverability.",
+  "repro_steps": "As owner d@e.com in ws A, take an action item assigned to a@e.com and linked to a project. POST promote to ws B (a@e.com is also member of B). Verify: source action unchanged in A; in B, fetch action-items API — the clone has no assignee, no project, no meeting. Check Settings→Audit in B for an 'action' row (embedding_status n/a). Then try to FIND the promoted action in B's UI (note /actions redirects to /inbox) — confirm whether there's any surface that lists standalone promoted actions.",
+  "expected": "Clone exists with source preserved + audit row; the promoted action is discoverable somewhere in the target ws UI.",
+  "suspected_defect": "Promoted action is orphaned (no project/meeting/assignee) AND has no UI surface to view it (since /actions→/inbox and inbox lists inbox items, not raw actions) → effectively invisible after promote.",
+  "priority": "P2",
+  "grounding": "backend/src/actions/service.py:250-260 new_item meeting_id=None project_id=None assignee_id=None (unconditional); audit embedding_status='n/a' service.py:272; frontend/src/app/(app)/actions/page.tsx:6 redirect('/inbox'); action-view fetches by meeting only"
+ },
+ {
+  "id": "POWER-09",
+  "area": "Note/Meeting JSON export content correctness (UTF-8 body, structure)",
+  "hypothesis": "JSON export uses json.dumps(..., ensure_ascii=False) so Korean stays readable — good. But note JSON includes the raw Tiptap `content` (rich JSON) AND `plainText`; meeting JSON embeds full transcript + actionItems. Edge: notes with empty title → 'Untitled' fallback (notes), but meetings use meeting.title directly with NO fallback → an empty-title meeting exports filename '.json' (just extension) and JSON title could be empty/null. Also verify the JSON parses and the body matches what's on screen (no truncation, correct camelCase per I-16).",
+  "repro_steps": "As owner d@e.com: (1) Create a note with Korean title + Korean body, export JSON; open the file and confirm Korean is not \\uXXXX-escaped, content+plainText present, dates ISO, keys camelCase. (2) Create/find a meeting and export JSON; confirm transcript[] and actionItems[] present with camelCase keys. (3) Create a meeting with an EMPTY or whitespace title (if UI allows) and export — observe the filename (likely '.json') and the title field in the body.",
+  "expected": "JSON is valid UTF-8, readable Korean, camelCase keys, complete body; empty meeting title handled with a sensible fallback filename.",
+  "suspected_defect": "Empty meeting title → filename is just '.json' (no base name) / null title in body; or transcript/actions missing/mis-cased.",
+  "priority": "P3",
+  "grounding": "backend/src/notes/service.py:198-207 json.dumps ensure_ascii=False, title=note.title or 'Untitled'; meetings/service.py:189-202 json.dumps ensure_ascii=False, filename=`{meeting.title}.json` NO fallback; detail camelCase keys"
+ },
+ {
+  "id": "POWER-10",
+  "area": "Viewer write-block on promote LIVE (target-ws viewer + source-ws roles)",
+  "hypothesis": "validate_promote_target rejects promote when the promoter is a VIEWER in the TARGET workspace (extra check beyond route require_member which only checks SOURCE ws). Edge to verify LIVE: owner flips a@e.com to viewer in the TARGET workspace B while a@e.com is member in SOURCE workspace A. a@e.com attempts to promote a note from A→B. The route's require_member passes (member in A) but validate_promote_target must reject with not_member because target role is viewer. Also verify the in-memory member cache (60s) doesn't let a just-demoted viewer slip a promote through.",
+  "repro_steps": "Setup: a@e.com is member of ws A and also member of ws B. As owner d@e.com, in ws B settings demote a@e.com to viewer. Immediately (within 60s) as a@e.com, promote a note from A to B via the promote UI/API. Expect 403 (TargetWorkspaceInvalidError). Then test the inverse: a@e.com is viewer in SOURCE ws A (route require_member should block at the source). Then a@e.com is member in both → promote succeeds.",
+  "expected": "Target-ws viewer is blocked from promote (403) even though source require_member passes; demotion takes effect promptly for the promote path.",
+  "suspected_defect": "Target-ws viewer can still promote (require_member only guards source ws) if validate_promote_target's viewer check is bypassed, OR 60s member cache lets a freshly-demoted viewer promote → write into a ws they can't write to (RBAC bypass).",
+  "priority": "P1",
+  "grounding": "backend/src/common/promote_helpers.py:88-95 viewer role rejected with not_member; route require_member guards source ws only (note in promote_helpers.py:88-90 comment); _MEMBER_CACHE 60s auth/rbac.py"
+ },
+ {
+  "id": "POWER-11",
+  "area": "RAG time_range compound filter + SemanticCache skip correctness",
+  "hypothesis": "When time_range is set (not None/'all'), the code intentionally skips the semantic cache (is_time_filtered → cache_hit=None) to avoid returning unfiltered cached answers. Edge: verify a time-filtered query actually filters results AND does NOT serve a stale cached answer; then verify that AFTER a time-filtered query, a subsequent UNfiltered identical query still gets/sets cache correctly (the filtered run must not poison the cache with a filtered answer keyed as unfiltered).",
+  "repro_steps": "As owner d@e.com on /search in a ws with documents spanning old + recent dates. (1) Ask Q with time_range='week' (use the time filter UI). Confirm answer/sources only reference recent docs. (2) Ask the SAME Q with no time filter ('all'). Confirm it now includes older docs and either serves/sets the unfiltered cache. (3) Re-ask the unfiltered Q again and confirm a cache hit ('cached':true in done event) returns the FULL (unfiltered) answer — NOT the previously filtered one. Watch the SSE done event 'cached' flag and sourceCount.",
+  "expected": "time-filtered query bypasses cache and returns date-scoped results; the filtered run must not write a filtered answer into the unfiltered cache key; unfiltered re-ask returns the correct full answer.",
+  "suspected_defect": "Filtered query writes its filtered answer into the question/ws/project cache key → a later unfiltered ask gets a HIT and returns the date-truncated answer (missing older docs); or time filter not actually applied to results.",
+  "priority": "P2",
+  "grounding": "backend/src/rag/service.py:67-80 is_time_filtered → skip find_similar_cache; cache key is question/workspace/project (comment l.68-70); cache write path elsewhere keyed without time_range; done event 'cached' l.96-101"
+ },
+ {
+  "id": "POWER-12",
+  "area": "Note promote searchability + SemanticCache invalidation (target ws)",
+  "hypothesis": "Note promote BG-copies chunks then calls delete_caches(target_workspace_id, None) to invalidate stale RAG answers. Edge to verify LIVE end-to-end: (1) before promote, run a RAG ask in target ws B that returns 'no info' (and gets cached for 7d); (2) promote a relevant note A→B; (3) once embedding completes, the SAME ask in B must NOT serve the stale 'no info' cached answer — it must reflect the newly promoted note. This validates the cache-invalidation-on-promote actually works through the live SSE path.",
+  "repro_steps": "As owner d@e.com: in ws B, /search ask a specific question about a topic only covered by a note that lives in ws A — confirm B answers 'no relevant info' (this seeds the cache). Then promote that note A→B; poll its embedding status (GET .../notes/{newId}/embedding-status or the audit) until completed. Re-ask the EXACT same question in B. Confirm B now answers using the promoted note's content and cites it — i.e. the stale 'no info' cache was invalidated.",
+  "expected": "After promote+embed completes, the previously-cached negative answer is invalidated and the promoted note becomes a citable RAG source in the target ws.",
+  "suspected_defect": "B keeps returning the stale cached 'no info' answer (delete_caches didn't fire / fired before chunks committed / TTL race) → promoted note appears unsearchable for up to 7 days.",
+  "priority": "P2",
+  "grounding": "backend/src/notes/service.py:463-469 delete_caches(target_workspace_id, None) after chunk flush; embedding_status pending→completed; I-8 SemanticCache TTL 7d threshold 0.93; get_embedding_status notes/service.py:350-373"
+ },
+ {
+  "id": "CONTENT-SKEPTIC-01",
+  "area": "/search RAG citation [N] -> SourceViewer (frontend/src/features/sources/components/source-viewer.tsx + rag-chat.tsx)",
+  "hypothesis": "The 2026-06-18 'chunk-offset highlighting' fix is hollow for meeting/note sources. RagSource.id is the EMBEDDING CHUNK id (rag/service.py:302 `\"id\": str(r[\"id\"])`), but SourceViewer.useFullSourceContent calls useMeetingDetail(wid, source.id) / useNote(wid, source.id) passing that chunk_id AS the meeting/note id (source-viewer.tsx:104-108). The real entity id (source_id) is never put in the RagSource payload. So the full-doc fetch keys on the wrong id, returns nothing/404, and silently falls back to the 200-char snippet (source.content).",
+  "repro_steps": "As owner d@e.com: create a meeting via /new (paste a long transcript, e.g. 15+ distinct sentences) so it distills + embeds. Go to /search, ask a question whose answer cites that meeting -> wait for [1] badge. Click the [1] CitationBadge. Observe the right-side SourceViewer (data-testid=rag-source-viewer): check whether it shows the FULL transcript (every speaker turn) or only the ~200-char snippet. Open DevTools Network and confirm whether GET .../meetings/{id} or .../notes/{id} fired with a 200 (and with the CHUNK id, which is NOT a valid meeting id -> 404). Repeat with a note source.",
+  "expected": "Clicking [1] opens SourceViewer showing the FULL meeting transcript/note body with the cited passage highlighted in context (the whole point of the 2026-06-18 fix).",
+  "suspected_defect": "SourceViewer always shows only the 200-char RAG snippet; the full-document fetch 404s because chunk_id is passed where meeting_id/note_id is required. '전체 내용 불러오는 중...' may flash then resolve to snippet. The feature appears to work (highlight shows) but never loads the real document.",
+  "priority": "P1",
+  "grounding": "backend/src/rag/service.py:301-310 (`id`=chunk id); frontend/src/features/sources/components/source-viewer.tsx:104-108,110-133 (useMeetingDetail/useNote called with source.id); frontend/src/features/rag/components/rag-chat.tsx:13-22 (toSourceDocument id=source.id) + types.ts:14-23 (RagSource has no source_id)"
+ },
+ {
+  "id": "CONTENT-SKEPTIC-02",
+  "area": "/search RAG citation highlight offsets (source-viewer.tsx renderHighlightedContent)",
+  "hypothesis": "Even when full content DOES load (if id mapping ever resolves), the HighlightChunk offsets are wrong. toHighlightChunk sets startOffset:0, endOffset:source.text.length (snippet length <=200), but renderHighlightedContent applies those offsets to the FULL fetched document (transcript could be thousands of chars). So the highlight marks the first <=200 chars of the whole document, NOT where the cited chunk actually appears.",
+  "repro_steps": "As d@e.com: create a meeting whose transcript has the relevant/cited content in the MIDDLE or END (not first 200 chars). Ask a /search question that cites it, click [1]. If the SourceViewer loads more than the snippet, observe WHERE the yellow <mark> highlight lands — it should surround the cited sentence; check if it instead highlights the opening 200 chars of the transcript regardless of where the answer was drawn from.",
+  "expected": "Highlight (<mark data-citation=1>) surrounds the actual cited passage within the full document.",
+  "suspected_defect": "Highlight always covers chars 0..min(200,len) of whatever content renders — i.e. the document's opening, not the cited chunk. Auto-scroll (source-viewer.tsx:146-155) jumps to the wrong mark. Misleads users about provenance.",
+  "priority": "P2",
+  "grounding": "frontend/src/features/rag/components/rag-chat.tsx:25-32 (startOffset:0,endOffset:source.text.length); source-viewer.tsx:37-89 (renderHighlightedContent slices content by those offsets) — offsets computed from 200-char snippet, applied to full doc"
+ },
+ {
+  "id": "CONTENT-SKEPTIC-03",
+  "area": "POST /api/v1/workspaces/{ws}/rag/ask SemanticCache (embeddings/repository.py find_similar_cache)",
+  "hypothesis": "SemanticCache poisoning across sourceType filter. find_similar_cache keys ONLY on workspace_id + (optional) project_id + question-embedding similarity >=0.93 — it does NOT include source_type. The store path (rag/service.py:202-223) only skips caching when time_range is set, NOT when source_type is set, and never persists source_type. So a question answered under sourceType=note (notes-only sources) gets cached, then the same question with NO filter (or sourceType=meeting) hits that cache and returns the notes-only answer/sources — and vice versa.",
+  "repro_steps": "As d@e.com: ensure ws has BOTH a meeting and a note relevant to a shared topic. /search with the source-type dropdown set to '노트' (sourceType=note), ask a question -> note the answer + the 소스 list (should be note-only). Then switch the dropdown to '모든 유형' (no filter) and ask the SAME (or near-identical) question -> check the 'done' SSE event cached:true and whether the answer/sources are identical to the note-only run (meeting sources missing). Reverse: prime with '모든 유형' first, then ask with '회의' filter and see if you get the unfiltered cached answer.",
+  "expected": "Each sourceType scope returns sources matching that scope; cache must not cross sourceType filter boundaries (analogous to the time_range cache-skip at service.py:71-73).",
+  "suspected_defect": "Filtered and unfiltered queries share one cache entry -> wrong-scope answer returned (e.g. meeting filter returns note-only answer, or unfiltered returns note-only answer). Sources shown don't match the selected filter.",
+  "priority": "P1",
+  "grounding": "backend/src/embeddings/repository.py:331-364 (find_similar_cache filters only wid + project_id, no source_type); backend/src/rag/service.py:71-80 (cache lookup ignores source_type), 219-223 (cache skip only for is_time_filtered, not source_type)"
+ },
+ {
+  "id": "CONTENT-SKEPTIC-04",
+  "area": "RAG onboarding step jump (rag/service.py _advance_onboarding + onboarding/repository.py increment)",
+  "hypothesis": "Onboarding integrity bug: a first RAG ask advances onboarding_step straight to 4 (completed) regardless of whether steps 2 (first project) and 3 (first meeting distill) were done. increment() does `SET onboarding_step=:target WHERE onboarding_step < :target` with target=4 — it OVERWRITES, not increments-by-one. A brand-new user at step 1 who navigates directly to /search and asks anything jumps to step 4 and the OnboardingBanner disappears having never created a project or distilled a meeting.",
+  "repro_steps": "Live signup a fresh account (the 'onboarding 0->4 live signup' gap) OR use member a@e.com if its onboarding_step is still <4. Immediately after workspace exists (step 1), navigate directly to /search and ask any question (even one that returns '관련 정보를 찾지 못했습니다' — but note: empty-result path at service.py:136-148 does NOT call _advance_onboarding, so ask something that yields >=1 source). Then GET /api/v1/users/me/onboarding and check step — and check the dashboard OnboardingBanner.",
+  "expected": "Onboarding should reflect actual progress; jumping to 'completed' while project/meeting steps were skipped is misleading. At minimum step should advance only through legitimately-completed milestones.",
+  "suspected_defect": "step jumps 1->4, OnboardingBanner vanishes, user told they're 'onboarded' despite never creating a project or meeting. onboarded_at set prematurely.",
+  "priority": "P2",
+  "grounding": "backend/src/rag/service.py:36-43 (increment_step(user_id,4)) + 95,228 (called on cache-hit and success); backend/src/onboarding/repository.py:24-35 (SET = :target, not +1; advances from any step<4)"
+ },
+ {
+  "id": "CONTENT-SKEPTIC-05",
+  "area": "RAG answer grounding / hallucination (common/prompts.py RAG_SYSTEM_PROMPT + rag/service.py)",
+  "hypothesis": "RAG can hallucinate beyond sources or fabricate citation numbers. The only guard is the prompt instruction (rule 1-3); there is NO post-generation validation that [N] numbers in the answer actually map to a real source index, and no check that claims are grounded. Gemini may cite [4] when only 3 sources exist, or answer confidently from parametric knowledge when sources are weak/irrelevant. The empty-fusion path returns a canned message, but a SINGLE weakly-relevant chunk still triggers full generation.",
+  "repro_steps": "As d@e.com seed the ws with a few unrelated meetings/notes (e.g. about 'marketing'). Go to /search and ask a question whose answer is NOT in any source but is general knowledge (e.g. 'What is the capital of France?' or '회사 창립일은?' when no source says it). Observe: does the answer say '제공된 소스에서 관련 정보를 찾지 못했습니다' (grounded refusal) or does it answer from world knowledge? Then ask a question that pulls exactly 2 sources and check whether the answer cites a [3] or [4] that doesn't exist in the 소스 list.",
+  "expected": "Answers strictly grounded in provided sources; refusal when sources lack the info; citation numbers never exceed the number of returned sources.",
+  "suspected_defect": "Model answers ungrounded questions from parametric knowledge (hallucination) and/or emits citation [N] beyond available source count -> clicking such a badge does nothing (sources[num-1] undefined at rag-chat.tsx:60) or opens the wrong source.",
+  "priority": "P1",
+  "grounding": "backend/src/common/prompts.py:100-115 (grounding is prompt-only, no enforcement); backend/src/rag/service.py:162-200 (no validation of [N] vs source count); frontend/src/features/rag/components/rag-chat.tsx:55-69 (sources?.[num-1] silently no-ops when out of range)"
+ },
+ {
+  "id": "CONTENT-SKEPTIC-06",
+  "area": "Meeting distill content quality (services/ai_processing.py summarize + meetings pipeline)",
+  "hypothesis": "summarize() does MeetingSummaryResult.model_validate(raw) which only checks types, not content fidelity. The summary/key_decisions/participants can hallucinate names/decisions not in the transcript, or the participants list can disagree with the diarized speakers. There is no cross-check between summary.participants and the actual TranscriptSegment speakers. For a short or noisy transcript, Gemini may invent plausible-but-absent decisions.",
+  "repro_steps": "As d@e.com via /new create a meeting with a SHORT, ambiguous transcript that has NO clear decisions (e.g. 3 lines of small talk, no names). Wait for status=completed (poll GET .../meetings/{id}/status). Open /meetings/{id} and inspect the AI summary: check key_decisions and participants — are decisions invented? Are participant names present that never appear in the transcript? Compare participants vs the speaker labels in the transcript tab.",
+  "expected": "Summary reflects only what's in the transcript; empty key_decisions for small-talk; participants match diarized speakers; no fabricated names/decisions.",
+  "suspected_defect": "Hallucinated decisions/participants on thin transcripts; participants list inconsistent with transcript speaker labels; over-confident summary of content-free audio.",
+  "priority": "P2",
+  "grounding": "backend/src/services/ai_processing.py:73-95 (model_validate is type-only); backend/src/common/prompts.py:9-20 (summary schema, no anti-hallucination guard for participants/decisions); meetings/pipeline_service.py:66-68 (summary saved verbatim)"
+ },
+ {
+  "id": "CONTENT-SKEPTIC-07",
+  "area": "Inbox auto-confirm threshold semantics (meetings/pipeline_service.py:125-139 + settings inbox_threshold)",
+  "hypothesis": "inbox_threshold is the AUTO-CONFIRM (auto-link meeting->project) threshold, not a 'classification accuracy' gate. When AI confidence >= threshold AND an existingProjectId is suggested, the meeting is auto-linked to a project WITHOUT user review (is_processed=True, add_meeting_link). If the owner lowers inbox_threshold via /settings (allowed down to 0.5), low-confidence/WRONG project suggestions get auto-linked silently — a quality/UX trap. Also if confidence>=threshold but suggestedProject is a NEW project (existingProjectId null), is_processed=True but NO link is created (line 129 requires existing id) -> item silently marked processed with no project attached.",
+  "repro_steps": "As owner d@e.com go to /settings and set inbox threshold to its minimum (0.5). Create a meeting (/new) whose content vaguely relates to an existing project. After completion, go to /inbox and /projects/{id}: was the meeting auto-linked to a possibly-wrong project without your confirmation? Then create a meeting that matches NO existing project (AI should suggest a NEW project name): check /inbox — is the item marked processed (gone from unprocessed list) yet attached to no project (orphaned, newProjectTitle never created)?",
+  "expected": "Auto-confirm should be conservative; low threshold should warn; new-project suggestions at high confidence should either create the project or stay unprocessed for user action, never silently mark processed-with-no-link.",
+  "suspected_defect": "Wrong project auto-linked at low threshold with no audit/undo; high-confidence NEW-project suggestions vanish from inbox (is_processed=True) without creating/attaching any project -> lost item.",
+  "priority": "P2",
+  "grounding": "backend/src/meetings/pipeline_service.py:108-139 (is_processed=confidence>=threshold; link only if existing_project_id_str truthy); backend/src/workspaces/schemas.py:75 (threshold ge=0.5); inbox/service.py:81-139 (classify does not re-check confidence)"
+ },
+ {
+  "id": "CONTENT-SKEPTIC-08",
+  "area": "RAG stale-source warning dual-system inconsistency (rag/service.py _format_sources freshness vs RAG_SYSTEM_PROMPT rule 4)",
+  "hypothesis": "Two independent stale-warning mechanisms can disagree. BE computes freshness=='stale' for created_at >90 days (service.py:296-297) and FE shows a '오래됨' badge — but ONLY inside the collapsed '소스 N건' expander (rag-sources.tsx:73-78), hidden by default. Separately the prompt tells Gemini to inline '⚠️ 오래된 소스입니다 (YYYY-MM-DD 기준)' in the answer text based on prompt header dates. These use different thresholds (BE: 90d; Gemini: '3개월 이상' judged from header date string which is only YYYY-MM-DD or the first 10 chars of an ISO string).",
+  "repro_steps": "As d@e.com create/seed a meeting or note with a created_at >90 days ago (if seeding is not possible, use an existing old source). Ask /search a question citing it. Observe: (a) does the streamed answer text contain the '⚠️ 오래된 소스' inline warning with a correct date? (b) expand '소스 N건' — does the '오래됨' badge appear? (c) do (a) and (b) agree, and does the inline date match the source date? Also confirm the badge is hidden until the expander is opened (discoverability defect).",
+  "expected": "Consistent, discoverable staleness signaling; inline warning date matches source date; badge visible enough to be noticed.",
+  "suspected_defect": "Inline LLM warning and BE badge disagree (one fires, the other doesn't) or wrong/missing date; stale badge effectively invisible (collapsed by default). Mixed signal undermines trust.",
+  "priority": "P3",
+  "grounding": "backend/src/rag/service.py:286-309 (freshness 90d) + _format_sources_for_prompt:313-331 (header date YYYY-MM-DD); backend/src/common/prompts.py:106 (rule 4 inline warning, '3개월'); frontend/src/features/rag/components/rag-sources.tsx:42-78 (badge only inside isExpanded)"
+ },
+ {
+  "id": "CONTENT-SKEPTIC-09",
+  "area": "RAG SSE error/empty-result UX (rag/service.py error+empty paths, rag/hooks.ts parser)",
+  "hypothesis": "When Gemini fails mid-stream the BE emits an 'error' SSE event (service.py:176-185), but the FE useRagStream switch (hooks.ts:87-105) handles only thinking/search_results/answer/done — there is NO case for 'error'. So a graceful BE degrade produces NO visible message; the assistant bubble stays empty (just the streaming cursor) until 'done', leaving a silent empty answer. Also the empty-fusion canned message '제공된 소스에서 관련 정보를 찾지 못했습니다' is sent as a normal answer token — fine — but partial-then-error leaves whatever tokens already streamed with no error indicator.",
+  "repro_steps": "As d@e.com on /search, ask a question that returns sources (so generation starts). To trigger the error path reliably, ask repeatedly/rapidly or a very long adversarial prompt to provoke a Gemini safety-filter/empty-candidate (the breaker path). Watch the assistant bubble: on a BE 'error' event, is ANY user-facing error shown, or does the bubble just stop with no message? Also ask a guaranteed-no-match question and confirm the empty-result canned message renders (not a blank bubble). Check console for errors.",
+  "expected": "On SSE 'error', show the BE-provided '질문을 처리할 수 없습니다. 다시 시도해주세요.' message; never leave a silent empty assistant bubble.",
+  "suspected_defect": "BE 'error' SSE event is dropped by the FE switch -> assistant message ends empty with no error text; user sees a blank/aborted answer with no explanation.",
+  "priority": "P2",
+  "grounding": "backend/src/rag/service.py:173-190 (yields event:error); frontend/src/features/rag/hooks.ts:87-106 (switch handles thinking/search_results/answer/done — no 'error' case)"
+ },
+ {
+  "id": "CONTENT-SKEPTIC-10",
+  "area": "Memory distill quality + suggested_visibility (common/prompts.py MEMORY_DISTILL_PROMPT, /memory)",
+  "hypothesis": "Memory distill returns suggested_visibility ('personal'|'team') from the LLM, but the prompt allows the model to over-classify private personal notes as 'team' (or vice versa). If the FE/pipeline auto-applies suggested_visibility, a private personal memo could be defaulted to team-visible (a privacy leak vector) — or a genuinely shareable decision defaulted personal (lost knowledge). model_validate only checks it's a str, accepts ANY string (e.g. 'public', '팀') silently.",
+  "repro_steps": "As d@e.com on /memory capture a clearly PRIVATE personal note (e.g. '연봉 협상 때 1억 부르자, 절대 회사에 말하지 말 것'). After distill completes, check the resulting memory's visibility — was it suggested/set 'team'? Then capture a clearly team-worthy decision and check if it's 'personal'. Also probe: does the distill ever emit a non-enum visibility value (inspect via API) that the system accepts without normalization?",
+  "expected": "Private personal content -> personal; the suggested_visibility must be validated to the {personal,team} enum and should never silently widen a private note to team without explicit user confirmation.",
+  "suspected_defect": "Sensitive personal memo classified/defaulted team-visible (privacy concern), or arbitrary visibility string accepted (MemoryDistilledResult.suggested_visibility is plain str with default 'personal', no enum validation).",
+  "priority": "P2",
+  "grounding": "backend/src/common/prompts.py:148-176 (MEMORY_DISTILL_PROMPT visibility heuristic + MemoryDistilledResult.suggested_visibility: str default 'personal', no Literal/enum)"
+ },
+ {
+  "id": "CONTENT-SKEPTIC-11",
+  "area": "Export MD/JSON UTF-8 filename + content (notes/router.py:62-69, meetings/router.py:103-110, services export)",
+  "hypothesis": "Export sets Content-Disposition with ONLY filename*=UTF-8''{quote(filename)} and no ASCII fallback filename=. For Korean note/meeting titles this relies on RFC 5987 (modern browsers OK) but tools/older clients with no filename* support get NO filename. Also quote() does not strip path-hostile chars (e.g. a title containing '/' or newline) — title comes straight from user input into f'{title}.md'. And JSON export uses ensure_ascii=False (good) but the .md export of a note converts Tiptap content — verify the markdown body isn't empty/garbled for rich content.",
+  "repro_steps": "As d@e.com create a note titled with Korean + a slash/emoji, e.g. '회의록 2026/06 ✅'. On /notes/{id} trigger export?format=md then ?format=json. Observe the downloaded filename: is the Korean preserved and the '/' handled (not breaking the filename), or does it become 'md' only / a broken name? Open both files: is the .md body the full note content (not empty/HTML) and the .json valid UTF-8 with readable Korean (not \\uXXXX)? Repeat for a meeting export.",
+  "expected": "Filename round-trips Korean safely, path-hostile chars sanitized; .md has full readable content; .json is human-readable UTF-8.",
+  "suspected_defect": "Broken/missing filename for titles with '/' or in clients lacking filename* support; possibly empty/garbled .md body for rich Tiptap notes; no ASCII fallback.",
+  "priority": "P3",
+  "grounding": "backend/src/notes/router.py:62-69 (filename* only, quote(filename)); backend/src/meetings/router.py:103-110 (same); notes/service.py:196,206-207 + meetings/service.py:188,201-202 (filename = f'{title}.md', title unsanitized)"
+ },
+ {
+  "id": "CONTENT-SKEPTIC-12",
+  "area": "RAG citation color/badge beyond 3 sources (citation-badge.tsx getCitationColor)",
+  "hypothesis": "Citation color palette only defines colors for [1],[2],[3]; [4]+ fall back to DEFAULT_COLOR (gray). Answers commonly cite 5-10 sources (RRF top_n=10). So [4]..[10] all render identical gray badges AND identical gray highlight border in SourceViewer (getHighlightStyle reuses getCitationColor), making it impossible to visually distinguish citations 4+ from each other or correlate badge color to highlight color. Also if Gemini emits [0] or a number, CITATION_COLORS[0] is undefined -> default; and sources?.[num-1] for num=0 -> sources[-1] (last source) opens WRONG source.",
+  "repro_steps": "As d@e.com seed the ws with 6+ distinct relevant sources on one topic. /search ask a broad question that should cite many sources -> expect [1]..[N] with N>=4. Observe: are badges [4]+ all the same gray (indistinguishable)? Click [4] and [5] — do their SourceViewer highlight border colors differ or are both gray? Separately, if any answer emits a [0] citation, click it and verify it doesn't open sources[-1] (the last source).",
+  "expected": "Each citation visually distinguishable, or at least badge color matches its SourceViewer highlight; out-of-range/zero citation numbers handled safely (no off-by-one opening the wrong source).",
+  "suspected_defect": "Citations 4+ are visually identical (gray), defeating the color-coded provenance UX; potential [0]/out-of-range citation opens the wrong (or last) source via sources[num-1].",
+  "priority": "P3",
+  "grounding": "frontend/src/features/rag/components/citation-badge.tsx:10-35,69-71 (only 1/2/3 defined, DEFAULT for rest); source-viewer.tsx:17-27,61 (highlight reuses getCitationColor); rag-chat.tsx:60 (sources?.[num-1]); backend/src/rag/service.py:134 (RRF top_n=10)"
+ },
+ {
+  "id": "ONBOARD-01",
+  "area": "Onboarding step progression / GET /api/v1/users/me/onboarding + OnboardingTooltip gating",
+  "hypothesis": "Onboarding step is a monotonic max() advanced from 5 different domains (auth ws=1, project=2, meeting distill=3, RAG ask=4) via idempotent increment_step(target). It is NOT a sequential 0->1->2->3->4 checklist. If a brand-new user does a RAG ask FIRST (e.g. clicks ⌘K and asks anything on an empty workspace), step jumps straight to 4, permanently skipping 1/2/3. Because OnboardingTooltip gates 'projects' on step<2 and 'new' on step<3, those guidance tooltips will then NEVER fire — the user is marked 'fully onboarded' having created nothing.",
+  "repro_steps": "Sign in as a fresh-feeling account state for d@e.com whose onboarding_step is low (or use a@e.com after owner resets context). 1) Go to /dashboard, click ⌘K search box, type any question, submit (RAG ask). 2) Immediately GET /api/v1/users/me/onboarding via Network tab — observe step. 3) Now navigate to /projects (empty) and /new — observe whether the OnboardingTooltip popovers ('+ 새 프로젝트로 시작하세요', etc.) appear. EXPECT they do NOT because step>=4. Compare against the documented '0->4 step progression' intent.",
+  "expected": "Either onboarding should advance sequentially (RAG ask should not be reachable/counted before a project+meeting exist), OR the tooltips should not be gated purely on step so a user who skipped ahead still gets first-project/first-meeting guidance. step jumping to 4 with zero projects/meetings is an inconsistent 'completed' state.",
+  "suspected_defect": "Onboarding reports step=4 (isCompleted true) for an account that has never created a project or distilled a meeting; projects/new tooltips silently suppressed; the 0->4 funnel is mislabeled as a max() rather than a sequence.",
+  "priority": "P1",
+  "grounding": "backend/src/onboarding/service.py:22-35 (increment_step no-op if current>=target); backend/src/rag/service.py:40,95,228 (RAG ask => increment_step 4 on both cache-hit and miss); backend/src/onboarding/service.py:51-58 (isCompleted = step>=4); frontend/src/components/onboarding/onboarding-tooltip.tsx:30-33,72-77 (projects step<2 / new step<3 gate, returns early if step>=threshold)"
+ },
+ {
+  "id": "ONBOARD-02",
+  "area": "First-run RAG ask on empty corpus (POST .../rag/ask SSE) + onboarding step=4",
+  "hypothesis": "A brand-new account has zero embedded chunks. Asking RAG yields the canned '제공된 소스에서 관련 정보를 찾지 못했습니다.' answer with sourceCount=0 — yet _advance_onboarding is still called on cache-hit and on the normal full_answer path. On the no-source 'fused empty' early-return path, step=4 is NOT advanced (no _advance_onboarding before that return), but on a fallback where Gemini returns the canned string as full_answer, step DOES advance. So whether a content-less first ask 'completes onboarding' depends on an internal branch the user can't see — non-deterministic onboarding completion.",
+  "repro_steps": "As a@e.com newly added to owner's team ws with no content, OR in a fresh personal ws: 1) /dashboard ⌘K, ask 'What did we decide last week?'. 2) Watch SSE in Network: note whether 'done' has sourceCount=0 and which branch (the [5] fused-empty early return vs [8] generation). 3) GET /users/me/onboarding — does step become 4? 4) Repeat the same ask — observe SemanticCache hit (cached:true) and whether it now advances step where the first didn't.",
+  "expected": "First-run RAG with no indexed content should give a helpful empty-state ('아직 검색할 콘텐츠가 없어요 — 회의를 올려보세요') AND should not mark onboarding complete on a zero-result answer. Behavior must be deterministic, not dependent on whether fusion is empty vs Gemini emitting the canned line.",
+  "suspected_defect": "Inconsistent onboarding completion on empty-corpus asks; unhelpful generic 'no info' message instead of a first-run nudge; possible step=4 set with no real value delivered.",
+  "priority": "P1",
+  "grounding": "backend/src/rag/service.py:136-148 (fused empty early return WITHOUT _advance_onboarding) vs 192-200 (empty full_answer return without advance) vs 227-228 (advance after non-empty answer) and 95 (cache-hit advance); frontend/src/features/rag/components/rag-chat.tsx:71-79 (no special empty-corpus copy)"
+ },
+ {
+  "id": "ONBOARD-03",
+  "area": "First-run /projects empty state divergence (personal ws lazy-seed vs team ws template seed)",
+  "hypothesis": "Team-workspace creation seeds 3 template projects (🚀 시작하기 / 💡 아이디어 / 📋 회의록) via DEFAULT_TEMPLATE_PROJECTS, but the personal-workspace lazy seed path inserts ONLY the workspace + owner member rows — no template projects. So a brand-new account whose active workspace defaults to the personal one lands on /projects with a bare '프로젝트가 없습니다' empty state, while an account that created a team ws sees 3 friendly onboarding projects. The first-run experience is sharply inconsistent depending on which ws is active first.",
+  "repro_steps": "1) Sign in as a brand-new-feeling personal-ws context (a@e.com before being added anywhere, or the auto-created '개인 Kairos'). Go to /projects. Observe: empty state, zero projects, no onboarding guide project. 2) Now as d@e.com create a fresh team workspace via /dashboard '워크스페이스 만들기'. Switch to it, go to /projects. Observe 3 seeded template projects. 3) Compare the two first-run experiences for the same just-arrived user.",
+  "expected": "First-run should be consistent. Either the personal ws should also get an onboarding guide project (or a tailored empty state explaining next steps), or the divergence should be intentional and documented. A new user dropped into an empty personal ws gets zero scaffolding.",
+  "suspected_defect": "New personal-workspace users see a cold empty /projects with no template/guidance, unlike team-ws users; onboarding scaffolding is workspace-type-dependent and undiscoverable.",
+  "priority": "P2",
+  "grounding": "backend/src/workspaces/service.py:41-51 (team ws seeds DEFAULT_TEMPLATE_PROJECTS); backend/src/workspaces/templates.py:23-52 (the 3 templates); backend/src/auth/dependencies.py:282-307 (personal ws lazy seed inserts workspace + member only, no projects)"
+ },
+ {
+  "id": "ONBOARD-04",
+  "area": "Onboarding 'new' tooltip is dead code — never rendered (/new page)",
+  "hypothesis": "OnboardingTooltip defines a 'new' page variant with copy '회의 음성을 업로드하면 AI 가 자동 요약합니다' and a step<3 + empty gate, and is documented as one of the '2 무조건 + 2 조건부' first-run hints. But grep shows OnboardingTooltip is mounted only on dashboard, search (cmd-k), and projects — NOT on /new. The /new page (NewContentPage) never imports or renders it. So the single most important first-run hint about uploading a meeting (the step-3 nudge) never appears.",
+  "repro_steps": "As a fresh account with onboarding step<3 and no meetings: 1) Navigate to /new. 2) Observe whether any onboarding tooltip/popover ('회의 음성을 업로드하면...') ever appears near the 회의 녹음 card. 3) Confirm via DOM: search for data-testid='onboarding-tooltip-new' — it will be absent. 4) Cross-check that the COPY['new'] string exists in code but is unreachable.",
+  "expected": "The step-3 first-meeting hint should appear on /new for a new user (step<3, no meetings), matching the documented '2 conditional' tooltip design. Currently it is unreachable dead UX.",
+  "suspected_defect": "The first-meeting onboarding tooltip is orphaned — defined but never mounted, so new users get no guidance on the most critical onboarding action (upload audio -> distill).",
+  "priority": "P2",
+  "grounding": "frontend/src/components/onboarding/onboarding-tooltip.tsx:19-24,30-33 (COPY.new + STEP_GATED.new=3 defined); grep shows OnboardingTooltip page= usages only at dashboard/page.tsx:183, cmd-k.tsx:149, projects/page.tsx:40 — none in app/(app)/new/page.tsx:1-60 (no import)"
+ },
+ {
+  "id": "ONBOARD-05",
+  "area": "RAG citation [N] -> SourceViewer highlight accuracy (source-viewer.tsx + rag-chat.tsx)",
+  "hypothesis": "When a citation [N] is clicked, rag-chat builds a HighlightChunk with startOffset:0, endOffset = source.text.length, where source.text is the 200-char truncated snippet (_format_sources truncates chunk_text[:200]). But SourceViewer.useFullSourceContent SWAPS the content to the FULL meeting transcript / full note plainText. renderHighlightedContent then highlights content.slice(0, snippetLength) — i.e. the FIRST ~200 chars of the full document, regardless of where the actually-cited chunk lives. So the highlighted/auto-scrolled region is almost never the real cited passage for any meeting/note longer than 200 chars. The advertised '2026-06-18 chunk-offset highlighting' fix does not use real offsets.",
+  "repro_steps": "Owner d@e.com: 1) Distill a meeting whose key answer is in the MIDDLE/END of a long transcript (e.g. decision stated at minute 30). 2) /dashboard ⌘K ask a question whose answer is that mid/late passage. 3) Click the [1] citation badge in the answer. 4) In the SourceViewer panel observe which text is highlighted (yellow mark) and where it auto-scrolls. EXPECT it highlights the true cited sentence; OBSERVE it highlights the first ~200 chars of the transcript top instead.",
+  "expected": "The citation highlight should mark the actual chunk that grounded the answer (real char offsets into the full document), and auto-scroll to it. Highlighting a fixed prefix of the full doc is misleading and undermines source verification.",
+  "suspected_defect": "Citation highlight always lands on the document's opening ~200 chars, not the cited passage — false 'source verification' UX; '1개 매치' badge points at the wrong text for any non-trivial transcript/note.",
+  "priority": "P1",
+  "grounding": "frontend/src/features/rag/components/rag-chat.tsx:24-32 (startOffset:0,endOffset:source.text.length against snippet); backend/src/rag/service.py:303 (text = chunk_text[:200] snippet only, no offset); frontend/src/features/sources/components/source-viewer.tsx:110-129 (content swapped to FULL transcript/note), 50-78 (slice by snippet offsets), 145-155 (scroll to first mark)"
+ },
+ {
+  "id": "ONBOARD-06",
+  "area": "RAG citation [N] out-of-range / spurious badge dead-click (markdown-message.tsx + rag-chat.tsx)",
+  "hypothesis": "The markdown renderer turns EVERY /\\[(\\d+)\\]/ in the answer text into a clickable CitationBadge, with no validation against the actual source count. rag-chat.handleCitationClick does sources[num-1]; if num exceeds the number of returned sources (common on a sparse first-run corpus where Gemini over-cites, or if it emits [0] or a bracketed number from the transcript like '[2]단계'), source is undefined and openSourceViewer is never called — a silent dead-click. The badge looks interactive but does nothing.",
+  "repro_steps": "As d@e.com with only 1-2 indexed items (fresh corpus): 1) Ask a broad question likely to make Gemini cite [1][2][3][4] while only ~2 sources exist. 2) Read the answer; click each citation badge in turn. 3) Observe which badges open the SourceViewer and which do nothing. 4) Also test a meeting whose transcript literally contains '[3]' or footnote-like brackets, distill+ask, and check those get wrongly rendered as citation badges.",
+  "expected": "Citation badges should only render for valid source indices (1..sources.length); out-of-range [N] should render as plain text, and clicking any badge must always open a source. Non-citation bracketed numbers from content should not become fake citations.",
+  "suspected_defect": "Clickable-looking citation badges that no-op on click (out-of-range N); transcript text like '[2]' mis-rendered as citations — both erode trust in AI grounding.",
+  "priority": "P2",
+  "grounding": "frontend/src/features/rag/components/markdown-message.tsx:22,30-38 (regex matches any [\\d+], no bound check); frontend/src/features/rag/components/rag-chat.tsx:55-68 (sources[num-1]; if undefined, no openSourceViewer => dead click); backend/src/common/prompts.py:105 (prompt instructs [1],[2] format but model not constrained)"
+ },
+ {
+  "id": "ONBOARD-07",
+  "area": "First-run audio meeting pipeline — distill content quality + failed-state UX (/new -> /meetings/[id])",
+  "hypothesis": "A new user's very first action is uploading real meeting audio (the headline value prop). The pipeline does STT (whisper) -> diarization (pyannote) -> Gemini summary -> action extraction, status polled via GET .../status. Two risks unverified live: (a) content quality on real audio — diarization speaker labels, summary faithfulness, action-item extraction, no hallucinated decisions; (b) failure UX — on any pipeline exception status becomes 'failed' and the UI shows a generic '분석에 실패했습니다' with raw error hidden, but a brand-new user gets no retry affordance and the meeting is stuck. Also useMeetingDetail.refetchInterval returns 3000 even when status is undefined (network blip), polling forever.",
+  "repro_steps": "Owner d@e.com: 1) /new, 회의 녹음 tab, upload a real multi-speaker audio file (>1 min). 2) Observe 202 + status badge polling (uploading->transcribing->analyzing->embedding->completed) on /meetings/[id]. 3) On completion inspect: transcript speaker accuracy, summary vs actual content (hallucination?), extracted action items correctness, and whether it auto-linked to a project at confidence>=0.9. 4) Separately upload a corrupt/tiny/non-audio file; observe the failed-state UI — is there any retry or clear next step? 5) Mid-processing, kill network briefly; observe whether detail page keeps polling indefinitely.",
+  "expected": "STT/diarization/summary/actions should be faithful (no invented decisions, sane speaker turns); a failed meeting should offer retry or a clear recovery path; polling should back off / stop on persistent error rather than hammer every 3s with undefined status.",
+  "suspected_defect": "Hallucinated/empty summary or wrong action items on first real audio; dead-end 'failed' meeting with no retry for a first-time user; indefinite 3s polling on undefined status (battery/network waste).",
+  "priority": "P1",
+  "grounding": "backend/src/meetings/pipeline_service.py:198-254 (STT->analyze->failed status with error_message hidden); pipeline_service.py:108-139 (auto-confirm inbox/project link at confidence>=threshold default 0.9); frontend/src/features/meetings/hooks.ts:53-59 (refetchInterval returns 3000 even when status undefined); frontend/src/features/meetings/components/meeting-detail.tsx:81-93,249-252 (FailedView generic copy, no retry button found)"
+ },
+ {
+  "id": "ONBOARD-08",
+  "area": "Note/meeting export filename with special chars (GET .../notes/{id}/export, .../meetings/{id}/export)",
+  "hypothesis": "Export builds filename as f\"{title}.md\" / f\"{title}.json\" then quote()-encodes into Content-Disposition: filename*=UTF-8''{encoded}. quote() percent-encodes Korean (good) but a title containing a newline, slash, or being empty/very long produces edge results: title may be None->'Untitled' (handled), but a title with embedded '\\n' or '/' gets percent-encoded into the filename param, and browsers may save a weird name; also note.plain_text being None yields the literal string 'None' in the MD body ('# Title\\n\\nNone'). For a first-run user exporting their first note/meeting, the downloaded file may have a corrupted name or 'None' content.",
+  "repro_steps": "Owner d@e.com: 1) Create a note titled with Korean + emoji + a slash e.g. '회의록 2026/06 🚀' and minimal/empty body. 2) Open /notes/[id], click export (MD then JSON). 3) Inspect downloaded filename (does the / break the name? is Korean correct?) and MD body (does empty body render literal 'None'?). 4) Create a note with a very long (>200 char) title and export — check filename length handling. 5) Repeat for a meeting export with an emoji/Korean title.",
+  "expected": "Downloaded filename should be a safe, correctly-decoded UTF-8 name (slashes/newlines sanitized, not percent-literal garbage), and MD/JSON body should never contain a literal 'None' for an empty note. First export should be clean.",
+  "suspected_defect": "Corrupted/unsafe download filename when title has /, newline, or is very long; literal 'None' string in exported MD for empty-body notes.",
+  "priority": "P3",
+  "grounding": "backend/src/notes/router.py:62-69 (quote(filename) -> filename*=UTF-8''); backend/src/notes/service.py:192-207 (filename = f\"{title}.md\"; content = f\"# {title}\\n\\n{note.plain_text}\" — plain_text None => 'None'); backend/src/meetings/router.py:103-110 (same quote pattern)"
+ },
+ {
+  "id": "ONBOARD-09",
+  "area": "Onboarding tooltip persistence & re-fire across devices/clear (onboarding-tooltip.tsx)",
+  "hypothesis": "Tooltip 'seen' state is stored ONLY in localStorage (kairos.onboarding.tooltip_shown.{page}), not server-side. So: (a) a returning user on a new device / incognito / after clearing storage will see all first-run tooltips AGAIN even though they are fully onboarded (step=4) — for dashboard/search which are NOT step-gated, they always re-fire on fresh storage. (b) The localStorage key is global, not workspace- or user-scoped, so if two accounts share a browser profile (QA scenario), account B inherits account A's 'already shown' marks and never sees the tooltips. (c) setTimeout(...,0) for setItem means a fast navigation away before the tick could fail to persist, re-firing next visit.",
+  "repro_steps": "1) As d@e.com (onboarded, step=4), open /dashboard and /search — note dashboard/search tooltips fire on a fresh browser. 2) In the SAME browser, sign out and sign in as a@e.com — go to /dashboard/search; observe the tooltips do NOT fire for a@e.com because localStorage marks from d@e.com persist (cross-account bleed). 3) Clear localStorage, revisit /dashboard as the onboarded d@e.com — tooltips re-fire despite full onboarding. 4) On /search, navigate away within <1 tick of open and return; check if tooltip re-fires (setItem race).",
+  "expected": "First-run tooltips should be tied to the user (server-side onboarding state) not a shared browser localStorage key; an onboarded user should not see them again on a new device, and account switching in one browser must not leak 'seen' state between users.",
+  "suspected_defect": "Cross-account tooltip bleed in shared browser; onboarded users re-prompted on new device/cleared storage; dashboard/search tooltips not step-gated so they reappear indefinitely on fresh storage.",
+  "priority": "P2",
+  "grounding": "frontend/src/components/onboarding/onboarding-tooltip.tsx:26-27 (STORAGE_KEY per-page, not user/ws scoped), 66-88 (localStorage-only gate; dashboard/search have no step gate), 85-87 (setItem deferred via setTimeout 0)"
+ },
+ {
+  "id": "ONBOARD-10",
+  "area": "Step=1 ambiguity & onboarding cache staleness (workspaces/service.py + auth/dependencies.py + useOnboarding)",
+  "hypothesis": "increment_step(target=1) fires from BOTH personal-ws lazy seed (every new user, auth) AND team-ws creation. So step reaches 1 the instant a user first authenticates (personal ws auto-created) — meaning the '0->1' workspace-creation milestone is auto-satisfied before the user does anything intentional. Combined with the FE useOnboarding query having retry:false + refetchOnMount:false + staleTime 30s and being disabled until activeWorkspaceId is set, the banner/tooltip state can be stale or never load: if the onboarding fetch errors (no workspace yet, token race), the tooltip silently treats onboarding as undefined and conditional tooltips never fire, while unconditional ones fire on every fresh load. The 60s user cache + pre-commit invalidate (R1) can also serve a stale step for up to 60s right after the triggering action.",
+  "repro_steps": "1) Brand-new auth as a@e.com: immediately GET /users/me/onboarding before creating anything — EXPECT step already =1 (personal ws auto-seed), confirming '워크스페이스 생성' milestone is auto-met. 2) Create first project as a@e.com, then within <60s re-GET onboarding from a different request path — check whether step still reads <2 (stale 60s cache) causing the projects tooltip to keep firing or banner to lag. 3) Force the onboarding fetch to error (e.g. switch to a ws where membership just changed) and observe conditional tooltips (projects/new) silently never appearing because onboarding data is undefined.",
+  "expected": "Onboarding step should reflect real intentional progress (auto-creating a personal ws shouldn't silently complete the 'create workspace' step in a way that confuses the funnel), and step reads should be fresh enough that tooltips/guidance reflect the user's actual state within a click, not up to 60s later.",
+  "suspected_defect": "Step=1 auto-satisfied at first login (funnel milestone meaningless); up-to-60s stale onboarding step after an action; conditional tooltips suppressed when onboarding fetch errors with no fallback.",
+  "priority": "P2",
+  "grounding": "backend/src/auth/dependencies.py:313-321 (lazy seed increment_step 1 for every new user); backend/src/workspaces/service.py:56-64 (team ws also step 1); backend/src/onboarding/service.py:22-35 (pre-commit cache invalidate, 60s TTL caveat); frontend/src/features/onboarding/hooks.ts:31-40 (enabled only with workspaceId, retry:false, refetchOnMount:false); frontend/src/components/onboarding/onboarding-tooltip.tsx:75 (if !onboarding return — conditional tooltip suppressed on error)"
+ },
+ {
+  "id": "MOBILE-01",
+  "area": "/search RAG ask -> citation [N] -> SourceViewer drawer @375px",
+  "hypothesis": "SourceViewer drawer renders width:100% h-full top-0 z-50 (panel-layout.tsx:158-172) while BottomNav is fixed bottom-0 z-50 56px (bottom-nav.tsx:30-36). The drawer has NO bottom-nav padding and equal z-index, so on mobile the drawer's scrollable content + footer area is covered by / collides with the bottom nav, and the drawer can overpaint or be overpainted by the nav. The drawer header close (X) is fine but the long transcript body bottom is occluded.",
+  "repro_steps": "Login as owner d@e.com. Playwright resize to 375x812. Navigate /search. Ask a question that returns sources (e.g. about an existing meeting/note in the team ws). Wait for answer + [1] citation. Tap a [1] badge to open SourceViewer. Observe: (a) is the bottom ~56px of the source content hidden behind the bottom nav, (b) does tapping bottom-nav items while drawer open navigate underneath, (c) scroll the transcript to the very bottom and check last lines are reachable. Screenshot.",
+  "expected": "SourceViewer on mobile should reserve bottom-nav-height padding (like main content does at panel-layout.tsx:93) OR sit above the nav (higher z) OR hide the nav while open; last lines of content must be fully readable.",
+  "suspected_defect": "Bottom of source content occluded by bottom nav; possible double-tap-through navigation; no bottom padding offset for the full-screen drawer.",
+  "priority": "P1",
+  "grounding": "frontend/src/components/layout/panel-layout.tsx:151-173 (drawer width:100%, z-50, top-0 h-full, no bottom padding) vs frontend/src/components/layout/bottom-nav.tsx:29-36 (fixed bottom-0 z-50) vs panel-layout.tsx:93 (main content DOES add paddingBottom bottom-nav-height but drawer does not)"
+ },
+ {
+  "id": "MOBILE-02",
+  "area": "RAG search overlay (header '검색' button -> toggleRagOverlay) @375px",
+  "hypothesis": "The RAG overlay panel uses a FIXED width var(--rag-overlay-width)=380px with NO isMobile override (panel-layout.tsx:109-116), unlike the SourceViewer right below it which DOES set width:isMobile?'100%' (line 161). 380px > 375px viewport, so on a 375px screen the overlay overflows the right edge / triggers horizontal scroll and its left content/close button positioning is off.",
+  "repro_steps": "Login d@e.com. Resize 375x812. On any /dashboard route tap the header center search button (label '검색'). The RAG overlay slides in from right. Observe: (a) does horizontal scrollbar appear on the page, (b) is any part of the 380px panel clipped past the right viewport edge, (c) is the RagPanel input/send reachable, (d) compare visual width vs the 375 viewport. Screenshot + run document.documentElement.scrollWidth vs window.innerWidth via browser_evaluate.",
+  "expected": "On mobile the RAG overlay should be width 100% (or max 100vw) like the SourceViewer drawer; no horizontal overflow.",
+  "suspected_defect": "380px overlay overflows 375px viewport causing horizontal scroll and a 5px clipped panel; inconsistent with SourceViewer which handles mobile.",
+  "priority": "P1",
+  "grounding": "frontend/src/components/layout/panel-layout.tsx:109-116 (overlay width:'var(--rag-overlay-width)' no mobile branch) vs panel-layout.tsx:161 (SourceViewer width:isMobile?'100%') ; frontend/src/app/globals.css:55 (--rag-overlay-width:380px)"
+ },
+ {
+  "id": "MOBILE-03",
+  "area": "BottomNav touch targets @375px (5 items)",
+  "hypothesis": "BottomNav links use only `p-2` padding around a 20px/24px icon + micro label (bottom-nav.tsx:42-46) with NO explicit min 44px target, inside a 56px-tall bar (--bottom-nav-height). The repo elsewhere enforces minHeight:44px on every tap target (inbox-item-card, project-dashboard, meeting-detail) but BottomNav was missed. 5 items in justify-around at 375px gives ~75px slots wide enough horizontally, but the tappable height is only ~icon(20)+gap+text+p-2 ≈ 40px < 44px WCAG/Apple HIG min, and adjacent-target spacing may be tight.",
+  "repro_steps": "Login d@e.com. Resize 375x812. On /dashboard inspect the bottom nav. Use browser_evaluate to measure each Link's getBoundingClientRect height/width. Tap each of the 5 items (홈/프로젝트/추가/Inbox/메모) and confirm navigation. Check the computed tap height is >=44px and there is no mis-tap to an adjacent item.",
+  "expected": "Each bottom-nav tap target should be >=44x44px per WCAG 2.5.5 / HIG, consistent with the 44px standard applied across the rest of the app.",
+  "suspected_defect": "Bottom-nav tap targets shorter than 44px (only p-2), inconsistent with the app-wide 44px minimum; risk of mis-taps on small screens.",
+  "priority": "P2",
+  "grounding": "frontend/src/components/layout/bottom-nav.tsx:42-46 (Link className 'flex flex-col items-center gap-0.5 p-2' no min-height) ; globals.css:57 (--bottom-nav-height:56px) ; contrast with frontend/src/features/inbox/components/inbox-item-card.tsx:127 and meeting-detail.tsx:269 which set minHeight:'44px'"
+ },
+ {
+  "id": "MOBILE-04",
+  "area": "/meetings/[id] detail header @375px (title + status + export + promote button row)",
+  "hypothesis": "MeetingDetail header is a single `flex items-center gap-3` row (meeting-detail.tsx:172-210) containing a text-2xl title, a status pill, the export button, AND a '워크스페이스 이동' button with icon — with NO flex-wrap. At 375px a long Korean meeting title plus 3 trailing controls cannot fit; either the title truncates/pushes the buttons off-screen (horizontal overflow) or the buttons wrap unstyled.",
+  "repro_steps": "Login d@e.com. Create or open a completed meeting with a long title (e.g. paste a 30+ char Korean title via /new text tab, wait for completed). Resize 375x812. Navigate /meetings/{id}. Observe the header row: does the title overflow horizontally, are the export + 워크스페이스 이동 buttons pushed off the right edge / clipped, does page get a horizontal scrollbar. browser_evaluate scrollWidth vs innerWidth. Screenshot.",
+  "expected": "Header should wrap or truncate gracefully so all controls remain reachable within 375px and no horizontal page scroll appears.",
+  "suspected_defect": "Long meeting title + 3 trailing buttons overflow the 375px row (no flex-wrap), clipping the promote/export controls or causing horizontal scroll.",
+  "priority": "P1",
+  "grounding": "frontend/src/features/meetings/components/meeting-detail.tsx:172-210 (single 'flex items-center gap-3' header with h1 text-2xl + status span + MeetingExportButton + 워크스페이스 이동 button, no flex-wrap / no min-w-0 truncate on h1)"
+ },
+ {
+  "id": "MOBILE-05",
+  "area": "768px (compact) sidebar collapse boundary + /new 3-column card grid",
+  "hypothesis": "Breakpoint logic: isMobile = <768, isCompact = 768-1279 (use-media-query.ts:40-42); sidebar shows collapsed icon mode at >=768. But the /new content-type cards use Tailwind `sm:grid-cols-3` (new/page.tsx:144) where sm=640px. So in the 640-767px band the page is mobile (bottom nav, NO sidebar) yet the 3 cards are already side-by-side in a max-w-3xl container with p-6 — combined with the long Korean descriptions this can squeeze. And exactly at 768px the sidebar appears collapsed simultaneously as bottom nav disappears — verify no flicker/dead-zone.",
+  "repro_steps": "Login d@e.com. Navigate /new. Resize through 640 -> 700 -> 767 -> 768 -> 769px. Observe: (1) at 700px are the 3 type cards readable or cramped with clipped descriptions; (2) at exactly 768px does the sidebar (collapsed) appear AND bottom nav disappear cleanly with no overlap/flicker (useSyncExternalStore claims no flicker — verify); (3) any horizontal overflow at 700px. Screenshots at 700 and 768.",
+  "expected": "Cards remain legible across the 640-767 band; transition at 768 swaps bottom-nav->collapsed-sidebar without overlap, flicker, or layout jump.",
+  "suspected_defect": "sm (640) vs md (768) breakpoint mismatch causes cramped 3-col cards on small tablets in the no-sidebar band; possible flicker/overlap exactly at 768.",
+  "priority": "P2",
+  "grounding": "frontend/src/hooks/use-media-query.ts:36-44 (isMobile<768, isCompact 768-1279) ; frontend/src/app/(app)/new/page.tsx:144 ('grid grid-cols-1 sm:grid-cols-3') ; frontend/src/components/layout/panel-layout.tsx:83 (sidebar only !isMobile) & :179 (BottomNav only isMobile)"
+ },
+ {
+  "id": "MOBILE-06",
+  "area": "/memory page min-h-screen + FAB inside scroll container @375px",
+  "hypothesis": "MemoryPage wraps content in `min-h-screen` (memory/page.tsx:51) but it is rendered INSIDE panel-layout's `flex-1 overflow-y-auto` div that already has paddingBottom=bottom-nav-height on mobile (panel-layout.tsx:91-95). min-h-screen = 100vh which exceeds the available content height (viewport minus header minus bottom nav), producing a nested scroll region taller than its container -> the bottom of the page sits under the bottom nav and the always-visible animate-pulse FAB (bottom calc(56px+16px)) may overlap the last RecallResultCard's promote button.",
+  "repro_steps": "Login d@e.com. Resize 375x812. Navigate /memory. Type a 2+ char query that returns several recall cards. Scroll to the bottom. Observe: (a) is there awkward extra blank space / double scrollbar from min-h-screen, (b) does the floating + FAB cover the last card's '워크스페이스 이동/promote' action, (c) can you scroll the last card fully above the bottom nav. Screenshot bottom of list.",
+  "expected": "Page height should fit the content area (not force 100vh inside an already-bounded scroll parent); FAB must not occlude the last result card's actions.",
+  "suspected_defect": "min-h-screen inside bounded scroll parent causes excess scroll / last card occluded by FAB or bottom nav on mobile.",
+  "priority": "P2",
+  "grounding": "frontend/src/app/(app)/memory/page.tsx:51 ('min-h-screen') & :122-135 (FAB bottom calc(var(--bottom-nav-height)+16px)) ; frontend/src/components/layout/panel-layout.tsx:91-95 (parent flex-1 overflow-y-auto with paddingBottom bottom-nav-height)"
+ },
+ {
+  "id": "MOBILE-07",
+  "area": "Header workspace switcher + RAG search bar + avatar @375px (3-section flex)",
+  "hypothesis": "Header is one row: left (sidebar-toggle hidden on mobile + WorkspaceSwitcher) / center (search button max-w-[160px] mobile) / right (avatar) (header.tsx:38-93). The left section has WorkspaceSwitcher with a memberCount badge and the center search is clamped to 160px. With a long workspace name + member count, the left min-w-0 shrink may collapse the workspace name to near-nothing OR the center 160px + avatar push it. Need to verify the workspace switcher is still tappable/readable and the dropdown opens within viewport at 375px.",
+  "repro_steps": "Login d@e.com (owner of a team ws with a long-ish name and >1 member). Resize 375x812. On /dashboard: (a) confirm header fits with no horizontal overflow (scrollWidth check), (b) tap WorkspaceSwitcher — does the dropdown open fully within the 375px viewport or clip at the left edge, (c) confirm avatar menu (right) opens with w-[240px] content not clipping off-screen-right, (d) is the workspace name truncated to unreadable. Screenshots of both dropdowns open.",
+  "expected": "Header fits 375px with no overflow; both the workspace switcher dropdown and the w-[240px] avatar menu open fully inside the viewport; workspace name remains identifiable.",
+  "suspected_defect": "Workspace switcher dropdown or 240px avatar menu clips off-screen at 375px; workspace name over-truncated.",
+  "priority": "P2",
+  "grounding": "frontend/src/components/layout/header.tsx:38-90 (3-section flex, search max-w-[160px] mobile) & :112-117 (DropdownMenuContent align=end w-[240px]) ; frontend/src/features/workspaces/components/WorkspaceSwitcher.tsx (memberCount badge)"
+ },
+ {
+  "id": "MOBILE-08",
+  "area": "CaptureSheet bottom sheet h-[60vh] + keyboard @375px",
+  "hypothesis": "CaptureSheet renders SheetContent side='bottom' className='h-[60vh] p-6' with a rows=6 textarea + record/cancel/send buttons (CaptureSheet.tsx:68-117). On mobile when the virtual keyboard opens for the textarea, a fixed 60vh sheet with internal content may push the action buttons (녹음/취소/전송) below the keyboard/fold, making submit unreachable. Also the sheet's auto close button is absolute top-3 right-3 which on a bottom sheet may overlap the title.",
+  "repro_steps": "Login d@e.com. Resize 375x812. Navigate /memory, tap the + FAB to open CaptureSheet. Observe: (a) sheet occupies 60vh from bottom, (b) focus the textarea and type >50 chars, (c) are the 음성 녹음 / 취소 / 전송(Send) buttons still visible and tappable without scrolling the sheet, (d) does the close X (top-3 right-3) overlap the sheet title. On a touch emulation, check if submit is reachable. Screenshot with textarea focused.",
+  "expected": "Action buttons remain reachable within the 60vh bottom sheet even with content; close button does not overlap title; submit works.",
+  "suspected_defect": "Fixed 60vh bottom sheet + keyboard hides submit buttons; possible close-button/title overlap on narrow width.",
+  "priority": "P2",
+  "grounding": "frontend/src/features/memory/components/CaptureSheet.tsx:68 (SheetContent side='bottom' h-[60vh] p-6) & :77 (textarea rows=6) & :88-117 (action buttons) ; frontend/src/components/ui/sheet.tsx:62-77 (close button absolute top-3 right-3)"
+ },
+ {
+  "id": "MOBILE-09",
+  "area": "/projects/[id] dashboard header + 2-col grid + members panel @375px",
+  "hypothesis": "DashboardHeader is `flex items-center gap-3` with h1 text-2xl title + status pill + VisibilityBadge + (admin) MoreHorizontal dropdown trigger, no flex-wrap (project-dashboard.tsx:378-422). The body uses md:grid-cols-2 (line 203) which stacks at <768 (good), but at 375px the header row with a long project title + 3 badges + dropdown will overflow. Additionally the ProjectMembersPanel (admin-gated PATCH controls) renders below — verify its add-member / role controls are reachable and the checkbox at minWidth:16px/minHeight:44px (line 554) is tappable.",
+  "repro_steps": "Login d@e.com (owner). Open a project with a moderately long title and private visibility (has visibility badge). Resize 375x812. Navigate /projects/{id}. Observe: (a) header row overflow — title pushes status/visibility/⋯ off right edge or wraps unstyled; (b) the 2-col grid stacks to 1 col correctly; (c) scroll to ProjectMembersPanel and confirm the add-member control + role dropdowns fit and are tappable; (d) page horizontal scroll check. Then flip a@e.com to member and reload as member to confirm the ⋯ dropdown is correctly hidden. Screenshots.",
+  "expected": "Header controls remain reachable (wrap or truncate); grid stacks to single column; members panel controls fit 375px and are tappable; no horizontal scroll.",
+  "suspected_defect": "Project header overflow at 375px with long title + 3 badges + dropdown; members panel controls cramped/clipped.",
+  "priority": "P2",
+  "grounding": "frontend/src/features/projects/components/project-dashboard.tsx:377-422 (DashboardHeader flex items-center gap-3, h1 text-2xl, no wrap) & :203 (grid grid-cols-1 md:grid-cols-2) & :270-277 (ProjectMembersPanel) & :554 (checkbox minWidth:16px minHeight:44px)"
+ },
+ {
+  "id": "MOBILE-10",
+  "area": "Feedback FAB z-30 vs BottomNav z-50 + RAG overlay backdrop z-30 @375px",
+  "hypothesis": "FeedbackButton is fixed right-4 bottom-[calc(var(--bottom-nav-height)+1rem)] z-30 (feedback-button.tsx:67). The RAG overlay backdrop is also z-30 (panel-layout.tsx:103) and the overlay panel z-40. So when the RAG overlay is OPEN on mobile, the feedback FAB (z-30) and the backdrop (z-30) share the same stacking level — the FAB may remain clickable through/over the backdrop, or be visually on top of the dimmed backdrop, breaking the modal isolation. Also the FAB sits 72px above bottom; verify it doesn't overlap the memory page's own FAB (also bottom 72px, right-6) on /memory.",
+  "repro_steps": "Login d@e.com. Resize 375x812. (1) On /dashboard tap header search to open RAG overlay; observe whether the feedback FAB still shows on top of the dimmed backdrop and is clickable (it should be covered/disabled by the modal). (2) Navigate /memory where BOTH the feedback FAB (right-4, 72px) and the memory + FAB (right-6, 72px) exist — check they don't visually collide/overlap at 375px. Screenshots of both states.",
+  "expected": "When RAG overlay is open the feedback FAB should be behind the backdrop (not interactable over a modal); on /memory the two FABs must not overlap.",
+  "suspected_defect": "Feedback FAB (z-30) competes with RAG backdrop (z-30) so it floats over the modal and stays tappable; dual-FAB overlap on /memory at 375px.",
+  "priority": "P3",
+  "grounding": "frontend/src/features/feedback/components/feedback-button.tsx:67 (fixed right-4 z-30 bottom calc(bottom-nav-height+1rem)) ; frontend/src/components/layout/panel-layout.tsx:103 (RAG backdrop z-30) & :109 (panel z-40) ; frontend/src/app/(app)/memory/page.tsx:122-130 (memory FAB right-6 bottom 72px)"
+ },
+ {
+  "id": "MOBILE-11",
+  "area": "SourceViewer highlight scroll-into-view + copy on mobile drawer @375px",
+  "hypothesis": "SourceViewer auto-scrolls to the first <mark> highlight via scrollIntoView block:center after 100ms (source-viewer.tsx:146-155). On a 100%-width mobile drawer with a long transcript and the highlight near the top, scrollIntoView block:center may be fine, but the highlighted <mark> uses inline px-2 py-0.5 border-left 3px (lines 62-72) inside whitespace-pre-wrap — on narrow 375px a long highlighted chunk that spans wrapping lines with border-left only on the first inline box may render visually broken/clipped. Also the copy button writes navigator.clipboard which may silently fail in non-secure/mobile contexts (caught and ignored, line 167-169) giving no user feedback.",
+  "repro_steps": "Login d@e.com. Resize 375x812. /search, ask a question returning a meeting source with a multi-sentence chunk. Tap [1] to open SourceViewer. Observe: (a) does it auto-scroll to the highlight and is the highlighted region fully visible (not clipped at right edge), (b) does a multi-line highlight render the border-left/background coherently across wrapped lines on 375px, (c) tap Copy — does the icon flip to Check (success) or silently do nothing. Screenshot the highlight.",
+  "expected": "Highlight scrolls into view and renders coherently across wrapped lines at 375px; Copy gives visible success feedback (Check) and actually copies.",
+  "suspected_defect": "Multi-line highlight renders broken at 375px (border-left only on first box); Copy silently fails on mobile with no feedback.",
+  "priority": "P3",
+  "grounding": "frontend/src/features/sources/components/source-viewer.tsx:50-79 (renderHighlightedContent <mark> inline px-2 border-left) & :146-155 (scrollIntoView block:center) & :162-170 (handleCopy try/catch swallows failure) ; whitespace-pre-wrap container :292-293"
+ },
+ {
+  "id": "MOBILE-12",
+  "area": "Export download (notes/meetings) UTF-8 filename on mobile browser",
+  "hypothesis": "Export buttons (MeetingExportButton, note export) hit GET .../export?format=md|json and trigger a file download. The HIGH-PRIORITY GAP flags UTF-8 filename handling. On mobile the export button lives in the cramped meeting header (MOBILE-04) and the download of a Korean-titled file (Content-Disposition filename* RFC5987) may produce a mangled filename or fail to trigger the mobile download UI. This is the live-export gap not yet executed.",
+  "repro_steps": "Login d@e.com. Create a meeting via /new text tab with a Korean title containing spaces/emoji (e.g. '2026 회의록 검토 ✅'), wait completed. Resize 375x812. Open /meetings/{id}, tap the export button (icon), choose md then json. Observe: (a) does the download trigger on mobile width, (b) capture the network response Content-Disposition header via browser_network_requests and verify filename* is RFC5987 percent-encoded UTF-8 (not '?' garbled), (c) repeat for a note via /notes/{id} export. Report the actual header value.",
+  "expected": "Export downloads succeed on mobile width; Content-Disposition uses filename*=UTF-8'' RFC5987 encoding so Korean/emoji titles are preserved, not garbled.",
+  "suspected_defect": "Korean/emoji export filename garbled (ASCII fallback / mojibake) or download fails to trigger from the cramped mobile header.",
+  "priority": "P1",
+  "grounding": "frontend/src/features/meetings/components/meeting-detail.tsx:190-192 (MeetingExportButton, completed only) ; export endpoints GET .../notes/{id}/export and .../meetings/{id}/export (per surface spec) ; header crowding grounded in meeting-detail.tsx:172-210"
+ }
+]
