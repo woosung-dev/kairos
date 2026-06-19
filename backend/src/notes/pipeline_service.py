@@ -103,19 +103,36 @@ class NotePipelineService:
         await embed_repo.commit()
 
     async def delete_note_with_cleanup(
-        self, note_id: uuid.UUID, workspace_id: uuid.UUID
+        self,
+        note_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> None:
         """노트 삭제 + embedding chunk cleanup + 캐시 무효화 (D-2 부채 해소).
 
         Codex H2 / 옵션 A: pipeline 시그니처 자체에 workspace_id 필수 → pipeline 우회 IDOR 차단.
         Codex 2차 F-4: cross-tenant 또는 missing note → NoteNotFoundError (404). 이전 silent return
         은 router 가 204 success 로 응답해 F-4 lock-in 위반 (C7 fix).
+
+        CAND-A completeness: SOURCE 노트의 project visibility 게이트 — 비-멤버가
+        private/draft 프로젝트의 노트를 삭제하는 write IDOR 차단 (비-멤버 → 404).
+        check_project_access (admin/owner 우회 / project None / public / draft creator /
+        private member) 재사용 — _verify_note_visibility 와 동일 규칙.
+        requester_role 미전달(None) = 내부 호출 → 게이트 skip (하위호환).
         """
         from src.notes.exceptions import NoteNotFoundError
 
         note = await self.note_repo.find_by_id(note_id, workspace_id)
         if note is None:
             raise NoteNotFoundError()
+        if requester_role is not None and requester_user_id is not None:
+            has_access = await self.check_project_access(
+                note.project_id, workspace_id, requester_user_id, requester_role
+            )
+            if not has_access:
+                # fail-closed 404 — 존재성/소속 누출 방지 (get/list 와 동일 시그널)
+                raise NoteNotFoundError()
         project_id = note.project_id
         # embedding chunk 삭제 (repository 직접 호출 = 헌법 §4.2 OK, read-only가 아니지만
         # embeddings 도메인은 cross-domain shared service로 분류 — ADR-014 §1)

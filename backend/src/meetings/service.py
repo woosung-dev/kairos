@@ -89,13 +89,30 @@ class MeetingService:
         page: int = 1,
         page_size: int = 20,
         project_id: uuid.UUID | None = None,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
-        """워크스페이스 회의 목록 (페이지네이션, project_id 필터 옵션)."""
+        """워크스페이스 회의 목록 (페이지네이션, project_id 필터 옵션).
+
+        CAND-A completeness: requester visibility 게이트 — private-linked 회의의
+        metadata/존재성이 비-ProjectMember 에게 노출되지 않도록 제외.
+        requester_role 미전달(None) = 내부/파이프라인 호출 → 게이트 skip (하위호환).
+        """
         offset = (page - 1) * page_size
         meetings = await self.repo.find_by_workspace(
-            workspace_id, offset, page_size, project_id
+            workspace_id,
+            offset,
+            page_size,
+            project_id,
+            requester_user_id=requester_user_id,
+            requester_role=requester_role,
         )
-        total = await self.repo.count_by_workspace(workspace_id, project_id)
+        total = await self.repo.count_by_workspace(
+            workspace_id,
+            project_id,
+            requester_user_id=requester_user_id,
+            requester_role=requester_role,
+        )
 
         return {
             "items": [self._to_list_item(m) for m in meetings],
@@ -212,12 +229,23 @@ class MeetingService:
         return result
 
     async def get_meeting_status(
-        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID
+        self,
+        meeting_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
-        """회의 처리 상태. 헌법 I-9 workspace_id 필수 (Codex F-1)."""
+        """회의 처리 상태. 헌법 I-9 workspace_id 필수 (Codex F-1).
+
+        CAND-A completeness: 연결된 project visibility 게이트 — 비-ProjectMember 가
+        private-linked 회의의 처리상태(존재성/실패사유)를 polling 으로 캐내는 status leak 차단.
+        """
         meeting = await self.repo.find_by_id(meeting_id, workspace_id)
         if meeting is None:
             raise MeetingNotFoundError()
+        await self._verify_meeting_visibility(
+            meeting_id, workspace_id, requester_user_id, requester_role
+        )
         return {
             "status": meeting.status,
             "errorMessage": meeting.error_message,
@@ -336,6 +364,7 @@ class MeetingService:
         target_workspace_id: uuid.UUID,
         promoted_by_user_id: uuid.UUID,
         background_tasks: BackgroundTasks,
+        requester_role: str | None = None,
     ) -> MeetingPromoteOut:
         """1-button promote: 원본 보존 + target ws 복제 (Meeting/Summary/Segments) + audit + bg embedding 복제.
 
@@ -370,6 +399,13 @@ class MeetingService:
         source = await self.repo.find_by_id(meeting_id, source_workspace_id)
         if source is None:
             raise MeetingNotFoundError()
+
+        # CAND-A completeness: SOURCE 회의의 연결 project visibility 게이트 — 비-멤버가
+        # private/draft 프로젝트의 회의를 team ws 로 promote(=복제 노출)하는 IDOR 차단.
+        # promoter 는 source ws 멤버지만 ProjectMember 가 아닐 수 있음 → 비-멤버 → 404.
+        await self._verify_meeting_visibility(
+            meeting_id, source_workspace_id, promoted_by_user_id, requester_role
+        )
 
         # Sprint 23 Codex 4차 P2-1 fix: terminal status (completed / failed) 만 promote 허용.
         # uploading / transcribing / analyzing 같은 transient 는 target ws 에서 영원히 stuck
