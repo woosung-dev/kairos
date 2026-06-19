@@ -78,6 +78,16 @@ class RagService:
                 requester_role=requester_role,
                 project_id=project_id,
             )
+        # CAND-E completeness: CAND-A fix 이전에 저장된 캐시는 sources 에 "sourceId"
+        # 키가 없다 (fresh 검색만 _format_sources 로 sourceId 부여). sourceId 없는
+        # 캐시를 그대로 serve 하면 FE SourceViewer 가 chunk id 로 폴백 → /meetings/{chunkId}
+        # 404 retry storm. 하나라도 sourceId 부재면 cache MISS 로 처리 → fresh 검색
+        # (sourceId 부여) 으로 fall-through. cache 는 재생성 시 자연히 치유된다.
+        if cache_hit and not all(
+            isinstance(s, dict) and "sourceId" in s
+            for s in cache_hit.get("sources", [])
+        ):
+            cache_hit = None
         if cache_hit:
             yield {
                 "event": "search_results",

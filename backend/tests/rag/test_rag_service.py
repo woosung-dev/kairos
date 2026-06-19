@@ -52,7 +52,9 @@ async def test_cache_hit_returns_cached_answer():
     mock_repo.find_similar_cache.return_value = {
         "id": "cache-1",
         "answer": "캐시된 답변입니다.",
-        "sources": [{"id": "s1", "text": "소스", "source": "회의"}],
+        # CAND-E completeness: fresh 검색이 부여한 sourceId 를 포함해야 cache HIT 으로
+        # serve 된다 (sourceId-less 캐시는 bypass → fresh path). 실 저장 캐시는 항상 sourceId 보유.
+        "sources": [{"id": "s1", "sourceId": "m1", "text": "소스", "source": "회의"}],
         "hit_count": 1,
     }
 
