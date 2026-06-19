@@ -15,6 +15,7 @@ integration_session (실 PostgreSQL) 위에서 직접 행사한다 (QA-0617-A le
 """
 from __future__ import annotations
 
+import json
 import uuid
 
 import pytest
@@ -192,6 +193,21 @@ def _meeting_service(session: AsyncSession):
     return MeetingService(
         repo=MeetingRepository(session),
         action_repo=ActionItemRepository(session),
+        project_repo=ProjectRepository(session),
+    )
+
+
+def _note_pipeline(session: AsyncSession):
+    """CAND-A completeness: delete_note_with_cleanup 게이트 검증용 pipeline."""
+    from src.embeddings.repository import EmbeddingRepository
+    from src.embeddings.service import EmbeddingService
+    from src.notes.pipeline_service import NotePipelineService
+    from src.notes.repository import NoteRepository
+    from src.projects.repository import ProjectRepository
+
+    return NotePipelineService(
+        note_repo=NoteRepository(session),
+        embedding_service=EmbeddingService(EmbeddingRepository(session)),
         project_repo=ProjectRepository(session),
     )
 
@@ -514,3 +530,508 @@ class TestMeetingUnlinkedAccessible:
             meeting.id, ws, requester_user_id=member, requester_role="member"
         )
         assert result["summary"]["summary"] == self.SECRET
+
+
+# ===========================================================================
+# CAND-A completeness — sibling 경로 회귀 (codex NO-GO findings)
+# list / status / write / promote 가 prior fix 의 get+export 게이트를 우회하던 갭.
+# ===========================================================================
+
+
+# --- NOTES list: visibility filter (P0 본문 누출) ---------------------------
+
+
+class TestNoteListVisibilityIDOR:
+    PRIVATE = "NONCE-LIST-PRIVATE-3a7c"
+    DRAFT = "NONCE-LIST-DRAFT-9f2b"
+    PUBLIC = "NONCE-LIST-PUBLIC-cc14"
+
+    async def _seed(self, session: AsyncSession):
+        owner = await _create_user(session, "owner")
+        outsider = await _create_user(session, "outsider")
+        ws = await _create_team_ws(session, owner)
+        await _add_ws_member(session, ws, outsider, "member")
+        priv = await _create_project(session, ws, owner, "private")
+        draft = await _create_project(session, ws, owner, "draft")
+        pub = await _create_project(session, ws, owner, "public")
+        await _create_note(session, ws, priv.id, owner, self.PRIVATE)
+        await _create_note(session, ws, draft.id, owner, self.DRAFT)
+        await _create_note(session, ws, pub.id, owner, self.PUBLIC)
+        await _create_note(session, ws, None, owner, "unscoped")
+        return owner, outsider, ws, priv
+
+    @pytest.mark.asyncio
+    async def test_non_member_list_excludes_private_and_draft(
+        self, integration_session: AsyncSession
+    ):
+        owner, outsider, ws, priv = await self._seed(integration_session)
+        service = _note_service(integration_session)
+
+        # 필터 없는 전체 목록 — 비-멤버는 private/draft 본문을 못 봐야 한다.
+        result = await service.list_notes(
+            ws, requester_user_id=outsider, requester_role="member"
+        )
+        bodies = {item["plainText"] for item in result["items"]}
+        assert self.PRIVATE not in bodies
+        assert self.DRAFT not in bodies
+        # public + unscoped 는 보임 (정상 접근 보존)
+        assert self.PUBLIC in bodies
+        assert "unscoped" in bodies
+        # total 도 필터된 집합 기준 (pagination 정합) — 2개만
+        assert result["total"] == 2
+
+    @pytest.mark.asyncio
+    async def test_non_member_list_by_private_project_id_empty(
+        self, integration_session: AsyncSession
+    ):
+        owner, outsider, ws, priv = await self._seed(integration_session)
+        service = _note_service(integration_session)
+
+        # projectId=<private> 명시 필터 — 비-멤버는 0건 (본문 누출 차단)
+        result = await service.list_notes(
+            ws,
+            project_id=priv.id,
+            requester_user_id=outsider,
+            requester_role="member",
+        )
+        assert result["items"] == []
+        assert result["total"] == 0
+
+    @pytest.mark.asyncio
+    async def test_member_list_includes_all_accessible(
+        self, integration_session: AsyncSession
+    ):
+        owner, outsider, ws, priv = await self._seed(integration_session)
+        # outsider 를 private project 멤버로 승격
+        await _add_project_member(integration_session, priv.id, ws, outsider)
+        service = _note_service(integration_session)
+
+        result = await service.list_notes(
+            ws, requester_user_id=outsider, requester_role="member"
+        )
+        bodies = {item["plainText"] for item in result["items"]}
+        # ProjectMember → private 도 보임 (draft 는 비-작성자라 여전히 제외)
+        assert self.PRIVATE in bodies
+        assert self.DRAFT not in bodies
+
+    @pytest.mark.asyncio
+    async def test_creator_list_sees_own_draft(
+        self, integration_session: AsyncSession
+    ):
+        owner, outsider, ws, priv = await self._seed(integration_session)
+        service = _note_service(integration_session)
+
+        # 작성자(owner role) → 자기 draft 포함 전부 보임
+        result = await service.list_notes(
+            ws, requester_user_id=owner, requester_role="owner"
+        )
+        bodies = {item["plainText"] for item in result["items"]}
+        assert self.PRIVATE in bodies
+        assert self.DRAFT in bodies
+        assert self.PUBLIC in bodies
+
+    @pytest.mark.asyncio
+    async def test_admin_list_sees_everything(
+        self, integration_session: AsyncSession
+    ):
+        owner, outsider, ws, priv = await self._seed(integration_session)
+        admin = await _create_user(integration_session, "admin")
+        await _add_ws_member(integration_session, ws, admin, "admin")
+        service = _note_service(integration_session)
+
+        result = await service.list_notes(
+            ws, requester_user_id=admin, requester_role="admin"
+        )
+        assert result["total"] == 4  # private + draft + public + unscoped 전부
+
+
+# --- NOTES status / update / delete / promote write IDOR --------------------
+
+
+class TestNoteWritePathVisibilityIDOR:
+    SECRET = "NONCE-WRITE-PRIVATE-4d8e"
+
+    async def _seed_private_note(self, session: AsyncSession):
+        owner = await _create_user(session, "owner")
+        outsider = await _create_user(session, "outsider")
+        ws = await _create_team_ws(session, owner)
+        await _add_ws_member(session, ws, outsider, "member")
+        project = await _create_project(session, ws, owner, "private")
+        note = await _create_note(session, ws, project.id, owner, self.SECRET)
+        return owner, outsider, ws, project, note
+
+    @pytest.mark.asyncio
+    async def test_non_member_embedding_status_404(
+        self, integration_session: AsyncSession
+    ):
+        from src.notes.exceptions import NoteNotFoundError
+
+        owner, outsider, ws, project, note = await self._seed_private_note(
+            integration_session
+        )
+        service = _note_service(integration_session)
+
+        with pytest.raises(NoteNotFoundError):
+            await service.get_embedding_status(
+                ws, note.id, requester_user_id=outsider, requester_role="member"
+            )
+
+    @pytest.mark.asyncio
+    async def test_member_embedding_status_ok(
+        self, integration_session: AsyncSession
+    ):
+        owner, outsider, ws, project, note = await self._seed_private_note(
+            integration_session
+        )
+        await _add_project_member(integration_session, project.id, ws, outsider)
+        service = _note_service(integration_session)
+
+        # ProjectMember → 정상 (status 응답)
+        result = await service.get_embedding_status(
+            ws, note.id, requester_user_id=outsider, requester_role="member"
+        )
+        assert result.status in ("pending", "completed")
+
+    @pytest.mark.asyncio
+    async def test_non_member_update_404(
+        self, integration_session: AsyncSession
+    ):
+        from src.notes.exceptions import NoteNotFoundError
+
+        owner, outsider, ws, project, note = await self._seed_private_note(
+            integration_session
+        )
+        service = _note_service(integration_session)
+
+        with pytest.raises(NoteNotFoundError):
+            await service.update_note(
+                note_id=note.id,
+                workspace_id=ws,
+                title="hijacked",
+                requester_user_id=outsider,
+                requester_role="member",
+            )
+
+    @pytest.mark.asyncio
+    async def test_member_update_ok(self, integration_session: AsyncSession):
+        owner, outsider, ws, project, note = await self._seed_private_note(
+            integration_session
+        )
+        await _add_project_member(integration_session, project.id, ws, outsider)
+        service = _note_service(integration_session)
+
+        result = await service.update_note(
+            note_id=note.id,
+            workspace_id=ws,
+            title="legit edit",
+            requester_user_id=outsider,
+            requester_role="member",
+        )
+        assert result["title"] == "legit edit"
+
+    @pytest.mark.asyncio
+    async def test_non_member_delete_404(
+        self, integration_session: AsyncSession
+    ):
+        from src.notes.exceptions import NoteNotFoundError
+
+        owner, outsider, ws, project, note = await self._seed_private_note(
+            integration_session
+        )
+        pipeline = _note_pipeline(integration_session)
+
+        with pytest.raises(NoteNotFoundError):
+            await pipeline.delete_note_with_cleanup(
+                note.id, ws, requester_user_id=outsider, requester_role="member"
+            )
+
+    @pytest.mark.asyncio
+    async def test_member_delete_ok(self, integration_session: AsyncSession):
+        owner, outsider, ws, project, note = await self._seed_private_note(
+            integration_session
+        )
+        await _add_project_member(integration_session, project.id, ws, outsider)
+        pipeline = _note_pipeline(integration_session)
+
+        # ProjectMember → 삭제 성공 (예외 없음)
+        await pipeline.delete_note_with_cleanup(
+            note.id, ws, requester_user_id=outsider, requester_role="member"
+        )
+
+    @pytest.mark.asyncio
+    async def test_non_member_promote_404(
+        self, integration_session: AsyncSession
+    ):
+        from fastapi import BackgroundTasks
+        from sqlalchemy.ext.asyncio import async_sessionmaker
+
+        from src.notes.exceptions import NoteNotFoundError
+        from src.notes.repository import NoteRepository
+        from src.notes.service import NoteService
+        from src.projects.repository import ProjectRepository
+        from src.workspaces.repository import WorkspaceRepository
+
+        owner, outsider, ws, project, note = await self._seed_private_note(
+            integration_session
+        )
+        # target team workspace (promote 대상) — outsider 가 멤버
+        target_ws = await _create_team_ws(integration_session, outsider)
+
+        bind = integration_session.get_bind()
+        factory = async_sessionmaker(bind, class_=AsyncSession, expire_on_commit=False)
+        service = NoteService(
+            repo=NoteRepository(integration_session),
+            project_repo=ProjectRepository(integration_session),
+            workspace_repo=WorkspaceRepository(integration_session),
+            session_factory=factory,
+        )
+
+        # 비-ProjectMember 가 private 노트를 promote 시도 → 404 (visibility 게이트 우선)
+        with pytest.raises(NoteNotFoundError):
+            await service.promote(
+                note_id=note.id,
+                source_workspace_id=ws,
+                target_workspace_id=target_ws,
+                promoted_by_user_id=outsider,
+                background_tasks=BackgroundTasks(),
+                requester_role="member",
+            )
+
+
+# --- MEETINGS list + status visibility --------------------------------------
+
+
+class TestMeetingListVisibilityIDOR:
+    SECRET = "NONCE-MLIST-PRIVATE-7b91"
+
+    async def _seed(self, session: AsyncSession):
+        owner = await _create_user(session, "owner")
+        outsider = await _create_user(session, "outsider")
+        ws = await _create_team_ws(session, owner)
+        await _add_ws_member(session, ws, outsider, "member")
+        priv = await _create_project(session, ws, owner, "private")
+        priv_meeting = await _create_meeting_in_project(
+            session, ws, priv, owner, self.SECRET
+        )
+        # 링크 없는 회의 (워크스페이스 레벨 — 누구나)
+        from src.meetings.models import Meeting
+
+        open_meeting = Meeting(
+            workspace_id=ws,
+            title="open",
+            file_key=f"uploads/{uuid.uuid4().hex}.mp3",
+            created_by_id=owner,
+            status="completed",
+        )
+        session.add(open_meeting)
+        await session.flush()
+        return owner, outsider, ws, priv, priv_meeting, open_meeting
+
+    @pytest.mark.asyncio
+    async def test_non_member_list_excludes_private_linked(
+        self, integration_session: AsyncSession
+    ):
+        owner, outsider, ws, priv, priv_m, open_m = await self._seed(
+            integration_session
+        )
+        service = _meeting_service(integration_session)
+
+        result = await service.list_meetings(
+            ws, requester_user_id=outsider, requester_role="member"
+        )
+        ids = {item["id"] for item in result["items"]}
+        # private-linked 회의 제외, 링크 없는 회의는 포함
+        assert str(priv_m.id) not in ids
+        assert str(open_m.id) in ids
+        assert result["total"] == 1
+
+    @pytest.mark.asyncio
+    async def test_member_list_includes_private_linked(
+        self, integration_session: AsyncSession
+    ):
+        owner, outsider, ws, priv, priv_m, open_m = await self._seed(
+            integration_session
+        )
+        await _add_project_member(integration_session, priv.id, ws, outsider)
+        service = _meeting_service(integration_session)
+
+        result = await service.list_meetings(
+            ws, requester_user_id=outsider, requester_role="member"
+        )
+        ids = {item["id"] for item in result["items"]}
+        assert str(priv_m.id) in ids
+        assert str(open_m.id) in ids
+        assert result["total"] == 2
+
+    @pytest.mark.asyncio
+    async def test_admin_list_includes_private_linked(
+        self, integration_session: AsyncSession
+    ):
+        owner, outsider, ws, priv, priv_m, open_m = await self._seed(
+            integration_session
+        )
+        admin = await _create_user(integration_session, "admin")
+        await _add_ws_member(integration_session, ws, admin, "admin")
+        service = _meeting_service(integration_session)
+
+        result = await service.list_meetings(
+            ws, requester_user_id=admin, requester_role="admin"
+        )
+        assert result["total"] == 2
+
+    @pytest.mark.asyncio
+    async def test_non_member_status_404(
+        self, integration_session: AsyncSession
+    ):
+        from src.meetings.exceptions import MeetingNotFoundError
+
+        owner, outsider, ws, priv, priv_m, open_m = await self._seed(
+            integration_session
+        )
+        service = _meeting_service(integration_session)
+
+        with pytest.raises(MeetingNotFoundError):
+            await service.get_meeting_status(
+                priv_m.id, ws, requester_user_id=outsider, requester_role="member"
+            )
+
+    @pytest.mark.asyncio
+    async def test_member_status_ok(self, integration_session: AsyncSession):
+        owner, outsider, ws, priv, priv_m, open_m = await self._seed(
+            integration_session
+        )
+        await _add_project_member(integration_session, priv.id, ws, outsider)
+        service = _meeting_service(integration_session)
+
+        result = await service.get_meeting_status(
+            priv_m.id, ws, requester_user_id=outsider, requester_role="member"
+        )
+        assert result["status"] == "completed"
+
+
+# --- CAND-E: sourceId-less cache hit bypass (real RagService.ask seam) -------
+
+
+def _rag_service_with_cache(cache_hit: dict | None):
+    """RagService 를 실제 인스턴스화하되, cache lookup(외부 DB seam)과 fresh 검색 seam만
+    stub. bug point(ask 의 cache-hit 가드)는 실제 코드 그대로 실행된다.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    from src.rag.service import RagService
+
+    embedding_repo = MagicMock()
+    embedding_repo.find_similar_cache = AsyncMock(return_value=cache_hit)
+    # fresh 검색 path stub — fall-through 가 일어나면 호출됨 (빈 결과 → no-source done).
+    embedding_repo.vector_search = AsyncMock(return_value=[])
+    embedding_repo.text_search = AsyncMock(return_value=[])
+
+    embedding_service = MagicMock()
+    embedding_service.generate_embeddings = AsyncMock(return_value=[[0.0] * 1536])
+
+    ai_service = MagicMock()
+
+    svc = RagService(
+        embedding_repo=embedding_repo,
+        embedding_service=embedding_service,
+        ai_service=ai_service,
+    )
+    # _advance_onboarding 는 cache-hit path 에서 호출됨 — DB 접근 stub.
+    svc._advance_onboarding = AsyncMock()
+    return svc, embedding_repo
+
+
+async def _collect_events(svc, **kwargs) -> list[dict]:
+    return [ev async for ev in svc.ask(**kwargs)]
+
+
+class TestCandECacheBypass:
+    """CAND-E completeness: sourceId 없는 cache hit 은 MISS 처리 → fresh 검색 fall-through.
+
+    실제 RagService.ask 를 구동한다 (bug point 에 mock 없음). cache lookup / fresh 검색
+    DB seam 만 stub — 가드는 실제 코드가 평가한다.
+    """
+
+    _ASK_KWARGS = dict(
+        question="비밀이 뭐야?",
+        workspace_id=uuid.uuid4(),
+        requester_user_id=uuid.uuid4(),
+        requester_role="member",
+    )
+
+    @pytest.mark.asyncio
+    async def test_sourceid_less_cache_bypassed_to_fresh_path(self):
+        # CAND-A fix 이전 캐시 — sourceId 키 없음 → cache MISS 처리되어 fresh 검색 실행.
+        stale_cache = {
+            "answer": "stale answer",
+            "sources": [{"id": "chunk-1", "text": "x"}],
+        }
+        svc, repo = _rag_service_with_cache(stale_cache)
+
+        events = await _collect_events(svc, **self._ASK_KWARGS)
+
+        # fresh 검색 seam 이 호출됐어야 한다 (cache bypass 증명).
+        repo.vector_search.assert_awaited_once()
+        # done 이벤트의 cached=False (캐시 serve 안 함).
+        done = next(e for e in events if e["event"] == "done")
+        assert json.loads(done["data"])["cached"] is False
+        # stale answer 가 토큰으로 흘러나오지 않았다.
+        answer_tokens = [
+            json.loads(e["data"]).get("token", "")
+            for e in events
+            if e["event"] == "answer"
+        ]
+        assert "stale answer" not in "".join(answer_tokens)
+
+    @pytest.mark.asyncio
+    async def test_mixed_sourceid_cache_bypassed(self):
+        # 일부만 sourceId — 하나라도 부재면 MISS → fresh 검색.
+        mixed_cache = {
+            "answer": "mixed",
+            "sources": [
+                {"id": "c1", "sourceId": "m1"},
+                {"id": "c2", "text": "no sourceId"},
+            ],
+        }
+        svc, repo = _rag_service_with_cache(mixed_cache)
+
+        await _collect_events(svc, **self._ASK_KWARGS)
+
+        repo.vector_search.assert_awaited_once()  # bypass → fresh
+
+    @pytest.mark.asyncio
+    async def test_complete_cache_is_served(self):
+        # fresh 검색이 부여한 sourceId 가 모두 있으면 정상 cache HIT (serve, fresh 미실행).
+        fresh_cache = {
+            "answer": "cached answer",
+            "sources": [
+                {"id": "c1", "sourceId": "m1"},
+                {"id": "c2", "sourceId": "n2"},
+            ],
+        }
+        svc, repo = _rag_service_with_cache(fresh_cache)
+
+        events = await _collect_events(svc, **self._ASK_KWARGS)
+
+        # cache HIT → fresh 검색 미실행 + cached=True + cached answer serve.
+        repo.vector_search.assert_not_awaited()
+        done = next(e for e in events if e["event"] == "done")
+        assert json.loads(done["data"])["cached"] is True
+        answer_tokens = [
+            json.loads(e["data"]).get("token", "")
+            for e in events
+            if e["event"] == "answer"
+        ]
+        assert "cached answer" in "".join(answer_tokens)
+
+    @pytest.mark.asyncio
+    async def test_empty_sources_cache_is_served(self):
+        # sources 빈 캐시는 all() == True → HIT (sourceId 누락 위험 없음, 회귀 방지).
+        empty_cache = {"answer": "empty-src", "sources": []}
+        svc, repo = _rag_service_with_cache(empty_cache)
+
+        events = await _collect_events(svc, **self._ASK_KWARGS)
+
+        repo.vector_search.assert_not_awaited()
+        done = next(e for e in events if e["event"] == "done")
+        assert json.loads(done["data"])["cached"] is True
