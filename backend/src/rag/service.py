@@ -300,6 +300,11 @@ class RagService:
 
             sources.append({
                 "id": str(r["id"]),
+                # CAND-E: 클라이언트의 SourceViewer full-detail fetch 는 source 엔티티 id 가
+                # 필요하다. id(=EmbeddingChunk PK)로 /meetings/{id} 를 호출하면 항상 404 →
+                # console retry storm. source_id(=meeting/note PK)를 별도 노출한다.
+                # source_id 부재 시(구 캐시 등) id 로 폴백 → 회귀 없음(기존 동작 유지).
+                "sourceId": str(r.get("source_id") or r["id"]),
                 "text": r["chunk_text"][:200],
                 "source": meta.get("title", ""),
                 "sourceType": r.get("source_type", ""),

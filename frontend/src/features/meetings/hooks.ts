@@ -50,9 +50,12 @@ export function useMeetingDetail(wid: string | undefined, id: string) {
       return fetchMeetingDetail(token, wid!, id);
     },
     enabled: !!wid,
+    // CAND-E: 404(삭제/미존재 source) 등 에러 상태에서 폴링을 멈춘다. 이전엔 에러 시에도
+    // 3000ms 폴링을 무한 반복해 SourceViewer 가 죽은 source 를 열면 console 에러가 폭증했다.
+    retry: (failureCount) => failureCount < 1,
     refetchInterval: (query) => {
+      if (query.state.error) return false; // 에러 지속 시 무한 폴링 중단 (storm 차단)
       const status = query.state.data?.status;
-      // 완료/실패 상태에서만 중단 — 네트워크 오류 시에도 재시도 유지
       if (status === "completed" || status === "failed") return false;
       if (status && POLLING_STATUSES.includes(status)) return 3000;
       return 3000;
