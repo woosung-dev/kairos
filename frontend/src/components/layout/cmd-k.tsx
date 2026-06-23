@@ -147,8 +147,12 @@ export function CmdK() {
       />
 
       <OnboardingTooltip page="search">
+      {/* 2026-06-24 fix: OnboardingTooltip 의 PopoverTrigger 가 `block w-full` 래퍼로
+          palette 를 감싸 부모 flex 의 justify-center 가 무효화(full-width 트리거 센터링) →
+          palette 좌측 정렬·사이드바 겹침. mx-auto 로 트리거 내부에서 다시 중앙 정렬. */}
       <div
-        className="relative w-full max-w-[520px] rounded-lg border shadow-2xl overflow-hidden"
+        data-testid="cmdk-panel"
+        className="relative w-full max-w-[520px] mx-auto rounded-lg border shadow-2xl overflow-hidden"
         style={{
           background: "var(--surface)",
           borderColor: "var(--border)",
