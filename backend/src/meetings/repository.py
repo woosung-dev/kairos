@@ -2,13 +2,76 @@
 """Meeting Repository — AsyncSession 유일 보유자. 헌법 I-9 workspace_id 필수 (Sprint 19 PR #1)."""
 import uuid
 
+from sqlalchemy.orm import aliased
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import func, select
+from sqlmodel import and_, exists, func, or_, select
 
 from src.common.promote_models import ItemPromotionAudit
 from src.embeddings.models import EmbeddingChunk
 from src.meetings.models import Meeting, MeetingSummary, TranscriptSegment
-from src.projects.models import MeetingProjectLink
+from src.projects.models import MeetingProjectLink, Project, ProjectMember
+
+
+def _meeting_visibility_filter(
+    stmt,
+    requester_user_id: uuid.UUID | None,
+    requester_role: str | None,
+):
+    """CAND-A completeness: meeting LIST 에 project visibility 게이트 적용.
+
+    회의는 MeetingProjectLink 로 N개 project 와 연결될 수 있다. 규칙
+    (_verify_meeting_visibility 와 동일):
+    - admin/owner : 모든 visibility 우회 (필터 없음)
+    - 링크 0개 : 통과 (프로젝트 미연결 = 미제한, 워크스페이스 레벨)
+    - 링크된 project 중 접근 가능한 것이 1개라도 있으면 통과
+    - 링크가 전부 접근 불가(private 비-멤버 / draft 비-작성자)면 제외
+
+    requester_role 미전달(None) = 내부/파이프라인 호출 → 게이트 skip (하위호환).
+
+    project_id 필터 시 외부 쿼리가 MeetingProjectLink 를 join 하므로, 상관 EXISTS
+    안에서는 별도 alias 를 사용해 외부 join 과의 충돌을 피한다.
+    """
+    if requester_role is None:
+        return stmt
+    if requester_role in ("admin", "owner"):
+        return stmt
+
+    from src.workspaces.models import WorkspaceMember
+
+    mpl_exists = aliased(MeetingProjectLink)
+    mpl_link = aliased(MeetingProjectLink)
+
+    # 회의에 링크가 하나도 없으면 통과 (워크스페이스 레벨).
+    no_links = ~exists().where(mpl_exists.meeting_id == Meeting.id)
+
+    # CAND-B 정합: private 분기는 ProjectMember 매핑 + 현 워크스페이스 멤버 동시 충족.
+    member_exists = exists().where(
+        and_(
+            ProjectMember.project_id == Project.id,
+            ProjectMember.user_id == requester_user_id,
+            WorkspaceMember.workspace_id == Project.workspace_id,
+            WorkspaceMember.user_id == requester_user_id,
+        )
+    )
+    # 링크된 project 중 접근 가능한 것이 하나라도 있으면 통과.
+    has_accessible_link = exists().where(
+        and_(
+            mpl_link.meeting_id == Meeting.id,
+            mpl_link.project_id == Project.id,
+            or_(
+                Project.visibility == "public",
+                and_(
+                    Project.visibility == "draft",
+                    Project.created_by_id == requester_user_id,
+                ),
+                and_(
+                    Project.visibility == "private",
+                    member_exists,
+                ),
+            ),
+        )
+    )
+    return stmt.where(or_(no_links, has_accessible_link))
 
 
 class MeetingRepository:
@@ -37,6 +100,8 @@ class MeetingRepository:
         offset: int = 0,
         limit: int = 20,
         project_id: uuid.UUID | None = None,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> list[Meeting]:
         stmt = select(Meeting).where(Meeting.workspace_id == workspace_id)
         if project_id is not None:
@@ -44,6 +109,8 @@ class MeetingRepository:
                 MeetingProjectLink,
                 MeetingProjectLink.meeting_id == Meeting.id,
             ).where(MeetingProjectLink.project_id == project_id)
+        # CAND-A completeness: project visibility 게이트 (비-멤버 private-linked 회의 metadata/존재성 누출 차단).
+        stmt = _meeting_visibility_filter(stmt, requester_user_id, requester_role)
         stmt = stmt.order_by(Meeting.created_at.desc()).offset(offset).limit(limit)
         return list((await self.session.exec(stmt)).all())
 
@@ -51,6 +118,8 @@ class MeetingRepository:
         self,
         workspace_id: uuid.UUID,
         project_id: uuid.UUID | None = None,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> int:
         stmt = (
             select(func.count())
@@ -62,6 +131,8 @@ class MeetingRepository:
                 MeetingProjectLink,
                 MeetingProjectLink.meeting_id == Meeting.id,
             ).where(MeetingProjectLink.project_id == project_id)
+        # CAND-A completeness: total 도 필터된 집합 기준 (pagination 정합).
+        stmt = _meeting_visibility_filter(stmt, requester_user_id, requester_role)
         return (await self.session.exec(stmt)).one()
 
     async def update_status(

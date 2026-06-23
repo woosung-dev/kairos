@@ -194,6 +194,14 @@ class InviteService:
             raise MemberAlreadyExistsError()
         member = inserted
 
+        # CAND-B fix (codex P1): 사전 잔재 ProjectMember 정리.
+        # accept 가 여기까지 도달했다면 user 는 직전까지 *비-멤버*였다(위 find_member None).
+        # 따라서 이 워크스페이스에 남아 있는 user 의 ProjectMember 행은 모두 stale 잔재다
+        # (과거 제거 시 정리 로직이 없던 시절의 orphan 포함). re-invite 로 WorkspaceMember
+        # 가 재생성되면 visibility 가드가 다시 참이 되어 private 접근이 복원되므로,
+        # 새 멤버는 명시적 재추가 전까지 private project 매핑이 없어야 한다.
+        await self.repo.delete_project_members_for_user(invite.workspace_id, user_id)
+
         # 사용 횟수 증가 (Sprint 19 PR #1 C12: invite.workspace_id 명시 전달)
         await self.repo.increment_invite_use_count(invite.id, invite.workspace_id)
 
@@ -272,6 +280,10 @@ class InviteService:
             raise CannotModifyOwnerError()
 
         await self.repo.remove_member(member_id, workspace_id)
+        # CAND-B fix: 워크스페이스 제거 시 해당 유저의 private project 매핑(ProjectMember)도
+        # revoke. 잔재 행이 남으면 re-invite 된 plain member 가 private project 접근/RAG 를
+        # 되찾는 privilege residue 가 발생한다 (PROBE-SENTINEL-03).
+        await self.repo.delete_project_members_for_user(workspace_id, member.user_id)
         await self.repo.commit()
 
         # BUG-RBAC-CACHE-STALE fix: 멤버 제거 즉시 반영 — RBAC in-process 캐시 무효화.

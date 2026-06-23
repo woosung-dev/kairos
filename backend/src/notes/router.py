@@ -37,7 +37,12 @@ async def list_notes(
 ):
     pid = uuid.UUID(project_id) if project_id else None
     return await service.list_notes(
-        workspace_id, project_id=pid, page=page, page_size=page_size
+        workspace_id,
+        project_id=pid,
+        page=page,
+        page_size=page_size,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
     )
 
 
@@ -48,7 +53,12 @@ async def get_note(
     member: WorkspaceMember = Depends(require_viewer),
     service: NoteService = Depends(get_note_service),
 ):
-    return await service.get_note(note_id, workspace_id)
+    return await service.get_note(
+        note_id,
+        workspace_id,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
+    )
 
 
 @router.get("/{note_id}/export")
@@ -60,7 +70,11 @@ async def export_note(
     service: NoteService = Depends(get_note_service),
 ):
     content, filename, media_type = await service.export_note(
-        note_id, workspace_id, format
+        note_id,
+        workspace_id,
+        format,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
     )
     encoded = quote(filename)
     return Response(
@@ -115,6 +129,8 @@ async def update_note(
         title=data.title,
         content=data.content,
         project_id=pid,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
     )
     # Sprint 29 R1 (notes-stale): project_id 변경 시 EmbeddingChunk.project_id 동기화 +
     # old/new SemanticCache 무효화 (content 미변경 시 embed_note_async 가 실행되지 않아
@@ -134,7 +150,13 @@ async def delete_note(
     pipeline: NotePipelineService = Depends(get_note_pipeline_service),
 ):
     # embedding cleanup 포함 orchestrator 경유 (ADR-014 옵션 A 정합) — Codex H2/옵션 A: workspace_id 필수
-    await pipeline.delete_note_with_cleanup(note_id, workspace_id)
+    # CAND-A completeness: SOURCE 노트의 project visibility 게이트 (비-멤버 write IDOR 차단)
+    await pipeline.delete_note_with_cleanup(
+        note_id,
+        workspace_id,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
+    )
 
 
 # Sprint 23 D4 Task 2 Step 2.3: notes promote — I-18 복제 + audit + BG embedding.
@@ -167,6 +189,7 @@ async def promote_note(
         target_workspace_id=body.target_workspace_id,
         promoted_by_user_id=member.user_id,
         background_tasks=background_tasks,
+        requester_role=member.role,
     )
 
 
@@ -183,4 +206,9 @@ async def get_embedding_status(
     RBAC: viewer 이상 (read-only).
     응답: audit raw embedding_status (pending/processing/completed/failed/n/a) + 실 chunk count.
     """
-    return await service.get_embedding_status(workspace_id, note_id)
+    return await service.get_embedding_status(
+        workspace_id,
+        note_id,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
+    )

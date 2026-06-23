@@ -13,6 +13,8 @@ export interface RagMessage {
 
 export interface RagSource {
   id: string;
+  /** CAND-E: source 엔티티(meeting/note) PK. SourceViewer full-detail fetch 용. id 는 chunk PK. */
+  sourceId: string;
   text: string;
   source: string;
   sourceType: "meeting" | "note";

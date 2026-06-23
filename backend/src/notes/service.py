@@ -118,13 +118,27 @@ class NoteService:
         project_id: uuid.UUID | None = None,
         page: int = 1,
         page_size: int = 20,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
+        """CAND-A completeness: requester visibility 게이트 (private/draft 본문 누출 차단).
+
+        requester_role 미전달(None) = 내부/파이프라인 호출 → 게이트 skip (하위호환).
+        """
         offset = (page - 1) * page_size
         notes = await self.repo.find_by_workspace(
-            workspace_id, project_id=project_id, offset=offset, limit=page_size
+            workspace_id,
+            project_id=project_id,
+            offset=offset,
+            limit=page_size,
+            requester_user_id=requester_user_id,
+            requester_role=requester_role,
         )
         total = await self.repo.count_by_workspace(
-            workspace_id, project_id=project_id
+            workspace_id,
+            project_id=project_id,
+            requester_user_id=requester_user_id,
+            requester_role=requester_role,
         )
         return {
             "items": [self._to_dict(n) for n in notes],
@@ -134,13 +148,58 @@ class NoteService:
             "hasNext": page * page_size < total,
         }
 
+    async def _verify_note_visibility(
+        self,
+        note: Note,
+        requester_user_id: uuid.UUID | None,
+        requester_role: str | None,
+    ) -> None:
+        """CAND-A: note 의 owning project visibility 게이트 (get_project 정합).
+
+        require_viewer/member 만으론 private/draft project 노트가 비-ProjectMember 에게
+        노출된다 (visibility-residue IDOR). project-detail 과 동일 규칙으로 게이트:
+        - admin/owner: 우회 (모든 visibility)
+        - project_id=None: 워크스페이스 멤버 누구나 OK
+        - draft: 작성자(created_by_id)만, 그 외 404
+        - private: ProjectMember 매핑된 사람만, 그 외 404
+
+        requester_role 미전달(None) = 내부/특권 호출 → 게이트 skip (하위호환).
+        """
+        if requester_role is None:
+            return
+        if requester_role in ("admin", "owner"):
+            return
+        if note.project_id is None:
+            return
+        if self.project_repo is None:
+            raise RuntimeError("project_repo 필수 (CAND-A visibility 검증)")
+        project = await self.project_repo.find_by_id(
+            note.project_id, note.workspace_id
+        )
+        if project is None:
+            # cross-tenant 또는 dangling project → fail-closed 404
+            raise NoteNotFoundError()
+        if project.visibility == "draft":
+            if project.created_by_id != requester_user_id:
+                raise NoteNotFoundError()
+        elif project.visibility == "private":
+            if requester_user_id is None or not await self.project_repo.is_member(
+                note.project_id, requester_user_id, note.workspace_id
+            ):
+                raise NoteNotFoundError()
+
     async def get_note(
-        self, note_id: uuid.UUID, workspace_id: uuid.UUID
+        self,
+        note_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
-        """헌법 I-9 (Codex F-1): workspace_id 필수."""
+        """헌법 I-9 (Codex F-1): workspace_id 필수. CAND-A: project visibility 게이트."""
         note = await self.repo.find_by_id(note_id, workspace_id)
         if note is None:
             raise NoteNotFoundError()
+        await self._verify_note_visibility(note, requester_user_id, requester_role)
         return self._to_dict(note)
 
     async def update_note(
@@ -150,11 +209,18 @@ class NoteService:
         title: str | None = None,
         content: dict | None = None,
         project_id: uuid.UUID | None = ...,  # type: ignore[assignment]
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
-        """헌법 I-9 (Codex F-1) + Codex F-2 Critical: project_id cross-workspace 거부."""
+        """헌법 I-9 (Codex F-1) + Codex F-2 Critical: project_id cross-workspace 거부.
+
+        CAND-A completeness: SOURCE 노트의 project visibility 게이트 — 비-멤버가
+        private/draft 프로젝트의 노트를 mutate 하는 write IDOR 차단 (비-멤버 → 404).
+        """
         note = await self.repo.find_by_id(note_id, workspace_id)
         if note is None:
             raise NoteNotFoundError()
+        await self._verify_note_visibility(note, requester_user_id, requester_role)
 
         if title is not None:
             note.title = title
@@ -182,12 +248,18 @@ class NoteService:
         await self.repo.commit()
 
     async def export_note(
-        self, note_id: uuid.UUID, workspace_id: uuid.UUID, fmt: str
+        self,
+        note_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        fmt: str,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> tuple[str, str, str]:
-        """노트 내보내기. (content, filename, media_type) 반환."""
+        """노트 내보내기. (content, filename, media_type) 반환. CAND-A: visibility 게이트."""
         note = await self.repo.find_by_id(note_id, workspace_id)
         if note is None:
             raise NoteNotFoundError()
+        await self._verify_note_visibility(note, requester_user_id, requester_role)
 
         title = note.title or "Untitled"
 
@@ -230,6 +302,7 @@ class NoteService:
         target_workspace_id: uuid.UUID,
         promoted_by_user_id: uuid.UUID,
         background_tasks: BackgroundTasks,
+        requester_role: str | None = None,
     ) -> NotePromoteOut:
         """1-button promote: 원본 보존 + target ws 복제 + audit + bg embedding 복제.
 
@@ -272,6 +345,13 @@ class NoteService:
         source = await self.repo.find_by_id(note_id, source_workspace_id)
         if source is None:
             raise NoteNotFoundError()
+
+        # CAND-A completeness: SOURCE 노트의 project visibility 게이트 — 비-멤버가
+        # private/draft 프로젝트의 노트를 team ws 로 promote(=복제 노출)하는 IDOR 차단.
+        # promoter 는 source ws 멤버지만 ProjectMember 가 아닐 수 있음 → 비-멤버 → 404.
+        await self._verify_note_visibility(
+            source, promoted_by_user_id, requester_role
+        )
 
         # Sprint 24 BL-064: chunk 0 + plain_text 분기 보강.
         # plain_text 부재 → 400 회귀 가드 유지 (Sprint 23 6차 P2).
@@ -348,7 +428,11 @@ class NoteService:
     # ── Sprint 24 BL-064: embedding-status polling endpoint 지원 ──
 
     async def get_embedding_status(
-        self, workspace_id: uuid.UUID, note_id: uuid.UUID
+        self,
+        workspace_id: uuid.UUID,
+        note_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> EmbeddingStatusOut:
         """target note 의 embedding 진행 상태 + 실 chunk count 반환.
 
@@ -356,10 +440,14 @@ class NoteService:
         - audit row 가 없으면 (promote 외 흐름의 일반 note):
             - chunk count > 0 → "completed"
             - chunk count == 0 → "pending" (embed_note_async 가 곧 호출됨)
+
+        CAND-A completeness: project visibility 게이트 — 비-멤버가 private/draft 노트의
+        embedding 진행 상태(존재성)를 polling 으로 캐내는 status leak 차단 (비-멤버 → 404).
         """
         note = await self.repo.find_by_id(note_id, workspace_id)
         if note is None:
             raise NoteNotFoundError()
+        await self._verify_note_visibility(note, requester_user_id, requester_role)
 
         chunk_count = await self.repo.count_note_chunks(note_id, workspace_id)
         audit = await self.repo.find_latest_audit_for_note(note_id, workspace_id)

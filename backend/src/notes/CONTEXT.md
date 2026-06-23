@@ -97,9 +97,9 @@ GET    /{id}/embedding-status     Sprint 24 BL-064: embedding 진행 상태 poll
 
 - 인증/인가: `require_member` (POST/PATCH/DELETE) / `require_viewer` (GET) 통과
 - service / repository: 모든 호출 시 path `workspace_id` 필수 (헌법 I-9)
-  - `service.get_note(note_id, workspace_id)`
+  - `service.get_note(note_id, workspace_id, requester_user_id=, requester_role=)`
   - `service.update_note(note_id, workspace_id, title=, content=, project_id=)`
-  - `service.export_note(note_id, workspace_id, fmt)`
+  - `service.export_note(note_id, workspace_id, fmt, requester_user_id=, requester_role=)`
   - `service.delete_note(note_id, workspace_id)` (현재 router 경로는 pipeline 직접 호출)
   - `repository.find_by_id(note_id, workspace_id)`
 - pipeline (옵션 A, Codex H2 — pipeline 우회 IDOR 차단):
@@ -112,6 +112,10 @@ GET    /{id}/embedding-status     Sprint 24 BL-064: embedding 진행 상태 poll
 - cross-tenant 응답:
   - path workspace 안에 없는 `note_id` → 404 (`NoteNotFoundError`)
   - cross-workspace `project_id` → 404 (`ProjectNotFoundError`)
+- project visibility 게이트 (CAND-A, visibility-residue IDOR fix):
+  - `get_note` / `export_note` 가 owning project 의 visibility 를 `get_project` 와 동일 규칙으로 검증
+  - private project 노트 → ProjectMember 만 (비-멤버 404), draft → 작성자만 (비-작성자 404), admin/owner 우회, `project_id=None`/public → 워크스페이스 멤버 OK
+  - `requester_role` 미전달(None) = 내부/특권 호출 → 게이트 skip (하위호환)
 - 회귀 가드: `backend/tests/integration/test_workspace_idor_matrix.py::TestNotesIDORMatrix` 7 케이스 + `tests/notes/test_notes_api.py` + `tests/notes/test_export.py`
 
 ---

@@ -89,13 +89,50 @@ class MeetingService:
         page: int = 1,
         page_size: int = 20,
         project_id: uuid.UUID | None = None,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
-        """워크스페이스 회의 목록 (페이지네이션, project_id 필터 옵션)."""
+        """워크스페이스 회의 목록 (페이지네이션, project_id 필터 옵션).
+
+        CAND-A completeness: requester visibility 게이트 — private-linked 회의의
+        metadata/존재성이 비-ProjectMember 에게 노출되지 않도록 제외.
+        requester_role 미전달(None) = 내부/파이프라인 호출 → 게이트 skip (하위호환).
+        """
+        # CAND-A completeness round 2 (codex): projectId 필터 시 그 프로젝트 자체가
+        # 접근 가능해야 한다. 비접근 private-B 로 필터하면 cross-link 회의(public-A +
+        # private-B)가 노출돼 B 링크 존재성이 누출된다. 접근 불가 projectId → 빈 결과.
+        if (
+            project_id is not None
+            and requester_role is not None
+            and requester_role not in ("admin", "owner")
+            and self.project_repo is not None
+        ):
+            target = await self.project_repo.find_by_id(project_id, workspace_id)
+            if target is None or not await self._is_project_accessible(
+                target, requester_user_id, requester_role, workspace_id
+            ):
+                return {
+                    "items": [],
+                    "total": 0,
+                    "page": page,
+                    "pageSize": page_size,
+                    "hasNext": False,
+                }
         offset = (page - 1) * page_size
         meetings = await self.repo.find_by_workspace(
-            workspace_id, offset, page_size, project_id
+            workspace_id,
+            offset,
+            page_size,
+            project_id,
+            requester_user_id=requester_user_id,
+            requester_role=requester_role,
         )
-        total = await self.repo.count_by_workspace(workspace_id, project_id)
+        total = await self.repo.count_by_workspace(
+            workspace_id,
+            project_id,
+            requester_user_id=requester_user_id,
+            requester_role=requester_role,
+        )
 
         return {
             "items": [self._to_list_item(m) for m in meetings],
@@ -105,13 +142,97 @@ class MeetingService:
             "hasNext": page * page_size < total,
         }
 
+    async def _is_project_accessible(
+        self,
+        project,
+        requester_user_id: uuid.UUID | None,
+        requester_role: str | None,
+        workspace_id: uuid.UUID,
+    ) -> bool:
+        """단일 project 가 requester 에게 접근 가능한지 (get_project visibility 규칙).
+
+        CAND-A completeness round 2 (codex): 다중 링크 회의에서 접근 가능한 링크가
+        하나 있어도 *접근 불가* private/draft 링크의 존재/메타는 가려야 한다.
+        """
+        if requester_role is None or requester_role in ("admin", "owner"):
+            return True
+        if project.visibility == "public":
+            return True
+        if project.visibility == "draft":
+            return project.created_by_id == requester_user_id
+        if project.visibility == "private":
+            return (
+                requester_user_id is not None
+                and self.project_repo is not None
+                and await self.project_repo.is_member(
+                    project.id, requester_user_id, workspace_id
+                )
+            )
+        return False
+
+    async def _verify_meeting_visibility(
+        self,
+        meeting_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None,
+        requester_role: str | None,
+    ) -> None:
+        """CAND-A: 회의에 연결된 project visibility 게이트 (get_project 정합).
+
+        require_viewer 만으론 private/draft project 에 연결된 회의의 트랜스크립트/요약/
+        export 가 비-ProjectMember 에게 노출된다 (visibility-residue IDOR).
+
+        회의는 MeetingProjectLink 로 N개 project 와 연결될 수 있다. 규칙:
+        - admin/owner: 우회
+        - project 링크 0개: 워크스페이스 멤버 누구나 OK (프로젝트 미연결 = 미제한)
+        - 링크된 project 중 접근 가능한 것이 1개라도 있으면 OK
+        - 링크된 project 가 전부 접근 불가(private 비-멤버 / draft 비-작성자)면 404
+
+        requester_role 미전달(None) = 내부/특권 호출 → 게이트 skip (하위호환).
+        """
+        if requester_role is None:
+            return
+        if requester_role in ("admin", "owner"):
+            return
+        if self.project_repo is None:
+            raise RuntimeError("project_repo 필수 (CAND-A visibility 검증)")
+        linked = await self.project_repo.find_projects_by_meeting(
+            meeting_id, workspace_id
+        )
+        if not linked:
+            # 프로젝트 미연결 = 워크스페이스 레벨 (미제한)
+            return
+        for project in linked:
+            if project.visibility == "public":
+                return
+            if project.visibility == "draft":
+                if project.created_by_id == requester_user_id:
+                    return
+            elif project.visibility == "private":
+                if requester_user_id is not None and await self.project_repo.is_member(
+                    project.id, requester_user_id, workspace_id
+                ):
+                    return
+        # 접근 가능한 연결 project 없음 → fail-closed 404
+        raise MeetingNotFoundError()
+
     async def get_meeting_detail(
-        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID
+        self,
+        meeting_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
-        """회의 상세 (요약 + 트랜스크립트 포함). 헌법 I-9 workspace_id 필수 (Codex F-1)."""
+        """회의 상세 (요약 + 트랜스크립트 포함). 헌법 I-9 workspace_id 필수 (Codex F-1).
+
+        CAND-A: 연결된 project visibility 게이트 (비-ProjectMember 누출 차단).
+        """
         meeting = await self.repo.find_by_id(meeting_id, workspace_id)
         if meeting is None:
             raise MeetingNotFoundError()
+        await self._verify_meeting_visibility(
+            meeting_id, workspace_id, requester_user_id, requester_role
+        )
 
         segments = await self.repo.get_segments(meeting_id, workspace_id)
         summary = await self.repo.get_summary(meeting_id, workspace_id)
@@ -142,6 +263,16 @@ class MeetingService:
         # Sprint 19 PR #1 C9 (Codex F-1): workspace_id 명시 전달
         if self.project_repo is not None:
             linked = await self.project_repo.find_projects_by_meeting(meeting_id, workspace_id)
+            # CAND-A completeness round 2 (codex): 접근 가능한 linked project 만 노출.
+            # 한 링크로 회의 접근이 허용돼도 접근 불가 private/draft 링크의 id/title/
+            # visibility 메타가 detail JSON 으로 새면 안 된다.
+            visible_linked = [
+                p
+                for p in linked
+                if await self._is_project_accessible(
+                    p, requester_user_id, requester_role, workspace_id
+                )
+            ]
             result["projects"] = [
                 {
                     "id": str(p.id),
@@ -149,31 +280,53 @@ class MeetingService:
                     "status": p.status,
                     "visibility": p.visibility,
                 }
-                for p in linked
+                for p in visible_linked
             ]
         else:
             result["projects"] = []
         return result
 
     async def get_meeting_status(
-        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID
+        self,
+        meeting_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
-        """회의 처리 상태. 헌법 I-9 workspace_id 필수 (Codex F-1)."""
+        """회의 처리 상태. 헌법 I-9 workspace_id 필수 (Codex F-1).
+
+        CAND-A completeness: 연결된 project visibility 게이트 — 비-ProjectMember 가
+        private-linked 회의의 처리상태(존재성/실패사유)를 polling 으로 캐내는 status leak 차단.
+        """
         meeting = await self.repo.find_by_id(meeting_id, workspace_id)
         if meeting is None:
             raise MeetingNotFoundError()
+        await self._verify_meeting_visibility(
+            meeting_id, workspace_id, requester_user_id, requester_role
+        )
         return {
             "status": meeting.status,
             "errorMessage": meeting.error_message,
         }
 
     async def export_meeting(
-        self, meeting_id: uuid.UUID, workspace_id: uuid.UUID, fmt: str
+        self,
+        meeting_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        fmt: str,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> tuple[str, str, str]:
-        """회의 내보내기 (content, filename, media_type). 헌법 I-9 workspace_id 필수 (Codex F-1)."""
+        """회의 내보내기 (content, filename, media_type). 헌법 I-9 workspace_id 필수 (Codex F-1).
+
+        CAND-A: 연결된 project visibility 게이트 (비-ProjectMember 누출 차단).
+        """
         meeting = await self.repo.find_by_id(meeting_id, workspace_id)
         if meeting is None:
             raise MeetingNotFoundError()
+        await self._verify_meeting_visibility(
+            meeting_id, workspace_id, requester_user_id, requester_role
+        )
 
         segments = await self.repo.get_segments(meeting_id, workspace_id)
         summary = await self.repo.get_summary(meeting_id, workspace_id)
@@ -187,7 +340,12 @@ class MeetingService:
             content = self._to_markdown(meeting, summary, segments, actions)
             return content, f"{meeting.title}.md", "text/markdown; charset=utf-8"
         else:
-            detail = await self.get_meeting_detail(meeting_id, workspace_id)
+            detail = await self.get_meeting_detail(
+                meeting_id,
+                workspace_id,
+                requester_user_id=requester_user_id,
+                requester_role=requester_role,
+            )
             detail["actionItems"] = [
                 {
                     "title": a.title,
@@ -264,6 +422,7 @@ class MeetingService:
         target_workspace_id: uuid.UUID,
         promoted_by_user_id: uuid.UUID,
         background_tasks: BackgroundTasks,
+        requester_role: str | None = None,
     ) -> MeetingPromoteOut:
         """1-button promote: 원본 보존 + target ws 복제 (Meeting/Summary/Segments) + audit + bg embedding 복제.
 
@@ -298,6 +457,13 @@ class MeetingService:
         source = await self.repo.find_by_id(meeting_id, source_workspace_id)
         if source is None:
             raise MeetingNotFoundError()
+
+        # CAND-A completeness: SOURCE 회의의 연결 project visibility 게이트 — 비-멤버가
+        # private/draft 프로젝트의 회의를 team ws 로 promote(=복제 노출)하는 IDOR 차단.
+        # promoter 는 source ws 멤버지만 ProjectMember 가 아닐 수 있음 → 비-멤버 → 404.
+        await self._verify_meeting_visibility(
+            meeting_id, source_workspace_id, promoted_by_user_id, requester_role
+        )
 
         # Sprint 23 Codex 4차 P2-1 fix: terminal status (completed / failed) 만 promote 허용.
         # uploading / transcribing / analyzing 같은 transient 는 target ws 에서 영원히 stuck

@@ -79,7 +79,14 @@ async def list_meetings(
     member: WorkspaceMember = Depends(require_viewer),
     service: MeetingService = Depends(get_meeting_service),
 ):
-    return await service.list_meetings(workspace_id, page, page_size, project_id)
+    return await service.list_meetings(
+        workspace_id,
+        page,
+        page_size,
+        project_id,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
+    )
 
 
 @router.get("/{meeting_id}")
@@ -89,7 +96,12 @@ async def get_meeting(
     member: WorkspaceMember = Depends(require_viewer),
     service: MeetingService = Depends(get_meeting_service),
 ):
-    return await service.get_meeting_detail(meeting_id, workspace_id)
+    return await service.get_meeting_detail(
+        meeting_id,
+        workspace_id,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
+    )
 
 
 @router.get("/{meeting_id}/export")
@@ -101,7 +113,11 @@ async def export_meeting(
     service: MeetingService = Depends(get_meeting_service),
 ):
     content, filename, media_type = await service.export_meeting(
-        meeting_id, workspace_id, format
+        meeting_id,
+        workspace_id,
+        format,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
     )
     encoded = quote(filename)
     return Response(
@@ -118,7 +134,12 @@ async def get_meeting_status(
     member: WorkspaceMember = Depends(require_viewer),
     service: MeetingService = Depends(get_meeting_service),
 ):
-    return await service.get_meeting_status(meeting_id, workspace_id)
+    return await service.get_meeting_status(
+        meeting_id,
+        workspace_id,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
+    )
 
 
 # Sprint 23 D4 Task 2 Step 2.2: meetings promote — I-18 복제 + audit + BG embedding.
@@ -145,4 +166,5 @@ async def promote_meeting(
         target_workspace_id=body.target_workspace_id,
         promoted_by_user_id=member.user_id,
         background_tasks=background_tasks,
+        requester_role=member.role,
     )

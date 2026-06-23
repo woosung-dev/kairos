@@ -3,11 +3,74 @@
 import uuid
 
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import func, select
+from sqlmodel import and_, exists, func, or_, select
 
 from src.common.promote_models import ItemPromotionAudit
 from src.embeddings.models import EmbeddingChunk
 from src.notes.models import Note
+from src.projects.models import Project, ProjectMember
+
+
+def _note_visibility_filter(
+    stmt,
+    requester_user_id: uuid.UUID | None,
+    requester_role: str | None,
+):
+    """CAND-A completeness: note LIST 에 project visibility 게이트 적용.
+
+    EmbeddingRepository._visibility_filter_sql 의 EXISTS 패턴을 SQLModel idiom
+    (ProjectRepository._apply_visibility_filter 와 동일) 으로 미러링한다.
+    notes.project_id 는 직접 컬럼이므로 correlated EXISTS 로 게이트:
+    - project_id IS NULL : 통과 (워크스페이스 레벨)
+    - admin/owner : 모든 visibility 통과 (필터 없음)
+    - public : 통과
+    - draft : created_by_id == requester 일 때만
+    - private : ProjectMember 매핑 + 현 워크스페이스 멤버 동시 충족 시에만
+
+    requester_role 미전달(None) = 내부/파이프라인 호출 → 게이트 skip (하위호환).
+    """
+    # requester 정보 없음 = 내부/특권 호출 → 필터 skip (하위호환).
+    if requester_role is None:
+        return stmt
+    # admin/owner 는 모든 visibility 우회.
+    if requester_role in ("admin", "owner"):
+        return stmt
+
+    from src.workspaces.models import WorkspaceMember
+
+    # CAND-B 정합: private 분기는 ProjectMember 매핑 + 현 워크스페이스 멤버 동시 충족.
+    # WorkspaceMember 검사를 같은 exists() 안에 펼쳐 외부 Project 행에 correlate
+    # (orphan ProjectMember 잔재로 private 가 되살아나는 LIST 누출 차단).
+    member_exists = exists().where(
+        and_(
+            ProjectMember.project_id == Project.id,
+            ProjectMember.user_id == requester_user_id,
+            WorkspaceMember.workspace_id == Project.workspace_id,
+            WorkspaceMember.user_id == requester_user_id,
+        )
+    )
+    accessible_project = exists().where(
+        and_(
+            Project.id == Note.project_id,
+            or_(
+                Project.visibility == "public",
+                and_(
+                    Project.visibility == "draft",
+                    Project.created_by_id == requester_user_id,
+                ),
+                and_(
+                    Project.visibility == "private",
+                    member_exists,
+                ),
+            ),
+        )
+    )
+    return stmt.where(
+        or_(
+            Note.project_id.is_(None),  # type: ignore[union-attr]
+            accessible_project,
+        )
+    )
 
 
 class NoteRepository:
@@ -36,10 +99,14 @@ class NoteRepository:
         project_id: uuid.UUID | None = None,
         offset: int = 0,
         limit: int = 20,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> list[Note]:
         stmt = select(Note).where(Note.workspace_id == workspace_id)
         if project_id:
             stmt = stmt.where(Note.project_id == project_id)
+        # CAND-A completeness: project visibility 게이트 (비-멤버 private/draft 본문 누출 차단).
+        stmt = _note_visibility_filter(stmt, requester_user_id, requester_role)
         stmt = stmt.order_by(Note.updated_at.desc()).offset(offset).limit(limit)
         return list((await self.session.exec(stmt)).all())
 
@@ -47,6 +114,8 @@ class NoteRepository:
         self,
         workspace_id: uuid.UUID,
         project_id: uuid.UUID | None = None,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> int:
         stmt = (
             select(func.count())
@@ -55,6 +124,8 @@ class NoteRepository:
         )
         if project_id:
             stmt = stmt.where(Note.project_id == project_id)
+        # CAND-A completeness: total 도 필터된 집합 기준 (pagination 정합).
+        stmt = _note_visibility_filter(stmt, requester_user_id, requester_role)
         return (await self.session.exec(stmt)).one()
 
     async def delete(self, note: Note) -> None:

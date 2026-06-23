@@ -5,9 +5,15 @@ import { useRagStore } from "../store";
 
 interface RagInputProps {
   onSubmit: (query: string) => void;
+  /**
+   * CAND-D: 전체 너비 composer(/search)는 우하단 피드백 FAB(fixed z-30)와 전송 버튼이
+   * 겹쳐 클릭이 가로채진다. true 면 composer 우측에 FAB 폭만큼 gutter 를 둬 분리한다.
+   * 우측 슬라이드 RAG 오버레이(z-40 패널)는 FAB 를 덮으므로 기본값 false.
+   */
+  fabSafe?: boolean;
 }
 
-export function RagInput({ onSubmit }: RagInputProps) {
+export function RagInput({ onSubmit, fabSafe = false }: RagInputProps) {
   const [query, setQuery] = useState("");
   const { isStreaming } = useRagStore();
 
@@ -25,7 +31,14 @@ export function RagInput({ onSubmit }: RagInputProps) {
   };
 
   return (
-    <div className="p-3 border-t" style={{ borderColor: "var(--border-subtle)" }}>
+    <div
+      className="p-3 border-t"
+      style={{
+        borderColor: "var(--border-subtle)",
+        // FAB 폭(44px) + right-4(16px) + 여유 → 전송 버튼이 FAB footprint 를 벗어남.
+        paddingRight: fabSafe ? "calc(0.75rem + 4rem)" : undefined,
+      }}
+    >
       <div
         className="flex items-center gap-2 px-3 py-2 rounded border"
         style={{

@@ -13,6 +13,8 @@ import type { SourceDocument, HighlightChunk } from "@/features/sources/types";
 function toSourceDocument(source: RagSource): SourceDocument {
   return {
     id: source.id,
+    // CAND-E: full-detail fetch 는 source 엔티티 id 사용 (id 는 chunk PK → /meetings/{id} 404).
+    sourceId: source.sourceId ?? source.id,
     title: source.source,
     type: source.sourceType,
     content: source.text,

@@ -101,11 +101,15 @@ function useFullSourceContent(source: SourceDocument): {
   const isMeeting = source.type === "meeting";
   const isNote = source.type === "note";
 
+  // CAND-E: full-detail fetch 는 source 엔티티 PK(sourceId)로 — source.id 는 chunk PK 라
+  // /meetings/{chunkId} 가 항상 404 → console retry storm. sourceId 미지정 시 id 폴백(하위호환).
+  const entityId = source.sourceId ?? source.id;
+
   const meetingDetail = useMeetingDetail(
     isMeeting ? wid : undefined,
-    source.id,
+    entityId,
   );
-  const noteDetail = useNote(isNote ? wid : undefined, source.id);
+  const noteDetail = useNote(isNote ? wid : undefined, entityId);
 
   if (isMeeting) {
     const transcript = meetingDetail.data?.transcript;

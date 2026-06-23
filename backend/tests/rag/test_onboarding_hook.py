@@ -15,7 +15,8 @@ async def test_rag_cache_hit_advances_onboarding_step_4():
     mock_repo.find_similar_cache.return_value = {
         "id": "cache-1",
         "answer": "캐시된 답변",
-        "sources": [{"id": "s1", "text": "소스", "source": "회의"}],
+        # CAND-E completeness: 실 저장 캐시는 sourceId 보유 → cache HIT 으로 serve.
+        "sources": [{"id": "s1", "sourceId": "m1", "text": "소스", "source": "회의"}],
         "hit_count": 1,
     }
 

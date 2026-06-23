@@ -20,7 +20,7 @@ export default function SearchPage() {
         <SearchScope />
       </div>
       <RagChat />
-      <RagInput onSubmit={ask} />
+      <RagInput onSubmit={ask} fabSafe />
     </div>
   );
 }
