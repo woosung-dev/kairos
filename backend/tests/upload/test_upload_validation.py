@@ -228,6 +228,46 @@ async def test_upload_proxy_accepts_valid_video_webm(authed_client):
 
 
 @pytest.mark.asyncio
+async def test_upload_proxy_accepts_recorded_webm_opus(authed_client):
+    """BUG (2026-06-24 fullsweep): 브라우저 MediaRecorder 직접 녹음은
+    'audio/webm;codecs=opus' MIME 으로 전송된다. 이전엔 allowlist exact-match
+    (audio/webm)가 ;codecs=opus 파라미터로 거부 → 415 '지원하지 않는 MIME'.
+    RFC 6838 essence(파라미터 제거) 정규화 후 정상 201."""
+    valid_webm_bytes = b"\x1a\x45\xdf\xa3" + b"\x00" * 128
+    expected_file_key = f"uploads/{uuid.uuid4()}/recording.webm"
+    with patch(
+        "src.upload.router.R2Service.upload_file_bytes",
+        new_callable=AsyncMock,
+        return_value=expected_file_key,
+    ):
+        response = await authed_client.post(
+            f"/api/v1/workspaces/{WORKSPACE_ID}/upload/file",
+            files={"file": ("recording.webm", valid_webm_bytes, "audio/webm;codecs=opus")},
+        )
+    assert response.status_code == 201, response.text
+
+
+@pytest.mark.asyncio
+async def test_presigned_url_accepts_recorded_ogg_opus(authed_client):
+    """녹음 MIME variant — Firefox 등은 'audio/ogg;codecs=opus'. presigned 흐름도
+    essence 정규화로 통과(200). R2 mock."""
+    with patch(
+        "src.upload.router.R2Service.get_presigned_upload_url",
+        new_callable=AsyncMock,
+        return_value={
+            "upload_url": "https://r2.example/x",
+            "file_key": "uploads/x/rec.ogg",
+            "expires_in": 3600,
+        },
+    ):
+        response = await authed_client.post(
+            f"/api/v1/workspaces/{WORKSPACE_ID}/upload/presigned-url",
+            json={"filename": "rec.ogg", "contentType": "audio/ogg;codecs=opus"},
+        )
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
 async def test_upload_proxy_accepts_valid_mov(authed_client):
     """F-2A v2: proxy /file 에 .mov (ftypqt) → 201."""
     valid_mov_bytes = b"\x00\x00\x00\x20ftypqt  \x00\x00\x00\x00qt  \x00\x00\x00\x00" + b"\x00" * 64
