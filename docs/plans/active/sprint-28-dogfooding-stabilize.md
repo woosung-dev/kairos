@@ -104,7 +104,7 @@ dogfooding 5명 응답 후 발견 패턴 + 미리 가드해야 할 corner case.
 - Clerk Production 키 발급 결정 (사용자 정책 reconsideration — 외부 5명 → 20명+ 확장 신호 있을 시)
 - production 환경 audit 진입 결정 (dev → production 전환 시점)
 
-산출물: `docs/sprints/sprint-28-dogfooding-stabilize/exit-evaluation.md`
+산출물: `git history`
 
 ---
 

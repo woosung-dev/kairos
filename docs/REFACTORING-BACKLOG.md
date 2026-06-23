@@ -42,7 +42,7 @@
 
 **목표**: User INSERT 에 `ON CONFLICT (clerk_id) DO NOTHING` 추가 (같은 file line 175-184 의 workspace INSERT 패턴 정합). 또는 try/except IntegrityError + retry find_by_clerk_id fallback.
 
-**근거**: Sprint 27c audit, `docs/audits/2026-05-23-sprint27c-audit/ROOT-CAUSE-CORRECTION.md`.
+**근거**: Sprint 27c audit, `git history`.
 
 **영향**: 외부 5명 진입 60-80% 첫 dashboard 진입 시 500 가능성. dogfooding prerequisite.
 
@@ -54,7 +54,7 @@
 
 **목표**: Google AI Studio (`https://aistudio.google.com`) 에서 새 API key 발급 + local `.env` + Cloud Run secret 동기화.
 
-**근거**: Sprint 27c audit, `docs/audits/2026-05-23-sprint27c-audit/qa-function.md` P0-AI-PIPELINE.
+**근거**: Sprint 27c audit, `git history` P0-AI-PIPELINE.
 
 **영향**: Kairos 핵심 가치 (AI 자동 요약) 0. ADR-019 Phase B (gemini-3.1-flash-lite) 동작 prerequisite.
 
@@ -366,15 +366,15 @@
 
 ---
 
-## BL-S26-3 — historical reference dead link cleanup (Sprint 26 carry-over) ★
+## BL-S26-3 — historical reference dead link cleanup ✅ **완료 (2026-06-23 ponytail cleanup)**
 
 **현 상태:** Sprint 26 P0-3 dev-log/sprints+qa+notes 폐지 후 `docs/TODO.md` + `docs/REFACTORING-BACKLOG.md` 본문 (L50/95/145/200/1768/1835 등) 에 historical reference 다수 잔존. agy 검증 3회차 REVISE 지적.
 
-**후보:** (A) sed 일괄 — `docs/dev-log/{sprints,qa,notes}/...` 참조를 "(Sprint NN 산출물, git history 참조)" 로 inline replace · (B) TODO.md 통째 슬림 (518줄 → 100줄 미만).
+**후보:** historical artifact 경로를 `git history` 참조로 치환하고, 필요한 경우 TODO.md 를 100줄 미만으로 슬림.
 
 **의도:** historical reference 는 context 보존 가치 vs dead link risk trade-off. agy = "신규 AI 가 폐지 경로 읽으려 시도할 수 있음" 권고 → cleanup.
 
-**제외:** `docs/superpowers/plans/` + `docs/superpowers/specs/` (G1 = historical archive 보존).
+**결정:** historical audit/sprint/superpowers 산출물은 git history와 PR body로 보존. live docs 는 canonical docs 중심으로 유지.
 
 **참조:** Sprint 26 verification 3회차 agy REVISE.
 
@@ -416,7 +416,7 @@ async def _report_progress(meeting_id, step, **meta): ...
 
 **Sprint 묶음 권고:** 단독 (Sprint 11+, F4 외부 인터뷰 완료 후)
 
-**근거:** deepen-modules audit 2026-05-12 (docs/dev-log/notes/2026-05-12-meetings-deepen.md)
+**근거:** deepen-modules audit 2026-05-12 (git history)
 
 ---
 
@@ -461,7 +461,7 @@ class MeetingPipelineService:
 
 **Sprint 묶음 권고:** BL-001과 묶어서 (Sprint 11+)
 
-**근거:** deepen-modules audit 2026-05-12 (docs/dev-log/notes/2026-05-12-meetings-deepen.md)
+**근거:** deepen-modules audit 2026-05-12 (git history)
 
 ---
 
@@ -511,7 +511,7 @@ enriched = [
 
 **Sprint 묶음 권고:** 단독 (Sprint 12+). BL-001 meetings 상태 commit 단일화와 독립적. 저위험·고가치라 조기 처리 적합.
 
-**근거:** deepen-modules audit 2026-05-12 Round 1 (docs/dev-log/notes/2026-05-12-rag-deepen.md)
+**근거:** deepen-modules audit 2026-05-12 Round 1 (git history)
 
 ---
 
@@ -566,7 +566,7 @@ async def extract_actions_and_link(self, ...) -> dict:
 
 **Sprint 묶음 권고:** BL-003과 묶어서 (Sprint 12+). 둘 다 서비스 레이어 안전성 강화 방향으로 묶을 수 있음.
 
-**근거:** deepen-modules audit 2026-05-12 Round 2 co-change 분석 (docs/dev-log/notes/2026-05-12-services-deepen.md)
+**근거:** deepen-modules audit 2026-05-12 Round 2 co-change 분석 (git history)
 
 ---
 
@@ -632,7 +632,7 @@ member = await self.workspace_repo.get_member(target_workspace_id, promoted_by_u
 
 **테스트 결과**: pytest 406 → 408 + 1 skipped (architecture gate +2). 기존 memory 27 테스트 회귀 0.
 
-**근거**: Sprint 24 Wave 2 trusty-heron plan / `docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md` §"T-N+1 BL-006".
+**근거**: Sprint 24 Wave 2 trusty-heron plan / `git history` §"T-N+1 BL-006".
 
 ---
 
@@ -1356,21 +1356,14 @@ Cloud Run + Neon Postgres 환경에서 BE 인스턴스 cold start 시:
 
 ---
 
-## BL-032 — superpowers/ stale doc 자동 archive 정책
+## BL-032 — superpowers/ stale doc 자동 archive 정책 ✅ **완료 (2026-06-23 ponytail cleanup)**
 
 **도메인:** docs / 운영
 **근거:** Sprint 18 PR-B 에서 superpowers/ 24 파일 archive 시도 후 revert (스킬 자동 산출 위치라 archive 부적합). 향후 신규 plan/spec 도 시간 지나면 stale — 정책 없으면 누적.
 
-**문제:**
-- 스킬이 매 sprint plan/spec 자동 생성. Sprint 종료 후 plan 은 reference 가치 ↓.
-- 영구 누적 시 docs/superpowers/ 비대.
+**결정:** historical superpowers 산출물은 git history와 PR body로 보존. live docs 에는 active plan/context notes만 둔다.
 
-**해결 후보:**
-1. **시간 기준** — N+3 sprint 이상 stale plan 자동 archive (script).
-2. **참조 기준** — 본문 frontmatter 에 `status: archived` 마킹 → 색인 제외.
-3. **외부 저장** — docs/superpowers/ 자체를 git ignore + 별도 백업 storage.
-
-**예상 LOC delta:** 정책 doc 1 + 스크립트 1 (~100 LOC).
+**예상 LOC delta:** -34 files.
 
 **Risk:** 🟢 낮음.
 
@@ -2145,7 +2138,7 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 
 **현 상태**: **[해소 2026-05-20] Sprint 24 Wave 2 T-N+4**. 4시간+ recording production 처리 차단 해소.
 
-**원본 발견**: Sprint 24 Multi-Agent QA Day 1 Sentinel Tier 2 (`docs/dev-log/qa/2026-05-19-sprint24-qa-multi-agent/verification.md:272`).
+**원본 발견**: Sprint 24 Multi-Agent QA Day 1 Sentinel Tier 2 (`git history`).
 
 **문제**:
 - `transcription.py:TranscriptionService.transcribe()` 가 Whisper API 단일 호출.
@@ -2212,7 +2205,7 @@ Phase 2 T-AI-DATE 완료 후 n=20 으로 확장 재측정해 P/R 회복 confirma
 
 **예상 시간:** 1-2h (fixture 확장 1h + 측정 + 비교 1h).
 
-**근거:** `docs/dev-log/sprints/2026-05-20-sprint24-wave2/post-swap-delta-report.md` §4 + §7 + §9 — Phase 2 진입 conditional 조건 명시 + Gate FAIL revert 미발동 사유 의존.
+**근거:** `git history` §4 + §7 + §9 — Phase 2 진입 conditional 조건 명시 + Gate FAIL revert 미발동 사유 의존.
 
 ---
 
@@ -2240,7 +2233,7 @@ Sprint 22 OBN-01~04 의 OnboardingBanner 는 Sprint 24 Wave 2 에서 폐기 (Cod
 
 **예상 시간:** 4-6h (재도입 시) — UI 설계 2h + BE 재활용 1h + analytics 추가 1h + E2E 1-2h.
 
-**근거:** `docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md` §T-OBN-05 D 옵션 + Codex/Gemini deep research 합의 메모.
+**근거:** `git history` §T-OBN-05 D 옵션 + Codex/Gemini deep research 합의 메모.
 
 
 ## BL-NEW-BE-PERF-COLD-START — Cloud Run + Neon cold start 진단 (Sprint 25+)

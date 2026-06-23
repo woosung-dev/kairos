@@ -1139,7 +1139,7 @@ ActionItem
 
 ## Sprint 3: RAG + Notes (구현 완료)
 
-> 설계 문서: `docs/superpowers/specs/2026-04-02-sprint3-rag-notes-design.md`
+> 설계 문서: `git history`
 
 | # | Method | Path | 설명 |
 |:-:|--------|------|------|

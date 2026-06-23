@@ -1,6 +1,6 @@
 # Sprint 27c — P0 fix (외부 5명 dogfooding 진입 prerequisite)
 
-> Sprint 27c audit (`docs/audits/2026-05-23-sprint27c-audit/`) 산출 P0 3건 fix. **외부 5명 진입 직전 코드 PR 1건 + API key 재발급 + 이미지 fix**. 예상 ~1-2h.
+> Sprint 27c audit (`git history`) 산출 P0 3건 fix. **외부 5명 진입 직전 코드 PR 1건 + API key 재발급 + 이미지 fix**. 예상 ~1-2h.
 
 ## 진입 조건
 

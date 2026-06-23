@@ -1,4 +1,0 @@
-{"type":"server-started","port":60598,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:60598","screen_dir":"/Users/woosung/project/agy-project/kairos/.superpowers/brainstorm/22603-1775313795/content","state_dir":"/Users/woosung/project/agy-project/kairos/.superpowers/brainstorm/22603-1775313795/state"}
-{"type":"screen-added","file":"/Users/woosung/project/agy-project/kairos/.superpowers/brainstorm/22603-1775313795/content/threshold-ui.html"}
-{"type":"screen-added","file":"/Users/woosung/project/agy-project/kairos/.superpowers/brainstorm/22603-1775313795/content/waiting.html"}
-{"type":"server-stopped","reason":"idle timeout"}

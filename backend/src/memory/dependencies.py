@@ -19,12 +19,6 @@ from src.memory.service import MemoryService
 from src.workspaces.repository import WorkspaceRepository
 
 
-async def get_memory_repository(
-    session: AsyncSession = Depends(get_async_session),
-) -> MemoryRepository:
-    return MemoryRepository(session)
-
-
 def get_memory_pipeline_service() -> MemoryPipelineService:
     """Stateless orchestrator — session 은 service 가 자체 BG task 에서 인자로 전달."""
     return MemoryPipelineService()

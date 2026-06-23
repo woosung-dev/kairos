@@ -30,7 +30,7 @@
 
 결과:
 - 표준출력: 요약 + 각 sample raw + 모델 비교 섹션
-- docs/dev-log/sprints/sprint-15-cost-spike.md에 manual paste용 JSON block (§3.5 ADR-019 비교)
+- git history manual paste용 JSON block (§3.5 ADR-019 비교)
 """
 from __future__ import annotations
 

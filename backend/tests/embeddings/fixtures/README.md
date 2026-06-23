@@ -1,6 +1,6 @@
 # tests/embeddings/fixtures
 
-> Sprint 16 ADR-020 (`docs/dev-log/adr/020-pgvector-hnsw-halfvec.md`) recall@10 검증 fixture.
+> Sprint 16 ADR-020 (`git history`) recall@10 검증 fixture.
 
 ## 사용 (옵션 B 합성 corpus)
 

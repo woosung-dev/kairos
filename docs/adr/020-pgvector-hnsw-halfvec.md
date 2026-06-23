@@ -1,9 +1,9 @@
 # ADR-020: pgvector 인덱스 전략 — ivfflat → HNSW + halfvec + iterative_scan
 
 > **날짜:** 2026-05-15
-> **상태:** Accepted (2026-05-15 Stage 5 측정 통과 — `docs/dev-log/sprints/sprint-16-pgvector-verification.md`)
+> **상태:** Accepted (2026-05-15 Stage 5 측정 통과 — `git history`)
 > **작성자:** Claude Opus 4.7 (1M context) + 사용자
-> **관련:** CONTEXT-MAP §6 I-20/I-21 (Sprint 16 Stage 0 lock-in) · ADR-014 Service Boundary · ADR-019 Gemini EOL · `docs/architecture/rag-pipeline.md` §3/§4/§7 · `backend/src/embeddings/CONTEXT.md` E-7/E-8 · `docs/dev-log/sprints/2026-05-15-sprint16-pgvector-grill.md` · `docs/dev-log/sprints/sprint-16-pgvector-verification.md` (Stage 5) · BL-003 (RAG N+1 해소, Sprint 13 PR #21)
+> **관련:** CONTEXT-MAP §6 I-20/I-21 (Sprint 16 Stage 0 lock-in) · ADR-014 Service Boundary · ADR-019 Gemini EOL · `docs/architecture/rag-pipeline.md` §3/§4/§7 · `backend/src/embeddings/CONTEXT.md` E-7/E-8 · `git history` · `git history` (Stage 5) · BL-003 (RAG N+1 해소, Sprint 13 PR #21)
 > **출처:** 당근(Karrot) DB 밋업 1회 (백은빈, 2025-XX) `pgvector 검색 최적화` — youtube `n3_LY7YFCwE`
 > **워크플로우:** `.ai/templates/workflow.md` Stage 1 (ADR + PRD) · plan `~/.claude/plans/karrot-eager-marshmallow.md`
 
@@ -164,7 +164,7 @@ SELECT default_version FROM pg_available_extensions WHERE name='vector';
 - ADR-014 / ADR-019 §관련 cross-link
 
 ### Stage 3 (plan 산출, 2026-05-15+)
-- `docs/dev-log/sprints/2026-05-15-sprint16-pgvector-plan.md` 신설
+- `git history` 신설
 - alembic 마이그레이션 순서 + `autocommit_block` + NULL safe 캐스팅
 - Neon branch 백업 절차
 - Stage 3 진입 직전: `SELECT default_version FROM pg_available_extensions WHERE name='vector'` ≥0.8 검증
@@ -182,7 +182,7 @@ SELECT default_version FROM pg_available_extensions WHERE name='vector';
 - `backend/tests/embeddings/test_halfvec_migration.py` — alembic up/down + EXPLAIN `Index Scan using idx_chunks_hnsw` 검증
 - `backend/tests/embeddings/fixtures/recall_corpus.json` — 1000 chunk + 50 query
 - `bench_vector_search.py` baseline(ivfflat) vs after(HNSW) 비교
-- `docs/dev-log/sprints/sprint-16-pgvector-verification.md` Heavy 검증 결과
+- `git history` Heavy 검증 결과
 - BL-022 등재
 - 본 ADR Status: Proposed → Accepted
 

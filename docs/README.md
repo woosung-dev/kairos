@@ -9,13 +9,13 @@
 | `api/`           | API 명세서, 프론트-백엔드 통신 규약        |
 | `guides/`        | 로컬 셋업, 배포, secrets, prompt, 세션 루틴 |
 | `adr/`           | Architecture Decision Records (Nygard 포맷, 19건) |
-| `plans/active/`  | 현재 진행 sprint plan (1 sprint = 1 파일, 머지 후 삭제) |
-| `superpowers/`   | `superpowers:writing-plans` 스킬 자동 산출 |
+| `plans/active/`  | 현재 활성 계획과 작업 추적 문서 |
 | `TODO.md`        | 작업 현황 (Completed / Blocked / Questions / Next Actions) |
 | `REFACTORING-BACKLOG.md` | BL-NNN 리팩토링 백로그 + "다음 Sprint 진입점" anchor |
 
 > **본 색인이 active doc 의 유일한 entry point.** stale 문서는 즉시 `git rm` (history 는 git log 로 복구).
 > Sprint 26 (2026-05-23) 부터 dev-log/ 폐지 — sprint-별 handoff/closeout/verification 작성 안 함.
+> 2026-06-23 cleanup 부터 historical audit/sprint/superpowers 산출물은 git history와 PR body로 보존한다.
 
 ## 문서 목록
 

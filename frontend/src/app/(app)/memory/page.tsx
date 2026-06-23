@@ -5,10 +5,10 @@ import { useEffect, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { useRecall } from "@/features/memory/hooks";
 import { CaptureSheet } from "@/features/memory/components/CaptureSheet";
-import { PromoteModal } from "@/features/memory/components/PromoteModal";
 import { RecallResultCard } from "@/features/memory/components/RecallResultCard";
 import { useBreakpoint } from "@/hooks/use-media-query";
 
@@ -141,8 +141,9 @@ export default function MemoryPage() {
       />
 
       {promoteMemoryId && workspaceId && (
-        <PromoteModal
-          memoryId={promoteMemoryId}
+        <ItemPromoteModal
+          itemType="memory"
+          itemId={promoteMemoryId}
           sourceWorkspaceId={workspaceId}
           open={promoteMemoryId !== null}
           onOpenChange={(open) => {

@@ -1,5 +1,5 @@
 // T-OBN-05 D 옵션 (Sprint 24 Wave 2): 첫 방문 inline tooltip 발화 + dismiss + 재방문 + banner 폐기 회귀 가드
-// 결정 anchor: docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md §T-OBN-05
+// 결정 anchor: git history §T-OBN-05
 import { test, expect } from "@playwright/test";
 
 test.describe("Onboarding Tooltip (T-OBN-05 D 옵션, Sprint 24 Wave 2)", () => {

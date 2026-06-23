@@ -9,12 +9,12 @@ Project + Note + EmbeddingChunk) 만 담당.
 
 사용:
     # 1. 사용자가 Clerk dev에서 5계정 만들고 JWT 발급
-    # 2. docs/dev-log/qa/2026-05-17-multi-agent-qa-sprint18/seed-credentials.env 채움
+    # 2. seed-credentials.env 채움
     # 3. backend 디렉터리에서:
     cd backend
     uv run python scripts/seed_qa_fixtures.py \
-        --env ../docs/dev-log/qa/2026-05-17-multi-agent-qa-sprint18/seed-credentials.env \
-        --out ../docs/dev-log/qa/2026-05-17-multi-agent-qa-sprint18/seed-fixtures.json
+        --env ~/.kairos-qa-secrets/seed-credentials.env \
+        --out /tmp/seed-fixtures.json
 
 옵션:
     --env PATH              seed-credentials.env 경로 (required)
