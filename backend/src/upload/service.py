@@ -158,6 +158,17 @@ def _get_extension(filename: str) -> str:
     return filename.rsplit(".", 1)[-1].lower()
 
 
+def _mime_essence(mime: str) -> str:
+    """RFC 6838 media type essence — 파라미터(;codecs=opus, ;charset=utf-8 등) 제거.
+
+    BUG (2026-06-24 fullsweep): 브라우저 MediaRecorder 직접 녹음은
+    'audio/webm;codecs=opus'(Chrome) / 'audio/ogg;codecs=opus'(Firefox) MIME 으로
+    전송한다. allowlist·확장자 매핑·signature 비교는 모두 base type(audio/webm) 기준이라
+    essence 로 정규화해야 한다. 보안: '`;`' 앞 essence 만 비교하므로 우회 위험 없음
+    (ext 매핑이 .exe 등은 별도 차단)."""
+    return mime.split(";", 1)[0].strip().lower()
+
+
 class UploadValidator:
     """upload 검증기 — 4 layer (size / MIME 화이트리스트 / 확장자 정합 / content signature)."""
 
@@ -180,7 +191,9 @@ class UploadValidator:
         MIME 화이트리스트 + 확장자 정합만 1차 차단. size/signature 는 R2 PUT 이
         후 별도 검증 필요 (BL carry).
         """
-        if declared_mime not in self.allowed_mimes:
+        # 2026-06-24 fix: codecs 파라미터(audio/webm;codecs=opus) 제거 후 essence 비교.
+        essence = _mime_essence(declared_mime)
+        if essence not in self.allowed_mimes:
             raise UnsupportedMimeError(declared_mime)
         ext = _get_extension(filename)
         # BUG-S27d-3 fix (Sprint 27d opus follow-up): 이전엔 ext 가 매핑에 없을 때
@@ -188,7 +201,7 @@ class UploadValidator:
         # None 이고 text/* 면 _is_signature_compatible 도 통과). 정당 텍스트 형식은
         # `_EXT_TO_MIME_FAMILY` 에 명시 추가 (csv/json/log/rtf), 매핑 외 확장자는 항상 reject.
         if ext and ext in _EXT_TO_MIME_FAMILY:
-            if declared_mime not in _EXT_TO_MIME_FAMILY[ext]:
+            if essence not in _EXT_TO_MIME_FAMILY[ext]:
                 raise MimeExtensionMismatchError(ext, declared_mime)
         elif ext:
             raise MimeExtensionMismatchError(ext, declared_mime)
@@ -206,9 +219,10 @@ class UploadValidator:
             raise FileTooLargeError(len(data), self.max_bytes)
         # 2+3. MIME 화이트리스트 + 확장자 정합 (pre_upload 와 동일 로직 재사용)
         self.validate_pre_upload(filename, declared_mime)
-        # 4. content signature (data 의존)
+        # 4. content signature (data 의존) — essence 로 비교 (codecs 파라미터 무시).
+        essence = _mime_essence(declared_mime)
         detected = _detect_mime_from_signature(data[:512])
-        if not _is_signature_compatible(detected, declared_mime):
+        if not _is_signature_compatible(detected, essence):
             raise ContentMismatchError(detected or "unknown", declared_mime)
-        if not _check_text_content(data[:512], declared_mime):
+        if not _check_text_content(data[:512], essence):
             raise ContentMismatchError("non-utf8 bytes", declared_mime)

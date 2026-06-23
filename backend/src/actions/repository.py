@@ -3,10 +3,68 @@
 import uuid
 
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import func, select, update
+from sqlmodel import and_, exists, func, or_, select, update
 
 from src.actions.models import ActionItem
 from src.common.promote_models import ItemPromotionAudit
+from src.projects.models import Project, ProjectMember
+
+
+def _action_visibility_filter(
+    stmt,
+    requester_user_id: uuid.UUID | None,
+    requester_role: str | None,
+):
+    """F1 (2026-06-23 fullsweep): action LIST 에 project visibility 게이트 적용.
+
+    notes._note_visibility_filter 와 동일한 correlated EXISTS 패턴을 ActionItem 에 미러링한다:
+    - project_id IS NULL : 통과 (워크스페이스 레벨)
+    - admin/owner : 모든 visibility 통과 (필터 없음)
+    - public : 통과
+    - draft : project.created_by_id == requester 일 때만
+    - private : ProjectMember 매핑 + 현 워크스페이스 멤버 동시 충족 시에만
+
+    requester_role 미전달(None) = 내부/파이프라인 호출 → 게이트 skip (하위호환).
+    """
+    if requester_role is None:
+        return stmt
+    if requester_role in ("admin", "owner"):
+        return stmt
+
+    from src.workspaces.models import WorkspaceMember
+
+    # private 분기: ProjectMember 매핑 + 현 워크스페이스 멤버 동시 충족
+    # (orphan ProjectMember 잔재로 private 가 되살아나는 LIST 누출 차단).
+    member_exists = exists().where(
+        and_(
+            ProjectMember.project_id == Project.id,
+            ProjectMember.user_id == requester_user_id,
+            WorkspaceMember.workspace_id == Project.workspace_id,
+            WorkspaceMember.user_id == requester_user_id,
+        )
+    )
+    accessible_project = exists().where(
+        and_(
+            Project.id == ActionItem.project_id,
+            or_(
+                Project.visibility == "public",
+                and_(
+                    Project.visibility == "draft",
+                    Project.created_by_id == requester_user_id,
+                ),
+                and_(
+                    Project.visibility == "private",
+                    member_exists,
+                ),
+            ),
+        )
+    )
+    return stmt.where(
+        or_(
+            ActionItem.project_id.is_(None),  # type: ignore[union-attr]
+            accessible_project,
+        )
+    )
 
 
 class ActionItemRepository:
@@ -32,6 +90,8 @@ class ActionItemRepository:
         project_id: uuid.UUID | None = None,
         offset: int = 0,
         limit: int = 20,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> list[ActionItem]:
         stmt = select(ActionItem).where(ActionItem.workspace_id == workspace_id)
         if status:
@@ -40,6 +100,8 @@ class ActionItemRepository:
             stmt = stmt.where(ActionItem.priority == priority)
         if project_id:
             stmt = stmt.where(ActionItem.project_id == project_id)
+        # F1: project visibility 게이트 (비-멤버 private/draft 액션 누출 차단).
+        stmt = _action_visibility_filter(stmt, requester_user_id, requester_role)
         stmt = stmt.order_by(ActionItem.created_at.desc())
         stmt = stmt.offset(offset).limit(limit)
         return list((await self.session.exec(stmt)).all())
@@ -48,6 +110,8 @@ class ActionItemRepository:
         self,
         workspace_id: uuid.UUID,
         status: str | None = None,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> int:
         stmt = (
             select(func.count())
@@ -56,6 +120,8 @@ class ActionItemRepository:
         )
         if status:
             stmt = stmt.where(ActionItem.status == status)
+        # F1: total 도 필터된 집합 기준 (pagination 정합).
+        stmt = _action_visibility_filter(stmt, requester_user_id, requester_role)
         return (await self.session.exec(stmt)).one()
 
     async def find_by_meeting(self, meeting_id: uuid.UUID) -> list[ActionItem]:

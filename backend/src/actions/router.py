@@ -33,7 +33,9 @@ async def list_action_items(
     service: ActionItemService = Depends(get_action_service),
 ):
     return await service.list_action_items(
-        workspace_id, status=status, priority=priority, project_id=project_id, page=page, page_size=page_size
+        workspace_id, status=status, priority=priority, project_id=project_id, page=page, page_size=page_size,
+        # F1: project visibility 게이트 (비-멤버 private/draft 액션 누출 차단).
+        requester_user_id=member.user_id, requester_role=member.role,
     )
 
 
@@ -76,6 +78,9 @@ async def update_action_item(
         due_date=data.due_date,
         priority=data.priority,
         status=data.status,
+        # F2: SOURCE 액션 project visibility 게이트 (비-멤버 write IDOR 차단).
+        requester_user_id=member.user_id,
+        requester_role=member.role,
     )
 
 

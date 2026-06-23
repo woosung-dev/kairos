@@ -171,10 +171,12 @@ async def test_add_member_workspace_mismatch_404(integration_session: AsyncSessi
 async def test_add_member_duplicate_409(integration_session: AsyncSession):
     """시나리오 5: 동일 멤버 중복 추가 → AlreadyExistsError(409) + 세션 미오염.
 
-    Sprint 29 R1 (projects-500): 이전엔 IntegrityError 가 service 를 통과해 500 으로
-    노출됐다. 이제 service.add_member 가 IntegrityError 를 catch + rollback 후
-    AlreadyExistsError(409) 로 래핑한다. rollback 으로 request 세션이 poison 되지
-    않아 후속 쿼리가 정상 동작해야 한다.
+    Sprint 29 R1 + F4 (2026-06-23 fullsweep): 이전엔 IntegrityError 가 service 를 통과해
+    500 으로 노출됐다. 이제 service.add_member 가 is_member pre-check(순차 중복)로
+    AlreadyExistsError(409) 를 던지고, 동시 race 는 repo.add_member 의 ON CONFLICT
+    DO NOTHING(→ None)으로 backstop 한다. IntegrityError catch/rollback 패턴이 아니라
+    pre-check + ON CONFLICT 이므로 세션 poison 없이 후속 쿼리가 정상 동작한다.
+    동시 케이스 회귀는 test_add_member_concurrent.py 가 별도 가드.
     """
     from src.common.exceptions import AlreadyExistsError
 

@@ -54,6 +54,20 @@ export function RagChat() {
     anchor.scrollIntoView({ behavior: isStreaming ? "auto" : "smooth" });
   }, [messages, isStreaming]);
 
+  // F3 (2026-06-23 fullsweep): RAG 답변을 markdown 파일로 내보내기 (클라이언트 다운로드).
+  // 이전엔 onExport 미전달로 '내보내기' 버튼이 dead button 이었다.
+  const handleExport = useCallback((content: string) => {
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `kairos-answer-${Date.now()}.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, []);
+
   const handleCitationClick = useCallback(
     (num: number, sources?: RagSource[]) => {
       setActiveCitation((prev) => (prev === num ? null : num));
@@ -125,7 +139,10 @@ export function RagChat() {
           {/* AI 메시지 하단 액션 바 */}
           {msg.role === "assistant" && !msg.isStreaming && msg.content && (
             <div style={{ paddingLeft: 0 }}>
-              <MessageActions content={msg.content} />
+              <MessageActions
+                content={msg.content}
+                onExport={() => handleExport(msg.content)}
+              />
             </div>
           )}
 
