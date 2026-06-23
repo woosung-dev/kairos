@@ -126,6 +126,9 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 | 45b | 24 | `GET` | `/api/v1/workspaces/{wid}/notes/{nid}/embedding-status` | **Sprint 24 BL-064 (NEW)**: target note 의 embedding 진행 상태 polling — require_viewer. 응답 `{status, chunkCount}` (status = audit raw value, chunkCount = 실 EmbeddingChunk 개수). FE ItemPromoteModal 가 chunk 0 분기 BG 완료 polling. |
 | 46 | 23 | `POST` | `/api/v1/workspaces/{wid}/inbox/{iid}/promote` | Inbox 아이템 → team workspace 복제 (InboxItem 복제, ai_suggested_project_id=None + is_processed=False reset, BG embedding 없음 — audit.embedding_status='n/a', I-18, 202) — require_member |
 | 47 | 23 | `POST` | `/api/v1/workspaces/{wid}/action-items/{aid}/promote` | 액션 아이템 → team workspace 복제 (ActionItem 복제, meeting_id/project_id/assignee_id=None reset, BG embedding 없음 — audit.embedding_status='n/a', I-18, 202) — require_member |
+| 48 | 5 | `GET` | `/api/v1/workspaces/{wid}/meetings/{mid}/export` | 회의 내보내기 — `?format=md\|json` (기본 md) — require_viewer. `Content-Disposition: attachment` (UTF-8 filename). MD/JSON 구현, PDF 미구현 (ADR-006 §5, Phase 4+ 이연). adr006-remaining (2026-04-05). |
+| 49 | 5 | `GET` | `/api/v1/workspaces/{wid}/notes/{nid}/export` | 노트 내보내기 — `?format=md\|json` (기본 md) — require_viewer. `Content-Disposition: attachment`. adr006-remaining. |
+| 50 | 5 | `PATCH` | `/api/v1/workspaces/{wid}/settings` | 워크스페이스 설정 변경 — `inbox_threshold` (0.5~1.0, Inbox 자동확정 임계값) — require_owner. adr006-remaining. |
 
 > **Sprint 15 변경 (Memory 모듈 신설)** — ADR-016 Personal↔Team IA + Recall-first wedge:
 > - 38~43: 신규 6 endpoint (memory 도메인). 38/39/40/41/42는 `/api/v1/workspaces/{ws_id}/memory*` 패턴 (I-13 정합). 43은 admin 예외.
