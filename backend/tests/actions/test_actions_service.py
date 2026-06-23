@@ -123,7 +123,8 @@ class TestListActionItems:
         assert result["hasNext"] is True  # 2 * 10 = 20 < 42
         assert len(result["items"]) == 3
         repo.find_by_workspace.assert_awaited_once_with(
-            ws_id, status=None, priority=None, project_id=None, offset=10, limit=10
+            ws_id, status=None, priority=None, project_id=None, offset=10, limit=10,
+            requester_user_id=None, requester_role=None,
         )
 
     @pytest.mark.asyncio
@@ -145,6 +146,8 @@ class TestListActionItems:
             project_id=proj_id,
             offset=0,
             limit=20,
+            requester_user_id=None,
+            requester_role=None,
         )
 
     @pytest.mark.asyncio

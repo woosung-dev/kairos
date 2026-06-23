@@ -122,8 +122,15 @@ class ActionItemService:
         project_id: uuid.UUID | None = None,
         page: int = 1,
         page_size: int = 20,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
-        """워크스페이스 액션 아이템 목록 (페이지네이션)."""
+        """워크스페이스 액션 아이템 목록 (페이지네이션).
+
+        F1 (2026-06-23 fullsweep): requester visibility 게이트 — 비-ProjectMember 가
+        private/draft 프로젝트 액션을 list 로 읽는 read IDOR 차단 (notes CAND-A 정합).
+        requester_role 미전달(None) = 내부/파이프라인 호출 → 게이트 skip (하위호환).
+        """
         offset = (page - 1) * page_size
         items = await self.repo.find_by_workspace(
             workspace_id,
@@ -132,8 +139,15 @@ class ActionItemService:
             project_id=project_id,
             offset=offset,
             limit=page_size,
+            requester_user_id=requester_user_id,
+            requester_role=requester_role,
         )
-        total = await self.repo.count_by_workspace(workspace_id, status=status)
+        total = await self.repo.count_by_workspace(
+            workspace_id,
+            status=status,
+            requester_user_id=requester_user_id,
+            requester_role=requester_role,
+        )
 
         return {
             "items": [self._to_dict(i) for i in items],
@@ -142,6 +156,43 @@ class ActionItemService:
             "pageSize": page_size,
             "hasNext": page * page_size < total,
         }
+
+    async def _verify_action_visibility(
+        self,
+        item: ActionItem,
+        requester_user_id: uuid.UUID | None,
+        requester_role: str | None,
+    ) -> None:
+        """F2 (2026-06-23 fullsweep): action 의 owning project visibility 게이트.
+
+        notes._verify_note_visibility 정합 — 비-ProjectMember 가 private/draft 프로젝트
+        액션을 mutate 하는 write IDOR 차단:
+        - admin/owner: 우회 / project_id=None: 통과
+        - draft: project.created_by_id == requester 만, 그 외 404
+        - private: ProjectMember 만, 그 외 404
+
+        requester_role 미전달(None) = 내부/특권 호출 → 게이트 skip (하위호환).
+        """
+        if requester_role is None:
+            return
+        if requester_role in ("admin", "owner"):
+            return
+        if item.project_id is None:
+            return
+        if self.project_repo is None:
+            raise RuntimeError("project_repo 필수 (F2 visibility 검증)")
+        project = await self.project_repo.find_by_id(item.project_id, item.workspace_id)
+        if project is None:
+            # cross-tenant 또는 dangling project → fail-closed 404
+            raise ActionItemNotFoundError()
+        if project.visibility == "draft":
+            if project.created_by_id != requester_user_id:
+                raise ActionItemNotFoundError()
+        elif project.visibility == "private":
+            if requester_user_id is None or not await self.project_repo.is_member(
+                item.project_id, requester_user_id, item.workspace_id
+            ):
+                raise ActionItemNotFoundError()
 
     async def update_action_item(
         self,
@@ -155,11 +206,18 @@ class ActionItemService:
         due_date: date | None = None,
         priority: str | None = None,
         status: str | None = None,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
-        """액션 아이템 수정. 헌법 I-9 (Codex F-1) + Codex F-2 Critical 3 secondary FK 검증."""
+        """액션 아이템 수정. 헌법 I-9 (Codex F-1) + Codex F-2 Critical 3 secondary FK 검증.
+
+        F2 (2026-06-23 fullsweep): SOURCE 액션의 project visibility 게이트 — 비-멤버가
+        private/draft 프로젝트 액션을 mutate 하는 write IDOR 차단 (비-멤버 → 404).
+        """
         item = await self.repo.find_by_id(action_id, workspace_id)
         if item is None:
             raise ActionItemNotFoundError()
+        await self._verify_action_visibility(item, requester_user_id, requester_role)
 
         # Codex F-2: 3 secondary FK 변경 요청 시 cross-workspace 거부
         await self._verify_secondary_fks(workspace_id, project_id, meeting_id, assignee_id)

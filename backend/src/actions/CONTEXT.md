@@ -57,6 +57,7 @@
 | A-5 | **`due_date`는 `date` 타입 (timezone 없음)**. FE에서 사용자 로컬로 해석 — 시각 표시 시 timezone 추론 금지 |
 | A-6 | **헌법 I-9 (Sprint 19 PR #1, Codex F-1)** — service / repository 모든 메서드 workspace_id 필수. find_by_id(action_id, workspace_id), update_action_item(action_id, workspace_id, ...) 시그니처 |
 | A-7 | **Codex F-2 Critical 3 secondary FK** — create / update 시 project_id / meeting_id / assignee_id 모두 같은 workspace 검증. project = ProjectRepository.find_by_id + project.workspace_id, meeting = MeetingRepository.find_by_id(meeting_id, workspace_id), assignee = WorkspaceRepository.find_member(workspace_id, assignee_id). 거부 시 모두 404 |
+| A-8 | **owning project visibility 게이트 (F1/F2, 2026-06-23 fullsweep; notes CAND-A 정합)** — `list_action_items`(repo `_action_visibility_filter`) + `update_action_item`(`_verify_action_visibility`) 이 requester_user_id/requester_role 로 게이트. private = ProjectMember 만, draft = project.created_by_id 만, admin/owner 우회, project_id=None/public 통과. requester_role=None(내부/파이프라인) = skip. 비-멤버 list 제외 / update 404 |
 
 ---
 
