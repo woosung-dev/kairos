@@ -9,7 +9,7 @@
 - [x] lockfile 갱신.
 - [x] frontend typecheck 실행.
 - [x] backend smoke pytest 실행.
-- [ ] 커밋, 푸시, draft PR 생성.
+- [x] 커밋, 푸시, draft PR 생성.
 
 ## Verification
 
