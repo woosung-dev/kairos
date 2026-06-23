@@ -2442,3 +2442,27 @@ agy F9 sub-3 — `/api/v1/users/sync` endpoint 재도입 시 Svix 서명 검증 
 
 ### 작업
 - log warn extra dict 에 `assignee` 등 추가
+
+---
+
+## 2026-06-23 Fullsweep 멀티-퍼스펙티브 QA 잔여 P3 (F5~F9)
+
+> 6관점 Generator→적대적 Evaluator 검증에서 confirmed 된 P3 (P1/P2 F1~F4 는 PR 에서 수정 완료).
+
+### BL-F5 — 모바일(<380px) RAG 오버레이 가로 오버플로 (P3, UX)
+`globals.css:55 --rag-overlay-width:380px` 고정 + `panel-layout.tsx:112` RAG 오버레이 패널에 `isMobile ? '100%'` 분기 누락 (형제 SourceViewer panel-layout.tsx:161 은 분기 보유). 320px(iPhone SE)에서 좌측 콘텐츠 클리핑. 수정=line 112 에 isMobile 분기 1줄. 회귀 가드: mobile-responsive.spec.ts 에 오버레이 열어 폭 검증 추가.
+
+### BL-F6 — OnboardingService.get_status repository 우회 raw SQL (P3, I-1 국소 일탈)
+`onboarding/service.py:39` 가 self._session.execute(text("SELECT ...")) 직접 실행 (repository 우회). 같은 클래스 increment_step 은 repo 위임. :user_id 바인딩이라 SQLi 없음 — 순수 tech-debt. 수정=OnboardingRepository 에 get_step 메서드 추가 후 위임.
+
+### BL-F7 — Markdown citation 주입이 표/blockquote/h4-h6 미커버 (P3, correctness)
+`markdown-message.tsx:87` components 매핑이 p/li/h1-h3 만 injectCitations → remark-gfm 표 셀/blockquote 내 [N] 이 raw 노출. RAG_SYSTEM_PROMPT 가 표 미요청이라 저확률(LLM 자발 표 emit 시만). 수정=td/th/blockquote/h4-h6 컴포넌트에도 injectCitations 적용 + 테스트 케이스.
+
+### BL-F8 — Citation [N] out-of-range silent no-op + SourceViewer '내보내기' dead button (P3, UX)
+`rag-chat.tsx:62` sources[num-1] 범위 초과 시 무반응(LLM 오작동 의존 edge). `source-viewer.tsx:231` ExternalLink('내보내기') onClick 부재 dead button. ⚠️2026-06-19 generator-checklist CASUAL-05 가설로 기등재. 수정=out-of-range 가드 토스트 + SourceViewer export wiring(또는 버튼 제거).
+
+### BL-F9 — team spine T7 RBAC-mutate e2e flaky (P3, 테스트 인프라)
+간헐 ~60s 행 → 30s 타임아웃(retry#2 전부 pass). rbac.py member-cache 60s TTL 관련 — 테스트 role-reset 경로(ensureMemberBaseline)에서 invalidate_member_cache 전파가 간헐 누락되어 캐시 TTL 만료까지 대기하는 정황. CI retries=2 가 가림. 보안 게이트(require_owner→403)는 건재(rbac.py + test_rbac.py 16-cell + T8 PASS). 수정=fixture 의 cache-warm/poll 보강 또는 setRole 후 명시적 cache 무효화 await.
+
+### BL-F10 — inbox-dismiss e2e 테스트 격리 취약성 (P3, 테스트 인프라)
+`inbox-dismiss.spec.ts:62` 가 `h3:has-text("${titleBefore}")` substring 매치로 dismiss 후 0건을 기대 → 공유 Neon dev DB 에 반복 e2e 실행으로 동일 AI 제목 inbox 항목이 누적되면(관측: 20건) 제목 유일성 가정이 깨져 실패. 2026-06-24 fullsweep 재실행 중 발현(수정 전 첫 런은 통과 — 데이터 누적 전). 제품 결함 아님(inbox 도메인 코드 무변경, F1~F4 와 무관). 수정=① 테스트가 고유 마커 제목 inbox 항목을 시드 후 그 항목만 dismiss/검증(self-contained), 또는 ② dismiss 한 항목의 id 기반 검증(has-text substring 대신 data-testid). 보강 전까지 dev DB inbox 누적 시 간헐 실패.
