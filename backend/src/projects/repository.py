@@ -9,6 +9,7 @@ join + WHERE Project.workspace_id 로 사전 tenant 검증.
 """
 import uuid
 
+from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, delete, exists, func, or_, select
 
@@ -180,12 +181,37 @@ class ProjectRepository:
         workspace_id: uuid.UUID,
         user_id: uuid.UUID,
         role: str = "member",
-    ) -> ProjectMember:
+    ) -> ProjectMember | None:
+        """F4 (2026-06-23 fullsweep): 동시 INSERT race backstop.
+
+        이전 plain add+flush 는 동시 (project_id, user_id) INSERT 시 uq_project_member
+        UNIQUE 위반 → 미처리 IntegrityError → asyncpg+greenlet MissingGreenlet → HTTP 500.
+        WorkspaceMember(QA-0617-D) 와 동일하게 ON CONFLICT DO NOTHING RETURNING 으로
+        race-safe. RETURNING 이 row 를 내면 INSERT 성공, 없으면 이미 멤버(충돌) → None.
+        (feedback_asyncpg_greenlet_precheck: flush + try/except IntegrityError 금지)
+        """
         member = ProjectMember(
             project_id=project_id, workspace_id=workspace_id, user_id=user_id, role=role
         )
-        self.session.add(member)
-        await self.session.flush()
+        row = (await self.session.exec(
+            text(
+                """
+                INSERT INTO project_members (id, project_id, workspace_id, user_id, role, created_at)
+                VALUES (:id, :project_id, :workspace_id, :user_id, :role, :created_at)
+                ON CONFLICT (project_id, user_id) DO NOTHING
+                RETURNING id
+                """
+            ).bindparams(
+                id=member.id,
+                project_id=project_id,
+                workspace_id=workspace_id,
+                user_id=user_id,
+                role=role,
+                created_at=member.created_at,
+            )
+        )).one_or_none()
+        if row is None:
+            return None
         return member
 
     async def remove_member(

@@ -204,16 +204,20 @@ class ProjectService:
         ws_member = await self.ws_repo.find_member(workspace_id, user_id)
         if ws_member is None:
             raise CrossWorkspaceMemberError()
-        # Sprint 29 R1 (projects-500): 동일 (project_id, user_id) 중복은 uq_project_member
-        # 위반 → 이전엔 IntegrityError 가 통과해 500. asyncpg+greenlet 에선 flush 실패 후
-        # try/except 가 connection autorollback 의 MissingGreenlet 을 유발하므로,
-        # 코드베이스 idiom(pre-check / ON CONFLICT, auth·memory repo 정합)대로 사전 검사.
-        # is_member 는 헌법 I-9 workspace_id 필터 포함 → cross-tenant 안전.
+        # Sprint 29 R1 + F4 (2026-06-23 fullsweep): 동일 (project_id, user_id) 중복은
+        # uq_project_member 위반 → 이전엔 IntegrityError 가 통과해 500. defense-in-depth:
+        # (1) is_member pre-check — 순차 중복에 빠른 409 + 헌법 I-9 workspace_id 필터.
+        # (2) repo.add_member ON CONFLICT DO NOTHING — pre-check 를 동시에 통과한 race
+        #     윈도(TOCTOU)에서 None 반환 → 409 (500/MissingGreenlet 방지,
+        #     feedback_asyncpg_greenlet_precheck).
         if await self.repo.is_member(project_id, user_id, project.workspace_id):
             raise AlreadyExistsError("프로젝트 멤버")
         member = await self.repo.add_member(
             project_id, project.workspace_id, user_id, role
         )
+        if member is None:
+            # 동시 race — 다른 요청이 먼저 INSERT (ON CONFLICT 충돌)
+            raise AlreadyExistsError("프로젝트 멤버")
         await self.repo.commit()
         return {
             "id": str(member.id),
