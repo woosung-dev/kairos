@@ -15,7 +15,7 @@
 실행:
   cd backend
   uv run python -m scripts.sprint24_wave2_perf_spike
-  # 결과는 stdout + docs/dev-log/sprints/2026-05-20-sprint24-wave2/be-perf-spike.json
+  # 결과는 stdout + git history
 
 전제:
 - testcontainers PostgreSQL 사용 (Neon cold start 노이즈 격리)
@@ -24,7 +24,7 @@
 
 산출:
 - /tmp/perf-spike.json (raw)
-- docs/dev-log/sprints/2026-05-20-sprint24-wave2/be-perf-spike.json (committable)
+- git history (committable)
 - stdout: API timing 매트릭스 + Top 5 cumulative + Top 5 slow queries
 
 §19 sub-agent: 코드 수정 + 측정 만, commit 0.

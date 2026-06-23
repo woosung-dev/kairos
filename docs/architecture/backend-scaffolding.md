@@ -17,7 +17,7 @@ cd backend/
 uv add fastapi "uvicorn[standard]" sqlmodel asyncpg alembic pydantic-settings
 
 # 외부 서비스
-uv add google-genai aioboto3 clerk-backend-api
+uv add google-genai aioboto3
 
 # 개발 의존성
 uv add --dev pytest pytest-asyncio httpx

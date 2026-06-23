@@ -242,7 +242,7 @@ T+30일  팀 RAG Q&A에서 신규 합류자 질문 "왜 freemium 채택?"
 2. **인프라 재사용 우선** — v2 음성 메모는 v1 STT 재사용, v1.8 cross-workspace RAG는 기존 6-Layer 재사용.
 3. **헌법 갱신 명시** — Y 축 ship마다 헌법 신규 불변식 (R-13 cross-workspace RAG opt-in 등) ADR 작성.
 
-상세는 `docs/dev-log/sprints/sprint-15-plan.md` 등 sprint plan에 작성.
+상세는 `git history` 등 sprint plan에 작성.
 
 ---
 

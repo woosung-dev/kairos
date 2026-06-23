@@ -14,12 +14,6 @@ from src.projects.service import ProjectService
 from src.workspaces.repository import WorkspaceRepository
 
 
-async def get_project_repository(
-    session: AsyncSession = Depends(get_async_session),
-) -> ProjectRepository:
-    return ProjectRepository(session)
-
-
 async def get_project_service(
     session: AsyncSession = Depends(get_async_session),
 ) -> ProjectService:

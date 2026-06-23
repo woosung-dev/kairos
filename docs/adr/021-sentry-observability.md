@@ -3,7 +3,7 @@
 > **날짜:** 2026-05-19
 > **상태:** Accepted (2026-05-19 Sprint 22 Task 7 구현 완료 — commit `60e8266` BE + `10fdaf2` FE)
 > **작성자:** Claude Opus 4.7 (1M context) + 사용자
-> **관련:** Sprint 22 spec `docs/superpowers/specs/2026-05-19-sprint22-onboarding-e2e-obs.md` §4.3/§5.8/§7.2 · plan `docs/superpowers/plans/2026-05-19-sprint22-tasks.md` Task 7 · ADR-014 Service Boundary · ADR-019 Gemini Phase B · `backend/src/main.py` Sentry init · `frontend/instrumentation.ts` Next.js 16 hook
+> **관련:** Sprint 22 spec `git history` §4.3/§5.8/§7.2 · plan `git history` Task 7 · ADR-014 Service Boundary · ADR-019 Gemini Phase B · `backend/src/main.py` Sentry init · `frontend/instrumentation.ts` Next.js 16 hook
 > **워크플로우:** `.ai/templates/workflow.md` Stage 4 (코드) — Stage 1 ADR 산출은 본 ADR 자체
 
 ---
@@ -144,7 +144,7 @@ Next.js 16 의 `Instrumentation.onRequestError` type 은 `(err, request: {path, 
 
 ## 검증 (Verification)
 
-본 ADR 채택의 실측 검증은 Sprint 22 dogfooding 후 1회 (Task 8.7 walkthrough) + Sprint 23 진입 시 대시보드 확인 (`docs/dev-log/sprints/sprint-23-verification.md` 신설 시).
+본 ADR 채택의 실측 검증은 Sprint 22 dogfooding 후 1회 (Task 8.7 walkthrough) + Sprint 23 진입 시 대시보드 확인 (`git history` 신설 시).
 
 체크리스트:
 - [ ] Sentry 대시보드에 FE+BE event 실제 수신 (production DSN 주입 후)

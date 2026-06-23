@@ -15,12 +15,6 @@ from src.projects.repository import ProjectRepository
 from src.workspaces.repository import WorkspaceRepository
 
 
-async def get_action_repository(
-    session: AsyncSession = Depends(get_async_session),
-) -> ActionItemRepository:
-    return ActionItemRepository(session)
-
-
 async def get_action_service(
     session: AsyncSession = Depends(get_async_session),
 ) -> ActionItemService:

@@ -3,7 +3,7 @@
 > **날짜:** 2026-05-14 (draft) → 2026-05-15 Phase B accepted (EOL D-33 압박으로 Sprint 16 일정보다 앞당김)
 > **상태:** **Accepted** (Phase A spike 2026-05-14 validated + Phase B 코드 swap 2026-05-15 적용 완료)
 > **작성자:** Claude Opus 4.7 (1M context) + 사용자
-> **관련:** PRD v3.0 §AI Pipeline · ADR-014 Service Boundary · ADR-020 pgvector HNSW/halfvec (Sprint 16 별도 commit — 코드 swap 충돌 회피) · `docs/architecture/ai-pipeline.md` · `docs/dev-log/sprints/sprint-15-cost-spike.md` · TODO P0 `S17-T-GEMINI-EOL`
+> **관련:** PRD v3.0 §AI Pipeline · ADR-014 Service Boundary · ADR-020 pgvector HNSW/halfvec (Sprint 16 별도 commit — 코드 swap 충돌 회피) · `docs/architecture/ai-pipeline.md` · `git history` · TODO P0 `S17-T-GEMINI-EOL`
 > **워크플로우:** Sprint 15 R8 14일 stagger 진행 중. EOL 2026-06-17 D-33 압박으로 R8 demo 완료 (2026-05-28) 전 swap 결정 (AD-49 정정 = AD-57로 별도 라벨).
 
 ---
@@ -19,7 +19,7 @@
 
 ### 트리거 사건
 
-1. **2026-05-14 Day 0 1차 spike 결과** (`docs/dev-log/sprints/sprint-15-cost-spike.md §4`):
+1. **2026-05-14 Day 0 1차 spike 결과** (`git history §4`):
    - Gemini SDK 응답 객체에 surface deprecation/sunset 신호 없음
    - `usage_metadata` / `response_attrs` / `sdk_http_response` 어디에도 signal 부재
    - 표면 신호 부재 ≠ EOL 무효 → Google AI Studio 공식 공지 (2026-06-17) 그대로 유효
@@ -122,7 +122,7 @@ verification: pytest 144 pass / R7 metrics latency 측정.
 1. ✅ Day 0 spike script 확장: `GEMINI_MODELS` list (commit 676556f)
 2. ✅ text 3 sample × 2 모델 = 6 distill success, audio 7 sample은 founder 녹음 후 별도 진행
 3. ✅ `model_comparison` 섹션 (latency_delta_ms / cost_delta_usd / output_equivalence) 출력 검증
-4. ✅ 결과 paste 완료: `docs/dev-log/sprints/sprint-15-cost-spike.md §3.5` (commit 2cee665)
+4. ✅ 결과 paste 완료: `git history §3.5` (commit 2cee665)
 
 ### Phase B — ✅ DONE (2026-05-15, AD-57 정정으로 앞당김)
 
@@ -171,5 +171,5 @@ verification: pytest 144 pass / R7 metrics latency 측정.
 - Google AI Studio Gemini 3.1 Flash-Lite GA: 2026-05-07 (blog.google + cloud.google.com)
 - OpenRouter benchmark: $0.25 / $1.50 per 1M tokens
 - Artificial Analysis: 2.5x faster TTFT + 45% output speed vs 2.5 Flash
-- 본 프로젝트: `docs/dev-log/sprints/sprint-15-cost-spike.md §4` Gemini EOL probe 결과
+- 본 프로젝트: `git history §4` Gemini EOL probe 결과
 - 본 프로젝트: `docs/TODO.md:250` S17-T-GEMINI-EOL P0 항목

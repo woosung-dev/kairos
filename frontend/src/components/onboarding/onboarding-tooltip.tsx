@@ -1,5 +1,5 @@
 // 첫 방문 inline tooltip — Sprint 24 Wave 2 T-OBN-05 D 옵션 (Linear-style)
-// 결정 anchor: docs/superpowers/specs/2026-05-20-sprint24-wave2-trusty-heron-design.md §T-OBN-05
+// 결정 anchor: git history §T-OBN-05
 // 동작: localStorage 로 재방문 시 발화 X / dismiss(X) + Esc 종료 / analytics event (shown / dismissed)
 // 2 무조건 (dashboard, search) + 2 조건부 (projects step<2, new step<3) — Codex cross-check 권장
 "use client";

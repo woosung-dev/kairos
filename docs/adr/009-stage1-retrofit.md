@@ -155,7 +155,7 @@ CONTEXT-MAP §7 부채:
 | F7 | **L4 우선화 검토 ADR (신규)** | Sprint 6 완료 + F4 결과 후 | ADR-010 §4 O1/O2/O3 옵션 선택 + ADR-007 Phase 4 진입 결정 | `docs/adr/013-l4-prioritization.md` (예정) |
 | F8 | ~~**부채 D-2/D-3 처리 ADR (신규)**~~ **(closeout 2026-05-11)** | Sprint 6 진입 직전 (옵션 a) ADR-014 선작성 후 머지(commit 038fe37, PR #11). D-2/D-3 부채는 Sprint 6 BE-T9~T14 commit 8096314로 해소(notes/rag pipeline_service 도입). CONTEXT-MAP §4.2 + §7 갱신은 Sprint 6 머지 PR에 포함 | `docs/adr/014-service-boundary.md` (Accepted) + CONTEXT-MAP §4.2/§7 patch |
 | F9 | **본 ADR 갱신 검토** | Sprint 7+ 외부 인터뷰 완료 후 | S1~S6 실측 결과로 임계값 재조정 필요성 평가 | 본 ADR supersedes 또는 갱신 PR |
-| F10 | ~~**`.ai/common/global.md` §2 ID 체계 표 갱신 PR**~~ **(closeout 2026-05-11)** | 본 retrofit 머지 직후 | `.ai/`가 의도적 git ignored(5adf9f7→231f660)로 PR 불가. ADR-011 §1이 `PERSONA-` 정의의 권위 출처로 확정. 로컬 `.ai/common/global.md` 표는 직접 갱신(git 외부) | ADR-011 closeout patch (docs/dev-log/011 §1·§"후속") |
+| F10 | ~~**`.ai/common/global.md` §2 ID 체계 표 갱신 PR**~~ **(closeout 2026-05-11)** | 본 retrofit 머지 직후 | `.ai/`가 의도적 git ignored(5adf9f7→231f660)로 PR 불가. ADR-011 §1이 `PERSONA-` 정의의 권위 출처로 확정. 로컬 `.ai/common/global.md` 표는 직접 갱신(git 외부) | ADR-011 closeout patch (git history 참조) |
 
 ---
 
