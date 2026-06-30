@@ -74,4 +74,39 @@ describe("MarkdownMessage — Sprint 29 R4 (rag-markdown)", () => {
     // strong 안에 badge(button)가 위치
     expect(container.querySelector("strong button")).not.toBeNull();
   });
+
+  // BL-F7 회귀 가드 — 표/인용/h4-h6 안의 [N] 도 CitationBadge 로 치환 (이전엔 raw 노출).
+  it("BL-F7: blockquote / table cell / h4 안의 출처 [N] 도 CitationBadge 로 렌더한다", () => {
+    const onCitationClick = vi.fn();
+    const content = [
+      "#### 작은 제목 [1]",
+      "",
+      "> 인용문 안의 근거 [2]",
+      "",
+      "| 항목 | 비고 |",
+      "| --- | --- |",
+      "| 결정 | 채택 [3] |",
+    ].join("\n");
+    const { container } = render(
+      <MarkdownMessage
+        content={content}
+        onCitationClick={onCitationClick}
+        activeCitation={null}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "출처 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "출처 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "출처 3" })).toBeInTheDocument();
+    // raw [N] 잔존 없음
+    expect(container.textContent).not.toContain("[1]");
+    expect(container.textContent).not.toContain("[2]");
+    expect(container.textContent).not.toContain("[3]");
+    // 인용/표 구조 안에 badge 위치
+    expect(container.querySelector("blockquote button")).not.toBeNull();
+    expect(container.querySelector("td button")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "출처 3" }));
+    expect(onCitationClick).toHaveBeenCalledWith(3);
+  });
 });

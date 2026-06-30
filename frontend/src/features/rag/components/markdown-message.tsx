@@ -101,6 +101,27 @@ export function MarkdownMessage({
       h3: ({ children }) => (
         <h3>{injectCitations(children, onCitationClick, activeCitation)}</h3>
       ),
+      // BL-F7: 표/인용/h4-h6 안의 [N] 도 보존 (이전엔 default 렌더러로 raw 노출).
+      h4: ({ children }) => (
+        <h4>{injectCitations(children, onCitationClick, activeCitation)}</h4>
+      ),
+      h5: ({ children }) => (
+        <h5>{injectCitations(children, onCitationClick, activeCitation)}</h5>
+      ),
+      h6: ({ children }) => (
+        <h6>{injectCitations(children, onCitationClick, activeCitation)}</h6>
+      ),
+      blockquote: ({ children }) => (
+        <blockquote>
+          {injectCitations(children, onCitationClick, activeCitation)}
+        </blockquote>
+      ),
+      td: ({ children }) => (
+        <td>{injectCitations(children, onCitationClick, activeCitation)}</td>
+      ),
+      th: ({ children }) => (
+        <th>{injectCitations(children, onCitationClick, activeCitation)}</th>
+      ),
       a: ({ children, href }) => (
         <a
           href={href}
