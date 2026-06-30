@@ -3,7 +3,7 @@
 > *καιρός — 흘러가는 시간(Chronos) 속 결정적 순간.*
 > 회의, 노트, 자료를 넣으면 AI가 정리하고, 질문하면 인사이트가 나온다.
 
-**프로덕션:** [kairos-zeta-ebon.vercel.app](https://kairos-zeta-ebon.vercel.app) · BE: [Cloud Run](https://kairos-api-467254555861.asia-northeast3.run.app/api/v1/docs)
+**프로덕션:** [kairos-zeta-ebon.vercel.app](https://kairos-zeta-ebon.vercel.app) · BE: [Cloud Run](https://kairos-api-imrsiyibaa-du.a.run.app/api/v1/docs)
 
 **현재 상태:** Sprint 26 (glittery-tulip, 2026-05-23) — docs 거버넌스 경량화 진행. ~Sprint 25 (moonlit-sutton) 까지 Multi-Agent QA P0~P2 + 보안 3-layer + 회귀 가드 완료. 상세: `git log` + `docs/REFACTORING-BACKLOG.md` "다음 Sprint 진입점".
 

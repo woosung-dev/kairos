@@ -100,7 +100,7 @@ cp frontend/.env.example frontend/.env.local  # Next.js: .env.local 표준
 |---|---|---|
 | `E2E_CLERK_PUBLISHABLE_KEY` | Secrets | Clerk dev 공개 키 (`pk_test_...`) |
 | `E2E_CLERK_SECRET_KEY` | Secrets | Clerk dev 비밀 키 (`sk_test_...`) |
-| `E2E_API_URL` | Secrets | `https://kairos-api-467254555861.asia-northeast3.run.app` |
+| `E2E_API_URL` | Secrets | `https://kairos-api-imrsiyibaa-du.a.run.app` |
 | `E2E_USER_EMAIL` | Secrets | 테스트 계정 이메일 |
 | `E2E_USER_PASSWORD` | Secrets | 테스트 계정 비밀번호 |
 | `E2E_ENABLED` | **Variables** | `true` |

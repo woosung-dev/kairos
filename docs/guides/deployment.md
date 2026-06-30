@@ -268,7 +268,7 @@ gcloud run services update-traffic kairos-api \
 2. GitHub repo 연결
 3. Framework Preset: **Next.js** (자동 감지)
 4. Root Directory: **`frontend/`**
-5. Production Branch: **`prod`**
+5. Production Branch: **`main`** (`prod` 브랜치 미사용 — `main` push 시 Vercel 자동 배포)
 
 ### 3.2 환경변수 설정
 
@@ -282,12 +282,10 @@ Vercel → Settings → Environment Variables:
 
 ### 3.3 배포
 
-`prod` 브랜치에 push하면 자동 배포:
+`main` 브랜치에 push 하면 Vercel 자동 배포 (`prod` 브랜치 미사용):
 
 ```bash
-git checkout prod
-git merge main
-git push origin prod
+git push origin main   # → Vercel 자동 배포(FE) + Cloud Run 자동 배포(BE, backend/** 변경 시)
 ```
 
 ### 3.4 CORS 업데이트
