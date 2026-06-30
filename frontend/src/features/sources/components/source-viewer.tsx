@@ -6,6 +6,7 @@ import { getCitationColor } from "@/features/rag/components/citation-badge";
 import { useMeetingDetail } from "@/features/meetings/hooks";
 import { useNote } from "@/features/notes/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import { triggerDownload } from "@/lib/download";
 import type { SourceDocument, HighlightChunk } from "../types";
 
 interface SourceViewerProps {
@@ -173,6 +174,17 @@ export function SourceViewer({
     }
   };
 
+  // BL-F8: 내보내기 버튼 onClick 부재(죽은 버튼) fix — 로드된 content 를 마크다운으로 다운로드.
+  // 복사 버튼과 동일하게 client-side content 사용 + 공용 triggerDownload 재사용.
+  const handleExport = () => {
+    const safeTitle =
+      source.title.replace(/[^\w가-힣 .-]/g, "").trim().slice(0, 60) || "source";
+    const blob = new Blob([`# ${source.title}\n\n${content}`], {
+      type: "text/markdown;charset=utf-8",
+    });
+    triggerDownload(blob, `${safeTitle}.md`);
+  };
+
   const icon = SOURCE_TYPE_ICON[source.type] ?? "\uD83D\uDCC4";
 
   return (
@@ -230,6 +242,7 @@ export function SourceViewer({
 
           <button
             type="button"
+            onClick={handleExport}
             className="p-1.5 rounded transition-colors cursor-pointer"
             style={{ color: "var(--text-muted)" }}
             onMouseOver={(e) => {
