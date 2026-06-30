@@ -113,14 +113,16 @@ jobs:
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
 
       # ── Smoke test ─────────────────────────────────────────────────────
+      # /api/v1/health 로 검사 — production 은 docs_url=None (main.py) 라 /docs 가 404.
+      # 기존 /docs=200 가정은 성공 배포를 red 로 보고해 실패를 가려왔음 (BL fix).
       - name: Smoke test
         run: |
           set -euo pipefail
           URL="${{ steps.deploy.outputs.url }}"
           for i in 1 2 3 4 5; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${URL}/api/v1/docs")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${URL}/api/v1/health")
             if [ "$STATUS" = "200" ]; then
-              echo "✅ $URL/api/v1/docs → 200 (attempt $i)"
+              echo "✅ $URL/api/v1/health → 200 (attempt $i)"
               exit 0
             fi
             echo "⏳ attempt $i: got $STATUS, retrying in 10s"
