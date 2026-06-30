@@ -5,7 +5,8 @@ import { ArrowUpRight, Loader2, AlertTriangle } from "lucide-react";
 import { MeetingSummaryView } from "./meeting-summary-view";
 import { TranscriptView } from "./transcript-view";
 import { ActionView } from "./action-view";
-import { MeetingExportButton } from "./export-button";
+import { ExportButton } from "@/components/shared/ExportButton";
+import { exportMeeting } from "../api";
 import { useMeetingDetail } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
@@ -188,7 +189,7 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
           </span>
           {/* S28b OBS-MEETING-ACTIONS: export 는 완료 상태에서만 (빈/실패 export 방지) */}
           {meeting.status === "completed" && (
-            <MeetingExportButton meetingId={meetingId} meetingTitle={meeting.title} />
+            <ExportButton exportFn={exportMeeting} id={meetingId} title={meeting.title} />
           )}
           {/* Sprint 23 D4: 워크스페이스 이동 (promote 1-button) */}
           <button

@@ -1,4 +1,5 @@
 "use client";
+// 도메인 무관 내보내기 버튼 — export fn 주입받아 Markdown/JSON 다운로드 (notes/meetings 공용)
 
 import { Download } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
@@ -11,24 +12,32 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { triggerDownload } from "@/lib/download";
-import { exportNote } from "../api";
 
-interface NoteExportButtonProps {
-  noteId: string;
-  noteTitle: string;
+type ExportFormat = "md" | "json";
+
+interface ExportButtonProps {
+  /** (token, workspaceId, id, format) → Blob 를 반환하는 도메인별 export fn */
+  exportFn: (
+    token: string,
+    workspaceId: string,
+    id: string,
+    format: ExportFormat,
+  ) => Promise<Blob>;
+  id: string;
+  /** 다운로드 파일명 (확장자 제외). 빈 값이면 "Untitled". */
+  title: string;
 }
 
-export function NoteExportButton({ noteId, noteTitle }: NoteExportButtonProps) {
+export function ExportButton({ exportFn, id, title }: ExportButtonProps) {
   const { getToken } = useAuth();
   const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
 
-  const handleExport = async (format: "md" | "json") => {
+  const handleExport = async (format: ExportFormat) => {
     try {
       const token = await getToken();
       if (!token || !wid) return;
-      const blob = await exportNote(token, wid, noteId, format);
-      const ext = format === "md" ? "md" : "json";
-      triggerDownload(blob, `${noteTitle || "Untitled"}.${ext}`);
+      const blob = await exportFn(token, wid, id, format);
+      triggerDownload(blob, `${title || "Untitled"}.${format}`);
       toast.success("내보내기 완료");
     } catch {
       toast.error("내보내기에 실패했습니다");

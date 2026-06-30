@@ -4,6 +4,11 @@
 import { FileEdit, Globe, Lock, type LucideIcon } from "lucide-react";
 
 import type { ProjectVisibility } from "../types";
+import {
+  VISIBILITY_COLOR_VAR,
+  VISIBILITY_DESCRIPTIONS,
+  VISIBILITY_LABELS,
+} from "@/lib/visibility";
 
 export const VISIBILITY_ICON: Record<ProjectVisibility, LucideIcon> = {
   public: Globe,
@@ -11,23 +16,8 @@ export const VISIBILITY_ICON: Record<ProjectVisibility, LucideIcon> = {
   private: Lock,
 };
 
-export const VISIBILITY_COLOR_VAR: Record<ProjectVisibility, string> = {
-  public: "var(--visibility-public)",
-  draft: "var(--visibility-draft)",
-  private: "var(--visibility-private)",
-};
-
-export const VISIBILITY_LABELS: Record<ProjectVisibility, string> = {
-  public: "공개",
-  draft: "작업 중",
-  private: "비공개",
-};
-
-export const VISIBILITY_DESCRIPTIONS: Record<ProjectVisibility, string> = {
-  public: "워크스페이스 모든 멤버 접근",
-  draft: "작성자 + admin/owner만 접근",
-  private: "명시적 멤버 + admin/owner만 접근",
-};
+// 공유 어휘 re-export — 정의는 @/lib/visibility, 기존 projects 내부 importer 호환 유지.
+export { VISIBILITY_COLOR_VAR, VISIBILITY_DESCRIPTIONS, VISIBILITY_LABELS };
 
 interface VisibilityBadgeProps {
   visibility: ProjectVisibility;

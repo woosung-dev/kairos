@@ -10,7 +10,8 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { useNote, useUpdateNote } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
-import { NoteExportButton } from "./export-button";
+import { ExportButton } from "@/components/shared/ExportButton";
+import { exportNote } from "../api";
 import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
 
 const AUTOSAVE_DEBOUNCE_MS = 1000;
@@ -209,7 +210,7 @@ export function NoteDetail({ noteId }: NoteDetailProps) {
             <ArrowUpRight className="w-4 h-4" />
             <span>팀으로 올리기</span>
           </button>
-          <NoteExportButton noteId={noteId} noteTitle={note.title || "Untitled"} />
+          <ExportButton exportFn={exportNote} id={noteId} title={note.title || "Untitled"} />
         </div>
       </div>
 
