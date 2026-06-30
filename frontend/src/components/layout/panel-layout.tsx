@@ -109,7 +109,9 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
           <div
             className="fixed right-0 top-0 h-full z-40 flex flex-col shadow-xl"
             style={{
+              // BL-F5: <380px 뷰포트에서 고정 380px 패널이 가로 overflow → 뷰포트 폭으로 cap.
               width: "var(--rag-overlay-width)",
+              maxWidth: "100%",
               background: "var(--surface)",
               borderLeft: "1px solid var(--border-subtle)",
             }}
