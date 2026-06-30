@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useMemo, useState, type ReactNode } from "react";
 import { X, Copy, ExternalLink, Check } from "lucide-react";
-import { getCitationColor } from "@/features/rag/components/citation-badge";
+import { getCitationColor } from "@/lib/citation-colors";
 import { useMeetingDetail } from "@/features/meetings/hooks";
 import { useNote } from "@/features/notes/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";

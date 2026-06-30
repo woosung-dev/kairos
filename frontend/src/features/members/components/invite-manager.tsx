@@ -20,10 +20,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  VISIBILITY_LABELS,
-} from "@/features/projects/components/visibility-badge";
-import type { ProjectVisibility } from "@/features/projects/types";
+import { VISIBILITY_LABELS } from "@/lib/visibility";
+import type { ProjectVisibility } from "@/lib/visibility";
 
 import { formatExpiry } from "@/lib/format-expiry";
 

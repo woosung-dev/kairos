@@ -1,41 +1,15 @@
 "use client";
 
+import { getCitationColor } from "@/lib/citation-colors";
+
 interface CitationBadgeProps {
   number: number;
   onClick: () => void;
   isActive?: boolean;
 }
 
-/** 인라인 출처 번호별 색상 시스템 */
-const CITATION_COLORS: Record<
-  number,
-  { bg: string; bgActive: string; color: string }
-> = {
-  1: {
-    bg: "var(--accent-subtle)",
-    bgActive: "var(--accent)",
-    color: "var(--accent)",
-  },
-  2: {
-    bg: "color-mix(in srgb, var(--chart-3) 10%, transparent)",
-    bgActive: "var(--chart-3)",
-    color: "var(--chart-3)",
-  },
-  3: {
-    bg: "color-mix(in srgb, var(--warning) 10%, transparent)",
-    bgActive: "var(--warning)",
-    color: "var(--warning)",
-  },
-};
-
-const DEFAULT_COLOR = {
-  bg: "var(--surface-hover)",
-  bgActive: "var(--text-secondary)",
-  color: "var(--text-secondary)",
-};
-
 export function CitationBadge({ number, onClick, isActive = false }: CitationBadgeProps) {
-  const palette = CITATION_COLORS[number] ?? DEFAULT_COLOR;
+  const palette = getCitationColor(number);
 
   return (
     <button
@@ -63,9 +37,4 @@ export function CitationBadge({ number, onClick, isActive = false }: CitationBad
       {number}
     </button>
   );
-}
-
-/** CitationBadge에서 사용하는 색상을 외부에서도 접근 가능하도록 export */
-export function getCitationColor(number: number) {
-  return CITATION_COLORS[number] ?? DEFAULT_COLOR;
 }

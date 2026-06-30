@@ -1,7 +1,8 @@
 import type { UUID, Timestamped } from "@/types";
+import type { ProjectVisibility } from "@/lib/visibility";
 
 export type ProjectStatus = "active" | "completed" | "archived";
-export type ProjectVisibility = "public" | "draft" | "private";
+export type { ProjectVisibility };
 
 export interface Project extends Timestamped {
   id: UUID;
