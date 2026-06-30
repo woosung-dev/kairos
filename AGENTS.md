@@ -29,7 +29,7 @@
 3. `DESIGN.md` (디자인 시스템)
 4. 작업 도메인의 `backend/src/<domain>/CONTEXT.md`
 5. `docs/TODO.md`
-6. 디렉토리 구조 필요 시: `docs/architecture/directory-map.md` (BE 15 모듈 + FE 14 features)
+6. 디렉토리 구조 필요 시: `docs/architecture/directory-map.md` (BE 16 모듈 = 13 도메인 + common/core/services, FE 15 features)
 
 ### Plan Before Code
 코드 전 "어떤 doc 을 참고했고 어떤 방향으로 수정할지" 1-2줄 브리핑.

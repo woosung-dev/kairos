@@ -57,7 +57,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 ### 4.3 프론트엔드 features (FSD)
 
-`actions · audit · home · inbox · meetings · members · memory · notes · onboarding · projects · rag · sources · upload · workspaces` (14). shadcn `components/ui/` 수정 금지 (DESIGN.md). TiptapEditor (useEditor/EditorContent) 는 `features/notes/components/note-detail.tsx` (Sprint 29 R3 정정 — 옛 `note-editor.tsx` 는 importer 0 dead-code 로 삭제).
+`actions · audit · feedback · home · inbox · meetings · members · memory · notes · onboarding · projects · rag · sources · upload · workspaces` (15). shadcn `components/ui/` 수정 금지 (DESIGN.md). TiptapEditor (useEditor/EditorContent) 는 `features/notes/components/note-detail.tsx` (Sprint 29 R3 정정 — 옛 `note-editor.tsx` 는 importer 0 dead-code 로 삭제).
 
 ## 5. visibility 도메인 용어 (ADR-014)
 

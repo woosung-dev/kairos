@@ -38,18 +38,19 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 
 ---
 
-## 4. 도메인 모듈 (Sprint 24 Wave 2 memory 행 명시 추가)
+## 4. 도메인 모듈 (Sprint 24 Wave 2 memory 행 명시 추가, 2026-07-01 arch-verification — feedback 행 + auth/notes/upload/workspaces CONTEXT.md 경로 정정)
 
 | 모듈 | CONTEXT.md | 책임 요약 |
 |---|---|---|
-| auth | 전역 규칙만 (전용 CONTEXT.md 없음) | Clerk JWT 검증 + User 매핑. **prefix 예외**: `/api/v1/users` |
-| workspaces | 전역 규칙만 (전용 CONTEXT.md 없음) | Workspace + WorkspaceMember + WorkspaceInvite + `inbox_threshold` |
+| auth | `src/auth/CONTEXT.md` | Clerk JWT 검증 + User 매핑. **prefix 예외**: `/api/v1/users` |
+| workspaces | `src/workspaces/CONTEXT.md` | Workspace + WorkspaceMember + WorkspaceInvite + `inbox_threshold` |
 | projects | `src/projects/CONTEXT.md` | Project CRUD, MeetingProjectLink, ProjectMember (Sprint 6 L-6), visibility 권한 분기 (Sprint 6 BE-T8), 태그, 인사이트 |
 | inbox | `src/inbox/CONTEXT.md` | Inbox 적재 + AI 분류 추천 |
 | meetings | `src/meetings/CONTEXT.md` | Meeting 인제스트, STT, 파이프라인 (orchestrator 표준 패턴) |
-| notes | 전역 규칙만 (전용 CONTEXT.md 없음) | Tiptap Note CRUD + NotePipelineService(embedding 위임 + 권한 검증, Sprint 6 ADR-014 옵션 A) + Sprint 24 BL-064 promote chunk 0 BG re-embedding |
+| notes | `src/notes/CONTEXT.md` | Tiptap Note CRUD + NotePipelineService(embedding 위임 + 권한 검증, Sprint 6 ADR-014 옵션 A) + Sprint 24 BL-064 promote chunk 0 BG re-embedding |
 | actions | `src/actions/CONTEXT.md` | ActionItem CRUD (nullable 부모) |
-| upload | 전역 규칙만 (전용 CONTEXT.md 없음) | R2 업로드 (presigned URL, aioboto3) |
+| feedback | `src/feedback/CONTEXT.md` | dogfooding 피드백 수집 (user-level, workspace nullable). **prefix 예외**: `/api/v1/feedback` |
+| upload | `src/upload/CONTEXT.md` | R2 업로드 (presigned URL, aioboto3) |
 | embeddings | `src/embeddings/CONTEXT.md` | EmbeddingChunk + SemanticCache 저장/검색 (pgvector HNSW + halfvec). cross-domain shared service — 호출은 호출자 도메인 `pipeline_service.py` 경유 (ADR-014) |
 | memory | `src/memory/CONTEXT.md` | Sprint 15 Recall-first wedge — MemoryItem capture(text+voice) / Distill / Recall / Promote. Sprint 24 Wave 2 BL-006: `MemoryPipelineService.save_memory_chunk` 가 embeddings 호출 격리 (헌법 §4.2) |
 | rag | `src/rag/CONTEXT.md` | RAG 6-Layer + Gemini 답변 (SSE 스트리밍) |
