@@ -204,3 +204,53 @@ def test_is_non_dev_env_via_environment_only(monkeypatch):
     # _is_non_dev_env 가 environment 도 확인 — dev fallback token 거부
     with pytest.raises(ValueError, match="must be set in non-dev"):
         Settings(_env_file=None)
+
+
+# Sprint 29 — 프로덕션 아웃티지 fix 회귀 가드.
+# APP_ENV=production + dev Clerk 인스턴스 유지(ADR-022) 조합이 27e validator 3종을
+# 부팅 시 crash-loop 시켜 prod 백엔드 전체가 다운된 인시던트 (2026-06-23~30).
+# CLERK_PROD_HARDENING 게이트(기본 ON)로 raise → loud warning 전환, dev Clerk 부팅 회복.
+def test_prod_hardening_disabled_allows_dev_clerk_boot(monkeypatch):
+    """게이트 OFF: production + dev issuer/audience/cron 전부라도 raise 없이 부팅(경고만)."""
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("CLERK_PROD_HARDENING", "false")
+    # dev Clerk 기본값 그대로 (issuer dev / audience None / cron fallback)
+    monkeypatch.delenv("CLERK_JWT_ISSUER", raising=False)
+    monkeypatch.delenv("CLERK_JWT_AUDIENCE", raising=False)
+    monkeypatch.delenv("CRON_SECRET_TOKEN", raising=False)
+
+    # logger.warning 직접 스파이 — 전역 logging 설정에 의존 않는 isolation-proof 검증.
+    import src.core.config as config_mod
+
+    warned: list[str] = []
+    monkeypatch.setattr(
+        config_mod.logger,
+        "warning",
+        lambda msg, *args: warned.append(msg % args if args else msg),
+    )
+
+    settings = config_mod.Settings(_env_file=None)  # raise 없이 부팅
+    assert settings.clerk_prod_hardening is False
+    assert settings.app_env == "production"
+    # 3종 위반 모두 loud warning 으로 기록 (조용한 무력화 금지)
+    blob = " ".join(warned)
+    assert "CLERK_JWT_ISSUER" in blob
+    assert "CLERK_JWT_AUDIENCE" in blob
+    assert "CRON_SECRET_TOKEN" in blob
+
+
+def test_prod_hardening_enabled_by_default_still_raises(monkeypatch):
+    """게이트 기본 ON: flag 미설정 시 27e 강제 검증 유지 (dev issuer → raise)."""
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("CRON_SECRET_TOKEN", "prod-real-secret-xyz-32bytes-long-aaaa")
+    monkeypatch.setenv("CLERK_JWT_AUDIENCE", "https://api.example.com")
+    monkeypatch.delenv("CLERK_JWT_ISSUER", raising=False)
+    monkeypatch.delenv("CLERK_PROD_HARDENING", raising=False)
+
+    from src.core.config import Settings
+
+    assert Settings.model_fields["clerk_prod_hardening"].default is True
+    with pytest.raises(ValueError, match="CLERK_JWT_ISSUER must be Clerk Production"):
+        Settings(_env_file=None)

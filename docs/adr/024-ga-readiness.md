@@ -6,6 +6,8 @@
 **Supersedes**: ADR-022 (Clerk webhook SKIP)  
 **관련**: ADR-016 (Personal/Team IA) · ADR-023 (D-6 lock-in)
 
+> **Status update (2026-06-30):** Clerk Production 컷오버는 **미실행** — prod 는 여전히 dev Clerk 인스턴스(`creative-boxer-79`)로 운영(ADR-022 자세 유지). Sprint 27e 가 추가한 prod 하드닝 validator(`backend/src/core/config.py` 의 issuer/audience/cron)는 "컷오버 완료"를 전제하는데, `deploy.yml` 이 `APP_ENV=production` 만 주입(Clerk env 는 dev 기본값 유지)해 부팅 시 `ValidationError` → **컨테이너 crash-loop → prod 백엔드 전체 다운(2026-06-23 PR #132 배포 ~ 06-30)**. 복구 = `CLERK_PROD_HARDENING=false` 게이트로 validator `raise` → loud `warning` 전환(`deploy.yml` env 주입). **본 ADR 의 Clerk Production 컷오버 실행 시 이 게이트를 제거(=하드닝 재무장)** 하는 것이 완료 조건의 일부. 교훈 — 부팅 차단형 config validator 는 prod 전체를 다운시킬 수 있으므로, 보안 config 위반은 crash 가 아니라 loud warning + alert 가 원칙.
+
 ## Context
 
 22 sprint 동안 외부 user 0명 (3 도구 점검 Sprint 26 합의). PRD Phase 4 "시기 미정" (Sprint 4 완료 후 office-hours 재검토 명시되었으나 미실행). Sprint 15 personal wedge pivot + Sprint 25 Clerk Production SKIP (ADR-022, 단독 founder 기능 검증 중 단계로 의도) → Sprint 27a D-6 grill 완료 후 외부 dogfooding 진입 가능 상태.

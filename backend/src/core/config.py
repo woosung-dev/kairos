@@ -1,8 +1,11 @@
 # 앱 환경변수를 pydantic-settings로 관리하는 설정 모듈
+import logging
 from functools import lru_cache
 
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 # Sprint 15 R-CRON 의 dev fallback 토큰 — production 에선 절대 사용 X (validator 가 차단).
 _CRON_TOKEN_DEV_FALLBACK = "dev-cron-secret-CHANGE-ME-IN-PROD"
@@ -19,6 +22,15 @@ class Settings(BaseSettings):
     # (Pydantic V2 field_validator 는 정의 순서대로 실행 — environment 가 cron_secret_token
     # 보다 앞에 있어야 info.data 에서 보임.)
     environment: str = "development"
+
+    # Sprint 29 — 27e prod 하드닝 validator(issuer/audience/cron) 게이트.
+    # 기본 True = 강제 검증 유지(보안 default). prod 가 ADR-022 에 따라 의도적으로 dev Clerk
+    # 인스턴스를 유지하는 동안, APP_ENV=production 과 dev Clerk 의 모순으로 부팅이 crash-loop
+    # 되어 prod 전체가 다운된 인시던트(2026-06-23~30) 회복용. CLERK_PROD_HARDENING=false 로
+    # 명시 opt-out 시 validator 가 raise → loud warning 으로 전환(조용한 무력화 아님).
+    # ADR-024 Clerk Production 컷오버 완료 시 이 줄을 제거(=True 복귀)해 하드닝 재무장.
+    # 본 field 는 issuer/audience/cron validator 보다 먼저 정의돼야 info.data 에서 보임.
+    clerk_prod_hardening: bool = True
 
     # CORS (쉼표 구분, 예: "http://localhost:3000,https://kairos.vercel.app")
     cors_origins: str = "http://localhost:3000"
@@ -91,6 +103,18 @@ class Settings(BaseSettings):
         non_dev = {"production", "staging", "stage", "prod"}
         return app_env.lower() in non_dev or environment.lower() in non_dev
 
+    # Sprint 29 — 27e prod 하드닝 위반 처리 게이트.
+    @classmethod
+    def _enforce_or_warn(cls, info, message: str) -> None:
+        """non-dev 보안 위반 처리. clerk_prod_hardening=True(기본)면 raise(27e 강제 검증 유지),
+        False(ADR-022 dev Clerk 유지 명시 opt-out)면 loud warning 으로 전환해 부팅 허용.
+        조용한 무력화 금지 — opt-out 이어도 위반은 항상 WARNING 로 기록."""
+        if info.data.get("clerk_prod_hardening", True):
+            raise ValueError(message)
+        logger.warning(
+            "[CONFIG GUARD · gated by CLERK_PROD_HARDENING=false · ADR-022] %s", message
+        )
+
     # Sprint 27e BUG-S27e-SEC-4 + Round 2 r2-3 — non-dev 환경에서 dev fallback + 약한 token 거부.
     # r2-3: staging 우회 (app_env=="production" 단일 비교) 차단 + 32 byte min length 강제.
     @field_validator("cron_secret_token")
@@ -102,13 +126,15 @@ class Settings(BaseSettings):
         ):
             val = v.get_secret_value()
             if val == _CRON_TOKEN_DEV_FALLBACK:
-                raise ValueError(
+                cls._enforce_or_warn(
+                    info,
                     "CRON_SECRET_TOKEN must be set in non-dev (production/staging) "
-                    "(dev fallback 'dev-cron-secret-CHANGE-ME-IN-PROD' rejected)"
+                    "(dev fallback 'dev-cron-secret-CHANGE-ME-IN-PROD' rejected)",
                 )
-            if len(val) < 32:
-                raise ValueError(
-                    f"CRON_SECRET_TOKEN must be >= 32 bytes in non-dev (got {len(val)})"
+            elif len(val) < 32:
+                cls._enforce_or_warn(
+                    info,
+                    f"CRON_SECRET_TOKEN must be >= 32 bytes in non-dev (got {len(val)})",
                 )
         return v
 
@@ -122,9 +148,10 @@ class Settings(BaseSettings):
             info.data.get("app_env", "development"),
             info.data.get("environment", "development"),
         ) and "creative-boxer-79.clerk.accounts.dev" in v:
-            raise ValueError(
+            cls._enforce_or_warn(
+                info,
                 "CLERK_JWT_ISSUER must be Clerk Production instance URL in non-dev "
-                "(production/staging). dev issuer 'creative-boxer-79.clerk.accounts.dev' rejected"
+                "(production/staging). dev issuer 'creative-boxer-79.clerk.accounts.dev' rejected",
             )
         return v
 
@@ -137,10 +164,11 @@ class Settings(BaseSettings):
             info.data.get("app_env", "development"),
             info.data.get("environment", "development"),
         ) and v is None:
-            raise ValueError(
+            cls._enforce_or_warn(
+                info,
                 "CLERK_JWT_AUDIENCE must be explicitly set in non-dev "
                 "(production/staging). implicit aud-skip (None) rejected — "
-                "audience 검증 영구 skip 방지"
+                "audience 검증 영구 skip 방지",
             )
         return v
 
