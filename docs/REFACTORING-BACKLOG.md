@@ -262,7 +262,7 @@
 
 - ARCH-1 + ARCH-r2-1 + ARCH-5 + BUG-S28-ARCH-2 — OnboardingService DI 통일 + Demeter helper
 - ARCH-2 + ARCH-r2-3 — services DTO 일관
-- ARCH-3 + BUG-S28-ARCH-1 — `backend/src/audit/` 도메인 신설 → BE 16 모듈
+- ARCH-3 + BUG-S28-ARCH-1 — `backend/src/audit/` 도메인 신설 → BE 17 모듈 (현재 16)
 - ARCH-6 — `common/promote_helpers.py` 확장 + 5 도메인 promote SRP
 - ARCH-r2-2 — auth lazy seed LazySeedService 추출
 - BUG-S28-ARCH-4 — `core ↔ common` cycle 분리
@@ -2466,3 +2466,23 @@ agy F9 sub-3 — `/api/v1/users/sync` endpoint 재도입 시 Svix 서명 검증 
 
 ### BL-F10 — inbox-dismiss e2e 테스트 격리 취약성 (P3, 테스트 인프라)
 `inbox-dismiss.spec.ts:62` 가 `h3:has-text("${titleBefore}")` substring 매치로 dismiss 후 0건을 기대 → 공유 Neon dev DB 에 반복 e2e 실행으로 동일 AI 제목 inbox 항목이 누적되면(관측: 20건) 제목 유일성 가정이 깨져 실패. 2026-06-24 fullsweep 재실행 중 발현(수정 전 첫 런은 통과 — 데이터 누적 전). 제품 결함 아님(inbox 도메인 코드 무변경, F1~F4 와 무관). 수정=① 테스트가 고유 마커 제목 inbox 항목을 시드 후 그 항목만 dismiss/검증(self-contained), 또는 ② dismiss 한 항목의 id 기반 검증(has-text substring 대신 data-testid). 보강 전까지 dev DB inbox 누적 시 간헐 실패.
+
+---
+
+## 2026-07-01 Architecture Verification 산출 (BL-AV-N)
+
+> docs + AGENTS.md 기반 아키텍처/기능 검증 (3-agent recon + deep-module Ousterhout deletion-test 렌즈). Scope B = 문서 정합 + arch test gate + 안전 FE 리팩토링. 검증 결론 = 코드는 헌법 21불변식을 대체로 준수 (I-1/I-4/I-9/I-13 clean; embeddings E-9·onboarding I-1 은 문서화된 예외).
+
+### ✅ 본 PR 에서 해소 (RESOLVED)
+- **문서 drift 봉합**. 모듈/feature 개수 정합 (BE 16 = 13 도메인 + common/core/services, FE 15 — feedback 등재) → `AGENTS.md` / `docs/architecture/directory-map.md` / `CONTEXT-MAP.md §4.3`. `backend/CONTEXT.md §4` 표 정정 (auth/notes/upload CONTEXT.md 존재 반영, feedback 행 추가). `backend/src/workspaces/CONTEXT.md` 신설 (유일 도메인 CONTEXT.md gap 해소).
+- **arch test gate 강제화** (BUG-S28-ARCH-5 부분 해소). I-1 (service 가 AsyncSession 인스턴스 미보유, onboarding allowlist) / I-4 (프롬프트 `common/prompts.py` 중앙화) / core→common import allowlist (cycle 악화 회귀 가드) 3종 추가. 기존 memory→embeddings 가드 포함 arch test 4 게이트로 확대.
+- **FE shallow/FSD 위반 제거**. notes·meetings `export-button.tsx` ~95% 중복 → `components/shared/ExportButton.tsx` 1개로 추출 (동작 보존, wrapper 2파일 삭제). FSD 격리 위반 2건 해소 — `getCitationColor` → `lib/citation-colors.ts`, visibility 공유 어휘(`ProjectVisibility` 타입 + 라벨/설명/색상) → `lib/visibility.ts` (members → projects 컴포넌트 내부 import 제거).
+
+### BL-AV-1 — FE project-dashboard.tsx god component 분해 (P2, FE 아키텍처)
+`features/projects/components/project-dashboard.tsx`(637줄)가 6개 feature(actions/meetings/notes/members/workspaces hooks+types)를 직접 결합 — 코드베이스 최고 결합도. deletion test: 분리 시 각 섹션 책임이 자기 feature 로 회귀(earning its keep 아님 = 단일 화면 hub). 수정=탭/섹션별 하위 컴포넌트 추출 + 데이터 훅 경계 정리.
+
+### BL-AV-2 — FE FSD public-API barrel 부재 (P3, FE 아키텍처)
+전 feature 에 `index.ts` 공개 표면 없음 → 모든 cross-feature import 가 deep import(컴포넌트 내부 직접 참조 가능). 본 PR 이 2건 위반을 해소했으나 구조적 재발 방지엔 feature 별 barrel + 경계 lint 필요. 수정=feature `index.ts` 점진 도입 또는 eslint `no-restricted-imports` 로 `features/*/components/*` cross-feature 직접 import 차단.
+
+### 백엔드 deep-module (이연 유지)
+`audit/` 도메인 추출(`common/audit_*` + `promote_*`) + `core↔common` cycle 해소(`common/database.py` → `core/database.py`)는 **기존 BL-S27e-F** 클러스터로 이연(Scope C). 본 검증으로 둘 다 코드 재확인 완료 — core→common 단일 edge=`lifespan.py → common.database`(test gate 로 고정), `common/audit_router.py` 가 `prefix=/audit` + `tags=["audit"]` 자가선언(도메인 추출 신호).
