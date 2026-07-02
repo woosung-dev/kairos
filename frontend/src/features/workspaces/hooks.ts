@@ -41,6 +41,9 @@ export function useCreateWorkspace() {
         (old) => (old ? [...old, newWorkspace] : [newWorkspace])
       );
     },
+    onError: (error: Error) => {
+      toast.error(error.message || "워크스페이스 생성에 실패했습니다");
+    },
   });
 }
 
