@@ -513,6 +513,9 @@ function RecordingView({
   const [recordTitle, setRecordTitle] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [includeShareAudio, setIncludeShareAudio] = useState(false);
+  const supportsShareAudio =
+    typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getDisplayMedia;
 
   const formatDuration = (sec: number) => {
     const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -575,15 +578,39 @@ function RecordingView({
         )}
 
         {state === 'idle' && (
-          <button
-            type="button"
-            onClick={() => void startRecording()}
-            className="w-16 h-16 rounded-full flex items-center justify-center transition-colors"
-            style={{ background: 'var(--accent)' }}
-            aria-label="녹음 시작"
-          >
-            <span className="w-6 h-6 rounded-full bg-white" />
-          </button>
+          <>
+            <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+              <input
+                type="checkbox"
+                checked={includeShareAudio}
+                disabled={!supportsShareAudio}
+                onChange={(e) => setIncludeShareAudio(e.target.checked)}
+              />
+              회의/영상 소리도 함께 녹음 (Zoom, Google Meet, YouTube 등)
+            </label>
+            {includeShareAudio && supportsShareAudio && (
+              <p className="text-xs text-center max-w-sm" style={{ color: 'var(--text-muted)' }}>
+                공유 창에서 Google Meet·YouTube 탭 소리는 해당 탭을 선택하고 &ldquo;탭 오디오 공유&rdquo;를
+                체크해주세요. Zoom 데스크톱 앱처럼 브라우저 밖의 소리는 &ldquo;전체 화면&rdquo;을 선택하고
+                시스템 오디오를 켜주세요 (macOS는 14.2 이상 + Chrome 141 이상 필요, PC의 다른 소리도 함께
+                녹음될 수 있어요).
+              </p>
+            )}
+            {!supportsShareAudio && (
+              <p className="text-xs text-center max-w-xs" style={{ color: 'var(--text-muted)' }}>
+                이 브라우저는 회의/영상 소리 캡처를 지원하지 않습니다 (Chrome/Edge 권장).
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => void startRecording({ includeShareAudio })}
+              className="w-16 h-16 rounded-full flex items-center justify-center transition-colors"
+              style={{ background: 'var(--accent)' }}
+              aria-label="녹음 시작"
+            >
+              <span className="w-6 h-6 rounded-full bg-white" />
+            </button>
+          </>
         )}
 
         {state === 'recording' && (
