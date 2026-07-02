@@ -593,7 +593,8 @@ function RecordingView({
                 공유 창에서 Google Meet·YouTube 탭 소리는 해당 탭을 선택하고 &ldquo;탭 오디오 공유&rdquo;를
                 체크해주세요. Zoom 데스크톱 앱처럼 브라우저 밖의 소리는 &ldquo;전체 화면&rdquo;을 선택하고
                 시스템 오디오를 켜주세요 (macOS는 14.2 이상 + Chrome 141 이상 필요, PC의 다른 소리도 함께
-                녹음될 수 있어요).
+                녹음될 수 있어요). 이 창은 화면을 녹화하는 기능이 아니라, 브라우저가 오디오 접근을
+                승인받기 위해 띄우는 절차입니다 — 화면 영상은 저장되지 않고 소리만 사용됩니다.
               </p>
             )}
             {!supportsShareAudio && (
