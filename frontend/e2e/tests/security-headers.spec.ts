@@ -12,7 +12,8 @@ import { expect, test } from "@playwright/test";
  * - X-Frame-Options: DENY (clickjacking 방어)
  * - X-Content-Type-Options: nosniff (MIME sniffing 방어)
  * - Referrer-Policy: strict-origin-when-cross-origin (referer leak 방어)
- * - Permissions-Policy: camera=()… (browser feature 제한)
+ * - Permissions-Policy: camera=(self)… (browser feature 제한, getDisplayMedia
+ *   화면 영상 트랙 캡처에 self 출처 camera 정책 통과가 필요 — PR #134)
  */
 
 const FOUR_HEADERS = [
@@ -35,7 +36,7 @@ test.describe("BUG-S27d-4 Security Headers Regression (Sprint 27e TEST-1)", () =
     expect(headers["x-frame-options"]).toBe("DENY");
     expect(headers["x-content-type-options"]).toBe("nosniff");
     expect(headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
-    expect(headers["permissions-policy"]).toContain("camera=()");
+    expect(headers["permissions-policy"]).toContain("camera=(self)");
   });
 
   test("Root / page returns 4 security headers", async ({ request }) => {
