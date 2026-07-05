@@ -61,14 +61,29 @@ def _validate_action_dates(actions: list[dict], current_year: int) -> list[dict]
     return actions
 
 
+# PERF-r2-2: 요청마다 genai.Client 재생성 방지 — 모듈 싱글턴.
+# 캐시 키 = 생성자 identity: 테스트가 genai 를 patch 하면 자동으로 새(mock)
+# 클라이언트를 만들고, patch 해제 후엔 실 클라이언트로 자가 복원.
+_genai_client_cache: "tuple[object, genai.Client] | None" = None
+
+
+def _get_genai_client() -> "genai.Client":
+    global _genai_client_cache
+    ctor = genai.Client
+    if _genai_client_cache is None or _genai_client_cache[0] is not ctor:
+        settings = get_settings()
+        _genai_client_cache = (
+            ctor,
+            ctor(api_key=settings.gemini_api_key.get_secret_value()),
+        )
+    return _genai_client_cache[1]
+
+
 class AIProcessingService:
     """Gemini API를 통한 회의 요약 생성."""
 
     def __init__(self) -> None:
-        settings = get_settings()
-        self.client = genai.Client(
-            api_key=settings.gemini_api_key.get_secret_value()
-        )
+        self.client = _get_genai_client()
 
     async def summarize(self, transcript: str) -> dict:
         """트랜스크립트 → 구조화된 요약 dict.

@@ -167,12 +167,33 @@ setup("team seed", async ({ browser }) => {
     teamWsId = created.id;
   }
 
-  // ── 3. member 초대 발급 (멱등: maxUses 무제한 + 30일) ──
-  const invite = (await jsonOk(ownerPage, "POST", `/api/v1/workspaces/${teamWsId}/invites`, {
-    role: "member",
-    maxUses: null,
-    expiresInDays: 30,
-  })) as { code: string };
+  // ── 3. member 초대 발급 (재사용 우선 — 매 실행 신규 POST 는 활성 초대 무한 누적) ──
+  const inviteList = (await jsonOk(
+    ownerPage,
+    "GET",
+    `/api/v1/workspaces/${teamWsId}/invites`,
+  )) as Array<{
+    code: string;
+    role: string;
+    isActive: boolean;
+    maxUses: number | null;
+    expiresAt: string | null;
+  }>;
+  const reusable = inviteList.find(
+    (i) =>
+      i.isActive &&
+      i.role === "member" &&
+      i.maxUses === null &&
+      (!i.expiresAt ||
+        new Date(i.expiresAt).getTime() - Date.now() > 7 * 86_400_000),
+  );
+  const invite =
+    reusable ??
+    ((await jsonOk(ownerPage, "POST", `/api/v1/workspaces/${teamWsId}/invites`, {
+      role: "member",
+      maxUses: null,
+      expiresInDays: 30,
+    })) as { code: string });
 
   // ── 4. member 로그인 (context B) ──
   const memberCtx = await browser.newContext();

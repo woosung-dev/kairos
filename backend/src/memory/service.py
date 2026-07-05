@@ -213,11 +213,11 @@ class MemoryService:
         매일 GCP Cloud Scheduler에서 호출. 삭제 카운트 반환.
         """
         from datetime import timedelta
-        from src.common.r2 import R2Service
+        from src.common.r2 import get_r2_service
 
         cutoff = datetime.utcnow() - timedelta(days=days)
         expired = await self.repo.list_expired_audio(cutoff)
-        r2 = R2Service()
+        r2 = get_r2_service()
         deleted = 0
         for item in expired:
             if not item.r2_audio_key:

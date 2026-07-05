@@ -54,6 +54,8 @@ export function useMembers(wid: string | undefined) {
       return fetchMembers(token, wid!);
     },
     enabled: !!wid,
+    // 권한 표면 — 전역 focus refetch off 에서 예외 (role 변경/제거 반영 지연 방지)
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -146,6 +148,8 @@ export function useInvites(
       return fetchInvites(token, wid!);
     },
     enabled: !!wid && (options?.enabled ?? true),
+    // 권한 표면 — 전역 focus refetch off 에서 예외 (초대 비활성화 반영 지연 방지)
+    refetchOnWindowFocus: true,
   });
 }
 

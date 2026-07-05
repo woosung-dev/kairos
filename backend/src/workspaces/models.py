@@ -33,6 +33,9 @@ class WorkspaceMember(SQLModel, table=True):
     workspace_id: uuid.UUID = Field(foreign_key="workspaces.id")
     user_id: uuid.UUID = Field(foreign_key="users.id")
     role: str = "member"  # owner | admin | member | viewer
+    # W-5: 초대 수락 시 invite.default_project_visibility 복사 — 이 멤버가 프로젝트
+    # 생성 시 visibility 미지정이면 적용되는 기본값 (null = 워크스페이스 기본 public)
+    default_project_visibility: str | None = Field(default=None)
 
 
 class WorkspaceInvite(SQLModel, table=True):

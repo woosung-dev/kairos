@@ -15,6 +15,8 @@ import {
   useWorkspace,
   useUpdateWorkspaceSettings,
 } from "@/features/workspaces/hooks";
+import { DangerZone } from "@/features/workspaces/components/DangerZone";
+import { inferWorkspaceType } from "@/features/workspaces/utils";
 
 const THRESHOLD_PRESETS = [0.7, 0.8, 0.9, 0.95] as const;
 // Sprint 24 Wave 2 T-AUDIT-VIEW: audit tab 추가 — admin/owner 만 노출.
@@ -29,8 +31,7 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 const MONO_STYLE = {
-  fontFamily:
-    '"Geist Mono", ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Code", monospace',
+  fontFamily: "var(--font-mono)",
   fontVariantNumeric: "tabular-nums" as const,
 };
 
@@ -69,9 +70,11 @@ function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const memberCount = members?.length ?? 0;
-  const activeInviteCount =
-    invites?.filter((invite) => invite.isActive).length ?? 0;
+  // 로딩 중 0 으로 깜빡이지 않도록 데이터 도착 전에는 대시 표시
+  const memberCount = members?.length;
+  const activeInviteCount = invites?.filter(
+    (invite) => invite.isActive,
+  ).length;
   const isOwner = hasRole("owner");
   const currentThreshold = workspace?.inboxThreshold ?? 0.9;
 
@@ -106,8 +109,7 @@ function SettingsContent() {
         <h1
           className="flex items-center gap-2.5 tracking-tight"
           style={{
-            fontFamily:
-              '"Satoshi", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            fontFamily: "var(--font-display)",
             fontSize: 32,
             fontWeight: 700,
             lineHeight: 1.1,
@@ -126,7 +128,8 @@ function SettingsContent() {
           }}
         >
           {workspace?.name ?? "—"} ·{" "}
-          {workspaceRole ? ROLE_LABEL[workspaceRole] : "—"} · 멤버 {memberCount}
+          {workspaceRole ? ROLE_LABEL[workspaceRole] : "—"} · 멤버{" "}
+          {memberCount ?? "—"}
         </p>
       </header>
 
@@ -143,7 +146,7 @@ function SettingsContent() {
             <Users className="w-4 h-4" aria-hidden />
             멤버
             <span
-              aria-label={`멤버 수 ${memberCount}`}
+              aria-label={`멤버 수 ${memberCount ?? "로딩 중"}`}
               style={{
                 ...MONO_STYLE,
                 fontSize: 11,
@@ -151,7 +154,7 @@ function SettingsContent() {
                 marginLeft: 2,
               }}
             >
-              {memberCount}
+              {memberCount ?? "—"}
             </span>
           </TabsTrigger>
           <TabsTrigger
@@ -161,7 +164,7 @@ function SettingsContent() {
             <Link2 className="w-4 h-4" aria-hidden />
             초대
             <span
-              aria-label={`활성 초대 ${activeInviteCount}`}
+              aria-label={`활성 초대 ${activeInviteCount ?? "로딩 중"}`}
               style={{
                 ...MONO_STYLE,
                 fontSize: 11,
@@ -169,7 +172,7 @@ function SettingsContent() {
                 marginLeft: 2,
               }}
             >
-              {activeInviteCount}
+              {activeInviteCount ?? "—"}
             </span>
           </TabsTrigger>
           <TabsTrigger
@@ -305,6 +308,19 @@ function SettingsContent() {
                 </p>
               </div>
             )}
+
+            {/* 위험 구역 — owner + team 워크스페이스만 (personal 은 BE 도 차단, I-19) */}
+            {isOwner &&
+              workspace &&
+              inferWorkspaceType({
+                name: workspace.name,
+                type: workspace.type,
+              }) === "team" && (
+                <DangerZone
+                  workspaceId={activeWorkspaceId}
+                  workspaceName={workspace.name}
+                />
+              )}
           </div>
         </TabsContent>
 

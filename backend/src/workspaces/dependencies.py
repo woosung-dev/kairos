@@ -14,10 +14,9 @@ from src.workspaces.service import WorkspaceService
 async def get_workspace_service(
     session: AsyncSession = Depends(get_async_session),
 ) -> WorkspaceService:
-    """동일 session을 workspace + user + project repo에 주입 (크로스 레포 트랜잭션)."""
+    """동일 session을 workspace + project repo에 주입 (크로스 레포 트랜잭션)."""
     return WorkspaceService(
         repo=WorkspaceRepository(session),
-        user_repo=UserRepository(session),
         project_repo=ProjectRepository(session),
     )
 

@@ -68,14 +68,28 @@ async def convert_to_wav(input_path: str) -> str:
     return output_path
 
 
+# PERF-r2-2: 요청마다 AsyncOpenAI 재생성 방지 — 모듈 싱글턴.
+# 캐시 키 = 생성자 identity: 테스트의 patch("...AsyncOpenAI") 를 그대로 지원.
+_openai_client_cache: tuple[object, AsyncOpenAI] | None = None
+
+
+def _get_openai_client() -> AsyncOpenAI:
+    global _openai_client_cache
+    ctor = AsyncOpenAI
+    if _openai_client_cache is None or _openai_client_cache[0] is not ctor:
+        settings = get_settings()
+        _openai_client_cache = (
+            ctor,
+            ctor(api_key=settings.openai_api_key.get_secret_value()),
+        )
+    return _openai_client_cache[1]
+
+
 class TranscriptionService:
     """Whisper API로 오디오 → 트랜스크립트 변환."""
 
     def __init__(self) -> None:
-        settings = get_settings()
-        self.client = AsyncOpenAI(
-            api_key=settings.openai_api_key.get_secret_value()
-        )
+        self.client = _get_openai_client()
 
     async def transcribe(
         self, audio_bytes: bytes, filename: str = "audio.mp3"

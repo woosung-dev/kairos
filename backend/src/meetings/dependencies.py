@@ -6,7 +6,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.actions.repository import ActionItemRepository
 from src.common.database import get_async_session, get_session_factory
-from src.common.r2 import R2Service
+from src.common.r2 import get_r2_service
 from src.meetings.pipeline_service import MeetingPipelineService
 from src.meetings.repository import MeetingRepository
 from src.meetings.service import MeetingService
@@ -38,7 +38,7 @@ def get_pipeline_service(
     """파이프라인 의존성. 세션 팩토리만 주입 — 실제 세션은 백그라운드 태스크 내부에서 생성."""
     return MeetingPipelineService(
         session_factory=session_factory,
-        r2_service=R2Service(),
+        r2_service=get_r2_service(),
         transcription_service=TranscriptionService(),
         ai_service=AIProcessingService(),
     )

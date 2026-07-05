@@ -224,14 +224,18 @@
 - ✅ **BUG-S28-PERF-RT-1** — User + Member cache. dashboard 4286→1586ms (commit `feacccc`, 11 test)
 - ✅ **PERF-2** — workspace_id 인덱스 3건 (alembic `be0e82ab810c`, commit `c8f777a`)
 
+**2026-07-05 team-collab-audit RESOLVED**:
+- ✅ **PERF-SSE-COMMIT (신규 발견, 최상위 병목)** — RAG 검색 read 트랜잭션이 Gemini 스트리밍(~10s) 내내 열려 커넥션 점유 → 동시 스트림 15개면 pool 고갈로 전체 API 블로킹. 스트리밍 진입 전 commit 으로 반납 (`rag/service.py`, 회귀 가드 `tests/rag/test_sse_connection_release.py` — 스트리밍 중 checkedout=0 검증, red-green 확인)
+- ✅ **멤버 목록 N+1 (신규 발견)** — `invite_service.list_members` 멤버당 `find_by_id` 루프 (header 가 전 페이지 호출) → `list_members_with_users` 단일 JOIN (`workspaces/repository.py`)
+- ✅ **PERF-1** — R2Service 공유 client (`_get_client` lazy + lock) + 모듈 싱글턴 `get_r2_service()` + main lifespan 래퍼에서 close (core→common 게이트 준수)
+- ✅ **PERF-r2-2** — AsyncOpenAI/genai.Client 모듈 싱글턴 (생성자 identity 캐시 — 테스트 patch 자가 복원, `embeddings/service.py`·`services/ai_processing.py`·`services/transcription.py`)
+- ✅ **PERF-5** — stale 종결: sse-starlette 2.x 가 `http.disconnect` 시 generator 자동 cancel — per-yield 체크 불필요
+- ✅ **PERF-r2-5** — `DB_POOL_SIZE`/`DB_MAX_OVERFLOW` env 설정화 (기본 5+10 유지). PERF-SSE-COMMIT 으로 주 고갈 원인 제거 — 상향은 Neon max_connections × 인스턴스 수 확인 후
+
 **잔존 carry**:
-- PERF-1 — `common/r2.py` R2Service singleton `_ensure_client()`
 - PERF-3 — `upload/router.py:91` streaming upload
-- PERF-5 — `rag/router.py` SSE `is_disconnected()` per-yield
-- PERF-r2-2 — RAG/meetings/memory/notes AI client lifespan singleton
-- PERF-r2-3 — `rag/service.py:112-131` hybrid search 병렬 await
+- PERF-r2-3 — `rag/service.py` hybrid search 병렬 await (동일 AsyncSession 공유 → 세션 2개 분리 재설계 필요, rag.timing 로그로 정당화되면 진행)
 - PERF-r2-4 잔여 — 1차 진입 lazy seed
-- PERF-r2-5 — connection pool 5+10=15 vs Cloud Run max-concurrency 80
 - BUG-S28-PERF-1 — list endpoints single SQL window 또는 cursor pagination (5 도메인)
 - BUG-S28-PERF-2 — Whisper API timeout 추가 spot (chunked_transcription)
 - BUG-S28-PERF-3 — meetings BG audio streaming download
@@ -240,7 +244,8 @@
 
 ## BL-S27e-D — 성능 P2/P3 cluster (Sprint 28 carry) ★ (P2/P3)
 
-- PERF-6/7/8/9/11/12 + PERF-r2-6~12 + BUG-S28-PERF-4~12 — promote cache wipe / cache cleanup cron / created_at 인덱스 / inbox N+1 / tiptap dynamic / refetchOnWindowFocus / lifespan singleton / BG task leak / member cache scope 등
+- PERF-6/7/8/11/12 + PERF-r2-6~12 + BUG-S28-PERF-4~12 — promote cache wipe / cache cleanup cron / created_at 인덱스 / BG task leak / member cache scope 등
+- 2026-07-05 team-collab-audit 정리: ✅ refetchOnWindowFocus 전역 false (`lib/query-client.tsx` — 탭 refocus 마다 앱 셸 7쿼리 재발화 × 인원수 증폭 차단) · ✅ PERF-9 "inbox N+1" 은 코드 반증(2쿼리+순수 변환)으로 종결 — 실제 N+1 은 멤버 목록이었고 BL-S27e-C 에서 해결 · ✅ tiptap dynamic 은 `/notes/[id]` 라우트 청크에만 포함 확인으로 종결 (대시보드 번들 무관)
 
 ---
 
@@ -2257,8 +2262,8 @@ Sprint 24 Wave 2 Phase 6 spike 결과: localhost 측정 BE 4 API 직렬 25ms (su
 
 ## BL-NEW-BE-PERF-PARALLEL-API — Dashboard 4 API 병렬화 (Sprint 25+)
 
-**상태**: 미시작 (carry-over from Sprint 24 Wave 2 T-BE-PERF spike)
-**우선순위**: P2
+**상태**: ✅ 종결 (2026-07-05 team-collab-audit) — activeWorkspaceId 가 zustand persist 라 재방문 시 앱 셸 쿼리들이 이미 병렬 발화 (uvicorn 로그 실측: workspaces/projects×2/inbox/members/onboarding 이 동시 burst). 워터폴은 최초 방문 1회뿐이며 Sprint 28 User/Member 캐시로 이미 1586ms 단축. 추가 작업 이득 없음.
+**우선순위**: ~~P2~~ 종결
 
 ### 배경
 dashboard 4 API (workspaces / members / meetings / inbox) 가 직렬 호출. workspaceId 의존 chain 검토 시 병렬화 가능 가능성. localhost 25ms → 12ms (~50%) 추정.

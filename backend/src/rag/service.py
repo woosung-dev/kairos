@@ -2,6 +2,7 @@
 """RAG 서비스 — 캐시 확인 → Hybrid Search → RRF → Gemini SSE."""
 import json
 import logging
+import time
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
@@ -60,8 +61,10 @@ class RagService:
         """
 
         # [1] 질문 임베딩
+        t_start = time.perf_counter()
         embeddings = await self.embedding_service.generate_embeddings([question])
         question_embedding = embeddings[0]
+        t_embed = time.perf_counter()
 
         # [2] Semantic Cache 확인 — BL-041: requester visibility 검증 포함
         # Codex F-2 fix (Sprint 24 Wave 2 P2): time_range filter 있을 때 cache skip.
@@ -172,6 +175,14 @@ class RagService:
         # [8] Generation (Gemini SSE) — SafetyFilter / API 오류 graceful degrade.
         # 5xx 대신 SSE error event + done event 송출 후 캐시 저장 skip.
         sources_text = self._format_sources_for_prompt(enriched)
+
+        # PERF-SSE-COMMIT: 검색 read 트랜잭션을 스트리밍 진입 전에 종료 — Gemini
+        # 스트리밍(수 초) 동안 DB 커넥션을 pool 에 반납. 동시 스트림 수만큼 커넥션이
+        # 잠기면 pool(15) 고갈로 전체 API 가 블로킹되는 것을 방지. 이후 cache save /
+        # onboarding 은 새 트랜잭션(autobegin) 으로 각자 commit.
+        await self.embedding_repo.commit()
+        t_search = time.perf_counter()
+
         full_answer = ""
         try:
             async for token in self.ai_service.stream_rag_answer(question, sources_text):
@@ -236,6 +247,16 @@ class RagService:
 
         # Sprint 22 OBN-02: 첫 RAG 성공 응답 — step=4 advance + onboarded_at set.
         await self._advance_onboarding(requester_user_id)
+
+        # BL-S27e-1 관측: stage 별 latency 분포 (p95 < 5s 목표 판단 근거)
+        t_llm = time.perf_counter()
+        logger.info(
+            "rag.timing embed=%.0fms search=%.0fms llm=%.0fms total=%.0fms",
+            (t_embed - t_start) * 1000,
+            (t_search - t_embed) * 1000,
+            (t_llm - t_search) * 1000,
+            (t_llm - t_start) * 1000,
+        )
 
         yield {
             "event": "done",

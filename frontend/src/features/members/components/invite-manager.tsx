@@ -15,11 +15,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { VISIBILITY_LABELS } from "@/lib/visibility";
 import type { ProjectVisibility } from "@/lib/visibility";
 
@@ -37,7 +38,7 @@ export function InviteManager({
   workspaceId,
   currentUserRole,
 }: InviteManagerProps) {
-  const { data: invites, isLoading } = useInvites(workspaceId);
+  const { data: invites, isLoading, isError, refetch } = useInvites(workspaceId);
   const createInvite = useCreateInvite(workspaceId);
   const deactivateInvite = useDeactivateInvite(workspaceId);
 
@@ -113,6 +114,23 @@ export function InviteManager({
     );
   }
 
+  if (isError) {
+    return (
+      <div
+        className="flex flex-col items-start gap-2 rounded-lg border p-4"
+        style={{ borderColor: "var(--border)" }}
+        role="alert"
+      >
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          초대 링크 목록을 불러오지 못했습니다. 네트워크 상태를 확인해주세요.
+        </p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>
+          다시 시도
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* 헤더 + 생성 버튼 */}
@@ -143,41 +161,38 @@ export function InviteManager({
               >
                 초대할 역할
               </label>
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  className="inline-flex items-center justify-between w-full px-3 py-2 text-sm rounded-md border cursor-pointer"
-                  style={{
-                    borderColor: "var(--border-subtle)",
-                    color: "var(--text-primary)",
-                  }}
+              {/* select 의미론 (listbox) — DropdownMenu(menu) 는 스크린리더에
+                  선택 컨트롤로 노출되지 않아 Select 로 교체 */}
+              <Select
+                value={newInviteRole}
+                onValueChange={(v) =>
+                  setNewInviteRole(v as Exclude<WorkspaceRole, "owner">)
+                }
+              >
+                <SelectTrigger
+                  className="w-full"
+                  aria-label="초대할 역할 선택"
                 >
-                  {newInviteRole === "admin"
-                    ? "Admin"
-                    : newInviteRole === "member"
-                      ? "Member"
-                      : "Viewer"}
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem
-                    className="cursor-pointer"
-                    onClick={() => setNewInviteRole("admin")}
-                  >
+                  <SelectValue>
+                    {newInviteRole === "admin"
+                      ? "Admin"
+                      : newInviteRole === "member"
+                        ? "Member"
+                        : "Viewer"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">
                     Admin — 멤버 초대/제거, 모든 콘텐츠 관리
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="cursor-pointer"
-                    onClick={() => setNewInviteRole("member")}
-                  >
+                  </SelectItem>
+                  <SelectItem value="member">
                     Member — 콘텐츠 생성/편집, AI 검색
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="cursor-pointer"
-                    onClick={() => setNewInviteRole("viewer")}
-                  >
+                  </SelectItem>
+                  <SelectItem value="viewer">
                     Viewer — 읽기 전용, AI 검색만
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
 
               {/* Sprint 6 FE-T5: default project visibility (시안 3A Two-Stack Radio) */}
               <label
@@ -186,37 +201,32 @@ export function InviteManager({
               >
                 기본 Project Visibility
               </label>
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  className="inline-flex items-center justify-between w-full px-3 py-2 text-sm rounded-md border cursor-pointer"
-                  style={{
-                    borderColor: "var(--border-subtle)",
-                    color: "var(--text-primary)",
-                  }}
+              <Select
+                value={newDefaultVisibility}
+                onValueChange={(v) =>
+                  setNewDefaultVisibility(v as ProjectVisibility)
+                }
+              >
+                <SelectTrigger
+                  className="w-full"
+                  aria-label="기본 Project Visibility 선택"
                 >
-                  {VISIBILITY_LABELS[newDefaultVisibility]}
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem
-                    className="cursor-pointer"
-                    onClick={() => setNewDefaultVisibility("public")}
-                  >
+                  <SelectValue>
+                    {VISIBILITY_LABELS[newDefaultVisibility]}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="public">
                     공개 — 워크스페이스 모든 멤버 접근
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="cursor-pointer"
-                    onClick={() => setNewDefaultVisibility("draft")}
-                  >
+                  </SelectItem>
+                  <SelectItem value="draft">
                     작업 중 — 작성자 + admin/owner만 접근
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="cursor-pointer"
-                    onClick={() => setNewDefaultVisibility("private")}
-                  >
+                  </SelectItem>
+                  <SelectItem value="private">
                     비공개 — 명시 멤버 + admin/owner만 접근
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <DialogFooter>
               <Button
@@ -283,17 +293,32 @@ export function InviteManager({
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <Badge variant="outline" className="text-xs">
-                  {invite.role}
+                {/* member-list 역할 뱃지와 동일 스타일 (대문자 + mono) */}
+                <Badge
+                  variant="outline"
+                  className="rounded-sm bg-transparent"
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 11,
+                    fontWeight: 500,
+                    letterSpacing: "0.04em",
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  {invite.role.toUpperCase()}
                 </Badge>
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 cursor-pointer"
+                  aria-label="초대 링크 복사"
                   onClick={() => handleCopy(invite.inviteUrl, invite.id)}
                 >
                   {copiedId === invite.id ? (
-                    <Check className="w-4 h-4 text-green-400" />
+                    <Check
+                      className="w-4 h-4"
+                      style={{ color: "var(--success)" }}
+                    />
                   ) : (
                     <Copy className="w-4 h-4" />
                   )}
@@ -301,7 +326,8 @@ export function InviteManager({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 cursor-pointer text-red-400 hover:text-red-300"
+                  className="h-8 w-8 cursor-pointer text-destructive hover:text-destructive"
+                  aria-label="초대 링크 비활성화"
                   onClick={() => setConfirmDeactivateId(invite.id)}
                 >
                   <Trash2 className="w-4 h-4" />

@@ -1,4 +1,6 @@
 import logging
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 import sentry_sdk
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -81,13 +83,26 @@ _is_production = (
     or settings.environment.lower() == "production"
 )
 
+# PERF-1: R2 공유 client 정리를 main 레벨 lifespan 래퍼에서 수행 —
+# core/lifespan 은 core→common allowlist 게이트(BUG-S28-ARCH-4) 상 common/r2
+# import 불가. lazy 생성이라 미사용 시 no-op.
+@asynccontextmanager
+async def _app_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    async with lifespan(app):
+        try:
+            yield
+        finally:
+            from src.common.r2 import get_r2_service
+            await get_r2_service().close()
+
+
 app = FastAPI(
     title="Kairos API",
     version="0.1.0",
     docs_url=None if _is_production else "/api/v1/docs",
     redoc_url=None if _is_production else "/api/v1/redoc",
     openapi_url=None if _is_production else "/api/v1/openapi.json",
-    lifespan=lifespan,
+    lifespan=_app_lifespan,
 )
 
 app.add_middleware(

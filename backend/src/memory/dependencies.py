@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.common.database import get_async_session, get_session_factory
-from src.common.r2 import R2Service
+from src.common.r2 import get_r2_service
 from src.memory.pipeline_service import MemoryPipelineService
 from src.memory.repository import MemoryRepository
 from src.memory.service import MemoryService
@@ -41,6 +41,6 @@ def get_memory_service(
         repo=MemoryRepository(session),
         workspace_repo=WorkspaceRepository(session),
         session_factory=session_factory,
-        r2_service=R2Service(),
+        r2_service=get_r2_service(),
         pipeline=pipeline,
     )

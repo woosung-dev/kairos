@@ -27,13 +27,11 @@ async def test_create_workspace_seeds_template_projects():
     saved_workspace.updated_at = datetime(2026, 4, 22)
     workspace_repo.save.return_value = saved_workspace
 
-    user_repo = AsyncMock()
     project_repo = AsyncMock()
     project_repo.save.side_effect = lambda p: p  # 저장 객체 그대로 반환
 
     service = WorkspaceService(
         repo=workspace_repo,
-        user_repo=user_repo,
         project_repo=project_repo,
     )
 

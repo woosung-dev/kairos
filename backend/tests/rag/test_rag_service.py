@@ -315,4 +315,5 @@ async def test_gemini_successful_answer_saves_cache():
         pass
 
     mock_repo.save_cache.assert_called_once()
-    mock_repo.commit.assert_called_once()
+    # PERF-SSE-COMMIT: 스트리밍 진입 전 커넥션 반납 commit + 캐시 저장 commit = 2회
+    assert mock_repo.commit.call_count == 2
