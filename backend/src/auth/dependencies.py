@@ -43,12 +43,35 @@ _USER_CACHE_TTL_SEC = 60.0
 _USER_CACHE_MAX_SIZE = 1000
 
 
+def _is_expired_orm_instance(instance: object) -> bool:
+    """live ORM 인스턴스가 expire 되어 `id` 속성 접근이 DetachedInstanceError 를 낼 상태인지.
+
+    비 ORM 객체(테스트 mock 등)는 False. rbac 멤버 캐시와 공용.
+    """
+    from sqlalchemy import inspect as _sa_inspect
+    from sqlalchemy.orm.state import InstanceState
+
+    state = _sa_inspect(instance, raiseerr=False)
+    if not isinstance(state, InstanceState):
+        return False
+    return bool(state.expired_attributes) or "id" not in instance.__dict__
+
+
 def _user_cache_get(clerk_id: str) -> User | None:
     entry = _USER_CACHE.get(clerk_id)
     if entry is None:
         return None
     user, expires_at = entry
     if time.time() >= expires_at:
+        _USER_CACHE.pop(clerk_id, None)
+        return None
+    if _is_expired_orm_instance(user):
+        # BUG-CACHE-DETACHED-EXPIRED (2026-07-05): 캐시는 live ORM 인스턴스를 보관하는데,
+        # 보관 후 원 세션 수명 이벤트(rollback 등)로 인스턴스가 expire+detach 되면 이후
+        # 모든 요청의 속성 접근이 DetachedInstanceError → 500 연쇄. miss 처리로 자가치유.
+        logging.getLogger(__name__).warning(
+            "user cache 에 expired-detached 인스턴스 감지 — drop (clerk_id=%s)", clerk_id
+        )
         _USER_CACHE.pop(clerk_id, None)
         return None
     return user

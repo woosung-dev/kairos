@@ -1,5 +1,6 @@
 # backend/src/auth/rbac.py
 """역할 기반 접근 제어 (RBAC). Depends()로 라우터에 주입."""
+import logging
 import time
 import uuid
 
@@ -22,12 +23,17 @@ ROLE_LEVEL: dict[str, int] = {
 
 # Sprint 28 BUG-S28-PERF-RT-1 fix — WorkspaceMember in-process TTL cache.
 # Round B 측정: dashboard 4 endpoint × RBAC SELECT × Neon RTT (1-2s) 가 fanout critical path
-# 의 큰 부분. JWT cache + User cache 와 동일 60s TTL 패턴. cache hit 시 SELECT 0.
+# 의 큰 부분. JWT cache + User cache 와 동일 TTL 패턴. cache hit 시 SELECT 0.
 # role 변경/제거 → invite_service 가 invalidate_member_cache() 호출로 즉시 반영
-# (BUG-RBAC-CACHE-STALE fix). 그 외 경로는 60s TTL 내 자연 만료.
+# (BUG-RBAC-CACHE-STALE fix). 단 invalidation 은 in-process 전용 — Cloud Run
+# max-instances=3 에서 타 인스턴스는 TTL 자연 만료에만 의존하므로 (Stage 2 #6, 2026-07-05):
+#   1) TTL 60s → 15s (cross-instance 읽기 stale 상한 축소)
+#   2) admin/owner 게이트는 캐시 bypass — 강등된 role 이 타 인스턴스에서 파괴적
+#      작업(멤버 관리·삭제·초대)을 통과하지 못하도록 항상 DB fresh 조회 (write-through).
 _MEMBER_CACHE: dict[tuple[uuid.UUID, uuid.UUID], tuple[WorkspaceMember, float]] = {}
-_MEMBER_CACHE_TTL_SEC = 60.0
+_MEMBER_CACHE_TTL_SEC = 15.0
 _MEMBER_CACHE_MAX_SIZE = 2000
+_CACHE_BYPASS_MIN_LEVEL = ROLE_LEVEL["admin"]
 
 
 def _member_cache_get(
@@ -39,6 +45,16 @@ def _member_cache_get(
         return None
     member, expires_at = entry
     if time.time() >= expires_at:
+        _MEMBER_CACHE.pop(key, None)
+        return None
+    from src.auth.dependencies import _is_expired_orm_instance
+
+    if _is_expired_orm_instance(member):
+        # BUG-CACHE-DETACHED-EXPIRED (2026-07-05): expire+detach 된 live ORM 인스턴스는
+        # 속성 접근 시 DetachedInstanceError → 500. miss 처리로 자가치유 (dependencies.py 동일).
+        logging.getLogger(__name__).warning(
+            "member cache 에 expired-detached 인스턴스 감지 — drop (ws=%s)", workspace_id
+        )
         _MEMBER_CACHE.pop(key, None)
         return None
     return member
@@ -59,7 +75,7 @@ def _member_cache_set(
 
 
 def invalidate_member_cache(workspace_id: uuid.UUID, user_id: uuid.UUID) -> None:
-    """role 변경 / member remove 직후 호출 권고 (60s 지연 회피)."""
+    """role 변경 / member remove 직후 호출 권고 (TTL 지연 회피, in-process 한정)."""
     _MEMBER_CACHE.pop((workspace_id, user_id), None)
 
 
@@ -87,7 +103,11 @@ class RoleChecker:
         session: AsyncSession = Depends(get_async_session),
     ) -> WorkspaceMember:
         # Sprint 28 BUG-S28-PERF-RT-1 — cache hit 시 SELECT 0.
-        member = _member_cache_get(workspace_id, current_user.id)
+        # admin/owner 게이트는 bypass — cross-instance stale role 로 파괴적 작업 차단.
+        bypass_cache = ROLE_LEVEL[self.min_role] >= _CACHE_BYPASS_MIN_LEVEL
+        member = (
+            None if bypass_cache else _member_cache_get(workspace_id, current_user.id)
+        )
         if member is None:
             repo = WorkspaceRepository(session)
             member = await repo.find_member(workspace_id, current_user.id)
