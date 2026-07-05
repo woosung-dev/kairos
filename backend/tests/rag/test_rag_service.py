@@ -1,6 +1,7 @@
 # backend/tests/rag/test_rag_service.py
 """RagService 단위 테스트 — RRF + 캐시 HIT/MISS."""
 import json
+import logging
 import uuid
 
 import pytest
@@ -317,3 +318,65 @@ async def test_gemini_successful_answer_saves_cache():
     mock_repo.save_cache.assert_called_once()
     # PERF-SSE-COMMIT: 스트리밍 진입 전 커넥션 반납 commit + 캐시 저장 commit = 2회
     assert mock_repo.commit.call_count == 2
+
+
+class _TimingLogCollector(logging.Handler):
+    """caplog 는 suite 전역 로깅 상태에 따라 유실될 수 있어 module logger 에 직접 부착."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.INFO)
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.messages.append(record.getMessage())
+
+
+@pytest.mark.asyncio
+async def test_rag_timing_log_includes_vector_text_fields():
+    """rag.timing 로그에 vector=/text= 개별 계측 필드 존재 (PERF-r2-3 판정 근거 가드)."""
+    mock_repo = AsyncMock()
+    mock_repo.find_similar_cache.return_value = None
+    mock_repo.vector_search.return_value = [
+        {"id": _uuid.uuid4(), "chunk_text": "콘텐츠", "score": 0.9, "source_type": "meeting"}
+    ]
+    mock_repo.text_search.return_value = []
+    mock_repo.find_chunks_by_ids.return_value = {}
+
+    mock_embedding_service = AsyncMock()
+    mock_embedding_service.generate_embeddings.return_value = [[0.1] * 1536]
+
+    mock_ai = AsyncMock()
+    mock_ai.stream_rag_answer = _make_async_iter("답변")
+
+    service = RagService(
+        embedding_repo=mock_repo,
+        embedding_service=mock_embedding_service,
+        ai_service=mock_ai,
+    )
+
+    collector = _TimingLogCollector()
+    rag_logger = logging.getLogger("src.rag.service")
+    old_level = rag_logger.level
+    old_disabled = rag_logger.disabled
+    rag_logger.addHandler(collector)
+    rag_logger.setLevel(logging.INFO)
+    # alembic env.py 의 fileConfig(disable_existing_loggers) 가 suite 내 기존 로거를
+    # disabled 로 만듦 (test_alembic_upgrade.py 선행 시) — 명시 복구.
+    rag_logger.disabled = False
+    try:
+        async for _event in service.ask(
+            "타이밍 질문?",
+            _uuid.uuid4(),
+            requester_user_id=_uuid.uuid4(),
+            requester_role="owner",
+        ):
+            pass
+    finally:
+        rag_logger.removeHandler(collector)
+        rag_logger.setLevel(old_level)
+        rag_logger.disabled = old_disabled
+
+    timing_lines = [m for m in collector.messages if "rag.timing" in m]
+    assert len(timing_lines) == 1
+    for field in ("embed=", "search=", "vector=", "text=", "llm=", "total="):
+        assert field in timing_lines[0]

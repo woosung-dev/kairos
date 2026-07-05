@@ -2,6 +2,25 @@
 
 > 이번 스프린트에서 구현하지 않고 제안으로만 기록. 우선순위는 팀 협업 가치 기준 추정.
 
+## 처리 현황 (2026-07-05 재평가 세션, 실측 기반 — branch `sprint/stage2-followup`)
+
+| # | 항목 | 처리 |
+|---|---|---|
+| 1 | 초대 승인 단계 | **제외** — 사용자 기결정(현행 유지) |
+| 2 | 초대 이메일 발송 | **제외** — 이메일/Clerk invitation 코드 0건, ADR-022/024 webhook SKIP 상태라 Clerk Production 컷오버 세션에 묶음 |
+| 3 | personal→team 승격 | **이연** — 의도적 lock-in(I-19) 유지, 외부 PLG 신호 후. 중간 단계 후보 = bulk promote |
+| 4 | FE visibility 셀렉터 | ✅ **구현** — create-project-dialog Select(기본 옵션="워크스페이스 기본값"=미전송, W-5 폴백 보존) + e2e T20 3케이스. 멤버 시드 prefill 은 BE 3계층 변경이라 후속 후보 |
+| 5 | Promotion review queue | **이연** — v1.7 로드맵 유지 |
+| 6 | RBAC 분산 캐시 | ✅ **경량안 구현** — Redis/DB버전 비교 후 기각(비용표는 세션 플랜 참조). admin/owner 게이트 캐시 bypass + TTL 60→15s. cross-instance 파괴 연산 창 0, 읽기 stale ≤15s (auth/CONTEXT.md §5.1) |
+| 7 | hybrid search 병렬화 | ❌ **실측 기각** — vector/text 분리 계측 후 n=20: 이득 p50=198ms < 판정선. PERF-r2-3 종결, 신규 레버 PERF-r2-6/7 등재 |
+| 8 | cursor pagination | **이연** — 데이터량 소, audit 도메인 cursor 레퍼런스 존재 확인 |
+| 9 | RAG p95<5s | 📊 **실측 확보** — n=20 분포로 BL-S27e-1 갱신. llm 비중 44%로 "LLM 지배" 반증, 레버 재서열화 |
+| 10 | soft delete + audit + last_active | **이연** — 백로그 P3 유지 |
+| 11 | 팀 e2e CI 통합 | ✅ **구현** — nightly-e2e.yml team step(T1~T20, workers=1) + trace artifact 분리. **사용자 작업**: GitHub secrets 4개(`QA_LOCAL_OWNER_EMAIL/PASSWORD`, `QA_LOCAL_MEMBER_EMAIL/PASSWORD`) 등록 후 workflow_dispatch 1회 실증 |
+| 12 | T-UI-1 햄버거 | **이연** — 기능 손실 0 재확인 |
+
+> 부수 발견·수정: BUG-CACHE-DETACHED-EXPIRED — User/Member in-process 캐시가 live ORM 인스턴스를 보관, expire+detach 시 전 요청 500 연쇄 (PR #135 members JOIN 이후 발현). 캐시 get 자가치유 가드 + 회귀 테스트 2건.
+
 ## A. 협업 기능 확장
 
 1. **초대 승인(approval) 단계** — 현재 링크 소지+로그인=즉시 가입. pending 멤버 상태 + owner/admin 승인 큐 도입 시 보안 강화. 사용자 결정으로 이번엔 현행 유지 (2026-07-05).

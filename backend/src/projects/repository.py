@@ -236,6 +236,21 @@ class ProjectRepository:
         return project
 
     async def delete(self, project: Project) -> None:
+        # BUG-PROJECT-DELETE-FK (2026-07-05 T20 발견): ondelete CASCADE 부재 + private
+        # 생성 시 creator ProjectMember 자동 추가(락아웃 fix)로 join 행이 상시 존재 —
+        # 같은 트랜잭션에서 join 행(멤버십/미팅 링크) 선삭제. 콘텐츠 FK 는 BL 별도.
+        await self.session.exec(
+            delete(ProjectMember).where(
+                ProjectMember.project_id == project.id,
+                ProjectMember.workspace_id == project.workspace_id,
+            )
+        )
+        await self.session.exec(
+            delete(MeetingProjectLink).where(
+                MeetingProjectLink.project_id == project.id,
+                MeetingProjectLink.workspace_id == project.workspace_id,
+            )
+        )
         await self.session.delete(project)
         await self.session.flush()
 

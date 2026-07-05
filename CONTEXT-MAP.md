@@ -93,7 +93,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 | I-20 | 벡터 컬럼 `halfvec(1536)` 고정 (ADR-020). `EmbeddingChunk.embedding` + `SemanticCache.question_embedding`. `Vector(1536)` 금지. 인덱스 = HNSW (m=16, ef_construction=64), ivfflat 금지. cosine `<=>` 유지 | `embeddings/models.py` + alembic |
 | I-21 | 벡터 검색 세션 변수 강제 (ADR-020): `SET LOCAL hnsw.ef_search=40 + iterative_scan='relaxed_order' + max_scan_tuples=20000`. `_apply_hnsw_session_params(session)` 헬퍼. pgvector ≥0.8 서버 + Python ≥0.4.2 | `embeddings/repository.py:_apply_hnsw_session_params` |
 
-> **회귀 가드 (2026-06-18)**: I-9/I-13/I-17/I-19 + §5 visibility + RBAC 4-cell + RAG private 누수 0 + revocation 캐시 즉시성 + promote 검색성은 멀티계정 e2e 회귀 스위트 `frontend/e2e/tests/team/`(T1~T18, owner+member 2-토큰 실 RBAC 관통, anti-hollow-green mutation-gated) 로 영구 고정. 로컬 게이트 `E2E_RUN_TEAM=true E2E_API_URL=http://localhost:8000 pnpm --dir frontend exec playwright test --project=team --workers=1` (BE :8000 단일 프로세스 + CORS `:3003`). 설계: `docs/plans/active/2026-06-18-team-spine-e2e-regression.md`.
+> **회귀 가드 (2026-06-18, 2026-07-05 T19~T20 확장)**: I-9/I-13/I-17/I-19 + §5 visibility + RBAC 4-cell + RAG private 누수 0 + revocation 캐시 즉시성 + promote 검색성 + ws 삭제 + 생성 다이얼로그 visibility(W-5 시드)는 멀티계정 e2e 회귀 스위트 `frontend/e2e/tests/team/`(T1~T20, owner+member 2-토큰 실 RBAC 관통, anti-hollow-green mutation-gated) 로 영구 고정. 로컬 게이트 `E2E_RUN_TEAM=true E2E_API_URL=http://localhost:8000 pnpm --dir frontend exec playwright test --project=team --workers=1` (BE :8000 단일 프로세스 + CORS `:3003`). 설계: `docs/plans/active/2026-06-18-team-spine-e2e-regression.md`.
 
 ## 7. 현재 부채
 

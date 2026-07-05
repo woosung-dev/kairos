@@ -145,6 +145,7 @@ jobs:
       # ── Heavy specs 만 실행 (meeting-upload) ──────────
       # rag-citation.spec.ts 는 삭제됨 — 팀 spine 회귀(e2e/tests/team/t15) 가 실 SSE 로 대체.
       - name: Run heavy Playwright specs
+        id: heavy
         working-directory: frontend
         env:
           CI: "true"
@@ -155,14 +156,53 @@ jobs:
           E2E_API_URL: ${{ env.LOCAL_API_URL }}
         run: pnpm e2e tests/meeting-upload.spec.ts
 
-      - name: Backend log on failure
-        if: failure()
-        run: cat /tmp/backend.log || true
-
-      - name: Upload traces on failure
-        if: failure()
+      - name: Upload heavy traces on failure
+        if: ${{ failure() && steps.heavy.outcome == 'failure' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: nightly-heavy-trace
           path: frontend/playwright-report/
           retention-days: 30
+
+      # ── 팀 spine 회귀 T1~T20 (Stage 2 #11, 2026-07-05) ──────────
+      # team-setup 이 owner/member 2계정 실 Clerk 로그인 + 시드 → team project 직렬 실행.
+      # 빈 CI DB 전제 충족: 첫 로그인 시 GET /users/me lazy seed 가 user + personal ws +
+      # member + onboarding step 을 생성 (별도 시드 step 불필요).
+      # heavy 실패와 독립 신호 유지를 위해 !cancelled() 로 실행.
+      # secrets 미등록 상태에서 nightly 신호를 깨지 않도록 게이트 (등록 전 자동 skip)
+      - name: Check team QA secrets
+        id: teamgate
+        if: ${{ !cancelled() }}
+        env:
+          QA_OWNER: ${{ secrets.QA_LOCAL_OWNER_EMAIL }}
+        run: echo "has=$([ -n "$QA_OWNER" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Run team spine specs (T1~T20)
+        id: team
+        if: ${{ !cancelled() && steps.teamgate.outputs.has == 'true' }}
+        timeout-minutes: 30
+        working-directory: frontend
+        env:
+          CI: "true"
+          E2E_PORT: "3003"
+          E2E_RUN_TEAM: "true"
+          E2E_API_URL: ${{ env.LOCAL_API_URL }}
+          QA_LOCAL_OWNER_EMAIL: ${{ secrets.QA_LOCAL_OWNER_EMAIL }}
+          QA_LOCAL_OWNER_PASSWORD: ${{ secrets.QA_LOCAL_OWNER_PASSWORD }}
+          QA_LOCAL_MEMBER_EMAIL: ${{ secrets.QA_LOCAL_MEMBER_EMAIL }}
+          QA_LOCAL_MEMBER_PASSWORD: ${{ secrets.QA_LOCAL_MEMBER_PASSWORD }}
+        run: pnpm e2e --project=team --workers=1
+
+      - name: Upload team traces on failure
+        if: ${{ !cancelled() && steps.team.outcome == 'failure' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: nightly-team-trace
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 30
+
+      - name: Backend log on failure
+        if: failure()
+        run: cat /tmp/backend.log || true

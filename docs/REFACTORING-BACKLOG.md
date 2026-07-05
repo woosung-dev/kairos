@@ -152,11 +152,11 @@
 
 ## BL-S27e-1 — RAG latency p95 < 5s 목표 + 모니터링 (Sprint 27d carry) ★ (P3)
 
-**현 상태**: Sprint 27d opus audit (agent-3 CTO) localhost dev 5 sample 평균 10.6s. Gemini `gemini-3.1-flash-lite` API 응답 시간이 지배적. 캐시 hit 률 / cold path 분포 미관측.
+**현 상태 (2026-07-05 실측 갱신, n=20 cold path, `scripts/rag_timing_bench.py`)**: total p50=5,721ms / p95=11,706ms. 구간 분해 — embed p50 294 / vector 1,594 / text 198 / search 합산 2,792 / llm 2,556ms. **"Gemini 지배적" 서사는 반증** — llm 비중 p50 44%, 검색 트랙(vector+enrich/commit RTT)이 대등. 캐시 hit 경로는 미계측 (timing 로그가 cold path 전용).
 
-**목표**: p95 < 5s. Sentry performance monitoring 도입 시 자동 추적 (ADR-021). 캐시 hit 률 + cold path 분포 모니터링.
+**목표**: p95 < 5s. 레버 우선순위 (실측 기반): ① PERF-r2-6 (SET LOCAL RTT 합침) ② PERF-r2-7 (enrich/commit RTT) ③ LLM first-token UX (이미 스트리밍 — 체감 개선은 스트리밍 시작점 앞당기기) ④ Sentry perf 도입 시 prod 분포 자동 추적 (ADR-021, DSN 발급 Blocked).
 
-**근거**: Sprint 27d opus audit BUG-S27d-6 (P3). 외부 dogfooding 시 UX 임계 임박.
+**근거**: Sprint 27d opus audit BUG-S27d-6 (P3) + 2026-07-05 Stage 2 재평가 실측. 외부 dogfooding 시 UX 임계 임박.
 
 ---
 
@@ -232,9 +232,13 @@
 - ✅ **PERF-5** — stale 종결: sse-starlette 2.x 가 `http.disconnect` 시 generator 자동 cancel — per-yield 체크 불필요
 - ✅ **PERF-r2-5** — `DB_POOL_SIZE`/`DB_MAX_OVERFLOW` env 설정화 (기본 5+10 유지). PERF-SSE-COMMIT 으로 주 고갈 원인 제거 — 상향은 Neon max_connections × 인스턴스 수 확인 후
 
+**2026-07-05 Stage 2 재평가 (실측 n=20, `scripts/rag_timing_bench.py`) 종결**:
+- ❌ **PERF-r2-3 — hybrid search 병렬화: 실측 기각.** rag.timing vector/text 분리 계측 후 20회 분포: vector p50=1,594ms / text p50=198ms → 병렬화 이득(=min(vector,text)) p50=**198ms** < 판정선(300ms 또는 total p50 5,721ms 의 10%=572ms). 세션 2개 분리 + pool 점유 +1 리스크 대비 이득 부족 — 종결. 재개 조건: 아래 PERF-r2-6/7 해소 후 text 구간이 커지는 데이터 변화 시.
+
 **잔존 carry**:
 - PERF-3 — `upload/router.py:91` streaming upload
-- PERF-r2-3 — `rag/service.py` hybrid search 병렬 await (동일 AsyncSession 공유 → 세션 2개 분리 재설계 필요, rag.timing 로그로 정당화되면 진행)
+- **PERF-r2-6 (신규, 2026-07-05 실측 발견)** — vector_search p50 1,594ms 가 text_search(198ms)의 8배. 유력 원인: `_apply_hnsw_session_params` 의 SET LOCAL 3문 = Neon RTT 3회 왕복 + HNSW 스캔. 후보: 3문을 단일 `SELECT set_config(...)×3` 로 합쳐 RTT 2회 절감 (~수백 ms, I-21 의미론 동일 — 헌법 문구 조정 필요해 별도 승인)
+- **PERF-r2-7 (신규, 2026-07-05 실측 발견)** — search 합산(p50 2,792ms) − vector(1,594) − text(198) ≈ **1,000ms** 가 RRF+enrich+commit 구간. enrich(`find_chunks_by_ids`)+commit 각 1 RTT — Neon RTT 지배 여부 분해 계측 후 대응
 - PERF-r2-4 잔여 — 1차 진입 lazy seed
 - BUG-S28-PERF-1 — list endpoints single SQL window 또는 cursor pagination (5 도메인)
 - BUG-S28-PERF-2 — Whisper API timeout 추가 spot (chunked_transcription)
