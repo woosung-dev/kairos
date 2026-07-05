@@ -235,10 +235,31 @@ class ProjectRepository:
         await self.session.flush()
         return project
 
+    async def count_content(
+        self, project_id: uuid.UUID, workspace_id: uuid.UUID
+    ) -> tuple[int, int]:
+        """BL-S27e-5: 삭제 차단 판정용 콘텐츠(노트/액션) 개수.
+
+        notes/action_items 는 projects 도메인 비소유 테이블이라 raw count 로 조회한다.
+        반환 (notes, actions). 둘 중 하나라도 >0 이면 service 가 409-block.
+        """
+        result = await self.session.execute(
+            text(
+                "SELECT "
+                "(SELECT COUNT(*) FROM notes "
+                " WHERE project_id = :pid AND workspace_id = :wid), "
+                "(SELECT COUNT(*) FROM action_items "
+                " WHERE project_id = :pid AND workspace_id = :wid)"
+            ),
+            {"pid": project_id, "wid": workspace_id},
+        )
+        notes, actions = result.one()
+        return int(notes), int(actions)
+
     async def delete(self, project: Project) -> None:
         # BUG-PROJECT-DELETE-FK (2026-07-05 T20 발견): ondelete CASCADE 부재 + private
         # 생성 시 creator ProjectMember 자동 추가(락아웃 fix)로 join 행이 상시 존재 —
-        # 같은 트랜잭션에서 join 행(멤버십/미팅 링크) 선삭제. 콘텐츠 FK 는 BL 별도.
+        # 같은 트랜잭션에서 join 행(멤버십/미팅 링크) 선삭제.
         await self.session.exec(
             delete(ProjectMember).where(
                 ProjectMember.project_id == project.id,
@@ -250,6 +271,37 @@ class ProjectRepository:
                 MeetingProjectLink.project_id == project.id,
                 MeetingProjectLink.workspace_id == project.workspace_id,
             )
+        )
+        # BL-S27e-5 파생/참조 FK 정리 (비소유 테이블 → raw text, workspaces cascade 패턴).
+        # notes/action_items(콘텐츠)는 service.delete_project 가 사전 count 로 409-block.
+        # embeddings/caches = DELETE: 재생성 가능한 파생 인덱스 + SET NULL 시 project_id
+        #   IS NULL 이 RAG visibility 필터를 무조건 통과 → private 청크 누수(헌법 위반)라
+        #   삭제로 원천 차단.
+        # inbox 제안 / promotion_audit 타깃 = SET NULL: 항목 자체는 워크스페이스에 보존,
+        #   죽은 프로젝트 포인터만 정리 (RAG 비대상이라 누수 없음).
+        await self.session.exec(
+            text(
+                "DELETE FROM embedding_chunks "
+                "WHERE project_id = :pid AND workspace_id = :wid"
+            ).bindparams(pid=project.id, wid=project.workspace_id)
+        )
+        await self.session.exec(
+            text(
+                "DELETE FROM semantic_caches "
+                "WHERE project_id = :pid AND workspace_id = :wid"
+            ).bindparams(pid=project.id, wid=project.workspace_id)
+        )
+        await self.session.exec(
+            text(
+                "UPDATE inbox_items SET ai_suggested_project_id = NULL "
+                "WHERE ai_suggested_project_id = :pid AND workspace_id = :wid"
+            ).bindparams(pid=project.id, wid=project.workspace_id)
+        )
+        await self.session.exec(
+            text(
+                "UPDATE promotion_audit SET target_project_id = NULL "
+                "WHERE target_project_id = :pid"
+            ).bindparams(pid=project.id)
         )
         await self.session.delete(project)
         await self.session.flush()

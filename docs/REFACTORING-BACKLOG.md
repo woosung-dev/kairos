@@ -150,7 +150,7 @@
 
 ---
 
-## BL-S27e-1 — RAG latency p95 < 5s 목표 + 모니터링 (Sprint 27d carry) ★ (P3, 진행 중 — p50 목표 달성 / p95 미달)
+## BL-S27e-1 — RAG latency p95 < 5s 목표 + 모니터링 (Sprint 27d carry) ★ (P3) ✅ **종결 (2026-07-05 — p50 목표 달성 / p95 꼬리는 쿼리-플랜 아님 수용)**
 
 **2026-07-05 후속 (PERF-r2-6 + r2-7 구현, branch `sprint/stage2-perf-r2`)** — n=20 cold, `scripts/rag_timing_bench.py` 8필드 계측 (enrich/commit 분해 추가):
 
@@ -167,9 +167,19 @@
 - **PERF-r2-6 (vector)**: SET LOCAL 3문 → 단일 set_config(...,true)×3. vector p50 1,672→1,350 (~2 RTT). bench 는 time_range 로 cache skip → 헬퍼 1회만 계측; 프로덕션(무필터)은 cache lookup+vector = 헬퍼 2회 → RTT 4회 절감(bench보다 큼).
 - **판정**: total p50 6,776→**4,742 (p50 목표 <5s 달성)** / p95 10,364→**6,485 (-37%, 여전히 >5s 미달)**. 개선이 시간대 노이즈 아님 — 내가 건드린 vector/enrich 2 구간만 이동, text/commit/llm 무변.
 
-**다음 레버 (p95 <5s 도달용)**: 잔여 p95 병목 = llm p95 3,302(스트리밍) + vector p95 2,196(HNSW 스캔 + visibility EXISTS 포스트필터). ① LLM first-token 체감(search 완료 즉시 첫 토큰) ② vector HNSW/visibility EXPLAIN 최적화 ③ Cloud Run min-instances 1 (BL-S27c-9) ④ Sentry perf prod 분포(ADR-021, DSN Blocked).
+**종결 근거 — vector EXPLAIN ANALYZE (2026-07-05, 실 Neon)**: 실 production 쿼리(visibility EXISTS 절 + set_config 3종)를 (a)visibility 포함 (b)미포함 으로 `EXPLAIN (ANALYZE, BUFFERS)` 비교. 최다 청크 workspace(L2=60) 기준:
 
-**근거**: Sprint 27d opus audit BUG-S27d-6 (P3) + 2026-07-05 Stage 2 재평가 + 본 후속 실측.
+| | Execution (cold) | Execution (warm, median n=5) |
+|---|---|---|
+| FULL (w/ visibility EXISTS) | 33.8ms | 0.25ms |
+| BASE (HNSW only) | 33.6ms | 0.53ms |
+| **visibility 포스트필터 비용** | **≈ +0.2ms** | **노이즈 수준** |
+
+→ HNSW 스캔(<35ms cold, <1ms warm) 도 visibility EXISTS(~0.2ms) 도 **p95 병목 아님**. vector p95 2,196ms 는 쿼리-플랜 비용이 아니라 **Neon 커넥션 cold + 왕복 오버헤드**(주 왕복은 PERF-r2-6 에서 이미 절감). **값싼 쿼리-레벨 win 없음** → 종결. (caveat: 현 데이터량 L2=60 소규모 — 데이터가 크게 늘어 HNSW 스캔 자체가 계측되면 재개.)
+
+**잔여 p95 = LLM 스트리밍(p95 3,302) + Neon cold 커넥션 수용.** min-instances=1(BL-S27c-9)은 cold-start 제거로 p95 개선하나 **상시 인스턴스 비용 = 비용 결정(엔지니어링 제외)**. LLM first-token 체감·Sentry perf 분포는 별도 트랙.
+
+**근거**: Sprint 27d opus audit BUG-S27d-6 (P3) + 2026-07-05 Stage 2 재평가 + PERF-r2-6/7 + 본 세션 EXPLAIN 실측.
 
 ---
 
@@ -209,24 +219,23 @@
 
 ---
 
-## BL-S27e-5 — project delete 콘텐츠 FK 정책 결정 (SET NULL vs 409) ★ (P2, 사용자 결정 대기)
+## BL-S27e-5 — project delete 콘텐츠 FK 정책 ★ (P2) ✅ **완료 (2026-07-05, `sprint/bl-s27e-5-project-delete-fk`)**
 
-**현 상태**: `projects/repository.py:delete()` 는 ProjectMember/MeetingProjectLink join 행만 선삭제(BUG-PROJECT-DELETE-FK, 2026-07-05). 콘텐츠 FK 는 미처리 — 프로젝트에 아래 참조가 하나라도 있으면 delete 시 NO ACTION FK 위반 → 미처리 IntegrityError → **HTTP 500**.
+**결정 (사용자 승인)**: 성격별 분리. 마이그레이션 0건 — FK 는 NO ACTION 유지, `repo.delete` 트랜잭션 내 app-level DELETE/UPDATE (workspaces cascade 와 동일 방식, 비소유 테이블은 raw `text()`).
 
-**FK 범위 (5 테이블, 모두 ondelete 없음 = NO ACTION)**: `notes.project_id`, `action_items.project_id`, `embedding_chunks.project_id`(단일+composite), `inbox.ai_suggested_project_id`, `memory.target_project_id`. → 완전한 해결은 5개 전부 커버 필요 (goal 4 원 범위 "notes/actions" 보다 넓음).
+**FK 범위 정정**: 백로그가 5테이블로 기재했으나 실제 `projects.id` 참조 콘텐츠/파생 = **6테이블** — `semantic_caches.project_id` 누락됨(안 다루면 500). "`memory.target_project_id`"는 실제 `promotion_audit.target_project_id`. (+ join 2: project_members/meeting_project_links 는 기존 선삭제.)
 
-**두 안 비교**:
-
-| | 409-block | SET NULL (detach) |
+| 테이블 | 성격 | 처리 |
 |---|---|---|
-| 동작 | 콘텐츠 있으면 삭제 거부 (409 + 개수 안내) | 5테이블 project_id NULL 후 삭제 |
-| UX | 명시적·안전, 마찰 有 (먼저 이동/삭제) | 마찰 0, 콘텐츠는 워크스페이스 레벨로 분리 |
-| visibility | 재배치 없음 → 추론 단순 | ⚠️ private 프로젝트 `embedding_chunks.project_id`→NULL 시 RAG 워크스페이스 스코프로 노출 가능 — 헌법 visibility 불변식 충돌 검토 필요 |
-| 비용 | pre-check count + 409 + FE 처리 (~6줄 + FE) | 5 UPDATE (repo.delete 트랜잭션 내) |
+| `notes.project_id`, `action_items.project_id` | 사용자 콘텐츠 | **409-block** (service pre-check count) |
+| `embedding_chunks.project_id`, `semantic_caches.project_id` | 파생 RAG 인덱스/캐시 | **DELETE** |
+| `inbox_items.ai_suggested_project_id`, `promotion_audit.target_project_id` | 참조 포인터 | **SET NULL** |
 
-**권고**: 409-block (visibility 안전 · 추론 단순). **사용자 결정 대기** — 다음 세션 착수.
+**SET NULL 이 embeddings 에 위험한 근거(실증)**: `embeddings/repository.py` visibility 필터 첫 분기가 `project_id IS NULL` → **무조건 통과**. embedding_chunks 에 visibility 컬럼 없음(부모 project JOIN 파생) → private 프로젝트 detach 시 청크가 워크스페이스 전 멤버 RAG 에 노출 = 헌법 "RAG private 누수 0"(CONTEXT-MAP.md:96) 위반. → DELETE 로 원천 차단.
 
-**근거**: 2026-07-05 Stage 2 follow-up goal 4 + Explore(FK 범위 확인). BUG-PROJECT-DELETE-FK 후속.
+**구현**: `projects/exceptions.py` ProjectHasContentError(409) · `projects/repository.py` `count_content()` + `delete()` 4문 추가 · `projects/service.py` delete_project pre-check 409. race 는 pre-check(asyncpg+greenlet 에서 try/except IntegrityError 회피, [[feedback_asyncpg_greenlet_precheck]]). **검증**: BE pytest 650 pass (신규 6: 409 block×2 / 파생 purge / 포인터 SET NULL / empty private / FK introspection 드리프트 가드). FE onError sonner toast (project-detail/dashboard). E2E `t21-project-delete.spec.ts`(nightly team, 콘텐츠 409→노트삭제 204 / empty 204). 마이그레이션 없음.
+
+**근거**: 2026-07-05 Stage 2 follow-up goal 4 이연분 + 본 세션 Explore(FK 6테이블 + visibility 누수 실증). BUG-PROJECT-DELETE-FK 후속.
 
 ---
 
