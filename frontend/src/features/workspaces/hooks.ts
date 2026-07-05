@@ -9,6 +9,7 @@ import {
   createWorkspace,
   fetchWorkspace,
   updateWorkspaceSettings,
+  deleteWorkspace,
 } from "./api";
 import type { Workspace } from "./types";
 
@@ -22,6 +23,8 @@ export function useWorkspaces() {
       if (!token) throw new Error("인증이 필요합니다");
       return fetchWorkspaces(token);
     },
+    // 권한 표면 — 전역 focus refetch off 에서 예외 (ws 삭제/가입 반영 지연 방지)
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -58,6 +61,30 @@ export function useWorkspace(wid: string | undefined) {
       return fetchWorkspace(token, wid!);
     },
     enabled: !!wid,
+  });
+}
+
+export function useDeleteWorkspace() {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (wid: string) => {
+      const token = await getToken();
+      if (!token) throw new Error("인증이 필요합니다");
+      await deleteWorkspace(token, wid);
+      return wid;
+    },
+    onSuccess: (wid: string) => {
+      queryClient.setQueryData<Workspace[]>(workspaceKeys.list(), (old) =>
+        old ? old.filter((ws) => ws.id !== wid) : old
+      );
+      queryClient.removeQueries({ queryKey: workspaceKeys.detail(wid) });
+      toast.success("워크스페이스가 삭제되었습니다");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "워크스페이스 삭제에 실패했습니다");
+    },
   });
 }
 

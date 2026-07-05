@@ -25,8 +25,24 @@ export async function createWorkspace(
 export async function fetchWorkspace(
   token: string,
   wid: string
-): Promise<{ id: string; name: string; inboxThreshold: number; memberCount: number }> {
+): Promise<{
+  id: string;
+  name: string;
+  type?: "personal" | "team";
+  inboxThreshold: number;
+  memberCount: number;
+}> {
   return apiClient(`/workspaces/${wid}`, { token });
+}
+
+export async function deleteWorkspace(
+  token: string,
+  wid: string
+): Promise<void> {
+  return apiClient<void>(`/workspaces/${wid}`, {
+    token,
+    method: "DELETE",
+  });
 }
 
 export async function updateWorkspaceSettings(
