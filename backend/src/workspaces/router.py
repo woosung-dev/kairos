@@ -51,3 +51,13 @@ async def update_workspace_settings(
     service: WorkspaceService = Depends(get_workspace_service),
 ):
     return await service.update_settings(workspace_id, data.inbox_threshold)
+
+
+@router.delete("/{workspace_id}", status_code=204)
+async def delete_workspace(
+    workspace_id: uuid.UUID,
+    member: WorkspaceMember = Depends(require_owner),
+    service: WorkspaceService = Depends(get_workspace_service),
+):
+    """워크스페이스 영구 삭제 (owner 전용, personal 차단, 산하 데이터 전체 cascade)."""
+    await service.delete_workspace(workspace_id)

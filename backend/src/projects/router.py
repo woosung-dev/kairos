@@ -89,7 +89,10 @@ async def create_project(
         title=data.title,
         created_by_id=member.user_id,
         description=data.description,
-        visibility=data.visibility,
+        # W-5: 미지정 시 초대에서 시드된 멤버 기본 visibility → 없으면 public
+        visibility=data.visibility
+        or member.default_project_visibility
+        or "public",
         tags=data.tags,
     )
 

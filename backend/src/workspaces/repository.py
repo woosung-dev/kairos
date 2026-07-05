@@ -7,11 +7,15 @@ deactivate_invite / increment_invite_use_count 모두 workspace_id 명시 + WHER
 """
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import delete, func, select, text, update
 
 from src.workspaces.models import Workspace, WorkspaceInvite, WorkspaceMember
+
+if TYPE_CHECKING:
+    from src.auth.models import User
 
 
 class WorkspaceRepository:
@@ -52,6 +56,52 @@ class WorkspaceRepository:
             .values(inbox_threshold=threshold, updated_at=datetime.utcnow())
         )
 
+    # DB 에 ondelete CASCADE 가 없어 FK 자식 → 부모 순서로 앱 레벨 삭제.
+    # feedback_entries 는 user-level 이라 삭제 대신 workspace_id NULL (컨텍스트만 해제).
+    # transcript_segments / meeting_summaries 는 workspace_id 컬럼이 없어 meeting 경유.
+    _CASCADE_DELETE_STATEMENTS = (
+        "DELETE FROM memory_ai_calls WHERE workspace_id = :ws",
+        "DELETE FROM promotion_audit"
+        " WHERE source_workspace_id = :ws OR target_workspace_id = :ws",
+        "DELETE FROM item_promotion_audit"
+        " WHERE source_workspace_id = :ws OR target_workspace_id = :ws",
+        "DELETE FROM memory_events WHERE workspace_id = :ws",
+        "DELETE FROM memory_items WHERE workspace_id = :ws",
+        "DELETE FROM memory_query_embedding_cache WHERE workspace_id = :ws",
+        "DELETE FROM semantic_caches WHERE workspace_id = :ws",
+        "DELETE FROM embedding_chunks WHERE workspace_id = :ws",
+        "DELETE FROM transcript_segments WHERE meeting_id IN"
+        " (SELECT id FROM meetings WHERE workspace_id = :ws)",
+        "DELETE FROM meeting_summaries WHERE meeting_id IN"
+        " (SELECT id FROM meetings WHERE workspace_id = :ws)",
+        "DELETE FROM action_items WHERE workspace_id = :ws",
+        "DELETE FROM meeting_project_links WHERE workspace_id = :ws",
+        "DELETE FROM inbox_items WHERE workspace_id = :ws",
+        "DELETE FROM notes WHERE workspace_id = :ws",
+        "DELETE FROM meetings WHERE workspace_id = :ws",
+        "DELETE FROM project_members WHERE workspace_id = :ws",
+        "DELETE FROM projects WHERE workspace_id = :ws",
+        "UPDATE feedback_entries SET workspace_id = NULL WHERE workspace_id = :ws",
+        "DELETE FROM workspace_invites WHERE workspace_id = :ws",
+        "DELETE FROM workspace_members WHERE workspace_id = :ws",
+        "DELETE FROM workspaces WHERE id = :ws",
+    )
+
+    async def delete_workspace_cascade(
+        self, workspace_id: uuid.UUID
+    ) -> list[uuid.UUID]:
+        """워크스페이스 + 산하 데이터 전체 삭제. commit 은 caller 책임 (단일 트랜잭션).
+
+        R2 객체는 여기서 지우지 않는다 — 트랜잭션 내 외부 IO 금지, r2-cleanup cron 위임.
+        반환: 삭제 전 멤버 user_id 목록 (RBAC 캐시 즉시 무효화용).
+        """
+        member_user_ids = [
+            m.user_id for m in await self.list_members(workspace_id)
+        ]
+        for stmt in self._CASCADE_DELETE_STATEMENTS:
+            await self.session.exec(text(stmt).bindparams(ws=workspace_id))
+        return member_user_ids
+
     # --- 멤버 관리 (Sprint 19 PR #1 C12: workspace_id 강제) ---
 
     async def find_member(
@@ -85,6 +135,22 @@ class WorkspaceRepository:
             )
         )).all())
 
+    async def list_members_with_users(
+        self, workspace_id: uuid.UUID
+    ) -> list[tuple[WorkspaceMember, "User | None"]]:
+        """멤버 + User 단일 JOIN — list_members 의 멤버당 find_by_id N+1 제거.
+
+        이 쿼리는 header(전 페이지) + useSyncWorkspaceRole 이 호출하는 hot path.
+        """
+        from src.auth.models import User
+
+        rows = (await self.session.exec(
+            select(WorkspaceMember, User)
+            .join(User, User.id == WorkspaceMember.user_id, isouter=True)
+            .where(WorkspaceMember.workspace_id == workspace_id)
+        )).all()
+        return list(rows)
+
     async def add_member(self, member: WorkspaceMember) -> WorkspaceMember | None:
         """멤버 추가 (race-safe). 이미 (workspace_id, user_id) 멤버면 None 반환.
 
@@ -98,8 +164,9 @@ class WorkspaceRepository:
         row = (await self.session.exec(
             text(
                 """
-                INSERT INTO workspace_members (id, workspace_id, user_id, role)
-                VALUES (:id, :workspace_id, :user_id, :role)
+                INSERT INTO workspace_members
+                    (id, workspace_id, user_id, role, default_project_visibility)
+                VALUES (:id, :workspace_id, :user_id, :role, :default_project_visibility)
                 ON CONFLICT (workspace_id, user_id) DO NOTHING
                 RETURNING id
                 """
@@ -108,6 +175,7 @@ class WorkspaceRepository:
                 workspace_id=member.workspace_id,
                 user_id=member.user_id,
                 role=member.role,
+                default_project_visibility=member.default_project_visibility,
             )
         )).one_or_none()
         if row is None:

@@ -10,7 +10,8 @@ VisibilityLiteral = Literal["public", "draft", "private"]
 class CreateProjectRequest(BaseModel):
     title: str
     description: str | None = None
-    visibility: VisibilityLiteral = "public"
+    # None = 미지정 → 멤버의 default_project_visibility 시드(W-5), 없으면 public
+    visibility: VisibilityLiteral | None = None
     tags: list[str] = Field(default_factory=list)
 
     model_config = {"populate_by_name": True}

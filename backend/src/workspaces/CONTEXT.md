@@ -30,6 +30,7 @@
   - `inbox_threshold`: float (default 0.9, PATCH 가능, I-10)
 - **WorkspaceMember** (`workspace_members`)
   - `role`: `owner` / `admin` / `member` / `viewer`
+  - `default_project_visibility`: `str | None` — 초대 수락 시 invite 에서 복사 (W-5). null = 워크스페이스 기본 `public`
   - **DB UNIQUE `(workspace_id, user_id)` = `uq_workspace_member`** (BUG-WS-MEMBER-UNIQUE, S28b) — lazy-seed/invite-accept 의 app-level `NOT EXISTS` 가드는 멀티워커(Cloud Run >1 인스턴스) interleave 에 backstop 없음 → DB 제약으로 중복 멤버십 차단
 - **WorkspaceInvite** (`workspace_invites`)
   - `code`: nanoid 12자리 (`unique`, indexed)
@@ -55,10 +56,10 @@
 | # | 불변식 |
 |---|---|
 | W-1 | **모든 Member / Invite 조회·변이는 `workspace_id` 필터 강제** (헌법 I-9 멀티테넌시) |
-| W-2 | **I-19 personal workspace = 1인 격리**: `type=='personal'` → owner 1명, `WorkspaceInvite` 발급 금지 + 멤버 추가 금지 (`invite_service.py:59-60,171-175`, `service.py:129-130` 에서 차단). ProjectMember 도 1명 (R5) |
-| W-3 | **역할 RBAC 4-cell** (`owner` / `admin` / `member` / `viewer`, ADR-025). admin 이상 = 멤버 초대/제거 + 역할 변경. owner 는 강등/제거 불가 대상 |
+| W-2 | **I-19 personal workspace = 1인 격리**: `type=='personal'` → owner 1명, `WorkspaceInvite` 발급 금지 + 멤버 추가 금지 (`invite_service.py` create/accept 에서 차단 — invite 가 유일한 멤버 추가 경로). ProjectMember 도 1명 (R5) |
+| W-3 | **역할 RBAC 4-cell** (`owner` / `admin` / `member` / `viewer`, ADR-025). admin 이상 = 멤버 초대/제거. **역할 변경은 owner 전용** (`member_router.py` `require_owner`). owner 는 강등/제거 불가 대상 |
 | W-4 | **I-10 inbox_threshold 워크스페이스별** (default 0.9, `PATCH /{workspace_id}/settings`). Inbox 자동 분류 confidence 임계값 |
-| W-5 | **초대 가입 시 `default_project_visibility` 시드** — 신규 멤버 기본 Project visibility (헌법 §5) |
+| W-5 | **초대 가입 시 `default_project_visibility` 시드** — accept 시 invite 값을 `WorkspaceMember.default_project_visibility` 로 복사, 프로젝트 생성 시 visibility 미지정이면 이 시드 적용 (`projects/router.py` 폴백 체인 `data.visibility → member 시드 → public`). private 생성 시 creator 는 ProjectMember 로 자동 추가 (락아웃 방지). (헌법 §5) |
 | W-6 | **I-13 prefix 예외**: `workspaces` 루트는 `/api/v1/workspaces` (워크스페이스 자체 CRUD). 하위 리소스(members/invites)는 `/api/v1/workspaces/{workspace_id}/...` 표준 |
 
 ---
@@ -71,10 +72,13 @@ POST   /                                   생성 (201, personal/team)
 GET    /                                   내 워크스페이스 목록
 GET    /{workspace_id}                     디테일
 PATCH  /{workspace_id}/settings            설정 변경 (inbox_threshold 등)
+DELETE /{workspace_id}                     영구 삭제 (204, owner 전용) — personal 차단 (W-2),
+                                           산하 데이터 앱 레벨 cascade (단일 트랜잭션),
+                                           R2 객체는 r2-cleanup cron 위임
 
 # /api/v1/workspaces/{workspace_id}/members
 GET    /                                   멤버 목록
-PATCH  /{member_id}                        역할 변경 (admin+)
+PATCH  /{member_id}                        역할 변경 (owner 전용)
 DELETE /{member_id}                        멤버 제거 (204, admin+)
 
 # /api/v1/workspaces/{workspace_id}/invites

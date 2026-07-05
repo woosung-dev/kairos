@@ -2,11 +2,9 @@
 """Workspace 서비스 — AsyncSession import 금지."""
 import uuid
 
-from src.auth.repository import UserRepository
-from src.common.exceptions import NotFoundError
 from src.projects.models import Project
 from src.projects.repository import ProjectRepository
-from src.workspaces.exceptions import MemberAlreadyExistsError, WorkspaceNotFoundError
+from src.workspaces.exceptions import WorkspaceNotFoundError
 from src.workspaces.models import Workspace, WorkspaceMember
 from src.workspaces.repository import WorkspaceRepository
 from src.workspaces.templates import DEFAULT_TEMPLATE_PROJECTS
@@ -16,11 +14,9 @@ class WorkspaceService:
     def __init__(
         self,
         repo: WorkspaceRepository,
-        user_repo: UserRepository,
         project_repo: ProjectRepository,
     ) -> None:
         self.repo = repo
-        self.user_repo = user_repo
         self.project_repo = project_repo
 
     async def create_workspace(
@@ -118,44 +114,23 @@ class WorkspaceService:
         await self.repo.commit()
         return {"inboxThreshold": inbox_threshold}
 
-    async def add_member(
-        self, workspace_id: uuid.UUID, email: str
-    ) -> dict:
-        """이메일로 사용자 찾아서 워크스페이스에 멤버로 추가."""
-        # 워크스페이스 존재 확인
+    async def delete_workspace(self, workspace_id: uuid.UUID) -> None:
+        """워크스페이스 삭제 (owner 전용은 라우터 require_owner 가 강제).
+
+        I-19: personal 은 lazy seed 무결성 보호를 위해 삭제 금지.
+        cascade 는 단일 트랜잭션 — 실패 시 전체 롤백.
+        """
         workspace = await self.repo.find_by_id(workspace_id)
         if workspace is None:
             raise WorkspaceNotFoundError()
-        # I-19: personal workspace는 1인 격리
         if getattr(workspace, "type", "team") == "personal":
             from src.workspaces.exceptions import PersonalWorkspaceProtected
-            raise PersonalWorkspaceProtected("멤버 추가")
+            raise PersonalWorkspaceProtected("워크스페이스 삭제")
 
-        # 이메일로 사용자 조회
-        user = await self.user_repo.find_by_email(email)
-        if user is None:
-            raise NotFoundError("해당 이메일의 사용자")
-
-        # 이미 멤버인지 확인
-        existing = await self.repo.find_member(workspace_id, user.id)
-        if existing is not None:
-            raise MemberAlreadyExistsError()
-
-        member = WorkspaceMember(
-            workspace_id=workspace_id,
-            user_id=user.id,
-            role="member",
-        )
-        # add_member 는 race-safe(ON CONFLICT) — 동시 추가로 이미 멤버면 None.
-        # 사전체크와 동일 semantics 로 409 (MemberAlreadyExistsError).
-        inserted = await self.repo.add_member(member)
-        if inserted is None:
-            raise MemberAlreadyExistsError()
-        member = inserted
+        member_user_ids = await self.repo.delete_workspace_cascade(workspace_id)
         await self.repo.commit()
 
-        return {
-            "id": str(member.id),
-            "userId": str(member.user_id),
-            "role": member.role,
-        }
+        # 삭제된 워크스페이스의 RBAC 캐시 즉시 무효화 (60s TTL 지연 회피)
+        from src.auth.rbac import invalidate_member_cache
+        for user_id in member_user_ids:
+            invalidate_member_cache(workspace_id, user_id)

@@ -75,6 +75,11 @@ class ProjectService:
         )
         project = await self.repo.save(project)
 
+        # private visibility 필터는 ProjectMember 만 통과 (creator 분기 없음, L-6)
+        # → creator 를 멤버로 추가하지 않으면 생성 직후 본인 프로젝트 404 락아웃.
+        if visibility == "private":
+            await self.repo.add_member(project.id, workspace_id, created_by_id)
+
         # Sprint 22 OBN-02: 첫 프로젝트 생성 시 onboarding step=2 (same transaction).
         # commit 이전 위치 — UPDATE rollback 방지.
         # graceful: hook 실패 시도 project 생성 흐름 보존 (CI E2E fail 학습).

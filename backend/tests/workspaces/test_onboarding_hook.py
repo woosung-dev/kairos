@@ -1,7 +1,6 @@
 # create_workspace path onboarding step=1 hook 검증 (Sprint 22 OBN-02)
 import pytest
 
-from src.auth.repository import UserRepository
 from src.onboarding.service import OnboardingService
 from src.projects.repository import ProjectRepository
 from src.workspaces.repository import WorkspaceRepository
@@ -14,10 +13,9 @@ async def test_create_team_workspace_sets_onboarding_step_1(
 ):
     """팀 워크스페이스 생성 경로 → onboarding step=1 advance."""
     ws_repo = WorkspaceRepository(integration_session)
-    user_repo = UserRepository(integration_session)
     project_repo = ProjectRepository(integration_session)
     service = WorkspaceService(
-        repo=ws_repo, user_repo=user_repo, project_repo=project_repo
+        repo=ws_repo, project_repo=project_repo
     )
 
     onboarding = OnboardingService(integration_session)
@@ -40,10 +38,9 @@ async def test_create_workspace_step_1_hook_is_idempotent(
     await integration_session.flush()
 
     ws_repo = WorkspaceRepository(integration_session)
-    user_repo = UserRepository(integration_session)
     project_repo = ProjectRepository(integration_session)
     service = WorkspaceService(
-        repo=ws_repo, user_repo=user_repo, project_repo=project_repo
+        repo=ws_repo, project_repo=project_repo
     )
 
     await service.create_workspace(name="두번째 팀", owner_id=auth_user.id)

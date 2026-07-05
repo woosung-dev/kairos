@@ -188,6 +188,8 @@ class InviteService:
             workspace_id=invite.workspace_id,
             user_id=user_id,
             role=invite.role,
+            # W-5: 신규 멤버의 프로젝트 생성 기본 visibility 시드
+            default_project_visibility=invite.default_project_visibility,
         )
         inserted = await self.repo.add_member(member)
         if inserted is None:
@@ -220,20 +222,19 @@ class InviteService:
     # --- 멤버 관리 ---
 
     async def list_members(self, workspace_id: uuid.UUID) -> list[dict]:
-        """워크스페이스 멤버 목록 (이메일, 이름 포함)."""
-        members = await self.repo.list_members(workspace_id)
-        result = []
-        for m in members:
-            user = await self.user_repo.find_by_id(m.user_id)
-            result.append({
+        """워크스페이스 멤버 목록 (이메일, 이름 포함). 단일 JOIN 쿼리 (N+1 제거)."""
+        rows = await self.repo.list_members_with_users(workspace_id)
+        return [
+            {
                 "id": str(m.id),
                 "userId": str(m.user_id),
                 "clerkId": user.clerk_id if user else None,
                 "email": user.email if user else None,
                 "displayName": user.display_name if user else None,
                 "role": m.role,
-            })
-        return result
+            }
+            for m, user in rows
+        ]
 
     async def update_member_role(
         self,
