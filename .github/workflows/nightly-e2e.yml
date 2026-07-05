@@ -164,7 +164,7 @@ jobs:
           path: frontend/playwright-report/
           retention-days: 30
 
-      # ── 팀 spine 회귀 T1~T20 (Stage 2 #11, 2026-07-05) ──────────
+      # ── 팀 spine 회귀 T1~T21 (Stage 2 #11, 2026-07-05 · T21 BL-S27e-5) ──────────
       # team-setup 이 owner/member 2계정 실 Clerk 로그인 + 시드 → team project 직렬 실행.
       # 빈 CI DB 전제 충족: 첫 로그인 시 GET /users/me lazy seed 가 user + personal ws +
       # member + onboarding step 을 생성 (별도 시드 step 불필요).
@@ -177,7 +177,7 @@ jobs:
           QA_OWNER: ${{ secrets.QA_LOCAL_OWNER_EMAIL }}
         run: echo "has=$([ -n "$QA_OWNER" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
-      - name: Run team spine specs (T1~T20)
+      - name: Run team spine specs (T1~T21)
         id: team
         if: ${{ !cancelled() && steps.teamgate.outputs.has == 'true' }}
         timeout-minutes: 30

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 from src.common.exceptions import AlreadyExistsError
 from src.projects.exceptions import (
     CrossWorkspaceMemberError,
+    ProjectHasContentError,
     ProjectNotFoundError,
     WorkspaceMismatchError,
 )
@@ -279,10 +280,22 @@ class ProjectService:
     async def delete_project(
         self, workspace_id: uuid.UUID, project_id: uuid.UUID
     ) -> None:
-        """프로젝트 삭제 (Codex F-1/F-4)."""
+        """프로젝트 삭제 (Codex F-1/F-4).
+
+        BL-S27e-5: 콘텐츠(notes/actions)가 연결돼 있으면 409-block (사전 count).
+        파생 FK(embeddings/caches DELETE, inbox/audit SET NULL)는 repo.delete 가
+        같은 트랜잭션에서 처리.
+        """
         project = await self.repo.find_by_id(project_id, workspace_id)
         if project is None:
             raise ProjectNotFoundError()
+        # ponytail: 콘텐츠 차단은 사전 count 로만. asyncpg+greenlet 에서 flush/commit
+        # 후 try/except IntegrityError 는 MissingGreenlet 으로 전파되어 불안정 →
+        # pre-check 선호 (feedback_asyncpg_greenlet_precheck). 사전 count~commit 사이
+        # 동시 INSERT 시에만 500(clean rollback, admin-only 라 희박) — 필요 시 SELECT FOR UPDATE.
+        notes, actions = await self.repo.count_content(project_id, workspace_id)
+        if notes or actions:
+            raise ProjectHasContentError(notes, actions)
         await self.repo.delete(project)
         await self.repo.commit()
 

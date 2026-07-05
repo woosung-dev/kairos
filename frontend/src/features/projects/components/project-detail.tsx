@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal, Mic, StickyNote, CheckCircle2, Search, FileText } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   AlertDialog,
@@ -329,6 +330,10 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
                     if (activeWorkspaceId) {
                       router.push(`/workspace/${activeWorkspaceId}/projects`);
                     }
+                  },
+                  onError: (err) => {
+                    // BL-S27e-5: 콘텐츠 연결 프로젝트는 409 → 사유 토스트, 다이얼로그 유지.
+                    toast.error(err instanceof Error ? err.message : "삭제 실패");
                   },
                 });
               }}

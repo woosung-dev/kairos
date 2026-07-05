@@ -96,7 +96,7 @@ DELETE /{project_id}                                        Meeting-Project 링�
 - archived 프로젝트의 콘텐츠 → RAG 검색 대상 유지 (조직 지식 베이스)
 - 멤버 0인 private 프로젝트 (Sprint 6) → owner만 접근
 - 태그 수동 수정 후 AI 재추천 → 사용자 태그 우선 (덮어쓰기 금지)
-- 프로젝트 삭제 → 관련 ActionItem은 `project_id=null` 처리 (orphan, §7 D-10)
+- 프로젝트 삭제 FK 정책 (BL-S27e-5, 2026-07-05): 콘텐츠(notes/action_items)가 있으면 **409-block**(`ProjectHasContentError`, 사전 count) — 먼저 삭제/이동. 파생 RAG(embedding_chunks/semantic_caches)는 `repo.delete` 트랜잭션 내 **DELETE**(SET NULL 시 `project_id IS NULL` 이 RAG visibility 필터 무조건 통과 = private 누수라 삭제로 차단). 참조 포인터(inbox_items.ai_suggested_project_id/promotion_audit.target_project_id)는 **SET NULL**(항목 보존). join(project_members/meeting_project_links)은 기존 선삭제. 마이그레이션 없음(FK NO ACTION 유지). 드리프트 가드 = `test_all_project_fk_tables_are_handled`.
 
 ---
 

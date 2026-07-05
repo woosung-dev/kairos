@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal, AlertTriangle, Mic, StickyNote, Rocket } from "lucide-react";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -340,6 +341,10 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
                   onSuccess: () => {
                     setDeleteAlertOpen(false);
                     router.push("/dashboard");
+                  },
+                  onError: (err) => {
+                    // BL-S27e-5: 콘텐츠 연결 프로젝트는 409 → 사유 토스트, 다이얼로그 유지.
+                    toast.error(err instanceof Error ? err.message : "삭제 실패");
                   },
                 });
               }}
