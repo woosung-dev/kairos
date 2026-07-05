@@ -59,6 +59,7 @@ _QUESTIONS = [
 _TIMING_RE = re.compile(
     r"rag\.timing embed=(?P<embed>\d+)ms search=(?P<search>\d+)ms "
     r"vector=(?P<vector>\d+)ms text=(?P<text>\d+)ms "
+    r"enrich=(?P<enrich>\d+)ms commit=(?P<commit>\d+)ms "
     r"llm=(?P<llm>\d+)ms total=(?P<total>\d+)ms"
 )
 
@@ -169,7 +170,7 @@ async def _run_bench(
         print("[abort] 수집된 rag.timing 0건 — 전 run 이 빈 결과/오류 경로.")
         return 1
 
-    fields = ["embed", "search", "vector", "text", "llm", "total"]
+    fields = ["embed", "search", "vector", "text", "enrich", "commit", "llm", "total"]
     gains = [min(s["vector"], s["text"]) for s in samples]
     llm_ratios = [s["llm"] / s["total"] * 100 for s in samples if s["total"] > 0]
 

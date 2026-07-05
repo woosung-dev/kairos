@@ -166,7 +166,10 @@ class RagService:
             return
 
         # [6] Context Enrichment — parent 청크 포함
+        # PERF-r2-7: enrich(find_chunks_by_ids 1 RTT) 개별 계측.
+        t0 = time.perf_counter()
         enriched = await self._enrich_context(fused)
+        enrich_ms = (time.perf_counter() - t0) * 1000
 
         # [7] search_results 이벤트
         sources_for_client = self._format_sources(enriched)
@@ -185,7 +188,10 @@ class RagService:
         # 스트리밍(수 초) 동안 DB 커넥션을 pool 에 반납. 동시 스트림 수만큼 커넥션이
         # 잠기면 pool(15) 고갈로 전체 API 가 블로킹되는 것을 방지. 이후 cache save /
         # onboarding 은 새 트랜잭션(autobegin) 으로 각자 commit.
+        # PERF-r2-7: commit(1 RTT) 개별 계측.
+        t0 = time.perf_counter()
         await self.embedding_repo.commit()
+        commit_ms = (time.perf_counter() - t0) * 1000
         t_search = time.perf_counter()
 
         full_answer = ""
@@ -257,11 +263,13 @@ class RagService:
         t_llm = time.perf_counter()
         logger.info(
             "rag.timing embed=%.0fms search=%.0fms vector=%.0fms text=%.0fms "
-            "llm=%.0fms total=%.0fms",
+            "enrich=%.0fms commit=%.0fms llm=%.0fms total=%.0fms",
             (t_embed - t_start) * 1000,
             (t_search - t_embed) * 1000,
             vector_ms,
             text_ms,
+            enrich_ms,
+            commit_ms,
             (t_llm - t_search) * 1000,
             (t_llm - t_start) * 1000,
         )

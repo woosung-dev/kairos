@@ -3,6 +3,7 @@
 import uuid
 from datetime import timedelta
 
+from sqlalchemy.orm import defer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import delete, select, text
 
@@ -27,11 +28,18 @@ TIME_RANGE_INTERVAL: dict[str, timedelta | None] = {
 
 
 async def _apply_hnsw_session_params(session: AsyncSession) -> None:
-    # Sprint 16 ADR-020 / CONTEXT-MAP I-21: 벡터 검색 트랜잭션 진입 시 SET LOCAL.
-    # pgvector >=0.8 의존. RBAC/visibility 포스트필터 결과 부족 자동 해소.
-    await session.execute(text("SET LOCAL hnsw.ef_search = 40"))
-    await session.execute(text("SET LOCAL hnsw.iterative_scan = 'relaxed_order'"))
-    await session.execute(text("SET LOCAL hnsw.max_scan_tuples = 20000"))
+    # Sprint 16 ADR-020 / CONTEXT-MAP I-21: 벡터 검색 트랜잭션 진입 시 세션 변수를
+    # 트랜잭션 로컬로 강제. PERF-r2-6: 3 SET LOCAL(=Neon RTT 3회) → 단일
+    # set_config(...,true)×3(=RTT 1회). set_config(name,val,is_local=true) 는
+    # SET LOCAL 과 의미 동일(트랜잭션 스코프). pgvector >=0.8 의존.
+    # RBAC/visibility 포스트필터 결과 부족 자동 해소.
+    await session.execute(
+        text(
+            "SELECT set_config('hnsw.ef_search', '40', true), "
+            "set_config('hnsw.iterative_scan', 'relaxed_order', true), "
+            "set_config('hnsw.max_scan_tuples', '20000', true)"
+        )
+    )
 
 
 class EmbeddingRepository:
@@ -325,13 +333,21 @@ class EmbeddingRepository:
     async def find_chunks_by_ids(
         self, ids: list[uuid.UUID]
     ) -> dict[uuid.UUID, EmbeddingChunk]:
-        """여러 청크를 한 번의 쿼리로 조회한다."""
+        """여러 청크를 한 번의 쿼리로 조회한다 (parent context enrich 전용).
+
+        PERF-r2-7: enrich 는 parent 의 chunk_text 만 사용한다. embedding(halfvec
+        1536) 컬럼은 미사용인데 fetch/역직렬화(TOAST detoast)가 tail 지연(같은
+        커넥션 실측 최대 ~3s)을 유발 — defer 로 SELECT 에서 제외한다. chunk_text 는
+        정상 로드되고 embedding 은 접근하지 않으므로 lazy-load(MissingGreenlet) 없음.
+        """
         if not ids:
             return {}
         return {
             c.id: c
             for c in (await self.session.exec(
-                select(EmbeddingChunk).where(EmbeddingChunk.id.in_(ids))
+                select(EmbeddingChunk)
+                .where(EmbeddingChunk.id.in_(ids))
+                .options(defer(EmbeddingChunk.embedding))
             )).all()
         }
 

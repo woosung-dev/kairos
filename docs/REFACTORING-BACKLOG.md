@@ -150,13 +150,26 @@
 
 ---
 
-## BL-S27e-1 — RAG latency p95 < 5s 목표 + 모니터링 (Sprint 27d carry) ★ (P3)
+## BL-S27e-1 — RAG latency p95 < 5s 목표 + 모니터링 (Sprint 27d carry) ★ (P3, 진행 중 — p50 목표 달성 / p95 미달)
 
-**현 상태 (2026-07-05 실측 갱신, n=20 cold path, `scripts/rag_timing_bench.py`)**: total p50=5,721ms / p95=11,706ms. 구간 분해 — embed p50 294 / vector 1,594 / text 198 / search 합산 2,792 / llm 2,556ms. **"Gemini 지배적" 서사는 반증** — llm 비중 p50 44%, 검색 트랙(vector+enrich/commit RTT)이 대등. 캐시 hit 경로는 미계측 (timing 로그가 cold path 전용).
+**2026-07-05 후속 (PERF-r2-6 + r2-7 구현, branch `sprint/stage2-perf-r2`)** — n=20 cold, `scripts/rag_timing_bench.py` 8필드 계측 (enrich/commit 분해 추가):
 
-**목표**: p95 < 5s. 레버 우선순위 (실측 기반): ① PERF-r2-6 (SET LOCAL RTT 합침) ② PERF-r2-7 (enrich/commit RTT) ③ LLM first-token UX (이미 스트리밍 — 체감 개선은 스트리밍 시작점 앞당기기) ④ Sentry perf 도입 시 prod 분포 자동 추적 (ADR-021, DSN 발급 Blocked).
+| stage | before p50 | after p50 | before p95 | after p95 |
+|---|---|---|---|---|
+| vector | 1,672 | **1,350** | 2,346 | **2,196** |
+| text | 201 | 192 | 248 | 248 |
+| enrich | 1,700 | **194** | 3,048 | **230** |
+| commit | 200 | 190 | 220 | 200 |
+| llm | 2,530 | 2,465 | 3,157 | 3,302 |
+| **total** | **6,776** | **4,742** | **10,364** | **6,485** |
 
-**근거**: Sprint 27d opus audit BUG-S27d-6 (P3) + 2026-07-05 Stage 2 재평가 실측. 외부 dogfooding 시 UX 임계 임박.
+- **PERF-r2-7 (enrich — 최대 레버)**: 분해 계측이 원인을 재지정. 잔여 ~1,000ms 는 commit(1 RTT, 190ms)이 아니라 **enrich(1,700ms)**. 근본 원인 = `find_chunks_by_ids` 가 미사용 `embedding`(halfvec 1536) 컬럼까지 fetch/역직렬화(TOAST detoast) → 같은 커넥션 실측 full=3,450ms vs trim=194ms(μs 간격, RTT 아닌 데이터 증명). `defer(EmbeddingChunk.embedding)` 로 SELECT 제외 → enrich p50 1,700→194 / p95 3,048→230. ("배치/왕복 합침" 가설이 아니라 컬럼 트림이 실제 해법.)
+- **PERF-r2-6 (vector)**: SET LOCAL 3문 → 단일 set_config(...,true)×3. vector p50 1,672→1,350 (~2 RTT). bench 는 time_range 로 cache skip → 헬퍼 1회만 계측; 프로덕션(무필터)은 cache lookup+vector = 헬퍼 2회 → RTT 4회 절감(bench보다 큼).
+- **판정**: total p50 6,776→**4,742 (p50 목표 <5s 달성)** / p95 10,364→**6,485 (-37%, 여전히 >5s 미달)**. 개선이 시간대 노이즈 아님 — 내가 건드린 vector/enrich 2 구간만 이동, text/commit/llm 무변.
+
+**다음 레버 (p95 <5s 도달용)**: 잔여 p95 병목 = llm p95 3,302(스트리밍) + vector p95 2,196(HNSW 스캔 + visibility EXISTS 포스트필터). ① LLM first-token 체감(search 완료 즉시 첫 토큰) ② vector HNSW/visibility EXPLAIN 최적화 ③ Cloud Run min-instances 1 (BL-S27c-9) ④ Sentry perf prod 분포(ADR-021, DSN Blocked).
+
+**근거**: Sprint 27d opus audit BUG-S27d-6 (P3) + 2026-07-05 Stage 2 재평가 + 본 후속 실측.
 
 ---
 
@@ -193,6 +206,27 @@
 **Round 1 cited 가설 (stale)**: storageState 단일 공유 + onboarding localStorage race — Sprint 27d codex audit CODEX-OBS-1 의 추정. Round 2 의 CI history 재검증 (`gh run list --workflow=test.yml --limit 30 since 2026-05-21`) 결과 main 가지 5/5 PASS / flake rate 0% — 추정 false 확정.
 
 **근거**: Sprint 27e Round 2 test-coverage-findings-r2.md §3 CI flake 정량. P3 유지.
+
+---
+
+## BL-S27e-5 — project delete 콘텐츠 FK 정책 결정 (SET NULL vs 409) ★ (P2, 사용자 결정 대기)
+
+**현 상태**: `projects/repository.py:delete()` 는 ProjectMember/MeetingProjectLink join 행만 선삭제(BUG-PROJECT-DELETE-FK, 2026-07-05). 콘텐츠 FK 는 미처리 — 프로젝트에 아래 참조가 하나라도 있으면 delete 시 NO ACTION FK 위반 → 미처리 IntegrityError → **HTTP 500**.
+
+**FK 범위 (5 테이블, 모두 ondelete 없음 = NO ACTION)**: `notes.project_id`, `action_items.project_id`, `embedding_chunks.project_id`(단일+composite), `inbox.ai_suggested_project_id`, `memory.target_project_id`. → 완전한 해결은 5개 전부 커버 필요 (goal 4 원 범위 "notes/actions" 보다 넓음).
+
+**두 안 비교**:
+
+| | 409-block | SET NULL (detach) |
+|---|---|---|
+| 동작 | 콘텐츠 있으면 삭제 거부 (409 + 개수 안내) | 5테이블 project_id NULL 후 삭제 |
+| UX | 명시적·안전, 마찰 有 (먼저 이동/삭제) | 마찰 0, 콘텐츠는 워크스페이스 레벨로 분리 |
+| visibility | 재배치 없음 → 추론 단순 | ⚠️ private 프로젝트 `embedding_chunks.project_id`→NULL 시 RAG 워크스페이스 스코프로 노출 가능 — 헌법 visibility 불변식 충돌 검토 필요 |
+| 비용 | pre-check count + 409 + FE 처리 (~6줄 + FE) | 5 UPDATE (repo.delete 트랜잭션 내) |
+
+**권고**: 409-block (visibility 안전 · 추론 단순). **사용자 결정 대기** — 다음 세션 착수.
+
+**근거**: 2026-07-05 Stage 2 follow-up goal 4 + Explore(FK 범위 확인). BUG-PROJECT-DELETE-FK 후속.
 
 ---
 
@@ -237,8 +271,8 @@
 
 **잔존 carry**:
 - PERF-3 — `upload/router.py:91` streaming upload
-- **PERF-r2-6 (신규, 2026-07-05 실측 발견)** — vector_search p50 1,594ms 가 text_search(198ms)의 8배. 유력 원인: `_apply_hnsw_session_params` 의 SET LOCAL 3문 = Neon RTT 3회 왕복 + HNSW 스캔. 후보: 3문을 단일 `SELECT set_config(...)×3` 로 합쳐 RTT 2회 절감 (~수백 ms, I-21 의미론 동일 — 헌법 문구 조정 필요해 별도 승인)
-- **PERF-r2-7 (신규, 2026-07-05 실측 발견)** — search 합산(p50 2,792ms) − vector(1,594) − text(198) ≈ **1,000ms** 가 RRF+enrich+commit 구간. enrich(`find_chunks_by_ids`)+commit 각 1 RTT — Neon RTT 지배 여부 분해 계측 후 대응
+- ✅ **PERF-r2-6 (2026-07-05 RESOLVED, `sprint/stage2-perf-r2`)** — `_apply_hnsw_session_params` 3 SET LOCAL → 단일 set_config(...,true)×3 (RTT 2회 절감). vector p50 1,672→1,350. I-21/E-8/ADR-020 문구 동기화(메커니즘 무관 표현, 사용자 승인). SHOW 기반 회귀 테스트 4건 green. BL-S27e-1 표 참조.
+- ✅ **PERF-r2-7 (2026-07-05 RESOLVED, `sprint/stage2-perf-r2`)** — 분해 계측 결과 잔여 ~1,000ms 는 commit(1 RTT, 190ms)이 아니라 **enrich(1,700ms)**: `find_chunks_by_ids` 가 미사용 halfvec `embedding` 컬럼까지 fetch. `defer(embedding)` 로 enrich p50 1,700→194 / p95 3,048→230. rag.timing 에 enrich/commit 필드 상시 추가(bench regex 동기화). BL-S27e-1 표 참조.
 - PERF-r2-4 잔여 — 1차 진입 lazy seed
 - BUG-S28-PERF-1 — list endpoints single SQL window 또는 cursor pagination (5 도메인)
 - BUG-S28-PERF-2 — Whisper API timeout 추가 spot (chunked_transcription)
