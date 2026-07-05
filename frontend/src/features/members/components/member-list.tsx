@@ -55,7 +55,7 @@ interface MemberListProps {
 }
 
 export function MemberList({ workspaceId, currentUserRole }: MemberListProps) {
-  const { data: members, isLoading } = useMembers(workspaceId);
+  const { data: members, isLoading, isError, refetch } = useMembers(workspaceId);
   const updateRole = useUpdateMemberRole(workspaceId);
   const removeMember = useRemoveMember(workspaceId);
 
@@ -85,6 +85,23 @@ export function MemberList({ workspaceId, currentUserRole }: MemberListProps) {
         {[1, 2, 3].map((i) => (
           <Skeleton key={i} className="h-14 rounded-lg" />
         ))}
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div
+        className="flex flex-col items-start gap-2 rounded-lg border p-4"
+        style={{ borderColor: "var(--border)" }}
+        role="alert"
+      >
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          멤버 목록을 불러오지 못했습니다. 네트워크 상태를 확인해주세요.
+        </p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>
+          다시 시도
+        </Button>
       </div>
     );
   }
@@ -137,8 +154,7 @@ export function MemberList({ workspaceId, currentUserRole }: MemberListProps) {
                   variant="outline"
                   className="gap-1 rounded-sm bg-transparent"
                   style={{
-                    fontFamily:
-                      '"Geist Mono", ui-monospace, "SF Mono", Menlo, Monaco, monospace',
+                    fontFamily: "var(--font-mono)",
                     fontSize: 11,
                     fontWeight: 500,
                     letterSpacing: "0.04em",
@@ -155,6 +171,7 @@ export function MemberList({ workspaceId, currentUserRole }: MemberListProps) {
                 {!isCurrentOwner && (isOwner || isAdmin) && (
                   <DropdownMenu>
                     <DropdownMenuTrigger
+                      aria-label={`${member.displayName ?? member.email ?? "멤버"} 관리 메뉴`}
                       className="inline-flex items-center justify-center h-8 w-8 rounded-md cursor-pointer transition-colors duration-150 hover:bg-[var(--surface-active)]"
                     >
                       <MoreHorizontal className="w-4 h-4" style={{ color: "var(--text-secondary)" }} />
@@ -191,7 +208,8 @@ export function MemberList({ workspaceId, currentUserRole }: MemberListProps) {
                       )}
                       {isAdmin && (
                         <DropdownMenuItem
-                          className="cursor-pointer text-red-400 focus:text-red-400"
+                          variant="destructive"
+                          className="cursor-pointer"
                           onClick={() => handleRemove(member)}
                         >
                           멤버 제거

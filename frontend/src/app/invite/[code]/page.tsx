@@ -10,6 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { useInviteInfo, useAcceptInvite } from "@/features/members/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 
+// role 원문(소문자 영문) 노출 방지 — 한국어 라벨 매핑
+const ROLE_JOIN_LABELS: Record<string, string> = {
+  admin: "관리자(Admin)",
+  member: "멤버(Member)",
+  viewer: "뷰어(Viewer)",
+};
+
 export default function InvitePage({
   params,
 }: {
@@ -18,7 +25,7 @@ export default function InvitePage({
   const { code } = use(params);
   const router = useRouter();
   const { isSignedIn } = useAuth();
-  const { data: info, isLoading } = useInviteInfo(code);
+  const { data: info, isLoading, isError, refetch } = useInviteInfo(code);
   const acceptInvite = useAcceptInvite();
   const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId);
 
@@ -48,6 +55,45 @@ export default function InvitePage({
     );
   }
 
+  // 네트워크/서버 오류 — "무효한 초대" 와 구분 (유효한 초대가 무효로 보이면
+  // 팀 온보딩 깔때기가 여기서 끊긴다). 재시도 제공.
+  if (isError) {
+    return (
+      <main
+        id="main-content"
+        className="min-h-dvh flex items-center justify-center px-4"
+        style={{ background: "var(--background)" }}
+      >
+        <Card className="w-full max-w-sm" style={{ background: "var(--surface)" }}>
+          <CardContent className="pt-8 pb-6 px-6 text-center space-y-4">
+            <XCircle
+              className="w-8 h-8 mx-auto"
+              style={{ color: "var(--text-muted)" }}
+            />
+            <div className="space-y-1.5">
+              <h1
+                className="text-lg font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                일시적인 오류가 발생했습니다
+              </h1>
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                초대 정보를 불러오지 못했습니다. 네트워크 상태를 확인하고 다시
+                시도해주세요.
+              </p>
+            </div>
+            <Button
+              className="w-full cursor-pointer"
+              onClick={() => refetch()}
+            >
+              다시 시도
+            </Button>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+
   return (
     <main
       id="main-content"
@@ -58,7 +104,7 @@ export default function InvitePage({
         <CardContent className="pt-8 pb-6 px-6 text-center space-y-5">
           {/* 아이콘 */}
           <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto"
+            className="w-14 h-14 rounded-lg flex items-center justify-center mx-auto"
             style={{ background: "var(--surface-active)" }}
           >
             <Users className="w-7 h-7" style={{ color: "var(--accent)" }} />
@@ -86,7 +132,7 @@ export default function InvitePage({
 
               {/* 역할 뱃지 */}
               <Badge variant="secondary" className="text-xs">
-                {info.role} 역할로 참여
+                {ROLE_JOIN_LABELS[info.role] ?? info.role} 역할로 참여
               </Badge>
 
               {/* 수락 버튼 */}
@@ -130,7 +176,11 @@ export default function InvitePage({
 
               {/* 에러 메시지 */}
               {acceptInvite.isError && (
-                <p className="text-xs text-red-400">
+                <p
+                  className="text-xs"
+                  style={{ color: "var(--error)" }}
+                  role="alert"
+                >
                   {(acceptInvite.error as Error)?.message ??
                     "참여에 실패했습니다. 다시 시도해주세요."}
                 </p>
@@ -140,7 +190,10 @@ export default function InvitePage({
             /* 무효한 초대 */
             <>
               <div className="space-y-1.5">
-                <XCircle className="w-8 h-8 mx-auto text-red-400 mb-2" />
+                <XCircle
+                  className="w-8 h-8 mx-auto mb-2"
+                  style={{ color: "var(--error)" }}
+                />
                 <h1
                   className="text-lg font-semibold"
                   style={{ color: "var(--text-primary)" }}
