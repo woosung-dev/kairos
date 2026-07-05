@@ -122,6 +122,8 @@ class RagService:
 
         # [4] Hybrid Search — visibility filter 포함 (ISSUE-040)
         # Sprint 24 Wave 2 T-RAG-TIME-FILTER: time_range chain 전달.
+        # PERF-r2-3 판정 근거: vector/text 개별 계측 (병렬화 이득 = min(vector, text)).
+        t0 = time.perf_counter()
         vector_results = await self.embedding_repo.vector_search(
             question_embedding,
             workspace_id,
@@ -132,6 +134,8 @@ class RagService:
             time_range=time_range,
             limit=50,
         )
+        vector_ms = (time.perf_counter() - t0) * 1000
+        t0 = time.perf_counter()
         text_results = await self.embedding_repo.text_search(
             question,
             workspace_id,
@@ -142,6 +146,7 @@ class RagService:
             time_range=time_range,
             limit=50,
         )
+        text_ms = (time.perf_counter() - t0) * 1000
 
         # [5] RRF 융합
         fused = self._reciprocal_rank_fusion(text_results, vector_results, top_n=10)
@@ -251,9 +256,12 @@ class RagService:
         # BL-S27e-1 관측: stage 별 latency 분포 (p95 < 5s 목표 판단 근거)
         t_llm = time.perf_counter()
         logger.info(
-            "rag.timing embed=%.0fms search=%.0fms llm=%.0fms total=%.0fms",
+            "rag.timing embed=%.0fms search=%.0fms vector=%.0fms text=%.0fms "
+            "llm=%.0fms total=%.0fms",
             (t_embed - t_start) * 1000,
             (t_search - t_embed) * 1000,
+            vector_ms,
+            text_ms,
             (t_llm - t_search) * 1000,
             (t_llm - t_start) * 1000,
         )
