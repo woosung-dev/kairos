@@ -15,12 +15,28 @@ from src.embeddings.repository import EmbeddingRepository
 
 logger = logging.getLogger(__name__)
 
+# PERF-r2-2: 요청마다 AsyncOpenAI 재생성(TLS/커넥션 풀 재수립) 방지 — 모듈 싱글턴.
+# 캐시 키 = 생성자 identity: 테스트가 AsyncOpenAI 를 patch 하면 자동으로 새(mock)
+# 클라이언트를 만들고, patch 해제 후엔 실 클라이언트로 자가 복원 (테스트 진입점 보존).
+_openai_client_cache: tuple[object, AsyncOpenAI] | None = None
+
+
+def _get_openai_client() -> AsyncOpenAI:
+    global _openai_client_cache
+    ctor = AsyncOpenAI
+    if _openai_client_cache is None or _openai_client_cache[0] is not ctor:
+        settings = get_settings()
+        _openai_client_cache = (
+            ctor,
+            ctor(api_key=settings.openai_api_key.get_secret_value()),
+        )
+    return _openai_client_cache[1]
+
 
 class EmbeddingService:
     def __init__(self, repo: EmbeddingRepository) -> None:
         self.repo = repo
-        settings = get_settings()
-        self.openai = AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value())
+        self.openai = _get_openai_client()
 
     # --- 청킹 ---
 

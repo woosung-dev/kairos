@@ -74,6 +74,12 @@ class Settings(BaseSettings):
     # 미설정 시 send_slack_message 는 no-op (피드백은 DB 에 항상 저장). Sentry SKIP 정책과 정합.
     slack_feedback_webhook_url: str | None = None
 
+    # DB pool (PERF-r2-5) — 기본값 5+10 유지. PERF-SSE-COMMIT 으로 스트리밍 중
+    # 커넥션 점유가 제거돼 상향 필요성은 낮아짐 — 상향 시 Neon max_connections
+    # (compute 크기 의존) × Cloud Run 인스턴스 수 곱 초과 금지.
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
+
     # Upload validation (Sprint 25 T-SEC-3 — BUG-SENTINEL-003)
     # 500MB 기본 한도. 음성 4시간 = ~120MB(64kbps mp3) ~ 480MB(128kbps wav) 커버.
     max_upload_bytes: int = 500 * 1024 * 1024

@@ -17,11 +17,14 @@ def init_engine(database_url: str) -> None:
     # 남은 connection 을 재사용하면 asyncpg.InterfaceError "connection is closed".
     # pool_pre_ping=True 는 매 체크아웃마다 가벼운 SELECT 1 으로 health check,
     # pool_recycle=240 은 4분 (Neon timeout 보다 짧게) 마다 connection 재생성.
+    # PERF-r2-5: pool 크기 env 조정 가능 (DB_POOL_SIZE / DB_MAX_OVERFLOW, 기본 5+10)
+    from src.core.config import get_settings
+    settings = get_settings()
     _engine = create_async_engine(
         database_url,
         echo=False,
-        pool_size=5,
-        max_overflow=10,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
         pool_pre_ping=True,
         pool_recycle=240,
     )

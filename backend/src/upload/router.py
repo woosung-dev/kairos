@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from src.auth.rbac import require_member
-from src.common.r2 import R2Service
+from src.common.r2 import R2Service, get_r2_service
 from src.upload.dependencies import get_upload_validator
 from src.upload.exceptions import (
     ContentMismatchError,
@@ -55,7 +55,7 @@ async def get_presigned_url(
     except MimeExtensionMismatchError as e:
         raise HTTPException(status_code=415, detail=str(e))
 
-    r2 = R2Service()
+    r2 = get_r2_service()
     result = await r2.get_presigned_upload_url(data.filename, declared_mime)
     return {
         "uploadUrl": result["upload_url"],
@@ -98,6 +98,6 @@ async def upload_file_proxy(
     except (UnsupportedMimeError, MimeExtensionMismatchError, ContentMismatchError) as e:
         raise HTTPException(status_code=415, detail=str(e))
 
-    r2 = R2Service()
+    r2 = get_r2_service()
     file_key = await r2.upload_file_bytes(filename, content_type, file_bytes)
     return {"fileKey": file_key}
