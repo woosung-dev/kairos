@@ -96,10 +96,12 @@ ivfflat 인덱스 (`idx_chunks_vector`, `idx_cache_vector`)는 **동일 마이�
 ```python
 # backend/src/embeddings/repository.py
 async def _apply_hnsw_session_params(session: AsyncSession) -> None:
-    """벡터 검색 트랜잭션 진입 시 SET LOCAL (I-21)."""
-    await session.execute(text("SET LOCAL hnsw.ef_search = 40"))
-    await session.execute(text("SET LOCAL hnsw.iterative_scan = 'relaxed_order'"))
-    await session.execute(text("SET LOCAL hnsw.max_scan_tuples = 20000"))
+    """벡터 검색 트랜잭션 진입 시 세션 변수 트랜잭션 로컬 설정 (I-21). PERF-r2-6: 단일 왕복."""
+    await session.execute(text(
+        "SELECT set_config('hnsw.ef_search', '40', true), "
+        "set_config('hnsw.iterative_scan', 'relaxed_order', true), "
+        "set_config('hnsw.max_scan_tuples', '20000', true)"
+    ))
 ```
 
 호출 위치 — `vector_search` (line 67 진입), `find_similar_cache` (line 152 진입). 기존 cosine `<=>` 연산자 유지, CAST 변경 `CAST(:qvec AS vector)` → `CAST(:qvec AS halfvec)`.
