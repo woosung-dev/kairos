@@ -22,12 +22,26 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { AlertTriangle } from "lucide-react";
+import { VISIBILITY_DESCRIPTIONS, VISIBILITY_LABELS } from "@/lib/visibility";
 import { useCreateProject } from "../hooks";
+
+// "default" = visibility 미전송 → BE 가 멤버의 default_project_visibility(W-5 시드),
+// 그것도 없으면 public 으로 결정 (projects/router.py 폴백 체인 보존)
+const VISIBILITY_OPTIONS = ["default", "public", "draft", "private"] as const;
 
 const createProjectSchema = z.object({
   title: z.string().min(1, "프로젝트 이름을 입력하세요"),
   description: z.string().optional(),
   tags: z.string(),
+  visibility: z.enum(VISIBILITY_OPTIONS),
 });
 
 type CreateProjectFormData = z.infer<typeof createProjectSchema>;
@@ -47,8 +61,10 @@ export function CreateProjectDialog({
 
   const form = useForm<CreateProjectFormData>({
     resolver: zodResolver(createProjectSchema),
-    defaultValues: { title: "", description: "", tags: "" },
+    defaultValues: { title: "", description: "", tags: "", visibility: "default" },
   });
+
+  const selectedVisibility = form.watch("visibility");
 
   const onSubmit = (data: CreateProjectFormData) => {
     const tags = data.tags
@@ -61,6 +77,7 @@ export function CreateProjectDialog({
         title: data.title,
         description: data.description || null,
         tags,
+        ...(data.visibility !== "default" && { visibility: data.visibility }),
       },
       {
         onSuccess: () => {
@@ -131,6 +148,69 @@ export function CreateProjectDialog({
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="visibility"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>공개 범위</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger
+                        className="w-full"
+                        aria-label="공개 범위 선택"
+                        data-testid="create-project-visibility"
+                      >
+                        <SelectValue>
+                          {field.value === "default"
+                            ? "워크스페이스 기본값"
+                            : VISIBILITY_LABELS[field.value]}
+                        </SelectValue>
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem
+                        value="default"
+                        data-testid="create-project-visibility-default"
+                      >
+                        워크스페이스 기본값 — 초대 시 설정된 공개 범위 (없으면 공개)
+                      </SelectItem>
+                      {(["public", "draft", "private"] as const).map((opt) => (
+                        <SelectItem
+                          key={opt}
+                          value={opt}
+                          data-testid={`create-project-visibility-${opt}`}
+                        >
+                          {VISIBILITY_LABELS[opt]} — {VISIBILITY_DESCRIPTIONS[opt]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {selectedVisibility === "private" && (
+              <div
+                className="p-3 text-xs rounded flex items-start gap-1.5"
+                data-testid="create-project-private-warning"
+                style={{
+                  background: "rgba(251,191,36,0.1)",
+                  borderLeft: "3px solid var(--warning)",
+                  color: "var(--text-secondary)",
+                  borderRadius: "var(--radius-sm)",
+                }}
+              >
+                <AlertTriangle
+                  className="w-4 h-4 shrink-0 mt-0.5"
+                  style={{ color: "var(--warning)" }}
+                />
+                <span>
+                  비공개 프로젝트는 명시적 멤버 + admin/owner만 접근하고 AI 검색에서
+                  제외됩니다. 생성자는 자동으로 멤버에 추가됩니다.
+                </span>
+              </div>
+            )}
             {form.formState.errors.root && (
               <p className="text-sm text-destructive">
                 {form.formState.errors.root.message}

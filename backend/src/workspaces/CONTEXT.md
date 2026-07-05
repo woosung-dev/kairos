@@ -59,7 +59,7 @@
 | W-2 | **I-19 personal workspace = 1인 격리**: `type=='personal'` → owner 1명, `WorkspaceInvite` 발급 금지 + 멤버 추가 금지 (`invite_service.py` create/accept 에서 차단 — invite 가 유일한 멤버 추가 경로). ProjectMember 도 1명 (R5) |
 | W-3 | **역할 RBAC 4-cell** (`owner` / `admin` / `member` / `viewer`, ADR-025). admin 이상 = 멤버 초대/제거. **역할 변경은 owner 전용** (`member_router.py` `require_owner`). owner 는 강등/제거 불가 대상 |
 | W-4 | **I-10 inbox_threshold 워크스페이스별** (default 0.9, `PATCH /{workspace_id}/settings`). Inbox 자동 분류 confidence 임계값 |
-| W-5 | **초대 가입 시 `default_project_visibility` 시드** — accept 시 invite 값을 `WorkspaceMember.default_project_visibility` 로 복사, 프로젝트 생성 시 visibility 미지정이면 이 시드 적용 (`projects/router.py` 폴백 체인 `data.visibility → member 시드 → public`). private 생성 시 creator 는 ProjectMember 로 자동 추가 (락아웃 방지). (헌법 §5) |
+| W-5 | **초대 가입 시 `default_project_visibility` 시드** — accept 시 invite 값을 `WorkspaceMember.default_project_visibility` 로 복사, 프로젝트 생성 시 visibility 미지정이면 이 시드 적용 (`projects/router.py` 폴백 체인 `data.visibility → member 시드 → public`). private 생성 시 creator 는 ProjectMember 로 자동 추가 (락아웃 방지). FE 생성 다이얼로그(`create-project-dialog.tsx`)의 기본 옵션 "워크스페이스 기본값" = visibility 미전송 → 이 폴백 체인 유지, 명시 선택 시만 전송 (2026-07-05 Stage 2 #4, e2e T20). (헌법 §5) |
 | W-6 | **I-13 prefix 예외**: `workspaces` 루트는 `/api/v1/workspaces` (워크스페이스 자체 CRUD). 하위 리소스(members/invites)는 `/api/v1/workspaces/{workspace_id}/...` 표준 |
 
 ---
