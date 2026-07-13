@@ -7,6 +7,10 @@ from sqlalchemy.orm import defer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import delete, select, text
 
+from src.common.visibility import (
+    ALL_CHUNKS_VISIBLE_SQL,
+    PROJECT_VISIBILITY_FILTER_SQL,
+)
 from src.embeddings.models import EmbeddingChunk, SemanticCache
 
 # I-9 4-C — 허용된 source_type 화이트리스트. 신규 도메인 추가 시 본 set + ADR 갱신 필수.
@@ -174,30 +178,10 @@ class EmbeddingRepository:
         CAND-B fix — private 분기에 workspace_members EXISTS 가드 추가. 워크스페이스에서
         제거된 멤버의 orphan ProjectMember 행이 잔재로 남아도 private chunk 접근을
         되찾지 못하도록 차단 (offboard→re-invite privilege residue).
+
+        규칙 정의는 common/visibility.py SSOT — 문자열 byte 보존 이동 (스냅샷 게이트).
         """
-        return """
-            AND (
-                project_id IS NULL
-                OR :req_role IN ('admin', 'owner')
-                OR EXISTS (
-                    SELECT 1 FROM projects p
-                    WHERE p.id = embedding_chunks.project_id
-                      AND (
-                        p.visibility = 'public'
-                        OR (p.visibility = 'draft' AND p.created_by_id = :req_uid)
-                        OR (p.visibility = 'private' AND EXISTS (
-                            SELECT 1 FROM project_members pm
-                            WHERE pm.project_id = p.id AND pm.user_id = :req_uid
-                              AND EXISTS (
-                                SELECT 1 FROM workspace_members wm
-                                WHERE wm.workspace_id = p.workspace_id
-                                  AND wm.user_id = :req_uid
-                              )
-                        ))
-                      )
-                )
-            )
-        """
+        return PROJECT_VISIBILITY_FILTER_SQL
 
     async def vector_search(
         self,
@@ -463,35 +447,15 @@ class EmbeddingRepository:
 
         CAND-B fix — private 분기에 workspace_members EXISTS 가드를 추가해
         _visibility_filter_sql 와 동일하게 유지 (orphan ProjectMember 잔재 차단).
+
+        규칙 정의는 common/visibility.py SSOT — 문자열 byte 보존 이동 (스냅샷 게이트).
         """
         if not chunk_ids:
             return True
 
         # 위반 chunk 1개라도 있는지 — anti-join 으로 1 round-trip 처리.
         # 위반 정의: project_id 있고, visibility 규칙 통과 안 함.
-        query = text("""
-            SELECT 1 FROM embedding_chunks ec
-            WHERE ec.id = ANY(:chunk_ids)
-              AND ec.project_id IS NOT NULL
-              AND NOT EXISTS (
-                SELECT 1 FROM projects p
-                WHERE p.id = ec.project_id
-                  AND (
-                    p.visibility = 'public'
-                    OR (p.visibility = 'draft' AND p.created_by_id = :req_uid)
-                    OR (p.visibility = 'private' AND EXISTS (
-                      SELECT 1 FROM project_members pm
-                      WHERE pm.project_id = p.id AND pm.user_id = :req_uid
-                        AND EXISTS (
-                          SELECT 1 FROM workspace_members wm
-                          WHERE wm.workspace_id = p.workspace_id
-                            AND wm.user_id = :req_uid
-                        )
-                    ))
-                  )
-              )
-            LIMIT 1
-        """)
+        query = text(ALL_CHUNKS_VISIBLE_SQL)
         result = await self.session.execute(
             query,
             {

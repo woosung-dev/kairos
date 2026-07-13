@@ -9,7 +9,6 @@ tests/fixtures/visibility/*.sql 스냅샷과 비교한다.
 """
 import os
 import pathlib
-import re
 import uuid
 
 import pytest
@@ -81,16 +80,11 @@ def _embeddings_filter_sql() -> str:
 
 
 def _embeddings_all_chunks_visible_sql() -> str:
-    # 인라인 text() 쿼리 — 소스에서 추출. C2 에서 모듈 상수로 승격 시 import 로 교체.
-    src = (
-        pathlib.Path(__file__).resolve().parents[2]
-        / "src" / "embeddings" / "repository.py"
-    ).read_text()
-    m = re.search(
-        r'async def _all_chunks_visible.*?query = text\("""(.*?)"""\)', src, re.DOTALL
-    )
-    assert m, "_all_chunks_visible query not found in source"
-    return m.group(1)
+    # C2: 인라인 text() → common/visibility.py 상수 승격. 스냅샷(C0 캡처)과의
+    # byte 일치가 이동의 무손실을 증명한다.
+    from src.common.visibility import ALL_CHUNKS_VISIBLE_SQL
+
+    return ALL_CHUNKS_VISIBLE_SQL
 
 
 _CASES = {
