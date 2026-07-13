@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, AlertTriangle, Mic, StickyNote, Rocket } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -15,12 +14,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useWorkspaceRole } from "@/features/members/hooks";
 import {
   useProject,
@@ -33,35 +26,15 @@ import { useActionItems, useUpdateActionItem } from "@/features/actions/hooks";
 import { useMeetings } from "@/features/meetings/hooks";
 import { useNotes } from "@/features/notes/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
-import type { Project, ProjectStatus } from "../types";
 import type { ActionItem, ActionStatus } from "@/features/actions/types";
-import type { Meeting } from "@/features/meetings/types";
-import type { Note } from "@/features/notes/types";
 import { EditProjectDialog } from "./edit-project-dialog";
 import { ProjectMembersPanel } from "./project-members-panel";
-import { VisibilityBadge } from "./visibility-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VisibilityChangeDialog } from "./visibility-change-dialog";
-
-/* ── 상태 라벨 ── */
-
-const STATUS_LABELS: Record<ProjectStatus, string> = {
-  active: "진행 중",
-  completed: "완료",
-  archived: "보관",
-};
-
-const STATUS_BG: Record<ProjectStatus, string> = {
-  active: "var(--accent-subtle)",
-  completed: "rgba(52,211,153,0.1)",
-  archived: "rgba(156,163,175,0.1)",
-};
-
-const STATUS_COLOR: Record<ProjectStatus, string> = {
-  active: "var(--accent)",
-  completed: "var(--success)",
-  archived: "var(--text-muted)",
-};
+import { DashboardHeader } from "./dashboard/dashboard-header";
+import { MeetingCard } from "./dashboard/meeting-card";
+import { NoteCard } from "./dashboard/note-card";
+import { OnboardingView } from "./dashboard/onboarding-view";
 
 /* ── 날짜 오버듀 확인 ── */
 
@@ -361,184 +334,6 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
 
 /* ── 서브 컴포넌트 ── */
 
-function DashboardHeader({
-  project,
-  canManage,
-  isRoleLoading,
-  onVisibilityClick,
-  onEditClick,
-  onArchiveClick,
-  onDeleteClick,
-}: {
-  project: Project;
-  canManage: boolean;
-  isRoleLoading: boolean;
-  onVisibilityClick: () => void;
-  onEditClick: () => void;
-  onArchiveClick: () => void;
-  onDeleteClick: () => void;
-}) {
-  return (
-    <div className="mb-6">
-      <div className="flex items-center gap-3 mb-2">
-        <h1
-          className="text-2xl font-bold"
-          style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}
-        >
-          {project.title}
-        </h1>
-        <span
-          className="px-2 py-0.5 rounded-full text-xs font-medium"
-          style={{
-            background: STATUS_BG[project.status],
-            color: STATUS_COLOR[project.status],
-          }}
-        >
-          {STATUS_LABELS[project.status]}
-        </span>
-        <VisibilityBadge
-          visibility={project.visibility}
-          isLoading={isRoleLoading}
-          interactive={canManage}
-          onClick={() => {
-            // closure 캐싱 회피 (BUG-H02) — 호출 시점 canManage 평가
-            if (canManage) onVisibilityClick();
-          }}
-        />
-        {canManage && (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className="inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-[var(--surface-hover)] transition-colors"
-            >
-              <MoreHorizontal className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEditClick}>편집</DropdownMenuItem>
-              <DropdownMenuItem onClick={onArchiveClick}>아카이브</DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={onDeleteClick}
-              >
-                삭제
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </div>
-      {project.description && (
-        <p className="text-sm mb-3" style={{ color: "var(--text-secondary)" }}>
-          {project.description}
-        </p>
-      )}
-      {project.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {project.tags.map((tag) => (
-            <span
-              key={tag}
-              className="px-1.5 py-0.5 rounded text-micro"
-              style={{
-                background: "var(--surface-active)",
-                color: "var(--text-muted)",
-              }}
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MeetingCard({ meeting }: { meeting: Meeting }) {
-  const displayDate = meeting.recordedAt
-    ? new Date(meeting.recordedAt).toLocaleDateString("ko-KR")
-    : new Date(meeting.createdAt).toLocaleDateString("ko-KR");
-
-  return (
-    <Link
-      href={`/meetings/${meeting.id}`}
-      data-testid="meeting-card"
-      className="block p-4 rounded-lg border transition-colors"
-      style={{
-        background: "var(--surface)",
-        borderColor: "var(--border-subtle)",
-        borderRadius: "var(--radius-lg)",
-      }}
-    >
-      <div className="flex items-start gap-3">
-        <Mic className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--text-muted)" }} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
-              {meeting.title}
-            </h3>
-            <span
-              className="shrink-0 px-1.5 py-0.5 rounded-full text-micro"
-              style={{
-                background: "var(--surface-active)",
-                color: "var(--text-muted)",
-              }}
-            >
-              회의
-            </span>
-          </div>
-          <div className="text-micro" style={{ color: "var(--text-muted)" }}>
-            {displayDate}
-            {meeting.actionItemCount > 0 && (
-              <span className="ml-2">액션 {meeting.actionItemCount}개</span>
-            )}
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function NoteCard({ note }: { note: Note }) {
-  const displayDate = new Date(note.createdAt).toLocaleDateString("ko-KR");
-
-  return (
-    <Link
-      href={`/notes/${note.id}`}
-      className="block p-4 rounded-lg border transition-colors"
-      style={{
-        background: "var(--surface)",
-        borderColor: "var(--border-subtle)",
-        borderRadius: "var(--radius-lg)",
-      }}
-    >
-      <div className="flex items-start gap-3">
-        <StickyNote className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--text-muted)" }} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
-              {note.title}
-            </h3>
-            <span
-              className="shrink-0 px-1.5 py-0.5 rounded-full text-micro"
-              style={{
-                background: "var(--surface-active)",
-                color: "var(--text-muted)",
-              }}
-            >
-              노트
-            </span>
-          </div>
-          {note.plainText && (
-            <p className="text-xs line-clamp-1 mb-1" style={{ color: "var(--text-secondary)" }}>
-              {note.plainText}
-            </p>
-          )}
-          <div className="text-micro" style={{ color: "var(--text-muted)" }}>
-            {displayDate}
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
 function ActionRow({ action, onToggle }: { action: ActionItem; onToggle: () => void }) {
   const isDone = action.status === "done";
 
@@ -583,59 +378,6 @@ function ActionRow({ action, onToggle }: { action: ActionItem; onToggle: () => v
             </>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function OnboardingView() {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <Rocket className="w-12 h-12 mb-6" style={{ color: "var(--text-muted)" }} />
-      <h2
-        className="text-xl font-bold mb-2"
-        style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}
-      >
-        프로젝트를 시작하세요
-      </h2>
-      <p className="text-sm mb-8 max-w-md" style={{ color: "var(--text-muted)" }}>
-        첫 회의를 녹음하거나 노트를 작성해보세요. AI가 자동으로 요약하고 지식을 구조화합니다.
-      </p>
-      <div className="flex items-center gap-3">
-        <a
-          href="/new"
-          className="px-5 py-2.5 rounded text-sm font-medium transition-colors"
-          style={{
-            background: "var(--accent)",
-            color: "var(--background)",
-            borderRadius: "var(--radius-sm)",
-            minHeight: "44px",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            cursor: "pointer",
-          }}
-        >
-          <Mic className="w-4 h-4" />
-          회의 녹음
-        </a>
-        <a
-          href="/notes"
-          className="px-5 py-2.5 rounded text-sm font-medium transition-colors border"
-          style={{
-            borderColor: "var(--border)",
-            color: "var(--text-primary)",
-            borderRadius: "var(--radius-sm)",
-            minHeight: "44px",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            cursor: "pointer",
-          }}
-        >
-          <StickyNote className="w-4 h-4" />
-          노트 작성
-        </a>
       </div>
     </div>
   );
