@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from src.common.exceptions import AlreadyExistsError
+from src.common.pagination import build_page, to_offset
 from src.common.visibility import (
     ADMIN_BYPASS_ROLES,
     Access,
@@ -119,7 +120,7 @@ class ProjectService:
         # 직접 호출(status=None=전체)에는 영향 없음.
         if status is None:
             status = "active"
-        offset = (page - 1) * page_size
+        offset = to_offset(page, page_size)
         projects = await self.repo.find_by_workspace(
             workspace_id,
             requester_user_id=requester_user_id,
@@ -137,13 +138,7 @@ class ProjectService:
             tag=tag,
         )
 
-        return {
-            "items": [self._to_dict(p) for p in projects],
-            "total": total,
-            "page": page,
-            "pageSize": page_size,
-            "hasNext": page * page_size < total,
-        }
+        return build_page([self._to_dict(p) for p in projects], total, page, page_size)
 
     async def get_project(
         self,

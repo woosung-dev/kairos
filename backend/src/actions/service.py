@@ -28,6 +28,7 @@ from src.actions.models import ActionItem
 from src.actions.repository import ActionItemRepository
 from src.actions.schemas import ActionPromoteOut
 from src.common.exceptions import NotFoundError
+from src.common.pagination import build_page, to_offset
 from src.common.promote_helpers import (
     PromoteValidationError,
     build_item_promotion_audit,
@@ -136,7 +137,7 @@ class ActionItemService:
         private/draft 프로젝트 액션을 list 로 읽는 read IDOR 차단 (notes CAND-A 정합).
         requester_role 미전달(None) = 내부/파이프라인 호출 → 게이트 skip (하위호환).
         """
-        offset = (page - 1) * page_size
+        offset = to_offset(page, page_size)
         items = await self.repo.find_by_workspace(
             workspace_id,
             status=status,
@@ -156,13 +157,7 @@ class ActionItemService:
             requester_role=requester_role,
         )
 
-        return {
-            "items": [self._to_dict(i) for i in items],
-            "total": total,
-            "page": page,
-            "pageSize": page_size,
-            "hasNext": page * page_size < total,
-        }
+        return build_page([self._to_dict(i) for i in items], total, page, page_size)
 
     async def _verify_action_visibility(
         self,

@@ -27,6 +27,7 @@ from src.common.promote_helpers import (
     build_item_promotion_audit,
     validate_promote_target,
 )
+from src.common.pagination import build_page, to_offset
 from src.common.visibility import (
     ADMIN_BYPASS_ROLES,
     Access,
@@ -130,7 +131,7 @@ class NoteService:
 
         requester_role 미전달(None) = 내부/파이프라인 호출 → 게이트 skip (하위호환).
         """
-        offset = (page - 1) * page_size
+        offset = to_offset(page, page_size)
         notes = await self.repo.find_by_workspace(
             workspace_id,
             project_id=project_id,
@@ -145,13 +146,7 @@ class NoteService:
             requester_user_id=requester_user_id,
             requester_role=requester_role,
         )
-        return {
-            "items": [self._to_dict(n) for n in notes],
-            "total": total,
-            "page": page,
-            "pageSize": page_size,
-            "hasNext": page * page_size < total,
-        }
+        return build_page([self._to_dict(n) for n in notes], total, page, page_size)
 
     async def _verify_note_visibility(
         self,

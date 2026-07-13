@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import BackgroundTasks
 
+from src.common.pagination import build_page, to_offset
 from src.common.promote_helpers import (
     PromoteValidationError,
     build_item_promotion_audit,
@@ -62,21 +63,16 @@ class InboxService:
         page_size: int = 20,
     ) -> dict:
         """워크스페이스 Inbox 목록 (페이지네이션)."""
-        offset = (page - 1) * page_size
+        offset = to_offset(page, page_size)
         items = await self.inbox_repo.find_by_workspace(
             workspace_id, is_processed=is_processed, offset=offset, limit=page_size
         )
         total = await self.inbox_repo.count_by_workspace(
             workspace_id, is_processed=is_processed
         )
-
-        return {
-            "items": [self._to_dict(item) for item in items],
-            "total": total,
-            "page": page,
-            "pageSize": page_size,
-            "hasNext": page * page_size < total,
-        }
+        return build_page(
+            [self._to_dict(item) for item in items], total, page, page_size
+        )
 
     async def classify(
         self,
