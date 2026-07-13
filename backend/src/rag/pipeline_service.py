@@ -9,10 +9,17 @@ import logging
 import uuid
 from collections.abc import AsyncGenerator
 
+from src.common.visibility import Access, decide_project_access
 from src.projects.repository import ProjectRepository
 from src.rag.service import RagService
 
 logger = logging.getLogger(__name__)
+
+# SSE deny 문구 (D5 계약 — FE 노출 문자열, 변경 금지). private 은 멤버십 해소 후
+# 별도 분기라 여기엔 draft 만 필요; 미등재 값은 generic 문구로 fail-closed.
+_DENY_MESSAGES: dict[str, str] = {
+    "draft": "Draft 프로젝트는 작성자만 접근 가능합니다.",
+}
 
 
 def _sse_error_done(message: str) -> tuple[dict, dict]:
@@ -41,18 +48,27 @@ class RagPipelineService:
         """프로젝트 접근 검증. 위반 시 사용자용 에러 메시지 반환, 통과 시 None.
 
         admin/owner 우회는 caller 책임 (ADR-014 옵션 A).
+        코어 규칙은 common/visibility.py decide_project_access SSOT — SSE 한국어
+        문구는 D5 계약이라 그대로 보존 (visibility 별 dict 매핑).
         """
         # Sprint 19 PR #1 C9 (Codex F-1 cascade): find_by_id / is_member workspace_id 강제
         project = await self.project_repo.find_by_id(project_id, workspace_id)
         if project is None:
             return "프로젝트를 찾을 수 없거나 접근 권한이 없습니다."
-        if project.visibility == "draft" and project.created_by_id != requester_user_id:
-            return "Draft 프로젝트는 작성자만 접근 가능합니다."
-        if project.visibility == "private":
-            is_member = await self.project_repo.is_member(project_id, requester_user_id, workspace_id)
-            if not is_member:
-                return "Private 프로젝트는 명시적 멤버만 접근 가능합니다."
-        return None
+        decision = decide_project_access(project, requester_user_id)
+        if decision is Access.ALLOW:
+            return None
+        if decision is Access.NEED_MEMBERSHIP:
+            is_member = await self.project_repo.is_member(
+                project_id, requester_user_id, workspace_id
+            )
+            if is_member:
+                return None
+            return "Private 프로젝트는 명시적 멤버만 접근 가능합니다."
+        # DENY — draft 비-작성자 또는 unknown visibility (D7 fail-closed)
+        return _DENY_MESSAGES.get(
+            project.visibility, "프로젝트를 찾을 수 없거나 접근 권한이 없습니다."
+        )
 
     async def ask(
         self,

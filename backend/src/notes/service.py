@@ -27,6 +27,11 @@ from src.common.promote_helpers import (
     build_item_promotion_audit,
     validate_promote_target,
 )
+from src.common.visibility import (
+    ADMIN_BYPASS_ROLES,
+    Access,
+    decide_project_access,
+)
 from src.embeddings.models import EmbeddingChunk
 from src.notes.exceptions import (
     CannotPromoteToPersonalError,
@@ -164,10 +169,11 @@ class NoteService:
         - private: ProjectMember 매핑된 사람만, 그 외 404
 
         requester_role 미전달(None) = 내부/특권 호출 → 게이트 skip (하위호환).
+        코어 규칙은 common/visibility.py decide_project_access SSOT.
         """
         if requester_role is None:
             return
-        if requester_role in ("admin", "owner"):
+        if requester_role in ADMIN_BYPASS_ROLES:
             return
         if note.project_id is None:
             return
@@ -179,14 +185,16 @@ class NoteService:
         if project is None:
             # cross-tenant 또는 dangling project → fail-closed 404
             raise NoteNotFoundError()
-        if project.visibility == "draft":
-            if project.created_by_id != requester_user_id:
-                raise NoteNotFoundError()
-        elif project.visibility == "private":
-            if requester_user_id is None or not await self.project_repo.is_member(
+        decision = decide_project_access(project, requester_user_id)
+        if decision is Access.DENY:
+            raise NoteNotFoundError()
+        if decision is Access.NEED_MEMBERSHIP and (
+            requester_user_id is None
+            or not await self.project_repo.is_member(
                 note.project_id, requester_user_id, note.workspace_id
-            ):
-                raise NoteNotFoundError()
+            )
+        ):
+            raise NoteNotFoundError()
 
     async def get_note(
         self,

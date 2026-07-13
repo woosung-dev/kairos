@@ -3,11 +3,11 @@
 import uuid
 
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, exists, func, or_, select, update
+from sqlmodel import func, select, update
 
 from src.actions.models import ActionItem
 from src.common.promote_models import ItemPromotionAudit
-from src.projects.models import Project, ProjectMember
+from src.common.visibility import RequesterContext, apply_fk_project_visibility
 
 
 def _action_visibility_filter(
@@ -17,53 +17,12 @@ def _action_visibility_filter(
 ):
     """F1 (2026-06-23 fullsweep): action LIST 에 project visibility 게이트 적용.
 
-    notes._note_visibility_filter 와 동일한 correlated EXISTS 패턴을 ActionItem 에 미러링한다:
-    - project_id IS NULL : 통과 (워크스페이스 레벨)
-    - admin/owner : 모든 visibility 통과 (필터 없음)
-    - public : 통과
-    - draft : project.created_by_id == requester 일 때만
-    - private : ProjectMember 매핑 + 현 워크스페이스 멤버 동시 충족 시에만
-
-    requester_role 미전달(None) = 내부/파이프라인 호출 → 게이트 skip (하위호환).
+    규칙 정의는 common/visibility.py SSOT — FK-상관 어댑터 위임
+    (notes._note_visibility_filter 와 동일 계보, project_id IS NULL 통과 /
+    role=None 내부호출 skip / admin·owner 우회 / CAND-B flatten EXISTS).
     """
-    if requester_role is None:
-        return stmt
-    if requester_role in ("admin", "owner"):
-        return stmt
-
-    from src.workspaces.models import WorkspaceMember
-
-    # private 분기: ProjectMember 매핑 + 현 워크스페이스 멤버 동시 충족
-    # (orphan ProjectMember 잔재로 private 가 되살아나는 LIST 누출 차단).
-    member_exists = exists().where(
-        and_(
-            ProjectMember.project_id == Project.id,
-            ProjectMember.user_id == requester_user_id,
-            WorkspaceMember.workspace_id == Project.workspace_id,
-            WorkspaceMember.user_id == requester_user_id,
-        )
-    )
-    accessible_project = exists().where(
-        and_(
-            Project.id == ActionItem.project_id,
-            or_(
-                Project.visibility == "public",
-                and_(
-                    Project.visibility == "draft",
-                    Project.created_by_id == requester_user_id,
-                ),
-                and_(
-                    Project.visibility == "private",
-                    member_exists,
-                ),
-            ),
-        )
-    )
-    return stmt.where(
-        or_(
-            ActionItem.project_id.is_(None),  # type: ignore[union-attr]
-            accessible_project,
-        )
+    return apply_fk_project_visibility(
+        stmt, ActionItem.project_id, RequesterContext(requester_user_id, requester_role)
     )
 
 

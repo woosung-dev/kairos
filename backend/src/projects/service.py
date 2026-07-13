@@ -11,6 +11,11 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from src.common.exceptions import AlreadyExistsError
+from src.common.visibility import (
+    ADMIN_BYPASS_ROLES,
+    Access,
+    decide_project_access,
+)
 from src.projects.exceptions import (
     CrossWorkspaceMemberError,
     ProjectHasContentError,
@@ -152,16 +157,19 @@ class ProjectService:
         if project is None:
             # Codex F-4: cross-tenant resource → 404 (정보 누설 방지)
             raise ProjectNotFoundError()
-        # visibility 권한 검증 (admin 이상 우회, 그 외 visibility별 분기)
-        if requester_role not in ("admin", "owner"):
-            if project.visibility == "draft":
-                if project.created_by_id != requester_user_id:
-                    raise ProjectNotFoundError()
-            elif project.visibility == "private":
-                if requester_user_id is None or not await self.repo.is_member(
+        # visibility 권한 검증 (admin 이상 우회, 코어 규칙은 common/visibility.py SSOT).
+        # 주의: projects 는 role=None 을 skip 하지 않는다 (D1 — get_project 원 동작 보존).
+        if requester_role not in ADMIN_BYPASS_ROLES:
+            decision = decide_project_access(project, requester_user_id)
+            if decision is Access.DENY:
+                raise ProjectNotFoundError()
+            if decision is Access.NEED_MEMBERSHIP and (
+                requester_user_id is None
+                or not await self.repo.is_member(
                     project_id, requester_user_id, workspace_id
-                ):
-                    raise ProjectNotFoundError()
+                )
+            ):
+                raise ProjectNotFoundError()
         return self._to_dict(project)
 
     # --- ProjectMember (Sprint 6 L-6, Sprint 19 PR #1 C9 workspace_id 강제) ---

@@ -16,6 +16,11 @@ import uuid
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.common.visibility import (
+    ADMIN_BYPASS_ROLES,
+    Access,
+    decide_project_access,
+)
 from src.embeddings.repository import EmbeddingRepository
 from src.embeddings.service import EmbeddingService
 from src.notes.repository import NoteRepository
@@ -155,18 +160,20 @@ class NotePipelineService:
         Returns True if requester has access, False otherwise.
         admin/owner는 우회. project_id=None은 워크스페이스 멤버 누구나 OK.
         Sprint 19 PR #1 C9 (Codex F-1 cascade): workspace_id 시그니처 강제.
+        코어 규칙은 common/visibility.py decide_project_access SSOT.
         """
-        if requester_role in ("admin", "owner"):
+        if requester_role in ADMIN_BYPASS_ROLES:
             return True
         if project_id is None:
             return True
         project = await self.project_repo.find_by_id(project_id, workspace_id)
         if project is None:
             return False
-        if project.visibility == "public":
+        decision = decide_project_access(project, requester_user_id)
+        if decision is Access.ALLOW:
             return True
-        if project.visibility == "draft":
-            return project.created_by_id == requester_user_id
-        if project.visibility == "private":
-            return await self.project_repo.is_member(project_id, requester_user_id, workspace_id)
+        if decision is Access.NEED_MEMBERSHIP:
+            return await self.project_repo.is_member(
+                project_id, requester_user_id, workspace_id
+            )
         return False

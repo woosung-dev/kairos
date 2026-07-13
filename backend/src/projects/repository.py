@@ -11,8 +11,9 @@ import uuid
 
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, delete, exists, func, or_, select
+from sqlmodel import and_, delete, exists, func, select
 
+from src.common.visibility import RequesterContext, apply_project_visibility
 from src.projects.exceptions import ProjectNotFoundError
 from src.projects.models import MeetingProjectLink, Project, ProjectMember
 
@@ -78,54 +79,12 @@ class ProjectRepository:
     ):
         """visibility 권한 분기 (Sprint 6 ADR-014 옵션 A 정합).
 
-        - admin/owner: 모든 visibility 접근 가능 (필터 없음)
-        - member/viewer (또는 requester 정보 없음): visibility 별 분기
-          * public: 모두 접근
-          * draft: creator만 접근 (AD-24)
-          * private: ProjectMember 매핑된 사람만 (L-6)
+        규칙 정의는 common/visibility.py SSOT — projects 전용 어댑터 위임
+        (D1: requester 부재 → public-only 보수 모드 / admin·owner 우회 /
+        CAND-B ProjectMember ∧ WorkspaceMember flatten EXISTS, codex P2 보존).
         """
-        # admin 이상은 필터 우회 (모든 visibility 접근)
-        if requester_role in ("admin", "owner"):
-            return stmt
-        # requester 정보 없음 = 보수적으로 public만 노출
-        if requester_user_id is None:
-            return stmt.where(Project.visibility == "public")
-        # member/viewer: public + draft(creator) + private(ProjectMember)
-        # CAND-B fix — ProjectMember 매핑 + 현 워크스페이스 멤버 동시 충족 시에만 private 노출.
-        # orphan ProjectMember 잔재(워크스페이스 제거 후 미정리)가 list 에서 private 을
-        # 되살리지 못하도록 차단.
-        #
-        # codex P2 fix — WorkspaceMember 검사를 중첩 exists() 가 아닌 *같은* exists() 안에
-        # 펼쳐 외부 Project 행에 상관(correlate)시킨다. 중첩 exists() 안에서
-        # Project.workspace_id 를 참조하면 SQLAlchemy 가 서브쿼리 FROM 절에 새 projects
-        # 테이블을 생성해 상관관계가 끊긴다 (요청자가 아무 워크스페이스 멤버이기만 하면
-        # 가드가 참이 되는 LIST 누출). 단일 join 으로 wm.workspace_id = 외부 Project 의
-        # workspace_id 를 직접 묶는다.
-        from src.workspaces.models import WorkspaceMember
-
-        member_exists = (
-            exists()
-            .where(
-                and_(
-                    ProjectMember.project_id == Project.id,
-                    ProjectMember.user_id == requester_user_id,
-                    WorkspaceMember.workspace_id == Project.workspace_id,
-                    WorkspaceMember.user_id == requester_user_id,
-                )
-            )
-        )
-        return stmt.where(
-            or_(
-                Project.visibility == "public",
-                and_(
-                    Project.visibility == "draft",
-                    Project.created_by_id == requester_user_id,
-                ),
-                and_(
-                    Project.visibility == "private",
-                    member_exists,
-                ),
-            )
+        return apply_project_visibility(
+            stmt, RequesterContext(requester_user_id, requester_role)
         )
 
     # --- ProjectMember (Sprint 6 L-6, Sprint 19 PR #1 C9 workspace_id 강제) ---
