@@ -1,7 +1,7 @@
 // 온보딩 도메인 React Query 훅 — server state (Sprint 22 OBN-02)
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
+import { useApiClient } from "@/lib/use-api-client";
 import { useQuery } from "@tanstack/react-query";
 
 import { useWorkspaceStore } from "@/features/workspaces/store";
@@ -16,17 +16,16 @@ import { fetchOnboarding, onboardingKeys } from "./api";
  * - step === 4 면 isCompleted = true (BE 책임)
  */
 export function useOnboarding() {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const workspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
   return useQuery({
     queryKey: onboardingKeys.status(workspaceId),
     queryFn: async () => {
-      const token = await getToken();
-      if (!token || !workspaceId) {
+      if (!workspaceId) {
         throw new Error("인증이 필요합니다");
       }
-      return fetchOnboarding(token, workspaceId);
+      return fetchOnboarding(api, workspaceId);
     },
     enabled: !!workspaceId,
     staleTime: 30_000,

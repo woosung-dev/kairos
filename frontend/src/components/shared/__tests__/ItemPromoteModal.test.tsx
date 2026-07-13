@@ -201,8 +201,13 @@ describe("ItemPromoteModal — Sprint 24 BL-064 note polling", () => {
     // 1차 polling 진입 (5s 후)
     await vi.advanceTimersByTimeAsync(5000);
     expect(getStatusSpy).toHaveBeenCalledTimes(1);
+    // PR-3 seam: 첫 인자는 token 문자열이 아닌 ApiClient 객체.
     expect(getStatusSpy).toHaveBeenLastCalledWith(
-      "test-jwt",
+      expect.objectContaining({
+        fetch: expect.any(Function),
+        fetchRaw: expect.any(Function),
+        getToken: expect.any(Function),
+      }),
       TARGET_WID,
       "99999999-9999-9999-9999-999999999999",
     );

@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api-client";
+import type { ApiClient } from "@/lib/api-client";
 import type { Workspace } from "./types";
 
 export const workspaceKeys = {
@@ -7,23 +7,22 @@ export const workspaceKeys = {
   detail: (id: string) => [...workspaceKeys.all, "detail", id] as const,
 };
 
-export async function fetchWorkspaces(token: string): Promise<Workspace[]> {
-  return apiClient<Workspace[]>("/workspaces", { token });
+export async function fetchWorkspaces(api: ApiClient): Promise<Workspace[]> {
+  return api.fetch<Workspace[]>("/workspaces");
 }
 
 export async function createWorkspace(
-  token: string,
+  api: ApiClient,
   name: string
 ): Promise<Workspace> {
-  return apiClient<Workspace>("/workspaces", {
-    token,
+  return api.fetch<Workspace>("/workspaces", {
     method: "POST",
     body: JSON.stringify({ name }),
   });
 }
 
 export async function fetchWorkspace(
-  token: string,
+  api: ApiClient,
   wid: string
 ): Promise<{
   id: string;
@@ -32,26 +31,24 @@ export async function fetchWorkspace(
   inboxThreshold: number;
   memberCount: number;
 }> {
-  return apiClient(`/workspaces/${wid}`, { token });
+  return api.fetch(`/workspaces/${wid}`);
 }
 
 export async function deleteWorkspace(
-  token: string,
+  api: ApiClient,
   wid: string
 ): Promise<void> {
-  return apiClient<void>(`/workspaces/${wid}`, {
-    token,
+  return api.fetch<void>(`/workspaces/${wid}`, {
     method: "DELETE",
   });
 }
 
 export async function updateWorkspaceSettings(
-  token: string,
+  api: ApiClient,
   wid: string,
   data: { inbox_threshold: number }
 ): Promise<{ inboxThreshold: number }> {
-  return apiClient(`/workspaces/${wid}/settings`, {
-    token,
+  return api.fetch(`/workspaces/${wid}/settings`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });

@@ -1,5 +1,5 @@
 // 온보딩 도메인 API — Clerk JWT + workspace 컨텍스트 헤더로 호출
-import { apiClient } from "@/lib/api-client";
+import type { ApiClient } from "@/lib/api-client";
 
 import { onboardingResponseSchema, type OnboardingResponse } from "./schemas";
 
@@ -9,12 +9,10 @@ export const onboardingKeys = {
 };
 
 export async function fetchOnboarding(
-  token: string,
+  api: ApiClient,
   workspaceId: string,
 ): Promise<OnboardingResponse> {
-  const data = await apiClient<unknown>("/users/me/onboarding", {
-    token,
-    headers: {
+  const data = await api.fetch<unknown>("/users/me/onboarding", { headers: {
       "X-Workspace-Id": workspaceId,
     },
   });

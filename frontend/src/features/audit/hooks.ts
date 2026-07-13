@@ -1,7 +1,7 @@
 "use client";
 
 // Sprint 24 Wave 2 T-AUDIT-VIEW — Audit 무한 스크롤 훅 (useInfiniteQuery)
-import { useAuth } from "@clerk/nextjs";
+import { useApiClient } from "@/lib/use-api-client";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { auditKeys, fetchAuditPromotions } from "./api";
 import type { AuditPromotionPage } from "./types";
@@ -15,7 +15,7 @@ export function useAuditPromotions(
   itemType: string | null,
   options?: UseAuditPromotionsOptions,
 ) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
 
   return useInfiniteQuery({
     queryKey: auditKeys.promotions(workspaceId ?? "", itemType),
@@ -25,10 +25,8 @@ export function useAuditPromotions(
     }: {
       pageParam: string | null;
     }): Promise<AuditPromotionPage> => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
       if (!workspaceId) throw new Error("workspaceId 필요");
-      return fetchAuditPromotions(token, workspaceId, {
+      return fetchAuditPromotions(api, workspaceId, {
         itemType: itemType ?? undefined,
         cursor: pageParam ?? undefined,
         limit: 20,

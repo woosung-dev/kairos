@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
+import { useApiClient } from "@/lib/use-api-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   noteKeys,
@@ -13,40 +13,28 @@ import {
 import type { CreateNoteRequest, UpdateNoteRequest } from "./types";
 
 export function useNotes(wid: string | undefined, projectId?: string) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   return useQuery({
     queryKey: noteKeys.list(wid ?? "", projectId),
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return fetchNotes(token, wid!, projectId);
-    },
+    queryFn: () => fetchNotes(api, wid!, projectId),
     enabled: !!wid,
   });
 }
 
 export function useNote(wid: string | undefined, id: string) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   return useQuery({
     queryKey: noteKeys.detail(wid ?? "", id),
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return fetchNote(token, wid!, id);
-    },
+    queryFn: () => fetchNote(api, wid!, id),
     enabled: !!wid && !!id,
   });
 }
 
 export function useCreateNote(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: CreateNoteRequest) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return createNote(token, wid!, data);
-    },
+    mutationFn: (data: CreateNoteRequest) => createNote(api, wid!, data),
     onSuccess: () => {
       if (wid) queryClient.invalidateQueries({ queryKey: noteKeys.all });
     },
@@ -54,14 +42,10 @@ export function useCreateNote(wid: string | undefined) {
 }
 
 export function useUpdateNote(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateNoteRequest }) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return updateNote(token, wid!, id, data);
-    },
+    mutationFn: ({ id, data }: { id: string; data: UpdateNoteRequest }) => updateNote(api, wid!, id, data),
     onSuccess: (_data, variables) => {
       if (wid) {
         queryClient.invalidateQueries({
@@ -74,14 +58,10 @@ export function useUpdateNote(wid: string | undefined) {
 }
 
 export function useDeleteNote(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return deleteNote(token, wid!, id);
-    },
+    mutationFn: (id: string) => deleteNote(api, wid!, id),
     onSuccess: () => {
       if (wid) queryClient.invalidateQueries({ queryKey: noteKeys.all });
     },

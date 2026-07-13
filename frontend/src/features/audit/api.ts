@@ -1,5 +1,5 @@
 // Sprint 24 Wave 2 T-AUDIT-VIEW — ItemPromotionAudit 조회 API client (admin only)
-import { apiClient } from "@/lib/api-client";
+import type { ApiClient } from "@/lib/api-client";
 import type { AuditPromotionItem, AuditPromotionPage } from "./types";
 
 export const auditKeys = {
@@ -9,7 +9,7 @@ export const auditKeys = {
 };
 
 export async function fetchAuditPromotions(
-  token: string,
+  api: ApiClient,
   wid: string,
   params: { itemType?: string | null; cursor?: string | null; limit?: number },
 ): Promise<AuditPromotionPage> {
@@ -20,7 +20,7 @@ export async function fetchAuditPromotions(
 
   const qs = search.toString();
   const path = `/workspaces/${wid}/audit/promotions${qs ? `?${qs}` : ""}`;
-  return apiClient<AuditPromotionPage>(path, { token });
+  return api.fetch<AuditPromotionPage>(path);
 }
 
 export type { AuditPromotionItem, AuditPromotionPage };

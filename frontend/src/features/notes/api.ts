@@ -1,4 +1,4 @@
-import { apiClient, API_BASE_URL } from "@/lib/api-client";
+import type { ApiClient } from "@/lib/api-client";
 import type { PaginatedResponse } from "@/types";
 import type { Note, CreateNoteRequest, UpdateNoteRequest } from "./types";
 
@@ -11,7 +11,7 @@ export const noteKeys = {
 };
 
 export async function fetchNotes(
-  token: string,
+  api: ApiClient,
   wid: string,
   projectId?: string,
   page?: number,
@@ -20,66 +20,61 @@ export async function fetchNotes(
   if (projectId) params.set("projectId", projectId);
   if (page) params.set("page", String(page));
   const query = params.toString();
-  return apiClient<PaginatedResponse<Note>>(
+  return api.fetch<PaginatedResponse<Note>>(
     `/workspaces/${wid}/notes${query ? `?${query}` : ""}`,
-    { token },
   );
 }
 
 export async function fetchNote(
-  token: string,
+  api: ApiClient,
   wid: string,
   id: string,
 ): Promise<Note> {
-  return apiClient<Note>(`/workspaces/${wid}/notes/${id}`, { token });
+  return api.fetch<Note>(`/workspaces/${wid}/notes/${id}`);
 }
 
 export async function createNote(
-  token: string,
+  api: ApiClient,
   wid: string,
   data: CreateNoteRequest,
 ): Promise<Note> {
-  return apiClient<Note>(`/workspaces/${wid}/notes`, {
-    token,
+  return api.fetch<Note>(`/workspaces/${wid}/notes`, {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
 export async function updateNote(
-  token: string,
+  api: ApiClient,
   wid: string,
   id: string,
   data: UpdateNoteRequest,
 ): Promise<Note> {
-  return apiClient<Note>(`/workspaces/${wid}/notes/${id}`, {
-    token,
+  return api.fetch<Note>(`/workspaces/${wid}/notes/${id}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
 }
 
 export async function exportNote(
-  token: string,
+  api: ApiClient,
   wid: string,
   id: string,
   format: "md" | "json"
 ): Promise<Blob> {
-  const res = await fetch(
-    `${API_BASE_URL}/api/v1/workspaces/${wid}/notes/${id}/export?format=${format}`,
-    { headers: { Authorization: `Bearer ${token}` } }
+  const res = await api.fetchRaw(
+    `/workspaces/${wid}/notes/${id}/export?format=${format}`,
   );
   if (!res.ok) throw new Error("내보내기에 실패했습니다");
   return res.blob();
 }
 
 export async function deleteNote(
-  token: string,
+  api: ApiClient,
   wid: string,
   id: string,
 ): Promise<void> {
-  return apiClient<void>(`/workspaces/${wid}/notes/${id}`, {
-    token,
+  return api.fetch<void>(`/workspaces/${wid}/notes/${id}`, {
     method: "DELETE",
   });
 }
@@ -105,12 +100,11 @@ export interface EmbeddingStatusOut {
  * 호환성 제약 무관 (기존 promote 응답만 snake_case 보존).
  */
 export async function getEmbeddingStatus(
-  token: string,
+  api: ApiClient,
   workspaceId: string,
   noteId: string,
 ): Promise<EmbeddingStatusOut> {
-  return apiClient<EmbeddingStatusOut>(
+  return api.fetch<EmbeddingStatusOut>(
     `/workspaces/${workspaceId}/notes/${noteId}/embedding-status`,
-    { token },
   );
 }

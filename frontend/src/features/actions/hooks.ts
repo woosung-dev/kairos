@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
+import { useApiClient } from "@/lib/use-api-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   actionKeys,
@@ -14,15 +14,11 @@ import type { FetchActionItemsParams, CreateActionItemRequest, UpdateActionItemR
  * 워크스페이스 내 액션 아이템 목록 조회
  */
 export function useActionItems(wid: string | undefined, params?: FetchActionItemsParams) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
 
   return useQuery({
     queryKey: actionKeys.list(wid ?? ""),
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return fetchActionItems(token, wid!, params);
-    },
+    queryFn: () => fetchActionItems(api, wid!, params),
     enabled: !!wid,
   });
 }
@@ -31,15 +27,11 @@ export function useActionItems(wid: string | undefined, params?: FetchActionItem
  * 액션 아이템 생성
  */
 export function useCreateActionItem(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: CreateActionItemRequest) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return createActionItem(token, wid!, data);
-    },
+    mutationFn: (data: CreateActionItemRequest) => createActionItem(api, wid!, data),
     onSuccess: () => {
       if (wid) {
         queryClient.invalidateQueries({ queryKey: actionKeys.list(wid) });
@@ -52,15 +44,11 @@ export function useCreateActionItem(wid: string | undefined) {
  * 액션 아이템 수정
  */
 export function useUpdateActionItem(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateActionItemRequest }) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return updateActionItem(token, wid!, id, data);
-    },
+    mutationFn: ({ id, data }: { id: string; data: UpdateActionItemRequest }) => updateActionItem(api, wid!, id, data),
     onSuccess: () => {
       if (wid) {
         queryClient.invalidateQueries({ queryKey: actionKeys.list(wid) });

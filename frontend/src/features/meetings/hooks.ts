@@ -1,7 +1,7 @@
 "use client";
 
+import { useApiClient } from "@/lib/use-api-client";
 import { useEffect, useRef } from "react";
-import { useAuth } from "@clerk/nextjs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   meetingKeys,
@@ -23,15 +23,11 @@ export function useMeetings(
   page = 1,
   projectId?: string,
 ) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
 
   return useQuery({
     queryKey: meetingKeys.list(wid ?? "", projectId),
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return fetchMeetings(token, wid!, page, projectId);
-    },
+    queryFn: () => fetchMeetings(api, wid!, page, projectId),
     enabled: !!wid,
   });
 }
@@ -40,15 +36,11 @@ export function useMeetings(
  * 회의 상세 (요약 + 트랜스크립트)
  */
 export function useMeetingDetail(wid: string | undefined, id: string) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
 
   return useQuery({
     queryKey: meetingKeys.detail(wid ?? "", id),
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return fetchMeetingDetail(token, wid!, id);
-    },
+    queryFn: () => fetchMeetingDetail(api, wid!, id),
     enabled: !!wid,
     // CAND-E: 404(삭제/미존재 source) 등 에러 상태에서 폴링을 멈춘다. 이전엔 에러 시에도
     // 3000ms 폴링을 무한 반복해 SourceViewer 가 죽은 source 를 열면 console 에러가 폭증했다.
@@ -78,17 +70,13 @@ const POLLING_STATUSES: MeetingStatus[] = [
  * BE pipeline_service 가 distillation 완료 시 step=3 advance.
  */
 export function useMeetingStatus(wid: string | undefined, id: string) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
   const previousStatusRef = useRef<MeetingStatus | undefined>(undefined);
 
   const query = useQuery({
     queryKey: meetingKeys.status(wid ?? "", id),
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return fetchMeetingStatus(token, wid!, id);
-    },
+    queryFn: () => fetchMeetingStatus(api, wid!, id),
     enabled: !!wid,
     refetchInterval: (q) => {
       const status = q.state.data?.status;
@@ -117,15 +105,11 @@ export function useMeetingStatus(wid: string | undefined, id: string) {
  * 회의 생성 (202 Accepted, 비동기 파이프라인)
  */
 export function useCreateMeeting(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: CreateMeetingRequest) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return createMeeting(token, wid!, data);
-    },
+    mutationFn: (data: CreateMeetingRequest) => createMeeting(api, wid!, data),
     onSuccess: () => {
       if (wid) {
         queryClient.invalidateQueries({ queryKey: meetingKeys.list(wid) });
@@ -138,15 +122,11 @@ export function useCreateMeeting(wid: string | undefined) {
  * 텍스트 캡처 (202 Accepted, 비동기 파이프라인)
  */
 export function useCaptureText(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: CaptureTextRequest) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return captureText(token, wid!, data);
-    },
+    mutationFn: (data: CaptureTextRequest) => captureText(api, wid!, data),
     onSuccess: () => {
       if (wid) {
         queryClient.invalidateQueries({ queryKey: meetingKeys.list(wid) });
