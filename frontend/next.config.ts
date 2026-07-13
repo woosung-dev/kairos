@@ -14,9 +14,6 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  // PR-3 c4: 자동 메모이제이션 — 수동 useMemo/useCallback 의존 축소.
-  // 게이트: build 시간 Stage 0 대비 +30% 이내 확인됨 (커밋 body 수치 참조).
-  reactCompiler: true,
   async headers() {
     return [
       {
