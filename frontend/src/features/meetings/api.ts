@@ -8,15 +8,6 @@ import type {
   CreateMeetingResponse,
 } from "./types";
 
-export const meetingKeys = {
-  all: ["meetings"] as const,
-  list: (wid: string, projectId?: string) =>
-    [...meetingKeys.all, "list", wid, projectId ?? "all"] as const,
-  detail: (wid: string, id: string) =>
-    [...meetingKeys.all, "detail", wid, id] as const,
-  status: (wid: string, id: string) =>
-    [...meetingKeys.all, "status", wid, id] as const,
-};
 
 export async function fetchMeetings(
   api: ApiClient,

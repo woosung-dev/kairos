@@ -1,11 +1,6 @@
 import type { ApiClient } from "@/lib/api-client";
 import type { Workspace } from "./types";
 
-export const workspaceKeys = {
-  all: ["workspaces"] as const,
-  list: () => [...workspaceKeys.all, "list"] as const,
-  detail: (id: string) => [...workspaceKeys.all, "detail", id] as const,
-};
 
 export async function fetchWorkspaces(api: ApiClient): Promise<Workspace[]> {
   return api.fetch<Workspace[]>("/workspaces");

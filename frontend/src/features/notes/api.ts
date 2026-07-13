@@ -2,13 +2,6 @@ import type { ApiClient } from "@/lib/api-client";
 import type { PaginatedResponse } from "@/types";
 import type { Note, CreateNoteRequest, UpdateNoteRequest } from "./types";
 
-export const noteKeys = {
-  all: ["notes"] as const,
-  list: (wid: string, projectId?: string) =>
-    [...noteKeys.all, "list", wid, projectId ?? "all"] as const,
-  detail: (wid: string, id: string) =>
-    [...noteKeys.all, "detail", wid, id] as const,
-};
 
 export async function fetchNotes(
   api: ApiClient,

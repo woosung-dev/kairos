@@ -8,19 +8,6 @@ import type {
   AcceptInviteResponse,
 } from "./types";
 
-// --- Query Key Factory ---
-
-export const memberKeys = {
-  all: ["members"] as const,
-  list: (wid: string) => [...memberKeys.all, "list", wid] as const,
-};
-
-export const inviteKeys = {
-  all: ["invites"] as const,
-  list: (wid: string) => [...inviteKeys.all, "list", wid] as const,
-  info: (code: string) => [...inviteKeys.all, "info", code] as const,
-};
-
 // --- 멤버 API ---
 
 export async function fetchMembers(

@@ -3,6 +3,7 @@
 // 기존 features/memory/components/PromoteModal.tsx 의 로직을 추출 + itemType dispatch.
 "use client";
 
+import { memoryKeys, meetingKeys, noteKeys, inboxKeys, actionKeys } from "@/lib/query-keys";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Users } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -17,15 +18,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { useWorkspaces } from "@/features/workspaces/hooks";
 import { useApiClient } from "@/lib/use-api-client";
-import { memoryKeys } from "@/features/memory/api";
-import { meetingKeys } from "@/features/meetings/api";
 import {
   getEmbeddingStatus,
-  noteKeys,
   type EmbeddingStatus,
 } from "@/features/notes/api";
-import { inboxKeys } from "@/features/inbox/api";
-import { actionKeys } from "@/features/actions/api";
 
 /* ── 5 도메인 타입 정의 ── */
 

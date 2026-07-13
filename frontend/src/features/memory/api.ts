@@ -6,16 +6,6 @@ import type {
   MemoryRecallResult,
 } from "./types";
 
-// --- Query Key Factory ---
-
-export const memoryKeys = {
-  all: ["memory"] as const,
-  detail: (wid: string, mid: string) =>
-    [...memoryKeys.all, "detail", wid, mid] as const,
-  recall: (wid: string, q: string) =>
-    [...memoryKeys.all, "recall", wid, q] as const,
-};
-
 // --- API 함수 ---
 // Sprint 29 R3 (api-multipart): api.fetch 가 FormData 본문을 지원하므로 전용 postFormData
 // 헬퍼 제거 — multipart 도 api.fetch 단일 경로로 통합(에러 처리·base URL 일관).

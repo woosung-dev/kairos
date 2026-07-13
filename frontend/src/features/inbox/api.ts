@@ -2,17 +2,6 @@ import type { ApiClient } from "@/lib/api-client";
 import type { PaginatedResponse } from "@/types";
 import type { InboxItem } from "./types";
 
-// --- Query Key Factory ---
-
-// Sprint 23 D3 fix: queryKey 에 params 포함 → cache 격리.
-// 이전: useInbox(wid) 와 useInbox(wid, { isProcessed: false }) 가 같은 cache 사용 → 마지막 호출자의 params 가 실 fetch 결정 → 다른 callsite 의 의도 손상.
-// 이후: 각 (wid, params) 조합이 별도 cache entry. invalidate 시 inboxKeys.byWorkspace(wid) prefix 로 일괄 무효화.
-export const inboxKeys = {
-  all: ["inbox"] as const,
-  byWorkspace: (wid: string) => [...inboxKeys.all, "list", wid] as const,
-  list: (wid: string, params?: FetchInboxParams) =>
-    [...inboxKeys.byWorkspace(wid), params ?? {}] as const,
-};
 
 // --- API 함수 ---
 

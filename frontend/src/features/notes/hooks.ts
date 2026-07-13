@@ -1,9 +1,9 @@
 "use client";
 
+import { noteKeys } from "@/lib/query-keys";
 import { useApiClient } from "@/lib/use-api-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  noteKeys,
   fetchNotes,
   fetchNote,
   createNote,

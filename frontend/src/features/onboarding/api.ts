@@ -3,10 +3,6 @@ import type { ApiClient } from "@/lib/api-client";
 
 import { onboardingResponseSchema, type OnboardingResponse } from "./schemas";
 
-export const onboardingKeys = {
-  all: ["onboarding"] as const,
-  status: (wid: string | null) => [...onboardingKeys.all, "status", wid] as const,
-};
 
 export async function fetchOnboarding(
   api: ApiClient,

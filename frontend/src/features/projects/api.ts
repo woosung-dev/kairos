@@ -8,23 +8,6 @@ import type {
   UpdateProjectRequest,
 } from "./types";
 
-// --- Query Key Factory ---
-
-export const projectKeys = {
-  all: ["projects"] as const,
-  // S28b RQ-KEY-COLLISION fix: params(status 등) 를 키에 포함 — 안 그러면
-  // 사이드바의 active/archived useProjects 두 호출이 같은 키로 충돌(교차오염).
-  // invalidate 는 list(wid) prefix 로 모든 param 변형 매칭.
-  list: (wid: string, params?: FetchProjectsParams) =>
-    params
-      ? ([...projectKeys.all, "list", wid, params] as const)
-      : ([...projectKeys.all, "list", wid] as const),
-  detail: (wid: string, id: string) =>
-    [...projectKeys.all, "detail", wid, id] as const,
-  members: (wid: string, id: string) =>
-    [...projectKeys.all, "members", wid, id] as const,
-};
-
 // --- API 함수 ---
 
 export interface FetchProjectsParams {

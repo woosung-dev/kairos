@@ -1,10 +1,10 @@
 "use client";
 
+import { projectKeys, meetingKeys, onboardingKeys } from "@/lib/query-keys";
 import { useApiClient } from "@/lib/use-api-client";
 import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  projectKeys,
   fetchProjects,
   fetchProject,
   createProject,
@@ -23,8 +23,6 @@ import type {
   CreateProjectRequest,
   UpdateProjectRequest,
 } from "./types";
-import { meetingKeys } from "../meetings/api";
-import { onboardingKeys } from "@/features/onboarding/api";
 import type { Meeting } from "../meetings/types";
 import type { Note } from "../notes/types";
 

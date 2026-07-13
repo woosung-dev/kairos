@@ -1,10 +1,10 @@
 "use client";
 
+import { workspaceKeys } from "@/lib/query-keys";
 import { useApiClient } from "@/lib/use-api-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  workspaceKeys,
   fetchWorkspaces,
   createWorkspace,
   fetchWorkspace,

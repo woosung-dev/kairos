@@ -1,12 +1,13 @@
 // 온보딩 도메인 React Query 훅 — server state (Sprint 22 OBN-02)
 "use client";
 
+import { onboardingKeys } from "@/lib/query-keys";
 import { useApiClient } from "@/lib/use-api-client";
 import { useQuery } from "@tanstack/react-query";
 
 import { useWorkspaceStore } from "@/features/workspaces/store";
 
-import { fetchOnboarding, onboardingKeys } from "./api";
+import { fetchOnboarding } from "./api";
 
 /**
  * 현재 사용자의 온보딩 진행 상태 조회.

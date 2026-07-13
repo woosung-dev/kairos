@@ -2,9 +2,6 @@
 import type { ApiClient } from "@/lib/api-client";
 import type { RagAskRequest } from "./types";
 
-export const ragKeys = {
-  all: ["rag"] as const,
-};
 
 export async function askRag(
   api: ApiClient,

@@ -2,11 +2,6 @@
 import type { ApiClient } from "@/lib/api-client";
 import type { AuditPromotionItem, AuditPromotionPage } from "./types";
 
-export const auditKeys = {
-  all: ["audit"] as const,
-  promotions: (wid: string, itemType: string | null) =>
-    [...auditKeys.all, "promotions", wid, itemType ?? "all"] as const,
-};
 
 export async function fetchAuditPromotions(
   api: ApiClient,

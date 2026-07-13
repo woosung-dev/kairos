@@ -2,13 +2,6 @@ import type { ApiClient } from "@/lib/api-client";
 import type { PaginatedResponse } from "@/types";
 import type { ActionItem } from "./types";
 
-// --- Query Key Factory ---
-
-export const actionKeys = {
-  all: ["actions"] as const,
-  list: (wid: string) => [...actionKeys.all, "list", wid] as const,
-};
-
 // --- API 함수 ---
 
 export interface FetchActionItemsParams {

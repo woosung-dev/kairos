@@ -1,9 +1,10 @@
 "use client";
 
 // Sprint 24 Wave 2 T-AUDIT-VIEW — Audit 무한 스크롤 훅 (useInfiniteQuery)
+import { auditKeys } from "@/lib/query-keys";
 import { useApiClient } from "@/lib/use-api-client";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { auditKeys, fetchAuditPromotions } from "./api";
+import { fetchAuditPromotions } from "./api";
 import type { AuditPromotionPage } from "./types";
 
 interface UseAuditPromotionsOptions {

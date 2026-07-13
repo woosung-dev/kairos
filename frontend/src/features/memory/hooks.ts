@@ -1,6 +1,7 @@
 // Sprint 15 Memory 도메인 React Query 훅 + MediaRecorder MIME negotiation
 "use client";
 
+import { memoryKeys } from "@/lib/query-keys";
 import { useApiClient } from "@/lib/use-api-client";
 import {
   useMutation,
@@ -13,7 +14,6 @@ import {
   captureText,
   captureVoice,
   getMemory,
-  memoryKeys,
   promoteMemory,
   recallMemory,
 } from "./api";

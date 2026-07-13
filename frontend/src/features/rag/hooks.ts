@@ -1,10 +1,10 @@
 "use client";
 
+import { onboardingKeys } from "@/lib/query-keys";
 import { useCallback } from "react";
 import { useApiClient } from "@/lib/use-api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceStore } from "@/features/workspaces/store";
-import { onboardingKeys } from "@/features/onboarding/api";
 import { askRag } from "./api";
 import { useRagStore } from "./store";
 import type { SSESearchResultsEvent, SSEAnswerEvent } from "./types";

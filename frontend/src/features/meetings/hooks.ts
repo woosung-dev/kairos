@@ -1,10 +1,10 @@
 "use client";
 
+import { meetingKeys, onboardingKeys } from "@/lib/query-keys";
 import { useApiClient } from "@/lib/use-api-client";
 import { useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  meetingKeys,
   fetchMeetings,
   fetchMeetingDetail,
   fetchMeetingStatus,
@@ -12,7 +12,6 @@ import {
   captureText,
   type CaptureTextRequest,
 } from "./api";
-import { onboardingKeys } from "@/features/onboarding/api";
 import type { CreateMeetingRequest, MeetingStatus } from "./types";
 
 /**
