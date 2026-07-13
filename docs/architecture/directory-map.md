@@ -88,6 +88,7 @@ backend/
     │   ├── r2.py                      # Cloudflare R2 클라이언트 (aioboto3)
     │   ├── prompts.py                 # Gemini 프롬프트 상수 + Pydantic V2 schema
     │   ├── pagination.py              # cursor + offset pagination utility
+    │   ├── visibility.py              # ★ project visibility 정책 SSOT (2026-07-13) — decide/ORM clause/raw SQL 상수, stateless
     │   ├── audit_repository.py        # ItemPromotionAudit (Sprint 23 D4) — 4 도메인 공통
     │   ├── audit_router.py            # audit 조회 endpoint (admin/owner 전용)
     │   ├── audit_schemas.py           # audit DTO (Pydantic V2)

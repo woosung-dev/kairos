@@ -67,6 +67,8 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 `WorkspaceInvite.default_project_visibility` = 초대 가입 사용자 기본값.
 
+> **SSOT (2026-07-13 visibility 통합 리팩토링)**: 규칙 구현은 `backend/src/common/visibility.py` 단일 파일 (decide_project_access + ORM clause + raw SQL 상수). 과거 6 도메인 13 사이트 복붙 → 사본별 보안 버그 독립 재발 이력. 사본 재발은 arch gate `tests/architecture/test_visibility_single_source.py` 가 CI 차단. admin/owner·내부호출 우회 분기만 사이트 소유 (D1/D6 — 사이트별 fail 방향 상이).
+
 ## 6. 핵심 불변식 (위반 즉시 중단)
 
 | # | 불변식 | 강제 위치 |
