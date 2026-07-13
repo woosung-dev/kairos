@@ -2,108 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Building2, Mic, StickyNote, Inbox, Folder } from "lucide-react";
-import { useWorkspaces, useCreateWorkspace } from "@/features/workspaces/hooks";
+import { useWorkspaces } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import { CreateWorkspaceDialog } from "@/features/workspaces/components/create-workspace-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { useUIStore } from "@/store/ui";
 import { OnboardingTooltip } from "@/components/onboarding/onboarding-tooltip";
 import { DashboardSuggestions } from "@/features/home/components/dashboard-suggestions";
-
-// 워크스페이스 생성 다이얼로그
-function CreateWorkspaceDialog({
-  isOpen,
-  onClose,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-}) {
-  const [name, setName] = useState("");
-  const createWorkspace = useCreateWorkspace();
-  const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId);
-
-  if (!isOpen) return null;
-
-  const handleSubmit = async (e: React.SyntheticEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-
-    const ws = await createWorkspace.mutateAsync(name.trim());
-    setActiveWorkspaceId(ws.id);
-    setName("");
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div
-        className="absolute inset-0"
-        style={{ background: "rgba(0,0,0,0.5)" }}
-        onClick={onClose}
-      />
-      <div
-        className="relative z-10 w-full max-w-md p-6 rounded-lg border"
-        style={{
-          background: "var(--surface)",
-          borderColor: "var(--border)",
-          borderRadius: "var(--radius-lg)",
-        }}
-      >
-        <h2
-          className="text-lg font-bold mb-4"
-          style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}
-        >
-          워크스페이스 만들기
-        </h2>
-        <form onSubmit={handleSubmit}>
-          <label
-            className="block text-xs mb-1"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            워크스페이스 이름
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="예: 우리팀"
-            autoFocus
-            className="w-full px-3 py-2 rounded border text-sm bg-transparent outline-none mb-4"
-            style={{
-              borderColor: "var(--border)",
-              color: "var(--text-primary)",
-              borderRadius: "var(--radius-sm)",
-            }}
-          />
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded text-sm"
-              style={{
-                color: "var(--text-secondary)",
-                borderRadius: "var(--radius-sm)",
-              }}
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              disabled={!name.trim() || createWorkspace.isPending}
-              className="px-4 py-2 rounded text-sm font-medium disabled:opacity-50"
-              style={{
-                background: "var(--accent)",
-                color: "var(--background)",
-                borderRadius: "var(--radius-sm)",
-              }}
-            >
-              {createWorkspace.isPending ? "생성 중..." : "만들기"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
 
 export default function DashboardPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -163,8 +68,8 @@ export default function DashboardPage() {
           </button>
         </div>
         <CreateWorkspaceDialog
-          isOpen={isDialogOpen}
-          onClose={() => setIsDialogOpen(false)}
+          open={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
         />
       </div>
     );
@@ -249,8 +154,8 @@ export default function DashboardPage() {
       </div>
 
       <CreateWorkspaceDialog
-        isOpen={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
       />
     </div>
   );
