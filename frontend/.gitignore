@@ -48,3 +48,6 @@ next-env.d.ts
 playwright-report/
 test-results/
 e2e/.smoke-shots/
+
+# clerk configuration (can include secrets)
+/.clerk/

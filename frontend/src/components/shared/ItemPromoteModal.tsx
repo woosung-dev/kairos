@@ -3,9 +3,9 @@
 // 기존 features/memory/components/PromoteModal.tsx 의 로직을 추출 + itemType dispatch.
 "use client";
 
+import { memoryKeys, meetingKeys, noteKeys, inboxKeys, actionKeys } from "@/lib/query-keys";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Users } from "lucide-react";
-import { useAuth } from "@clerk/nextjs";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -17,16 +17,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useWorkspaces } from "@/features/workspaces/hooks";
-import { API_BASE_URL } from "@/lib/api-client";
-import { memoryKeys } from "@/features/memory/api";
-import { meetingKeys } from "@/features/meetings/api";
+import { useApiClient } from "@/lib/use-api-client";
 import {
   getEmbeddingStatus,
-  noteKeys,
   type EmbeddingStatus,
 } from "@/features/notes/api";
-import { inboxKeys } from "@/features/inbox/api";
-import { actionKeys } from "@/features/actions/api";
 
 /* ── 5 도메인 타입 정의 ── */
 
@@ -112,7 +107,7 @@ export function ItemPromoteModal({
   onOpenChange,
   onSuccess,
 }: ItemPromoteModalProps) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
   const { data: workspaces } = useWorkspaces();
 
@@ -141,29 +136,17 @@ export function ItemPromoteModal({
 
   const promote = useMutation({
     mutationFn: async (targetWorkspaceId: string): Promise<PromoteResponse> => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
       const segment = ENDPOINT_SEGMENT[itemType];
-      const url = `${API_BASE_URL}/api/v1/workspaces/${sourceWorkspaceId}/${segment}/${itemId}/promote`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      // api.fetch 가 토큰 첨부 + 에러 detail 파싱 + JSON 반환을 모두 담당 (PR-3 seam).
+      return api.fetch<PromoteResponse>(
+        `/workspaces/${sourceWorkspaceId}/${segment}/${itemId}/promote`,
+        {
+          method: "POST",
+          // BE schemas.py 는 populate_by_name=True 라 snake_case/camelCase 둘 다 허용.
+          // 명세 (Task 4 prompt) 는 camelCase targetWorkspaceId 권장 → 그대로 사용.
+          body: JSON.stringify({ targetWorkspaceId }),
         },
-        // BE schemas.py 는 populate_by_name=True 라 snake_case/camelCase 둘 다 허용.
-        // 명세 (Task 4 prompt) 는 camelCase targetWorkspaceId 권장 → 그대로 사용.
-        body: JSON.stringify({ targetWorkspaceId }),
-      });
-      if (!res.ok) {
-        const errBody = await res
-          .json()
-          .catch(() => ({ detail: "요청 실패" }));
-        throw new Error(
-          (errBody as { detail?: string }).detail ?? `HTTP ${res.status}`
-        );
-      }
-      return (await res.json()) as PromoteResponse;
+      );
     },
     onSuccess: async (response, targetWorkspaceId) => {
       // 도메인별 invalidate (5 도메인 모두 list/detail 키)
@@ -189,16 +172,10 @@ export function ItemPromoteModal({
         const intervalId = window.setInterval(async () => {
           attempts += 1;
           try {
-            const token = await getToken();
-            if (!token) {
-              window.clearInterval(intervalId);
-              setIsPolling(false);
-              toast.error("상태 확인 실패", { id: toastId });
-              onOpenChange(false);
-              return;
-            }
+            // 토큰 부재 시 AuthRequiredError → 아래 catch 가 기존 null-token 분기와
+            // 동일하게 cleanup + "상태 확인 실패" toast + close 처리.
             const status = await getEmbeddingStatus(
-              token,
+              api,
               targetWorkspaceId,
               newId,
             );

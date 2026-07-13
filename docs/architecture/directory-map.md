@@ -51,6 +51,9 @@ frontend/
     │
     ├── hooks/                         # 공통 유틸리티 훅
     ├── lib/                           # 서드파티 설정, 유틸 (query-client, constants)
+    │   ├── api-client.ts              # ★ ApiClient seam (2026-07-13) — createApiClient(getToken), 토큰 주입 SSOT
+    │   ├── use-api-client.ts          # useApiClient() — Clerk getToken 클로저 주입 훅
+    │   └── query-keys.ts              # ★ queryKey factory 레지스트리 (2026-07-13) — cross-feature key import 금지 (eslint no-restricted-imports)
     ├── mocks/                         # Mock data (개발용)
     │   └── data/
     ├── store/                         # Zustand 전역 상태

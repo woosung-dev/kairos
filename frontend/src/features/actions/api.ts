@@ -1,13 +1,6 @@
-import { apiClient } from "@/lib/api-client";
+import type { ApiClient } from "@/lib/api-client";
 import type { PaginatedResponse } from "@/types";
 import type { ActionItem } from "./types";
-
-// --- Query Key Factory ---
-
-export const actionKeys = {
-  all: ["actions"] as const,
-  list: (wid: string) => [...actionKeys.all, "list", wid] as const,
-};
 
 // --- API 함수 ---
 
@@ -41,7 +34,7 @@ export interface UpdateActionItemRequest {
 }
 
 export async function fetchActionItems(
-  token: string,
+  api: ApiClient,
   wid: string,
   params?: FetchActionItemsParams
 ): Promise<PaginatedResponse<ActionItem>> {
@@ -55,29 +48,27 @@ export async function fetchActionItems(
   const query = searchParams.toString();
   const path = `/workspaces/${wid}/action-items${query ? `?${query}` : ""}`;
 
-  return apiClient<PaginatedResponse<ActionItem>>(path, { token });
+  return api.fetch<PaginatedResponse<ActionItem>>(path);
 }
 
 export async function createActionItem(
-  token: string,
+  api: ApiClient,
   wid: string,
   data: CreateActionItemRequest
 ): Promise<ActionItem> {
-  return apiClient<ActionItem>(`/workspaces/${wid}/action-items`, {
-    token,
+  return api.fetch<ActionItem>(`/workspaces/${wid}/action-items`, {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
 export async function updateActionItem(
-  token: string,
+  api: ApiClient,
   wid: string,
   id: string,
   data: UpdateActionItemRequest
 ): Promise<ActionItem> {
-  return apiClient<ActionItem>(`/workspaces/${wid}/action-items/${id}`, {
-    token,
+  return api.fetch<ActionItem>(`/workspaces/${wid}/action-items/${id}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });

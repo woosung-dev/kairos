@@ -2,7 +2,6 @@
 // 도메인 무관 내보내기 버튼 — export fn 주입받아 Markdown/JSON 다운로드 (notes/meetings 공용)
 
 import { Download } from "lucide-react";
-import { useAuth } from "@clerk/nextjs";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -11,14 +10,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import type { ApiClient } from "@/lib/api-client";
+import { useApiClient } from "@/lib/use-api-client";
 import { triggerDownload } from "@/lib/download";
 
 type ExportFormat = "md" | "json";
 
 interface ExportButtonProps {
-  /** (token, workspaceId, id, format) → Blob 를 반환하는 도메인별 export fn */
+  /** (api, workspaceId, id, format) → Blob 를 반환하는 도메인별 export fn */
   exportFn: (
-    token: string,
+    api: ApiClient,
     workspaceId: string,
     id: string,
     format: ExportFormat,
@@ -29,14 +30,13 @@ interface ExportButtonProps {
 }
 
 export function ExportButton({ exportFn, id, title }: ExportButtonProps) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
 
   const handleExport = async (format: ExportFormat) => {
     try {
-      const token = await getToken();
-      if (!token || !wid) return;
-      const blob = await exportFn(token, wid, id, format);
+      if (!wid) return;
+      const blob = await exportFn(api, wid, id, format);
       triggerDownload(blob, `${title || "Untitled"}.${format}`);
       toast.success("내보내기 완료");
     } catch {

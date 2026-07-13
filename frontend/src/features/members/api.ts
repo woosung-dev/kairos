@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api-client";
+import { apiClient, type ApiClient } from "@/lib/api-client";
 import type {
   Member,
   Invite,
@@ -8,48 +8,33 @@ import type {
   AcceptInviteResponse,
 } from "./types";
 
-// --- Query Key Factory ---
-
-export const memberKeys = {
-  all: ["members"] as const,
-  list: (wid: string) => [...memberKeys.all, "list", wid] as const,
-};
-
-export const inviteKeys = {
-  all: ["invites"] as const,
-  list: (wid: string) => [...inviteKeys.all, "list", wid] as const,
-  info: (code: string) => [...inviteKeys.all, "info", code] as const,
-};
-
 // --- 멤버 API ---
 
 export async function fetchMembers(
-  token: string,
+  api: ApiClient,
   wid: string
 ): Promise<Member[]> {
-  return apiClient<Member[]>(`/workspaces/${wid}/members`, { token });
+  return api.fetch<Member[]>(`/workspaces/${wid}/members`);
 }
 
 export async function updateMemberRole(
-  token: string,
+  api: ApiClient,
   wid: string,
   memberId: string,
   data: UpdateMemberRoleRequest
 ): Promise<Member> {
-  return apiClient<Member>(`/workspaces/${wid}/members/${memberId}`, {
-    token,
+  return api.fetch<Member>(`/workspaces/${wid}/members/${memberId}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
 }
 
 export async function removeMember(
-  token: string,
+  api: ApiClient,
   wid: string,
   memberId: string
 ): Promise<void> {
-  return apiClient<void>(`/workspaces/${wid}/members/${memberId}`, {
-    token,
+  return api.fetch<void>(`/workspaces/${wid}/members/${memberId}`, {
     method: "DELETE",
   });
 }
@@ -57,47 +42,45 @@ export async function removeMember(
 // --- 초대 API ---
 
 export async function fetchInvites(
-  token: string,
+  api: ApiClient,
   wid: string
 ): Promise<Invite[]> {
-  return apiClient<Invite[]>(`/workspaces/${wid}/invites`, { token });
+  return api.fetch<Invite[]>(`/workspaces/${wid}/invites`);
 }
 
 export async function createInvite(
-  token: string,
+  api: ApiClient,
   wid: string,
   data: CreateInviteRequest
 ): Promise<Invite> {
-  return apiClient<Invite>(`/workspaces/${wid}/invites`, {
-    token,
+  return api.fetch<Invite>(`/workspaces/${wid}/invites`, {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
 export async function deactivateInvite(
-  token: string,
+  api: ApiClient,
   wid: string,
   inviteId: string
 ): Promise<void> {
-  return apiClient<void>(`/workspaces/${wid}/invites/${inviteId}`, {
-    token,
+  return api.fetch<void>(`/workspaces/${wid}/invites/${inviteId}`, {
     method: "DELETE",
   });
 }
 
 // --- 공개 초대 API ---
 
+// 공개 엔드포인트 — 비로그인 사용자도 초대 정보를 조회하므로 무토큰 apiClient 유지.
 export async function fetchInviteInfo(code: string): Promise<InviteInfo> {
   return apiClient<InviteInfo>(`/invites/${code}`);
 }
 
 export async function acceptInvite(
-  token: string,
+  api: ApiClient,
   code: string
 ): Promise<AcceptInviteResponse> {
-  return apiClient<AcceptInviteResponse>(`/invites/${code}/accept`, {
-    token,
+  return api.fetch<AcceptInviteResponse>(`/invites/${code}/accept`, {
     method: "POST",
   });
 }

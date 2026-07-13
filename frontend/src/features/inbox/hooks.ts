@@ -1,10 +1,10 @@
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
+import { inboxKeys } from "@/lib/query-keys";
+import { useApiClient } from "@/lib/use-api-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  inboxKeys,
   fetchInbox,
   classifyInboxItem,
   dismissInboxItem,
@@ -15,16 +15,12 @@ import type { FetchInboxParams } from "./api";
  * 워크스페이스 내 Inbox 목록 조회
  */
 export function useInbox(wid: string | undefined, params?: FetchInboxParams) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
 
   return useQuery({
     // Sprint 23 D3 fix: queryKey 에 params 포함 → 각 callsite 의 의도 분리.
     queryKey: inboxKeys.list(wid ?? "", params),
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return fetchInbox(token, wid!, params);
-    },
+    queryFn: () => fetchInbox(api, wid!, params),
     enabled: !!wid,
   });
 }
@@ -33,21 +29,17 @@ export function useInbox(wid: string | undefined, params?: FetchInboxParams) {
  * Inbox 항목 분류 확정
  */
 export function useClassifyInbox(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
+    mutationFn: ({
       id,
       projectIds,
     }: {
       id: string;
       projectIds: string[];
-    }) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return classifyInboxItem(token, wid!, id, projectIds);
-    },
+    }) => classifyInboxItem(api, wid!, id, projectIds),
     onSuccess: () => {
       if (wid) {
         // Sprint 23 D3 fix: byWorkspace prefix 로 모든 params 의 cache 일괄 무효화.
@@ -65,15 +57,11 @@ export function useClassifyInbox(wid: string | undefined) {
  * Inbox 항목 무시 (dismiss)
  */
 export function useDismissInbox(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return dismissInboxItem(token, wid!, id);
-    },
+    mutationFn: (id: string) => dismissInboxItem(api, wid!, id),
     onSuccess: () => {
       if (wid) {
         // Sprint 23 D3 fix: byWorkspace prefix 로 모든 params 의 cache 일괄 무효화.

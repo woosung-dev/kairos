@@ -1,10 +1,10 @@
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
+import { workspaceKeys } from "@/lib/query-keys";
+import { useApiClient } from "@/lib/use-api-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  workspaceKeys,
   fetchWorkspaces,
   createWorkspace,
   fetchWorkspace,
@@ -14,30 +14,22 @@ import {
 import type { Workspace } from "./types";
 
 export function useWorkspaces() {
-  const { getToken } = useAuth();
+  const api = useApiClient();
 
   return useQuery({
     queryKey: workspaceKeys.list(),
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return fetchWorkspaces(token);
-    },
+    queryFn: () => fetchWorkspaces(api),
     // 권한 표면 — 전역 focus refetch off 에서 예외 (ws 삭제/가입 반영 지연 방지)
     refetchOnWindowFocus: true,
   });
 }
 
 export function useCreateWorkspace() {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (name: string) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return createWorkspace(token, name);
-    },
+    mutationFn: (name: string) => createWorkspace(api, name),
     onSuccess: (newWorkspace: Workspace) => {
       queryClient.setQueryData<Workspace[]>(
         workspaceKeys.list(),
@@ -51,28 +43,22 @@ export function useCreateWorkspace() {
 }
 
 export function useWorkspace(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
 
   return useQuery({
     queryKey: workspaceKeys.detail(wid ?? ""),
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return fetchWorkspace(token, wid!);
-    },
+    queryFn: () => fetchWorkspace(api, wid!),
     enabled: !!wid,
   });
 }
 
 export function useDeleteWorkspace() {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (wid: string) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      await deleteWorkspace(token, wid);
+      await deleteWorkspace(api, wid);
       return wid;
     },
     onSuccess: (wid: string) => {
@@ -89,15 +75,11 @@ export function useDeleteWorkspace() {
 }
 
 export function useUpdateWorkspaceSettings(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { inbox_threshold: number }) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return updateWorkspaceSettings(token, wid!, data);
-    },
+    mutationFn: (data: { inbox_threshold: number }) => updateWorkspaceSettings(api, wid!, data),
     onSuccess: (result) => {
       toast.success(
         `임계값이 ${Math.round(result.inboxThreshold * 100)}%로 변경되었습니다`

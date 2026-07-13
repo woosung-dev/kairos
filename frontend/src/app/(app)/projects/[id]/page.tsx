@@ -1,4 +1,4 @@
-import { ProjectDashboard } from "@/features/projects/components/project-dashboard";
+import { ProjectDashboard } from "@/features/projects/components/dashboard/project-dashboard";
 
 export default async function ProjectDetailPage({
   params,

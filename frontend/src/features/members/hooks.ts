@@ -1,12 +1,12 @@
 "use client";
 
+import { memberKeys, inviteKeys } from "@/lib/query-keys";
+import { useApiClient } from "@/lib/use-api-client";
 import { useEffect } from "react";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import {
-  memberKeys,
-  inviteKeys,
   fetchMembers,
   updateMemberRole,
   removeMember,
@@ -44,15 +44,11 @@ export function useSyncWorkspaceRole(wid: string | undefined) {
 // --- 멤버 훅 ---
 
 export function useMembers(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
 
   return useQuery({
     queryKey: memberKeys.list(wid ?? ""),
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return fetchMembers(token, wid!);
-    },
+    queryFn: () => fetchMembers(api, wid!),
     enabled: !!wid,
     // 권한 표면 — 전역 focus refetch off 에서 예외 (role 변경/제거 반영 지연 방지)
     refetchOnWindowFocus: true,
@@ -79,21 +75,17 @@ export function useWorkspaceRole(workspaceId: string | undefined) {
 }
 
 export function useUpdateMemberRole(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
+    mutationFn: ({
       memberId,
       data,
     }: {
       memberId: string;
       data: UpdateMemberRoleRequest;
-    }) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return updateMemberRole(token, wid!, memberId, data);
-    },
+    }) => updateMemberRole(api, wid!, memberId, data),
     onSuccess: (_data, variables) => {
       toast.success(`역할이 ${variables.data.role}로 변경되었습니다`);
       if (wid) {
@@ -107,15 +99,11 @@ export function useUpdateMemberRole(wid: string | undefined) {
 }
 
 export function useRemoveMember(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (memberId: string) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return removeMember(token, wid!, memberId);
-    },
+    mutationFn: (memberId: string) => removeMember(api, wid!, memberId),
     onSuccess: () => {
       toast.success("멤버가 제거되었습니다");
       if (wid) {
@@ -138,15 +126,11 @@ export function useInvites(
   wid: string | undefined,
   options?: { enabled?: boolean },
 ) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
 
   return useQuery({
     queryKey: inviteKeys.list(wid ?? ""),
-    queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return fetchInvites(token, wid!);
-    },
+    queryFn: () => fetchInvites(api, wid!),
     enabled: !!wid && (options?.enabled ?? true),
     // 권한 표면 — 전역 focus refetch off 에서 예외 (초대 비활성화 반영 지연 방지)
     refetchOnWindowFocus: true,
@@ -154,15 +138,11 @@ export function useInvites(
 }
 
 export function useCreateInvite(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: CreateInviteRequest) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return createInvite(token, wid!, data);
-    },
+    mutationFn: (data: CreateInviteRequest) => createInvite(api, wid!, data),
     onSuccess: (newInvite) => {
       toast.success("초대 링크가 생성되었습니다");
       if (wid) {
@@ -182,14 +162,12 @@ export function useCreateInvite(wid: string | undefined) {
 }
 
 export function useDeactivateInvite(wid: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (inviteId: string) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      await deactivateInvite(token, wid!, inviteId);
+      await deactivateInvite(api, wid!, inviteId);
       return inviteId;
     },
     onSuccess: (deactivatedId) => {
@@ -219,13 +197,9 @@ export function useInviteInfo(code: string) {
 }
 
 export function useAcceptInvite() {
-  const { getToken } = useAuth();
+  const api = useApiClient();
 
   return useMutation({
-    mutationFn: async (code: string) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
-      return acceptInvite(token, code);
-    },
+    mutationFn: (code: string) => acceptInvite(api, code),
   });
 }
