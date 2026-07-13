@@ -50,3 +50,48 @@ export async function apiClient<T = unknown>(
 
   return res.json() as Promise<T>;
 }
+
+/** 토큰 부재 시 throw — 소비처가 error.message("인증이 필요합니다")를 그대로 렌더한다. */
+export class AuthRequiredError extends Error {
+  constructor() {
+    super("인증이 필요합니다");
+    this.name = "AuthRequiredError";
+  }
+}
+
+/**
+ * 인증 토큰이 주입된 API 클라이언트 seam (PR-3 c5).
+ * feature api 함수는 token 문자열 대신 이 인터페이스를 받는다.
+ */
+export interface ApiClient {
+  /** apiClient 동작 보존 (JSON/FormData/204 처리) + 토큰 자동 첨부. */
+  fetch<T = unknown>(path: string, init?: RequestInit): Promise<T>;
+  /** raw Response 반환 — Blob export, SSE 스트림 용. ok 검사는 호출자 책임. */
+  fetchRaw(path: string, init?: RequestInit): Promise<Response>;
+  /** rag SSE 등 escape hatch. 토큰 null 이면 AuthRequiredError throw. */
+  getToken(): Promise<string>;
+}
+
+export function createApiClient(
+  getToken: () => Promise<string | null>,
+): ApiClient {
+  const resolveToken = async (): Promise<string> => {
+    const token = await getToken();
+    if (!token) throw new AuthRequiredError();
+    return token;
+  };
+
+  return {
+    async fetch<T = unknown>(path: string, init?: RequestInit): Promise<T> {
+      const token = await resolveToken();
+      return apiClient<T>(path, { ...init, token });
+    },
+    async fetchRaw(path: string, init?: RequestInit): Promise<Response> {
+      const token = await resolveToken();
+      const headers = new Headers(init?.headers);
+      headers.set("Authorization", `Bearer ${token}`);
+      return fetch(`${API_BASE_URL}/api/v1${path}`, { ...init, headers });
+    },
+    getToken: resolveToken,
+  };
+}
