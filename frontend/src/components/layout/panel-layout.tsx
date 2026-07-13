@@ -1,16 +1,44 @@
 "use client";
 
 import { useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { useAuth } from "@clerk/nextjs";
 import { useUIStore } from "@/store/ui";
 import { useSourceViewerStore } from "@/features/sources/store";
 import { useBreakpoint } from "@/hooks/use-media-query";
 import { Sidebar } from "./sidebar";
-import { RagPanel } from "./rag-panel";
 import { Header } from "./header";
-import { CmdK } from "./cmd-k";
 import { BottomNav } from "./bottom-nav";
-import { SourceViewer } from "@/features/sources/components/source-viewer";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// 번들 분리 (PR-3 c1): RagPanel(react-markdown+remark-gfm)/CmdK/SourceViewer 를
+// next/dynamic 으로 lazy-load — (app) 공용 청크에서 무거운 마크다운 파서를 이탈시킨다.
+// 세 컴포넌트 모두 panel-layout 이 유일한 importer 이므로 여기 한 곳 전환으로 충분.
+function PanelSkeleton() {
+  return (
+    <div className="flex flex-col gap-3 p-4">
+      <Skeleton className="h-8 w-full" />
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-4 w-2/3" />
+      <Skeleton className="h-32 w-full" />
+    </div>
+  );
+}
+
+const RagPanel = dynamic(
+  () => import("./rag-panel").then((m) => m.RagPanel),
+  { ssr: false, loading: () => <PanelSkeleton /> },
+);
+const CmdK = dynamic(() => import("./cmd-k").then((m) => m.CmdK), {
+  ssr: false,
+});
+const SourceViewer = dynamic(
+  () =>
+    import("@/features/sources/components/source-viewer").then(
+      (m) => m.SourceViewer,
+    ),
+  { ssr: false, loading: () => <PanelSkeleton /> },
+);
 import { useSyncWorkspaceRole } from "@/features/members/hooks";
 import { useWorkspaces } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
