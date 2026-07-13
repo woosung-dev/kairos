@@ -7,9 +7,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, exists, func, or_, select
 
 from src.common.promote_models import ItemPromotionAudit
+from src.common.visibility import ADMIN_BYPASS_ROLES, project_access_clause
 from src.embeddings.models import EmbeddingChunk
 from src.meetings.models import Meeting, MeetingSummary, TranscriptSegment
-from src.projects.models import MeetingProjectLink, Project, ProjectMember
+from src.projects.models import MeetingProjectLink, Project
 
 
 def _meeting_visibility_filter(
@@ -33,10 +34,8 @@ def _meeting_visibility_filter(
     """
     if requester_role is None:
         return stmt
-    if requester_role in ("admin", "owner"):
+    if requester_role in ADMIN_BYPASS_ROLES:
         return stmt
-
-    from src.workspaces.models import WorkspaceMember
 
     mpl_exists = aliased(MeetingProjectLink)
     mpl_link = aliased(MeetingProjectLink)
@@ -44,31 +43,14 @@ def _meeting_visibility_filter(
     # 회의에 링크가 하나도 없으면 통과 (워크스페이스 레벨).
     no_links = ~exists().where(mpl_exists.meeting_id == Meeting.id)
 
-    # CAND-B 정합: private 분기는 ProjectMember 매핑 + 현 워크스페이스 멤버 동시 충족.
-    member_exists = exists().where(
-        and_(
-            ProjectMember.project_id == Project.id,
-            ProjectMember.user_id == requester_user_id,
-            WorkspaceMember.workspace_id == Project.workspace_id,
-            WorkspaceMember.user_id == requester_user_id,
-        )
-    )
     # 링크된 project 중 접근 가능한 것이 하나라도 있으면 통과.
+    # 코어 규칙은 common/visibility.py SSOT (CAND-B flatten EXISTS 포함) —
+    # N:M 링크 shape(aliased MPL + no_links)만 meetings 도메인 소유.
     has_accessible_link = exists().where(
         and_(
             mpl_link.meeting_id == Meeting.id,
             mpl_link.project_id == Project.id,
-            or_(
-                Project.visibility == "public",
-                and_(
-                    Project.visibility == "draft",
-                    Project.created_by_id == requester_user_id,
-                ),
-                and_(
-                    Project.visibility == "private",
-                    member_exists,
-                ),
-            ),
+            project_access_clause(requester_user_id),
         )
     )
     return stmt.where(or_(no_links, has_accessible_link))
