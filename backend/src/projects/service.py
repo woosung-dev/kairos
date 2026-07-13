@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from src.common.exceptions import AlreadyExistsError
+from src.common.fk_guard import require_in_workspace
 from src.common.pagination import build_page, to_offset
 from src.common.visibility import (
     ADMIN_BYPASS_ROLES,
@@ -52,15 +53,12 @@ class ProjectService:
 
         fail-closed (Codex 2차 Minor 1): repo 미주입 시 RuntimeError (silent skip 금지).
         """
-        if meeting_id is not None:
-            if self.meeting_repo is None:
-                raise RuntimeError("meeting_repo 필수 (F-2 검증)")
-            meeting = await self.meeting_repo.find_by_id(meeting_id, workspace_id)
-            if meeting is None:
-                # cross-tenant meeting → 404 (F-4 lock-in)
-                from src.meetings.exceptions import MeetingNotFoundError
+        from src.meetings.exceptions import MeetingNotFoundError
 
-                raise MeetingNotFoundError()
+        await require_in_workspace(
+            self.meeting_repo, meeting_id, workspace_id,
+            not_found=MeetingNotFoundError, repo_label="meeting_repo",
+        )
 
     async def create_project(
         self,

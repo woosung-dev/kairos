@@ -27,6 +27,7 @@ from src.common.promote_helpers import (
     build_item_promotion_audit,
     validate_promote_target,
 )
+from src.common.fk_guard import require_in_workspace
 from src.common.pagination import build_page, to_offset
 from src.common.visibility import (
     ADMIN_BYPASS_ROLES,
@@ -86,14 +87,10 @@ class NoteService:
         Codex 2차 Minor 1 (C7): fail-closed — project_id 가 들어왔는데 project_repo
         미주입이면 RuntimeError 로 차단 (silent skip 금지).
         """
-        if project_id is None:
-            return
-        if self.project_repo is None:
-            raise RuntimeError("project_repo 필수 (F-2 검증)")
-        # Sprint 19 PR #1 C9 (Codex F-1 cascade): find_by_id workspace_id 강제
-        project = await self.project_repo.find_by_id(project_id, workspace_id)
-        if project is None:
-            raise ProjectNotFoundError()
+        await require_in_workspace(
+            self.project_repo, project_id, workspace_id,
+            not_found=ProjectNotFoundError, repo_label="project_repo",
+        )
 
     async def create_note(
         self,

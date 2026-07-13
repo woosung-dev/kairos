@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import BackgroundTasks
 
+from src.common.fk_guard import require_in_workspace
 from src.common.pagination import build_page, to_offset
 from src.common.promote_helpers import (
     PromoteValidationError,
@@ -94,10 +95,12 @@ class InboxService:
         # Sprint 19 PR #1 C9 (Codex F-1 cascade): find_by_id 시그니처 workspace_id 강제
         verified_projects: list = []
         for project_id in project_ids:
-            project = await self.project_repo.find_by_id(project_id, workspace_id)
-            if project is None:
-                raise ProjectNotFoundError()
-            verified_projects.append(project)
+            verified_projects.append(
+                await require_in_workspace(
+                    self.project_repo, project_id, workspace_id,
+                    not_found=ProjectNotFoundError, repo_label="project_repo",
+                )
+            )
 
         item.is_processed = True
         item.updated_at = datetime.utcnow()
@@ -109,16 +112,13 @@ class InboxService:
         # fail-closed: meeting_repo 미주입 시 RuntimeError (silent skip 금지)
         linked_projects: list[dict] = []
         if item.source_type == "meeting":
-            if self.meeting_repo is None:
-                raise RuntimeError(
-                    "meeting_repo 필수 (Codex 2차 F-1 source_id meeting 검증)"
-                )
             # source_id (meeting_id) 가 같은 workspace 소속 인지 검증
             from src.meetings.exceptions import MeetingNotFoundError
 
-            meeting = await self.meeting_repo.find_by_id(item.source_id, workspace_id)
-            if meeting is None:
-                raise MeetingNotFoundError()
+            await require_in_workspace(
+                self.meeting_repo, item.source_id, workspace_id,
+                not_found=MeetingNotFoundError, repo_label="meeting_repo",
+            )
             for project in verified_projects:
                 await self.project_repo.add_meeting_link(
                     item.source_id, project.id, workspace_id

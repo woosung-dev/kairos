@@ -82,6 +82,7 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 | B-12 | **에러는 도메인별 `exceptions.py` + 전역 핸들러** (`common/exceptions.py`) | 도메인 모듈마다 |
 | B-13 | **R2 클라이언트는 aioboto3** (boto3 동기 사용 금지). 불가피한 경우 `run_in_executor` | `common/r2.py` |
 | B-14 | **SSE 스트리밍 응답**: `EventSourceResponse` (`sse_starlette.sse`) — 내부적으로 `text/event-stream` 헤더, `data:` 포맷. `StreamingResponse` 직접 사용하지 않음 (RAG에서 사용) | `rag/router.py:6,40` |
+| B-15 | **read-path 공용 규약 SSOT (2026-07-13)**: ① visibility 규칙 = `common/visibility.py` 만 (arch gate 강제) ② 페이지 응답 조립 = `common/pagination.py` `build_page`/`empty_page` (`"hasNext"` 손조립 금지, list/count 는 동일 필터 계약) ③ secondary FK workspace 검증 = `common/fk_guard.py` `require_in_workspace` (예외 타입 매핑은 도메인 소유) | `tests/architecture/test_visibility_single_source.py` + code review |
 
 ---
 
