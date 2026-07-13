@@ -1,7 +1,7 @@
 // Sprint 15 Memory 도메인 React Query 훅 + MediaRecorder MIME negotiation
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
+import { useApiClient } from "@/lib/use-api-client";
 import {
   useMutation,
   useQuery,
@@ -39,14 +39,12 @@ function pickMimeType(): string | undefined {
  * 텍스트 메모 capture mutation
  */
 export function useCaptureText(workspaceId: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (text: string) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
       if (!workspaceId) throw new Error("워크스페이스가 선택되지 않았습니다");
-      return captureText(token, workspaceId, text);
+      return captureText(api, workspaceId, text);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: memoryKeys.all });
@@ -63,14 +61,12 @@ export function useCaptureText(workspaceId: string | undefined) {
  * 음성 메모 capture mutation
  */
 export function useCaptureVoice(workspaceId: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { blob: Blob; filename: string }) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
       if (!workspaceId) throw new Error("워크스페이스가 선택되지 않았습니다");
-      return captureVoice(token, workspaceId, input.blob, input.filename);
+      return captureVoice(api, workspaceId, input.blob, input.filename);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: memoryKeys.all });
@@ -90,14 +86,12 @@ export function useRecall(
   q: string,
   enabled = true
 ) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   return useQuery({
     queryKey: memoryKeys.recall(workspaceId ?? "", q),
     queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
       if (!workspaceId) throw new Error("워크스페이스가 선택되지 않았습니다");
-      return recallMemory(token, workspaceId, q);
+      return recallMemory(api, workspaceId, q);
     },
     enabled: enabled && !!workspaceId && q.trim().length >= 2,
     staleTime: 30_000,
@@ -109,18 +103,16 @@ export function useRecall(
  * 성공 시 invalidate + toast. 실패 시 toast로 사용자 피드백.
  */
 export function usePromote(workspaceId: string | undefined) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
       memoryId: string;
       targetWorkspaceId: string;
     }) => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
       if (!workspaceId) throw new Error("워크스페이스가 선택되지 않았습니다");
       return promoteMemory(
-        token,
+        api,
         workspaceId,
         input.memoryId,
         input.targetWorkspaceId
@@ -143,14 +135,12 @@ export function useMemoryDetail(
   workspaceId: string | undefined,
   memoryId: string | undefined
 ) {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   return useQuery({
     queryKey: memoryKeys.detail(workspaceId ?? "", memoryId ?? ""),
     queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error("인증이 필요합니다");
       if (!workspaceId || !memoryId) throw new Error("필수 파라미터 누락");
-      return getMemory(token, workspaceId, memoryId);
+      return getMemory(api, workspaceId, memoryId);
     },
     enabled: !!workspaceId && !!memoryId,
   });

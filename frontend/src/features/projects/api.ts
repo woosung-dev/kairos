@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api-client";
+import type { ApiClient } from "@/lib/api-client";
 import type { PaginatedResponse } from "@/types";
 import type {
   AddProjectMemberRequest,
@@ -34,7 +34,7 @@ export interface FetchProjectsParams {
 }
 
 export async function fetchProjects(
-  token: string,
+  api: ApiClient,
   wid: string,
   params?: FetchProjectsParams
 ): Promise<PaginatedResponse<Project>> {
@@ -47,125 +47,117 @@ export async function fetchProjects(
   const query = searchParams.toString();
   const path = `/workspaces/${wid}/projects${query ? `?${query}` : ""}`;
 
-  return apiClient<PaginatedResponse<Project>>(path, { token });
+  return api.fetch<PaginatedResponse<Project>>(path);
 }
 
 export async function fetchProject(
-  token: string,
+  api: ApiClient,
   wid: string,
   id: string
 ): Promise<Project> {
-  return apiClient<Project>(`/workspaces/${wid}/projects/${id}`, { token });
+  return api.fetch<Project>(`/workspaces/${wid}/projects/${id}`);
 }
 
 export async function createProject(
-  token: string,
+  api: ApiClient,
   wid: string,
   data: CreateProjectRequest
 ): Promise<Project> {
-  return apiClient<Project>(`/workspaces/${wid}/projects`, {
-    token,
+  return api.fetch<Project>(`/workspaces/${wid}/projects`, {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
 export async function updateProject(
-  token: string,
+  api: ApiClient,
   wid: string,
   id: string,
   data: UpdateProjectRequest
 ): Promise<Project> {
-  return apiClient<Project>(`/workspaces/${wid}/projects/${id}`, {
-    token,
+  return api.fetch<Project>(`/workspaces/${wid}/projects/${id}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
 }
 
 export async function deleteProject(
-  token: string,
+  api: ApiClient,
   wid: string,
   id: string
 ): Promise<void> {
-  return apiClient<void>(`/workspaces/${wid}/projects/${id}`, {
-    token,
+  return api.fetch<void>(`/workspaces/${wid}/projects/${id}`, {
     method: "DELETE",
   });
 }
 
 export async function archiveProject(
-  token: string,
+  api: ApiClient,
   wid: string,
   id: string
 ): Promise<Project> {
-  return apiClient<Project>(`/workspaces/${wid}/projects/${id}/archive`, {
-    token,
+  return api.fetch<Project>(`/workspaces/${wid}/projects/${id}/archive`, {
     method: "POST",
   });
 }
 
 export async function addMeetingProject(
-  token: string,
+  api: ApiClient,
   wid: string,
   meetingId: string,
   projectId: string
 ): Promise<void> {
-  return apiClient<void>(
+  return api.fetch<void>(
     `/workspaces/${wid}/meetings/${meetingId}/projects/${projectId}`,
-    { token, method: "PUT" }
+    { method: "PUT" }
   );
 }
 
 export async function removeMeetingProject(
-  token: string,
+  api: ApiClient,
   wid: string,
   meetingId: string,
   projectId: string
 ): Promise<void> {
-  return apiClient<void>(
+  return api.fetch<void>(
     `/workspaces/${wid}/meetings/${meetingId}/projects/${projectId}`,
-    { token, method: "DELETE" }
+    { method: "DELETE" }
   );
 }
 
 // --- ProjectMember (Sprint 6 L-6) ---
 
 export async function fetchProjectMembers(
-  token: string,
+  api: ApiClient,
   wid: string,
   projectId: string
 ): Promise<ProjectMember[]> {
-  return apiClient<ProjectMember[]>(
-    `/workspaces/${wid}/projects/${projectId}/members`,
-    { token }
-  );
+  return api.fetch<ProjectMember[]>(
+    `/workspaces/${wid}/projects/${projectId}/members`);
 }
 
 export async function addProjectMember(
-  token: string,
+  api: ApiClient,
   wid: string,
   projectId: string,
   data: AddProjectMemberRequest
 ): Promise<ProjectMember> {
-  return apiClient<ProjectMember>(
+  return api.fetch<ProjectMember>(
     `/workspaces/${wid}/projects/${projectId}/members`,
-    {
-      token,
-      method: "POST",
+    { method: "POST",
       body: JSON.stringify(data),
     }
   );
 }
 
 export async function removeProjectMember(
-  token: string,
+  api: ApiClient,
   wid: string,
   projectId: string,
   userId: string
 ): Promise<void> {
-  return apiClient<void>(
+  return api.fetch<void>(
     `/workspaces/${wid}/projects/${projectId}/members/${userId}`,
-    { token, method: "DELETE" }
+    { method: "DELETE" }
   );
 }
