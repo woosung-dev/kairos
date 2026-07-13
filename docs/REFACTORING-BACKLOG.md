@@ -2530,11 +2530,14 @@ agy F9 sub-3 — `/api/v1/users/sync` endpoint 재도입 시 Svix 서명 검증 
 - **arch test gate 강제화** (BUG-S28-ARCH-5 부분 해소). I-1 (service 가 AsyncSession 인스턴스 미보유, onboarding allowlist) / I-4 (프롬프트 `common/prompts.py` 중앙화) / core→common import allowlist (cycle 악화 회귀 가드) 3종 추가. 기존 memory→embeddings 가드 포함 arch test 4 게이트로 확대.
 - **FE shallow/FSD 위반 제거**. notes·meetings `export-button.tsx` ~95% 중복 → `components/shared/ExportButton.tsx` 1개로 추출 (동작 보존, wrapper 2파일 삭제). FSD 격리 위반 2건 해소 — `getCitationColor` → `lib/citation-colors.ts`, visibility 공유 어휘(`ProjectVisibility` 타입 + 라벨/설명/색상) → `lib/visibility.ts` (members → projects 컴포넌트 내부 import 제거).
 
-### BL-AV-1 — FE project-dashboard.tsx god component 분해 (P2, FE 아키텍처)
-`features/projects/components/project-dashboard.tsx`(637줄)가 6개 feature(actions/meetings/notes/members/workspaces hooks+types)를 직접 결합 — 코드베이스 최고 결합도. deletion test: 분리 시 각 섹션 책임이 자기 feature 로 회귀(earning its keep 아님 = 단일 화면 hub). 수정=탭/섹션별 하위 컴포넌트 추출 + 데이터 훅 경계 정리.
+### BL-AV-1 — FE project-dashboard.tsx god component 분해 (P2, FE 아키텍처) ✅ **완료 (2026-07-13 FE seam 리팩토링 PR)**
+`features/projects/components/project-dashboard.tsx`(637줄→셸 ~120줄)를 `components/dashboard/` 8파일로 분해 — header/content/actions-section/admin-dialogs 가 각자 쿼리 소유(쿼리 소유권 하향). 온보딩 게이트는 dashboard-content 소유로 거동 보존. team spine t3/t14/t20/t21 그린.
 
-### BL-AV-2 — FE FSD public-API barrel 부재 (P3, FE 아키텍처)
-전 feature 에 `index.ts` 공개 표면 없음 → 모든 cross-feature import 가 deep import(컴포넌트 내부 직접 참조 가능). 본 PR 이 2건 위반을 해소했으나 구조적 재발 방지엔 feature 별 barrel + 경계 lint 필요. 수정=feature `index.ts` 점진 도입 또는 eslint `no-restricted-imports` 로 `features/*/components/*` cross-feature 직접 import 차단.
+### BL-AV-2 — FE FSD public-API barrel 부재 (P3, FE 아키텍처) ✅ **완료 (2026-07-13, barrel 대신 lint 채택)**
+barrel `index.ts` 대신 (Vercel bundle-barrel-imports 규칙과 상충 회피) `lib/query-keys.ts` 레지스트리로 cross-feature key import 소멸 + eslint `no-restricted-imports` 로 `@/features/*/components/*` cross-feature deep import 차단.
+
+### BL-FE-COMPILER — React Compiler 재도입 (P3, FE 성능) — 진입 조건부
+2026-07-13 시도→revert. 원인: compiler auto-memo 가 zustand store 의 안정 참조 함수 `hasRole("admin")` 결과를 stale 캐시 → role-gated UI(설정 Audit 탭, projects 생성 버튼) 미표시, team spine t16+t20 결정적 실패 (revert 후 그린). **재도입 조건**: `workspaces/store.ts` 의 `hasRole`(get() 클로저)를 반응형 selector 기반으로 교체 후. 현행 완화: SmartInboxItemCard 수동 memo.
 
 ### 백엔드 deep-module (이연 유지)
 `audit/` 도메인 추출(`common/audit_*` + `promote_*`) + `core↔common` cycle 해소(`common/database.py` → `core/database.py`)는 **기존 BL-S27e-F** 클러스터로 이연(Scope C). 본 검증으로 둘 다 코드 재확인 완료 — core→common 단일 edge=`lifespan.py → common.database`(test gate 로 고정), `common/audit_router.py` 가 `prefix=/audit` + `tags=["audit"]` 자가선언(도메인 추출 신호).
