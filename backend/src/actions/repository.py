@@ -69,9 +69,13 @@ class ActionItemRepository:
         self,
         workspace_id: uuid.UUID,
         status: str | None = None,
+        priority: str | None = None,
+        project_id: uuid.UUID | None = None,
         requester_user_id: uuid.UUID | None = None,
         requester_role: str | None = None,
     ) -> int:
+        """count 는 find_by_workspace 와 동일 필터 계약 (PR-2 c1 — 이전엔
+        priority/project_id 를 못 받아 필터된 list 와 total/hasNext 가 불일치)."""
         stmt = (
             select(func.count())
             .select_from(ActionItem)
@@ -79,6 +83,10 @@ class ActionItemRepository:
         )
         if status:
             stmt = stmt.where(ActionItem.status == status)
+        if priority:
+            stmt = stmt.where(ActionItem.priority == priority)
+        if project_id:
+            stmt = stmt.where(ActionItem.project_id == project_id)
         # F1: total 도 필터된 집합 기준 (pagination 정합).
         stmt = _action_visibility_filter(stmt, requester_user_id, requester_role)
         return (await self.session.exec(stmt)).one()

@@ -134,6 +134,7 @@ class ProjectService:
             requester_user_id=requester_user_id,
             requester_role=requester_role,
             status=status,
+            tag=tag,
         )
 
         return {

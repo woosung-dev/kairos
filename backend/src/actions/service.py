@@ -150,6 +150,8 @@ class ActionItemService:
         total = await self.repo.count_by_workspace(
             workspace_id,
             status=status,
+            priority=priority,
+            project_id=project_id,
             requester_user_id=requester_user_id,
             requester_role=requester_role,
         )

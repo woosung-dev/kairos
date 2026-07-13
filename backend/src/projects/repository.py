@@ -18,6 +18,18 @@ from src.projects.exceptions import ProjectNotFoundError
 from src.projects.models import MeetingProjectLink, Project, ProjectMember
 
 
+def _tag_contains(tag: str):
+    """JSON 배열 tags 에 태그 포함 여부 (PostgreSQL @> 연산자).
+
+    PR-2 c1 fix: sa_type=JSON 컬럼의 .contains() 는 문자열 LIKE(`json ~~ text`)로
+    컴파일돼 실 Postgres 에서 UndefinedFunctionError 500 — JSONB cast 후 @> 적용.
+    """
+    from sqlalchemy import cast
+    from sqlalchemy.dialects.postgresql import JSONB
+
+    return cast(Project.tags, JSONB).contains([tag])
+
+
 class ProjectRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -48,8 +60,7 @@ class ProjectRepository:
         if status:
             stmt = stmt.where(Project.status == status)
         if tag:
-            # JSON 배열에 태그 포함 여부 (PostgreSQL @> 연산자)
-            stmt = stmt.where(Project.tags.contains([tag]))
+            stmt = stmt.where(_tag_contains(tag))
         stmt = stmt.order_by(Project.sort_order, Project.created_at.desc())
         stmt = stmt.offset(offset).limit(limit)
         return list((await self.session.exec(stmt)).all())
@@ -60,7 +71,10 @@ class ProjectRepository:
         requester_user_id: uuid.UUID | None = None,
         requester_role: str | None = None,
         status: str | None = None,
+        tag: str | None = None,
     ) -> int:
+        """count 는 find_by_workspace 와 동일 필터 계약 (PR-2 c1 — 이전엔
+        tag 를 못 받아 태그 필터된 list 와 total/hasNext 가 불일치)."""
         stmt = (
             select(func.count())
             .select_from(Project)
@@ -69,6 +83,8 @@ class ProjectRepository:
         stmt = self._apply_visibility_filter(stmt, requester_user_id, requester_role)
         if status:
             stmt = stmt.where(Project.status == status)
+        if tag:
+            stmt = stmt.where(_tag_contains(tag))
         return (await self.session.exec(stmt)).one()
 
     @staticmethod
