@@ -3,7 +3,7 @@
 import pytest
 
 from src.common.exceptions import AlreadyExistsError, NotFoundError
-from src.common.pagination import PaginatedResponse
+from src.common.pagination import build_page
 from src.common.prompts import (
     MEETING_SUMMARY_SYSTEM_PROMPT,
     parse_json_response,
@@ -23,32 +23,14 @@ class TestExceptions:
 
 
 class TestPagination:
-    def test_paginated_response_has_next(self):
-        resp = PaginatedResponse(
-            items=["a", "b"],
-            total=50,
-            page=1,
-            page_size=20,
-        )
-        assert resp.has_next is True
+    def test_build_page_has_next(self):
+        assert build_page(["a", "b"], total=50, page=1, page_size=20)["hasNext"] is True
 
-    def test_paginated_response_no_next(self):
-        resp = PaginatedResponse(
-            items=["a"],
-            total=1,
-            page=1,
-            page_size=20,
-        )
-        assert resp.has_next is False
+    def test_build_page_no_next(self):
+        assert build_page(["a"], total=1, page=1, page_size=20)["hasNext"] is False
 
-    def test_paginated_response_last_page(self):
-        resp = PaginatedResponse(
-            items=["c"],
-            total=41,
-            page=3,
-            page_size=20,
-        )
-        assert resp.has_next is False
+    def test_build_page_last_page(self):
+        assert build_page(["c"], total=41, page=3, page_size=20)["hasNext"] is False
 
 
 class TestPrompts:

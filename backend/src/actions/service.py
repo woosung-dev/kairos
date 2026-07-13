@@ -28,6 +28,8 @@ from src.actions.models import ActionItem
 from src.actions.repository import ActionItemRepository
 from src.actions.schemas import ActionPromoteOut
 from src.common.exceptions import NotFoundError
+from src.common.fk_guard import require_in_workspace
+from src.common.pagination import build_page, to_offset
 from src.common.promote_helpers import (
     PromoteValidationError,
     build_item_promotion_audit,
@@ -71,20 +73,14 @@ class ActionItemService:
         Codex 2차 Minor 1 (C7): fail-closed — FK 가 들어왔는데 검증 repo 미주입이면
         silent skip 대신 RuntimeError 로 차단 (테스트 사고 방지).
         """
-        if project_id is not None:
-            if self.project_repo is None:
-                raise RuntimeError("project_repo 필수 (F-2 검증)")
-            # Sprint 19 PR #1 C9 (Codex F-1 cascade): find_by_id workspace_id 강제
-            project = await self.project_repo.find_by_id(project_id, workspace_id)
-            if project is None:
-                raise ProjectNotFoundError()
-        if meeting_id is not None:
-            if self.meeting_repo is None:
-                raise RuntimeError("meeting_repo 필수 (F-2 검증)")
-            # MeetingRepository.find_by_id 가 이미 workspace_id 시그니처 (Sprint 19 PR #1 commit C1)
-            meeting = await self.meeting_repo.find_by_id(meeting_id, workspace_id)
-            if meeting is None:
-                raise MeetingNotFoundError()
+        await require_in_workspace(
+            self.project_repo, project_id, workspace_id,
+            not_found=ProjectNotFoundError, repo_label="project_repo",
+        )
+        await require_in_workspace(
+            self.meeting_repo, meeting_id, workspace_id,
+            not_found=MeetingNotFoundError, repo_label="meeting_repo",
+        )
         if assignee_id is not None:
             if self.workspace_repo is None:
                 raise RuntimeError("workspace_repo 필수 (F-2 검증)")
@@ -136,7 +132,7 @@ class ActionItemService:
         private/draft 프로젝트 액션을 list 로 읽는 read IDOR 차단 (notes CAND-A 정합).
         requester_role 미전달(None) = 내부/파이프라인 호출 → 게이트 skip (하위호환).
         """
-        offset = (page - 1) * page_size
+        offset = to_offset(page, page_size)
         items = await self.repo.find_by_workspace(
             workspace_id,
             status=status,
@@ -150,17 +146,13 @@ class ActionItemService:
         total = await self.repo.count_by_workspace(
             workspace_id,
             status=status,
+            priority=priority,
+            project_id=project_id,
             requester_user_id=requester_user_id,
             requester_role=requester_role,
         )
 
-        return {
-            "items": [self._to_dict(i) for i in items],
-            "total": total,
-            "page": page,
-            "pageSize": page_size,
-            "hasNext": page * page_size < total,
-        }
+        return build_page([self._to_dict(i) for i in items], total, page, page_size)
 
     async def _verify_action_visibility(
         self,

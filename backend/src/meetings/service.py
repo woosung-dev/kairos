@@ -20,6 +20,7 @@ from src.common.promote_helpers import (
     clone_action_items_for_promote,
     validate_promote_target,
 )
+from src.common.pagination import build_page, empty_page, to_offset
 from src.common.visibility import (
     ADMIN_BYPASS_ROLES,
     Access,
@@ -116,14 +117,8 @@ class MeetingService:
             if target is None or not await self._is_project_accessible(
                 target, requester_user_id, requester_role, workspace_id
             ):
-                return {
-                    "items": [],
-                    "total": 0,
-                    "page": page,
-                    "pageSize": page_size,
-                    "hasNext": False,
-                }
-        offset = (page - 1) * page_size
+                return empty_page(page, page_size)
+        offset = to_offset(page, page_size)
         meetings = await self.repo.find_by_workspace(
             workspace_id,
             offset,
@@ -139,13 +134,9 @@ class MeetingService:
             requester_role=requester_role,
         )
 
-        return {
-            "items": [self._to_list_item(m) for m in meetings],
-            "total": total,
-            "page": page,
-            "pageSize": page_size,
-            "hasNext": page * page_size < total,
-        }
+        return build_page(
+            [self._to_list_item(m) for m in meetings], total, page, page_size
+        )
 
     async def _is_project_accessible(
         self,

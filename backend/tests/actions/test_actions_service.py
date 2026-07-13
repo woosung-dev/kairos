@@ -149,6 +149,15 @@ class TestListActionItems:
             requester_user_id=None,
             requester_role=None,
         )
+        # PR-2 c1: count 도 동일 필터 계약 (priority/project_id 미전달 회귀 차단)
+        repo.count_by_workspace.assert_awaited_once_with(
+            ws_id,
+            status="done",
+            priority="high",
+            project_id=proj_id,
+            requester_user_id=None,
+            requester_role=None,
+        )
 
     @pytest.mark.asyncio
     async def test_last_page_has_next_false(self):
