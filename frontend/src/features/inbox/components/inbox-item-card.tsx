@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { ArrowUpRight, Mic, StickyNote, Paperclip, Pin, Check, Pencil, Trash2, Undo2 } from "lucide-react";
 import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
@@ -31,7 +31,10 @@ interface SmartInboxItemCardProps {
 
 /* ── 컴포넌트 ── */
 
-export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
+// React Compiler revert(zustand hasRole 비반응형 get() 과 stale 메모이제이션 충돌) 후
+// 수동 memo fallback — item 단일 prop + React Query structural sharing 으로 참조 안정,
+// 리스트 내 타 카드 변경 시 재렌더 차단 (439줄 최대 리스트 아이템).
+function SmartInboxItemCardImpl({ item }: SmartInboxItemCardProps) {
   const [status, setStatus] = useState<"idle" | "confirmed" | "dismissed" | "editing">("idle");
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
@@ -437,3 +440,5 @@ export function SmartInboxItemCard({ item }: SmartInboxItemCardProps) {
     </div>
   );
 }
+
+export const SmartInboxItemCard = memo(SmartInboxItemCardImpl);
