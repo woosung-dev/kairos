@@ -2,8 +2,8 @@
 
 // Sprint 15 R7 — Founder admin recall-metrics 페이지
 import { useQuery } from "@tanstack/react-query";
-import { useAuth, useUser } from "@clerk/nextjs";
-import { apiClient } from "@/lib/api-client";
+import { useUser } from "@clerk/nextjs";
+import { useApiClient } from "@/lib/use-api-client";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 
 const FOUNDER_CLERK_ID = process.env.NEXT_PUBLIC_FOUNDER_CLERK_ID;
@@ -18,7 +18,7 @@ interface MemoryMetrics {
 
 export default function RecallMetricsPage() {
   const { user, isLoaded } = useUser();
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const workspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
   const isFounder = !!FOUNDER_CLERK_ID && user?.id === FOUNDER_CLERK_ID;
@@ -26,12 +26,10 @@ export default function RecallMetricsPage() {
   const metrics = useQuery({
     queryKey: ["memory", "metrics", workspaceId],
     queryFn: async () => {
-      const token = await getToken();
-      if (!token || !workspaceId) throw new Error("auth/workspace 미설정");
-      // apiClient는 `${API_BASE_URL}/api/v1` prefix를 자동 부여한다. 중복 prefix 금지.
-      return apiClient<MemoryMetrics>(
+      if (!workspaceId) throw new Error("auth/workspace 미설정");
+      // api.fetch 는 `${API_BASE_URL}/api/v1` prefix 자동 부여 + 토큰 첨부. 중복 prefix 금지.
+      return api.fetch<MemoryMetrics>(
         `/workspaces/${workspaceId}/memory/metrics`,
-        { token },
       );
     },
     enabled: !!workspaceId && isFounder,

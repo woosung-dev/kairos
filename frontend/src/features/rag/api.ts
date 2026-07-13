@@ -1,23 +1,19 @@
+// RAG ask SSE 스트림 API — raw Response 가 필요해 ApiClient.fetchRaw 사용
+import type { ApiClient } from "@/lib/api-client";
 import type { RagAskRequest } from "./types";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export const ragKeys = {
   all: ["rag"] as const,
 };
 
 export async function askRag(
-  token: string,
+  api: ApiClient,
   wid: string,
   data: RagAskRequest,
 ): Promise<Response> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/workspaces/${wid}/rag/ask`, {
+  const res = await api.fetchRaw(`/workspaces/${wid}/rag/ask`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
 

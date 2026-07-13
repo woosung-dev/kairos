@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { useAuth } from "@clerk/nextjs";
+import { useApiClient } from "@/lib/use-api-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { onboardingKeys } from "@/features/onboarding/api";
@@ -10,7 +10,7 @@ import { useRagStore } from "./store";
 import type { SSESearchResultsEvent, SSEAnswerEvent } from "./types";
 
 export function useRagStream() {
-  const { getToken } = useAuth();
+  const api = useApiClient();
   const queryClient = useQueryClient();
   const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
   // Sprint 29 R3 (rag-store): selector 별 구독 — 이전 전체 구독은 SSE 토큰마다 store 가
@@ -30,7 +30,8 @@ export function useRagStream() {
     async (question: string) => {
       if (!wid) return;
 
-      const token = await getToken();
+      // 거동 보존: 토큰 부재 시 메시지 추가 없이 조용히 반환 (기존 null-token 분기).
+      const token = await api.getToken().catch(() => null);
       if (!token) return;
 
       // 사용자 메시지 추가
@@ -53,7 +54,7 @@ export function useRagStream() {
       setIsStreaming(true);
 
       try {
-        const response = await askRag(token, wid, {
+        const response = await askRag(api, wid, {
           question,
           projectId: searchFilter.projectId ?? null,
           timeRange: searchFilter.timeRange ?? null,
@@ -118,7 +119,7 @@ export function useRagStream() {
         setIsStreaming(false);
       }
     },
-    [wid, getToken, addMessage, updateLastAssistantMessage, setSourcesOnLastAssistant, setIsStreaming, searchFilter, queryClient]
+    [wid, api, addMessage, updateLastAssistantMessage, setSourcesOnLastAssistant, setIsStreaming, searchFilter, queryClient]
   );
 
   return { ask };
