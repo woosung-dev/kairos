@@ -83,7 +83,7 @@ docs: 문서 / chore: 빌드·설정 / test: 테스트
 
 **한 줄**: 팀의 세컨드 브레인 — 회의/노트/자료 → AI Distillation → 프로젝트 구조화 → RAG 인사이트. PERSONA-001 1인 풀스택 founder (`docs/adr/011-persona-definition.md`). 상세: `docs/requirements/prd.md`.
 
-**기술 스택**: Next.js 16 + React 19 + Tailwind v4 + shadcn/ui v4 (FE) / FastAPI + SQLModel + asyncpg (BE) / PostgreSQL Neon + pgvector HNSW halfvec (ADR-020) / Clerk OAuth (webhook SKIP, ADR-022) / R2 / Whisper + pyannote / Gemini `gemini-3.1-flash-lite` 고정 (ADR-019 Phase B) / OpenAI text-embedding-3-small 1536d / Vercel + GCP Cloud Run (`jetaime-dev`) / Sentry (ADR-021).
+**기술 스택**: Next.js 16 + React 19 + Tailwind v4 + shadcn/ui v4 (FE) / FastAPI + SQLModel + asyncpg (BE) / PostgreSQL Neon + pgvector HNSW halfvec (ADR-020) / Clerk OAuth (webhook SKIP, ADR-022) / R2 / Whisper + pyannote / Gemini `gemini-3.1-flash-lite` 고정 (ADR-019 Phase B) / OpenAI text-embedding-3-small 1536d / Vercel + GCP Cloud Run (`gcp-project-504004`, 2026-07-30 이전 — 이전 `jetaime-dev` 는 DELETE_REQUESTED) / Sentry (ADR-021).
 
 **도메인 / 엔티티 / visibility / 파이프라인**: `CONTEXT-MAP.md` (헌법). 상세 architecture: `docs/architecture/{ai,rag,cross-domain}-pipeline.md`.
 

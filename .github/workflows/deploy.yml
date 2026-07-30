@@ -13,7 +13,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  GCP_PROJECT: jetaime-dev
+  # 2026-07-30: jetaime-dev 가 DELETE_REQUESTED 상태가 되어 배포 불가 → gcp-project-504004 로 이전.
+  # 이 프로젝트는 cookmark / nexus-core 와 공유하는 배포 허브이며, WIF provider 와 배포 SA 는 리포별로 분리한다.
+  GCP_PROJECT: gcp-project-504004
   GCP_REGION: asia-northeast3
   SERVICE_NAME: kairos-api
   ARTIFACT_REGISTRY: kairos-docker

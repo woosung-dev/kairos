@@ -155,7 +155,7 @@ echo -n "new-value" | gcloud secrets versions add database-url --data-file=-
 #### B. Workload Identity Federation 풀 + 프로바이더 생성
 
 ```bash
-PROJECT_ID=jetaime-dev
+PROJECT_ID=gcp-project-504004   # 2026-07-30 이전. 이전 jetaime-dev 는 DELETE_REQUESTED 상태
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
 REPO=woosung-dev/kairos
 
@@ -224,7 +224,7 @@ Repo → Settings → Secrets and variables → Actions:
 | Secret 이름 | 값 |
 |---|---|
 | `GCP_WIF_PROVIDER` | 위 스크립트가 출력한 provider resource name |
-| `GCP_DEPLOYER_SA` | `github-actions-sa@jetaime-dev.iam.gserviceaccount.com` (공유 SA — truewords/kairos 동시 사용) |
+| `GCP_DEPLOYER_SA` | `kairos-deployer@gcp-project-504004.iam.gserviceaccount.com` (2026-07-30 이전 — kairos 전용 SA, WIF provider `kairos` 가 `woosung-dev/kairos` 리포로 제한) |
 | `CORS_ORIGINS` | `https://kairos-zeta-ebon.vercel.app,...` |
 | `FRONTEND_URL` | `https://kairos-zeta-ebon.vercel.app` |
 
@@ -234,7 +234,7 @@ E2E 테스트까지 활성화하려면 추가로:
 |---|---|
 | `E2E_CLERK_PUBLISHABLE_KEY` | Clerk dev 공개 키 |
 | `E2E_CLERK_SECRET_KEY` | Clerk dev 비밀 키 |
-| `E2E_API_URL` | `https://kairos-api-imrsiyibaa-du.a.run.app` |
+| `E2E_API_URL` | 최신 성공 배포의 `deploy-cloudrun` 출력 URL. 정적 URL을 복사하지 말고 `/api/v1/health` 200을 확인한 값을 등록한다. |
 | `E2E_USER_EMAIL` | 테스트 계정 이메일 |
 | `E2E_USER_PASSWORD` | 테스트 계정 비밀번호 |
 | (Variable) `E2E_ENABLED` | `true` |
