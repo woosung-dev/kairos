@@ -15,16 +15,22 @@ class IntegrationConnection(SQLModel, table=True):
             "workspace_id",
             name="uq_integration_connections_id_workspace_id",
         ),
+        UniqueConstraint(
+            "workspace_id",
+            "provider",
+            name="uq_integration_connections_workspace_provider",
+        ),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     workspace_id: uuid.UUID = Field(foreign_key="workspaces.id", index=True)
     provider: str = "google_drive"
     authorized_by_id: uuid.UUID = Field(foreign_key="users.id")
-    encrypted_refresh_token: str
+    encrypted_refresh_token: str | None
     status: str = "active"  # active | disabled | reauth_required
     scope: str
     token_expires_at: datetime | None = None
+    last_synced_at: datetime | None = None
 
 
 class ExternalDocument(SQLModel, table=True):
@@ -53,6 +59,11 @@ class ExternalDocument(SQLModel, table=True):
             ["projects.workspace_id", "projects.id"],
             name="fk_external_documents_project_workspace",
         ),
+        ForeignKeyConstraint(
+            ["workspace_id", "sync_run_id"],
+            ["integration_sync_runs.workspace_id", "integration_sync_runs.id"],
+            name="fk_external_documents_sync_run_workspace",
+        ),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -60,6 +71,9 @@ class ExternalDocument(SQLModel, table=True):
     connection_id: uuid.UUID = Field(foreign_key="integration_connections.id")
     project_id: uuid.UUID | None = Field(
         default=None, foreign_key="projects.id"
+    )
+    sync_run_id: uuid.UUID | None = Field(
+        default=None, foreign_key="integration_sync_runs.id"
     )
     drive_file_id: str
     title: str

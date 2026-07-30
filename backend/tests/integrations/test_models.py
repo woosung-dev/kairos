@@ -70,11 +70,13 @@ def _external_document(
     seed: _IntegrationSeed,
     drive_file_id: str,
     project_id: uuid.UUID | None,
+    sync_run_id: uuid.UUID | None = None,
 ) -> ExternalDocument:
     return ExternalDocument(
         workspace_id=seed.workspace.id,
         connection_id=seed.connection.id,
         project_id=project_id,
+        sync_run_id=sync_run_id,
         drive_file_id=drive_file_id,
         title="Drive 문서",
         mime_type="application/vnd.google-apps.document",
@@ -96,17 +98,20 @@ async def test_integration_models_create_and_query(
 ) -> None:
     """연결·외부 문서·sync run을 생성하고 조회한다."""
     seed = await _seed_workspace_with_connection(integration_session, "basic")
-    document = _external_document(
-        seed,
-        drive_file_id="drive-basic",
-        project_id=seed.project.id,
-    )
     sync_run = IntegrationSyncRun(
         workspace_id=seed.workspace.id,
         connection_id=seed.connection.id,
         requested_by_id=seed.user.id,
     )
-    integration_session.add_all([document, sync_run])
+    integration_session.add(sync_run)
+    await integration_session.flush()
+    document = _external_document(
+        seed,
+        drive_file_id="drive-basic",
+        project_id=seed.project.id,
+        sync_run_id=sync_run.id,
+    )
+    integration_session.add(document)
     await integration_session.commit()
 
     document_result = await integration_session.exec(
@@ -116,8 +121,51 @@ async def test_integration_models_create_and_query(
         select(IntegrationSyncRun).where(IntegrationSyncRun.id == sync_run.id)
     )
 
-    assert document_result.one().connection_id == seed.connection.id
+    stored_document = document_result.one()
+
+    assert stored_document.connection_id == seed.connection.id
+    assert stored_document.sync_run_id == sync_run.id
     assert sync_run_result.one().requested_by_id == seed.user.id
+
+
+async def test_connection_provider_is_unique_per_workspace(
+    integration_session: AsyncSession,
+) -> None:
+    seed = await _seed_workspace_with_connection(integration_session, "provider-unique")
+    integration_session.add(
+        IntegrationConnection(
+            workspace_id=seed.workspace.id,
+            authorized_by_id=seed.user.id,
+            encrypted_refresh_token="duplicate-refresh-token",
+            scope="https://www.googleapis.com/auth/drive.file",
+        )
+    )
+
+    await _expect_integrity_error(integration_session)
+
+
+async def test_external_document_cross_workspace_sync_run_is_blocked(
+    integration_session: AsyncSession,
+) -> None:
+    first = await _seed_workspace_with_connection(integration_session, "sync-first")
+    second = await _seed_workspace_with_connection(integration_session, "sync-second")
+    other_sync_run = IntegrationSyncRun(
+        workspace_id=second.workspace.id,
+        connection_id=second.connection.id,
+        requested_by_id=second.user.id,
+    )
+    integration_session.add(other_sync_run)
+    await integration_session.flush()
+    integration_session.add(
+        _external_document(
+            first,
+            drive_file_id="drive-cross-workspace-sync-run",
+            project_id=first.project.id,
+            sync_run_id=other_sync_run.id,
+        )
+    )
+
+    await _expect_integrity_error(integration_session)
 
 
 async def test_external_document_cross_workspace_project_is_blocked(
