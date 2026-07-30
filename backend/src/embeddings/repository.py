@@ -15,7 +15,7 @@ from src.embeddings.models import EmbeddingChunk, SemanticCache
 
 # I-9 4-C — 허용된 source_type 화이트리스트. 신규 도메인 추가 시 본 set + ADR 갱신 필수.
 _ALLOWED_SOURCE_TYPES: frozenset[str] = frozenset(
-    {"meeting", "note", "action", "inbox", "memory"}
+    {"meeting", "note", "action", "inbox", "memory", "external_document"}
 )
 
 # Sprint 24 Wave 2 T-RAG-TIME-FILTER (BUG-POW-006):

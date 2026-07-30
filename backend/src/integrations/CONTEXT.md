@@ -4,7 +4,7 @@
 
 > 상위: `/backend/CONTEXT.md` → `/CONTEXT-MAP.md`. 상세 결정: `docs/adr/026-external-source-ingest-rail.md`.
 >
-> **현재 상태 (2026-07-30)**: ADR-026 모델과 마이그레이션은 구현됐다(W4). integrations repository/service/router/schemas와 Google API 호출은 미구현이다.
+> **현재 상태 (2026-07-31)**: ADR-026의 모델·repository/service·GoogleDriveClient·동기화 pipeline·외부 문서 임베딩 경로가 구현됐다. OAuth authorize/callback 라우터 연결은 W8 범위다.
 
 ---
 
@@ -14,6 +14,7 @@
 - Workspace owner가 명시 선택한 외부 파일과 `ExternalDocument`의 저장·발행 상태 소유
 - `IntegrationSyncRun`의 sync 상태, 수동 재동기화, 외부 원본 생명주기 소유
 - Drive → Kairos 단방향 읽기 전용의 Google Docs plain-text export 조율
+- 원본 소실이 확인된 경우 `purged` 상태로 본문·청크·관련 캐시를 정리하고 이력 행을 보존
 
 ## 2. 비책임
 
@@ -61,3 +62,4 @@ OAuth callback은 고정 redirect URI 제약으로 I-13 예외이며, 서명 sta
 - Drive 삭제·휴지통·실제 권한 회수가 확인되면 `ExternalDocument` plain text, `EmbeddingChunk`, 관련 `SemanticCache`를 즉시 제거한다 (ADR-023 D-6.5 부분 개정).
 - 401/403은 세부 reason을 판별한다. 판별할 수 없으면 purge하지 않고 `reauth_required`로 보류한다.
 - unsupported MIME은 조용히 건너뛰지 않고 문서별 `failed` 상태와 사유를 남긴다.
+- `purged`는 원본 소실·권한 회수가 확인된 상태이며, `stale`·`reauth_required`·`failed`는 본문과 청크를 보존한다.

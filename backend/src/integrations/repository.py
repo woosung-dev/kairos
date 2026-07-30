@@ -116,6 +116,20 @@ class IntegrationRepository:
             )
         )).one_or_none()
 
+    async def find_document_id_by_drive_file_id(
+        self,
+        connection_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        drive_file_id: str,
+    ) -> uuid.UUID | None:
+        return (await self.session.exec(
+            select(ExternalDocument.id).where(
+                ExternalDocument.connection_id == connection_id,
+                ExternalDocument.workspace_id == workspace_id,
+                ExternalDocument.drive_file_id == drive_file_id,
+            )
+        )).one_or_none()
+
     async def find_documents_by_workspace(
         self,
         workspace_id: uuid.UUID,
@@ -198,17 +212,51 @@ class IntegrationRepository:
         workspace_id: uuid.UUID,
         sync_status: str,
         last_synced_at: datetime | None,
+        sync_run_id: uuid.UUID | None | _SyncRunIdUnchanged = (
+            _SYNC_RUN_ID_UNCHANGED
+        ),
     ) -> None:
+        values = {
+            "sync_status": sync_status,
+            "last_synced_at": last_synced_at,
+        }
+        if sync_run_id is not _SYNC_RUN_ID_UNCHANGED:
+            values["sync_run_id"] = sync_run_id
         await self.session.exec(
             update(ExternalDocument)
             .where(
                 ExternalDocument.id == document_id,
                 ExternalDocument.workspace_id == workspace_id,
             )
-            .values(
-                sync_status=sync_status,
-                last_synced_at=last_synced_at,
+            .values(**values)
+        )
+
+    async def purge_document_content(
+        self,
+        document_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        *,
+        last_synced_at: datetime,
+        sync_run_id: uuid.UUID | None | _SyncRunIdUnchanged = (
+            _SYNC_RUN_ID_UNCHANGED
+        ),
+    ) -> None:
+        """외부 원본 소실 확정 시 본문만 purge하고 이력 행은 보존한다."""
+        values = {
+            "plain_text": "",
+            "content_hash": "",
+            "sync_status": "purged",
+            "last_synced_at": last_synced_at,
+        }
+        if sync_run_id is not _SYNC_RUN_ID_UNCHANGED:
+            values["sync_run_id"] = sync_run_id
+        await self.session.exec(
+            update(ExternalDocument)
+            .where(
+                ExternalDocument.id == document_id,
+                ExternalDocument.workspace_id == workspace_id,
             )
+            .values(**values)
         )
 
     async def delete_document(

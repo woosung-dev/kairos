@@ -82,7 +82,7 @@ class ExternalDocument(SQLModel, table=True):
     revision_id: str
     content_hash: str
     plain_text: str
-    sync_status: str = "pending"  # pending | processing | completed | failed | stale | reauth_required
+    sync_status: str = "pending"  # pending | processing | completed | failed | stale | reauth_required | purged
     last_synced_at: datetime | None = None
 
 

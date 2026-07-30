@@ -49,6 +49,82 @@ logger = logging.getLogger(__name__)
 
 def _scrub_pii_hook(event, hint):
     """Sentry before_send PII 스크럽 — transcript / email / password / audio_url 제거."""
+    if not isinstance(event, dict):
+        return event
+
+    sensitive_name_parts = (
+        "token",
+        "secret",
+        "password",
+        "passwd",
+        "plaintext",
+        "ciphertext",
+        "credential",
+        "api_key",
+        "apikey",
+        "private_key",
+        "authorization",
+        "code_verifier",
+        "nonce",
+    )
+    max_depth = 4
+    max_items = 100
+
+    def is_sensitive_name(name):
+        return isinstance(name, str) and any(
+            part in name.lower() for part in sensitive_name_parts
+        )
+
+    def scrub_value(value, depth=0):
+        if depth >= max_depth:
+            return "[truncated]" if isinstance(value, (dict, list, tuple)) else value
+        if isinstance(value, dict):
+            scrubbed = {}
+            for index, (name, nested_value) in enumerate(value.items()):
+                if index >= max_items:
+                    scrubbed["[truncated]"] = "[truncated]"
+                    break
+                scrubbed[name] = (
+                    "[redacted]"
+                    if is_sensitive_name(name)
+                    else scrub_value(nested_value, depth + 1)
+                )
+            return scrubbed
+        if isinstance(value, (list, tuple)):
+            scrubbed = [
+                scrub_value(item, depth + 1) for item in value[:max_items]
+            ]
+            if len(value) > max_items:
+                scrubbed.append("[truncated]")
+            return scrubbed
+        return value
+
+    def scrub_stacktrace(stacktrace):
+        if not isinstance(stacktrace, dict):
+            return
+        frames = stacktrace.get("frames")
+        if not isinstance(frames, list):
+            return
+        for frame in frames:
+            if isinstance(frame, dict) and isinstance(frame.get("vars"), dict):
+                frame["vars"] = scrub_value(frame["vars"])
+
+    exception = event.get("exception")
+    exception_values = (
+        exception.get("values") if isinstance(exception, dict) else exception
+    )
+    if isinstance(exception_values, list):
+        for exception_value in exception_values:
+            if isinstance(exception_value, dict):
+                scrub_stacktrace(exception_value.get("stacktrace"))
+
+    threads = event.get("threads")
+    thread_values = threads.get("values") if isinstance(threads, dict) else threads
+    if isinstance(thread_values, list):
+        for thread in thread_values:
+            if isinstance(thread, dict):
+                scrub_stacktrace(thread.get("stacktrace"))
+
     request = event.get("request")
     if request and isinstance(request.get("data"), dict):
         for field in ("transcript", "email", "password", "audio_url"):

@@ -2,6 +2,8 @@
 import uuid
 from datetime import datetime
 
+import sentry_sdk
+
 from src.common.crypto import decrypt_string, encrypt_string
 from src.common.exceptions import EncryptionError
 from src.integrations.exceptions import (
@@ -69,6 +71,7 @@ class IntegrationService:
         try:
             encrypted_refresh_token = encrypt_string(refresh_token)
         except EncryptionError as exc:
+            sentry_sdk.capture_exception(exc)
             raise IntegrationEncryptionError() from exc
 
         if connection is not None:
@@ -124,6 +127,7 @@ class IntegrationService:
         try:
             return decrypt_string(connection.encrypted_refresh_token)
         except EncryptionError as exc:
+            sentry_sdk.capture_exception(exc)
             raise IntegrationEncryptionError() from exc
 
     async def get_document(

@@ -243,6 +243,59 @@ class EmbeddingService:
         logger.info(f"노트 {note_id} 임베딩 완료: {len(all_chunks)}개 청크")
         return len(all_chunks)
 
+    async def embed_external_document(
+        self,
+        document_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        source_workspace_id: uuid.UUID,
+        project_id: uuid.UUID | None,
+        title: str,
+        origin_url: str,
+        plain_text: str,
+    ) -> int:
+        """외부 문서 본문을 L1/L2 청크로 저장한다."""
+        await self.repo.delete_by_source("external_document", document_id)
+
+        if not plain_text.strip():
+            await self.repo.commit()
+            return 0
+
+        paragraphs = self._chunk_text(plain_text)
+        embeddings = await self.generate_embeddings([plain_text, *paragraphs])
+        metadata_json = {"title": title, "originUrl": origin_url}
+
+        level1_chunk = await self.repo.save_chunk(
+            workspace_id=workspace_id,
+            source_workspace_id=source_workspace_id,
+            source_type="external_document",
+            source_id=document_id,
+            chunk_text=plain_text,
+            embedding=embeddings[0],
+            chunk_index=0,
+            chunk_level=1,
+            project_id=project_id,
+            metadata_json=metadata_json,
+        )
+        for chunk_index, (paragraph, embedding) in enumerate(
+            zip(paragraphs, embeddings[1:])
+        ):
+            await self.repo.save_chunk(
+                workspace_id=workspace_id,
+                source_workspace_id=source_workspace_id,
+                source_type="external_document",
+                source_id=document_id,
+                chunk_text=paragraph,
+                embedding=embedding,
+                chunk_index=chunk_index,
+                chunk_level=2,
+                parent_chunk_id=level1_chunk.id,
+                project_id=project_id,
+                metadata_json=metadata_json,
+            )
+
+        await self.repo.commit()
+        return len(paragraphs) + 1
+
     # --- 캐시 무효화 ---
 
     async def invalidate_cache(

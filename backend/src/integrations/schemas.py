@@ -13,6 +13,7 @@ DocumentSyncStatus = Literal[
     "failed",
     "stale",
     "reauth_required",
+    "purged",
 ]
 SyncRunStatus = Literal["pending", "processing", "completed", "failed"]
 
