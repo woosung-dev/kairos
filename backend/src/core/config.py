@@ -2,6 +2,7 @@
 import logging
 from functools import lru_cache
 
+from cryptography.fernet import Fernet
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -74,6 +75,12 @@ class Settings(BaseSettings):
     # 미설정 시 send_slack_message 는 no-op (피드백은 DB 에 항상 저장). Sentry SKIP 정책과 정합.
     slack_feedback_webhook_url: str | None = None
 
+    # Integrations (ADR-026 D10 — Google Drive v0, 미구현 상태에서는 모두 선택값)
+    integrations_encryption_key: SecretStr | None = None
+    google_oauth_client_id: str | None = None
+    google_oauth_client_secret: SecretStr | None = None
+    google_picker_api_key: SecretStr | None = None
+
     # DB pool (PERF-r2-5) — 기본값 5+10 유지. PERF-SSE-COMMIT 으로 스트리밍 중
     # 커넥션 점유가 제거돼 상향 필요성은 낮아짐 — 상향 시 Neon max_connections
     # (compute 크기 의존) × Cloud Run 인스턴스 수 곱 초과 금지.
@@ -99,6 +106,28 @@ class Settings(BaseSettings):
         env_ignore_empty=True,  # 빈 문자열 환경변수 무시
         extra="ignore",         # 선언되지 않은 변수 무시
     )
+
+    # ADR-026 D10 / ADR-024: Fernet 키는 길이 비교 대신 Fernet() 생성으로 검증한다.
+    # `_enforce_or_warn` 은 `clerk_prod_hardening=True`(기본)일 때 `raise` 한다. 현재
+    # `deploy.yml` 이 `CLERK_PROD_HARDENING=false` 로 게이팅해 warning 으로 동작하지만,
+    # Clerk Production 컷오버 시 그 게이트를 제거하면 integrations 키 검증까지 부팅 차단으로
+    # 재무장된다. ADR-024 의 2026-06-30 prod crash-loop 교훈(부팅 차단형 validator 가 prod
+    # 전체를 다운시킴)에 따라 integrations 키는 Clerk 하드닝 플래그와 분리해 항상 warning 으로
+    # 처리한다.
+    @field_validator("integrations_encryption_key")
+    @classmethod
+    def _validate_integrations_encryption_key(cls, v: SecretStr | None) -> SecretStr | None:
+        if v is None:
+            return v
+
+        try:
+            Fernet(v.get_secret_value().encode())
+        except ValueError:
+            logger.warning(
+                "[CONFIG GUARD · ADR-026] INTEGRATIONS_ENCRYPTION_KEY is invalid; "
+                "Fernet key validation failed"
+            )
+        return v
 
     # Sprint 27e Round 2 BUG-S27e-SEC-r2-4 — production 판별 분기 통합.
     # main.py 의 _is_production (OR + lower) 와 validator 의 분기 일관성 회복.

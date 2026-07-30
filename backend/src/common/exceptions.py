@@ -33,3 +33,11 @@ class ForbiddenError(HTTPException):
 
     def __init__(self) -> None:
         super().__init__(status_code=403, detail="권한이 없습니다")
+
+
+class EncryptionError(Exception):
+    """암호화 또는 복호화에 실패."""
+
+    def __init__(self, message: str = "암호화 처리에 실패했습니다") -> None:
+        self.message = message
+        super().__init__(self.message)

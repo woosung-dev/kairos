@@ -111,6 +111,10 @@ jobs:
             R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }}
             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            INTEGRATIONS_ENCRYPTION_KEY=${{ secrets.INTEGRATIONS_ENCRYPTION_KEY }}
+            GOOGLE_OAUTH_CLIENT_ID=${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+            GOOGLE_OAUTH_CLIENT_SECRET=${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+            GOOGLE_PICKER_API_KEY=${{ secrets.GOOGLE_PICKER_API_KEY }}
 
       # ── Smoke test ─────────────────────────────────────────────────────
       # /api/v1/health 로 검사 — production 은 docs_url=None (main.py) 라 /docs 가 404.

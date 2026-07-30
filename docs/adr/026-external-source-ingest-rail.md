@@ -118,8 +118,8 @@ ADR-023 D-6.5의 내부 텍스트 보존 원칙을 supersede하지 않는다. �
 
 다음 키를 도입한다: `INTEGRATIONS_ENCRYPTION_KEY`(Fernet), `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_PICKER_API_KEY`.
 
-- `Settings`에는 `SecretStr`로 선언해 I-15를 따른다.
-- `backend/src/core/config.py`에서 재사용하는 것은 `_is_non_dev_env`와 `_enforce_or_warn` 두 개뿐이다.
+- `INTEGRATIONS_ENCRYPTION_KEY`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_PICKER_API_KEY`는 `Settings`에서 `SecretStr`로 선언해 I-15를 따른다. `GOOGLE_OAUTH_CLIENT_ID`는 OAuth 인가 URL과 Picker JS에 노출되는 공개 식별자이므로 `SecretStr`이 아닌 `str`로 선언한다.
+- `backend/src/core/config.py`에서 재사용하는 것은 `_is_non_dev_env`뿐이다. `_enforce_or_warn`은 `clerk_prod_hardening=True`일 때 raise하므로 Clerk 컷오버 시 integration key 검증까지 부팅 차단으로 재무장될 수 있어 사용하지 않는다. 이는 ADR-024가 기록한 부팅 차단형 validator의 prod crash-loop 교훈을 따른다.
 - 신규 작성하는 Fernet 키 전용 validator는 `Fernet(key)` 생성을 시도한다. 성공하면 유효한 키로, `ValueError`가 발생하면 무효한 키로 처리한다. 이 방법은 길이와 urlsafe-base64 유효성을 함께 검증한다.
 - `_validate_cron_token`의 32 byte 최소 길이 규칙은 cron token 전용이며 Fernet 키에는 적용하지 않는다. 현재 Fernet validator는 없으므로 위 validator를 새로 작성한다.
 - 그러나 새 integration key validator는 부팅을 차단하지 않는다. 누락·약한 값은 **loud warning + alert**로 남긴다. ADR-024 Status update가 기록한 2026-06-30 부팅 차단형 validator의 prod crash-loop 사고를 재발시키지 않는다.
