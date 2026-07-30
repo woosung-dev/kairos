@@ -27,6 +27,8 @@ GEMINI_TIMEOUT_SEC = 30.0
 GEMINI_STREAM_TIMEOUT_SEC = 60.0
 # Whisper: 5min audio 정상 5-20s. 1hr chunk worst-case 60s. 90s 안전 한계.
 WHISPER_TIMEOUT_SEC = 90.0
+# Google Drive 메타데이터 / Docs text export — 일반 문서는 짧고, Gemini와 같은 30s 안전 한계.
+DRIVE_TIMEOUT_SEC = 30.0
 
 
 class CircuitBreakerOpen(Exception):
@@ -99,6 +101,7 @@ class _CircuitBreaker:
 # Module-level singleton — 각 process 의 모든 worker 가 공유.
 gemini_breaker = _CircuitBreaker("gemini")
 whisper_breaker = _CircuitBreaker("whisper")
+drive_breaker = _CircuitBreaker("google_drive")
 
 
 async def with_gemini_timeout(
@@ -137,9 +140,26 @@ async def with_whisper_timeout(
     return result
 
 
+async def with_drive_timeout(
+    coro: Awaitable[T],
+    timeout_sec: float = DRIVE_TIMEOUT_SEC,
+) -> T:
+    """Google Drive API 호출 안전망 — timeout + circuit breaker."""
+    drive_breaker.check()
+    try:
+        result = await asyncio.wait_for(coro, timeout=timeout_sec)
+    except (asyncio.TimeoutError, Exception):
+        drive_breaker.on_failure()
+        raise
+    drive_breaker.on_success()
+    return result
+
+
 def reset_breakers_for_test() -> None:
     """test 격리용 — circuit breaker state 초기화."""
     gemini_breaker._consecutive_failures = 0
     gemini_breaker._opened_at = None
     whisper_breaker._consecutive_failures = 0
     whisper_breaker._opened_at = None
+    drive_breaker._consecutive_failures = 0
+    drive_breaker._opened_at = None
