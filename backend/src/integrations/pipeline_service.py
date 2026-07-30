@@ -201,8 +201,12 @@ class GoogleDriveSyncPipelineService:
             if document is None:
                 return
 
+            # 사전 무효화는 이후 실패·취소에도 기존 본문이 노출될 창을 닫는다.
+            await self._invalidate_document_caches(embedding_repository, workspace_id)
             await embedding_repository.delete_by_source("external_document", document.id)
-            await embedding_repository.delete_caches(workspace_id, None)
+            # 사후 무효화는 삭제 사이 도착한 캐시행을 덮는다. 중복이 아니므로 하나를
+            # 제거하면 이번 권한 회수 캐시 누출 회귀가 다시 발생한다.
+            await self._invalidate_document_caches(embedding_repository, workspace_id)
             await repository.delete_document(document.id, workspace_id)
             await repository.commit()
 
@@ -352,7 +356,6 @@ class GoogleDriveSyncPipelineService:
             )
             return
 
-        old_project_ids: set[uuid.UUID | None] = set()
         if document is None:
             document = ExternalDocument(
                 workspace_id=workspace_id,
@@ -371,10 +374,6 @@ class GoogleDriveSyncPipelineService:
             await repository.create_document(document, workspace_id)
             await repository.commit()
         else:
-            old_project_ids = await embedding_repository.find_chunk_project_ids(
-                "external_document",
-                document.id,
-            )
             await self._update_document(
                 repository,
                 document,
@@ -390,6 +389,12 @@ class GoogleDriveSyncPipelineService:
                 sync_run_id=sync_run_id,
             )
 
+        # 같은 세션의 실패 상태 commit이 미완료 청크 DELETE를 확정할 수 있으므로,
+        # 청크 변형 전 cache를 먼저 비우고 commit해 노출 창을 닫는다.
+        await self._invalidate_document_caches(
+            embedding_repository,
+            document.workspace_id,
+        )
         await embedding_service.embed_external_document(
             document_id=document.id,
             workspace_id=workspace_id,
@@ -399,11 +404,10 @@ class GoogleDriveSyncPipelineService:
             origin_url=origin_url,
             plain_text=exported.plain_text,
         )
+        # 동기화 중 생성된 cache도 옛 청크를 참조할 수 있어 사후 무효화도 유지한다.
         await self._invalidate_document_caches(
             embedding_repository,
             document.workspace_id,
-            document.project_id,
-            old_project_ids,
         )
         await self._update_document_status(
             repository,
@@ -426,10 +430,12 @@ class GoogleDriveSyncPipelineService:
         if document is None:
             return
 
+        # 사전 무효화는 이후 실패·취소에도 기존 본문이 노출될 창을 닫는다.
+        await self._invalidate_document_caches(embedding_repository, workspace_id)
         await embedding_repository.delete_by_source("external_document", document.id)
-        # 권한 회수 purge는 이전 workspace 전역 질의의 캐시도 제거해야 한다.
-        # 드문 purge 경로에서는 캐시 효율보다 회수 실효성을 우선한다.
-        await embedding_repository.delete_caches(workspace_id, None)
+        # 사후 무효화는 삭제 사이 도착한 캐시행을 덮는다. 중복이 아니므로 하나를
+        # 제거하면 이번 권한 회수 캐시 누출 회귀가 다시 발생한다.
+        await self._invalidate_document_caches(embedding_repository, workspace_id)
         await embedding_repository.commit()
         if sync_run_id is None:
             await repository.purge_document_content(
@@ -560,11 +566,10 @@ class GoogleDriveSyncPipelineService:
         self,
         embedding_repository: EmbeddingRepository,
         workspace_id: uuid.UUID,
-        project_id: uuid.UUID | None,
-        old_project_ids: set[uuid.UUID | None],
     ) -> None:
-        for cache_project_id in old_project_ids | {project_id}:
-            await embedding_repository.delete_caches(workspace_id, cache_project_id)
+        # ADR-026 D8의 사용자 요청 동기화는 저빈도이므로 캐시 효율보다 본문 교체와
+        # 권한 회수의 정확성을 우선해 workspace 캐시를 전량 무효화한다.
+        await embedding_repository.delete_caches(workspace_id, None)
         await embedding_repository.commit()
 
     async def _find_document_for_file(

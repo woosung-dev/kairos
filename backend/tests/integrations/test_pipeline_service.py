@@ -1,4 +1,5 @@
 """Google Drive sync pipeline의 fail-closed 계약 테스트."""
+import asyncio
 import gc
 import json
 import uuid
@@ -9,11 +10,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 import sentry_sdk
+from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.auth.models import User
+from src.common import crypto as crypto_module
 from src.common.exceptions import EncryptionError
 from src.embeddings.models import EmbeddingChunk, SemanticCache
 from src.embeddings.repository import EmbeddingRepository
@@ -38,7 +41,7 @@ from src.integrations.pipeline_service import (
 from src.integrations.service import IntegrationService
 from src.main import _scrub_pii_hook
 from src.projects.models import Project
-from src.workspaces.models import Workspace
+from src.workspaces.models import Workspace, WorkspaceMember
 
 
 @dataclass
@@ -50,9 +53,9 @@ class _PipelineState:
     sync_run: SimpleNamespace | None = None
     deleted_sources: list[tuple[str, uuid.UUID]] = field(default_factory=list)
     deleted_caches: list[tuple[uuid.UUID, uuid.UUID | None]] = field(default_factory=list)
+    operations: list[str] = field(default_factory=list)
     embedded_documents: list[dict[str, object]] = field(default_factory=list)
     generated_chunk_count: int = 0
-    chunk_project_ids: set[uuid.UUID | None] = field(default_factory=set)
     commits: int = 0
 
 
@@ -212,19 +215,12 @@ class _FakeEmbeddingRepository:
     def __init__(self, session: _FakeSession) -> None:
         self.state = session.state
 
-    async def find_chunk_project_ids(
-        self,
-        source_type: str,
-        source_id: uuid.UUID,
-    ) -> set[uuid.UUID | None]:
-        assert source_type == "external_document"
-        return set(self.state.chunk_project_ids)
-
     async def delete_by_source(
         self,
         source_type: str,
         source_id: uuid.UUID,
     ) -> None:
+        self.state.operations.append("delete_chunks")
         self.state.deleted_sources.append((source_type, source_id))
 
     async def delete_caches(
@@ -232,6 +228,7 @@ class _FakeEmbeddingRepository:
         workspace_id: uuid.UUID,
         project_id: uuid.UUID | None,
     ) -> None:
+        self.state.operations.append("delete_caches")
         self.state.deleted_caches.append((workspace_id, project_id))
 
     async def commit(self) -> None:
@@ -325,6 +322,192 @@ def _metadata(file_id: str, revision_id: str) -> DriveFileMetadata:
     )
 
 
+def _cache_vector(seed: int) -> list[float]:
+    base = 0.001 * (seed + 1)
+    return [base + (index * 0.0001) for index in range(1536)]
+
+
+def _rag_cache_source(
+    chunk: EmbeddingChunk,
+    document: ExternalDocument,
+) -> dict[str, object]:
+    """RAGService._format_sources가 저장하는 production sources 형태."""
+    return {
+        "id": str(chunk.id),
+        "sourceId": str(document.id),
+        "text": chunk.chunk_text[:200],
+        "source": document.title,
+        "sourceType": chunk.source_type,
+        "date": "",
+        "speaker": None,
+        "score": 0.0,
+        "freshness": "recent",
+    }
+
+
+@dataclass
+class _PrivateDocumentCacheScenario:
+    session_factory: async_sessionmaker[AsyncSession]
+    workspace: Workspace
+    non_member: User
+    document: ExternalDocument
+    chunk: EmbeddingChunk
+    question_embedding: list[float]
+
+
+async def _seed_private_document_cache(
+    integration_session: AsyncSession,
+    *,
+    seed: int,
+    file_id: str,
+) -> _PrivateDocumentCacheScenario:
+    engine = integration_session.bind
+    assert engine is not None
+    session_factory = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    owner = User(
+        clerk_id=f"b5-owner-{uuid.uuid4().hex}",
+        display_name="B5 Owner",
+        email=f"b5-owner-{uuid.uuid4().hex}@kairos.test",
+    )
+    non_member = User(
+        clerk_id=f"b5-non-member-{uuid.uuid4().hex}",
+        display_name="B5 Non-member",
+        email=f"b5-non-member-{uuid.uuid4().hex}@kairos.test",
+    )
+    integration_session.add_all([owner, non_member])
+    await integration_session.commit()
+
+    workspace = Workspace(name="B5 Cache Workspace", owner_id=owner.id)
+    integration_session.add(workspace)
+    await integration_session.commit()
+    project = Project(
+        workspace_id=workspace.id,
+        title="B5 Private Project",
+        created_by_id=owner.id,
+        visibility="private",
+    )
+    connection = IntegrationConnection(
+        workspace_id=workspace.id,
+        authorized_by_id=owner.id,
+        encrypted_refresh_token="encrypted-refresh-token",
+        scope="drive.file",
+    )
+    integration_session.add_all(
+        [
+            WorkspaceMember(
+                workspace_id=workspace.id,
+                user_id=owner.id,
+                role="owner",
+            ),
+            WorkspaceMember(
+                workspace_id=workspace.id,
+                user_id=non_member.id,
+                role="member",
+            ),
+            project,
+            connection,
+        ]
+    )
+    await integration_session.commit()
+
+    document = ExternalDocument(
+        workspace_id=workspace.id,
+        connection_id=connection.id,
+        project_id=project.id,
+        drive_file_id=file_id,
+        title="B5 Drive document",
+        mime_type="application/vnd.google-apps.document",
+        origin_url=f"https://docs.google.com/document/d/{file_id}/edit",
+        revision_id="revision-1",
+        content_hash="content-hash-1",
+        plain_text="private source text",
+        sync_status="completed",
+    )
+    integration_session.add(document)
+    await integration_session.commit()
+    question_embedding = _cache_vector(seed)
+    chunk = EmbeddingChunk(
+        workspace_id=workspace.id,
+        project_id=project.id,
+        source_id=document.id,
+        source_type="external_document",
+        chunk_text="private source text",
+        chunk_level=2,
+        embedding=question_embedding,
+    )
+    cache = SemanticCache(
+        workspace_id=workspace.id,
+        question="private cache question",
+        question_embedding=question_embedding,
+        answer="private source text",
+        sources=[_rag_cache_source(chunk, document)],
+        max_visibility="private",
+    )
+    integration_session.add_all([chunk, cache])
+    await integration_session.commit()
+    return _PrivateDocumentCacheScenario(
+        session_factory=session_factory,
+        workspace=workspace,
+        non_member=non_member,
+        document=document,
+        chunk=chunk,
+        question_embedding=question_embedding,
+    )
+
+
+async def _find_private_cache_for_non_member(
+    scenario: _PrivateDocumentCacheScenario,
+) -> dict | None:
+    async with scenario.session_factory() as verification_session:
+        return await EmbeddingRepository(verification_session).find_similar_cache(
+            question_embedding=scenario.question_embedding,
+            workspace_id=scenario.workspace.id,
+            requester_user_id=scenario.non_member.id,
+            requester_role="member",
+        )
+
+
+def _cache_injecting_embedding_repository(
+    scenario: _PrivateDocumentCacheScenario,
+) -> type[EmbeddingRepository]:
+    """청크 DELETE 직전의 동시 RAG 캐시 write를 별도 세션으로 재현한다."""
+
+    class _CacheInjectingEmbeddingRepository(EmbeddingRepository):
+        injection_count = 0
+
+        async def delete_by_source(
+            self,
+            source_type: str,
+            source_id: uuid.UUID,
+        ) -> None:
+            if (
+                source_type == "external_document"
+                and source_id == scenario.document.id
+            ):
+                async with scenario.session_factory() as cache_session:
+                    cache_session.add(
+                        SemanticCache(
+                            workspace_id=scenario.workspace.id,
+                            question="cache write during chunk deletion",
+                            question_embedding=scenario.question_embedding,
+                            answer="private source text",
+                            sources=[
+                                _rag_cache_source(scenario.chunk, scenario.document)
+                            ],
+                            max_visibility="private",
+                        )
+                    )
+                    await cache_session.commit()
+                type(self).injection_count += 1
+            await super().delete_by_source(source_type, source_id)
+
+    return _CacheInjectingEmbeddingRepository
+
+
 @pytest.fixture
 def pipeline_environment(
     monkeypatch: pytest.MonkeyPatch,
@@ -377,10 +560,96 @@ async def test_confirmed_source_errors_purge_document_content(
     await pipeline.resync_document(document.id, state.workspace_id)
 
     assert state.deleted_sources == [("external_document", document.id)]
+    assert state.operations == ["delete_caches", "delete_chunks", "delete_caches"]
     assert document.plain_text == ""
     assert document.content_hash == ""
     assert document.sync_status == "purged"
     assert document.revision_id == "revision-1"
+
+
+async def test_unpublish_invalidates_caches_before_deleting_chunks(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    state, pipeline, _, _ = pipeline_environment
+    document = _make_document(state)
+
+    await pipeline.unpublish_document(document.id, state.workspace_id)
+
+    assert state.operations == ["delete_caches", "delete_chunks", "delete_caches"]
+
+
+async def test_purge_post_invalidation_removes_cache_written_during_chunk_deletion(
+    integration_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _StaticIntegrationService:
+        def __init__(self, repository: object) -> None:
+            self.repository = repository
+
+        async def get_decrypted_refresh_token(
+            self,
+            connection_id: uuid.UUID,
+            workspace_id: uuid.UUID,
+        ) -> str:
+            return "refresh-token"
+
+    scenario = await _seed_private_document_cache(
+        integration_session,
+        seed=31,
+        file_id="purge-post-invalidation-window",
+    )
+    injecting_repository = _cache_injecting_embedding_repository(scenario)
+    drive_client = _FakeDriveClient()
+    drive_client.metadata[scenario.document.drive_file_id] = DriveSourceMissingError()
+    monkeypatch.setattr(
+        pipeline_module,
+        "IntegrationService",
+        _StaticIntegrationService,
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "EmbeddingRepository",
+        injecting_repository,
+    )
+    pipeline = GoogleDriveSyncPipelineService(
+        session_factory=scenario.session_factory,
+        drive_client_factory=lambda: drive_client,
+        google_oauth_client_id="client-id",
+        google_oauth_client_secret="client-secret",
+    )
+
+    await pipeline.resync_document(scenario.document.id, scenario.workspace.id)
+
+    assert injecting_repository.injection_count == 1
+    assert await _find_private_cache_for_non_member(scenario) is None
+
+
+async def test_unpublish_post_invalidation_removes_cache_written_during_chunk_deletion(
+    integration_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = await _seed_private_document_cache(
+        integration_session,
+        seed=32,
+        file_id="unpublish-post-invalidation-window",
+    )
+    injecting_repository = _cache_injecting_embedding_repository(scenario)
+    monkeypatch.setattr(
+        pipeline_module,
+        "EmbeddingRepository",
+        injecting_repository,
+    )
+    pipeline = GoogleDriveSyncPipelineService(
+        session_factory=scenario.session_factory,
+        drive_client_factory=_FakeDriveClient,
+        google_oauth_client_id="client-id",
+        google_oauth_client_secret="client-secret",
+    )
+
+    await pipeline.unpublish_document(scenario.document.id, scenario.workspace.id)
+
+    assert injecting_repository.injection_count == 1
+    assert await _find_private_cache_for_non_member(scenario) is None
 
 
 @pytest.mark.parametrize(
@@ -562,36 +831,7 @@ async def test_failed_embedding_retries_on_same_revision(
     assert state.generated_chunk_count == 2
 
 
-@pytest.mark.parametrize(
-    "has_project_id",
-    [False, True],
-    ids=("workspace-scope", "project-scope"),
-)
-async def test_reembedding_invalidates_only_document_project_cache_scope(
-    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
-    has_project_id: bool,
-) -> None:
-    state, pipeline, drive_client, _ = pipeline_environment
-    project_id = uuid.uuid4() if has_project_id else None
-    document = _make_document(state)
-    document.project_id = project_id
-    state.chunk_project_ids = {project_id}
-    drive_client.metadata[document.drive_file_id] = _metadata(
-        document.drive_file_id,
-        "revision-2",
-    )
-    drive_client.exports[document.drive_file_id] = DriveExport(
-        plain_text="갱신 본문",
-        content_hash="content-hash-2",
-    )
-
-    await pipeline.resync_document(document.id, state.workspace_id)
-
-    assert state.embedded_documents[0]["project_id"] == project_id
-    assert state.deleted_caches == [(state.workspace_id, project_id)]
-
-
-async def test_purge_invalidates_workspace_cache_while_sync_keeps_other_project_cache(
+async def test_embedding_failure_invalidates_cache_before_uncommitted_chunk_delete(
     integration_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -606,12 +846,284 @@ async def test_purge_invalidates_workspace_cache_while_sync_keeps_other_project_
         ) -> str:
             return "refresh-token"
 
-    class _NoopEmbeddingService:
+    class _DeleteThenFailEmbeddingService:
         def __init__(self, repository: EmbeddingRepository) -> None:
             self.repository = repository
 
         async def embed_external_document(self, **kwargs: object) -> int:
-            return 0
+            document_id = kwargs["document_id"]
+            assert isinstance(document_id, uuid.UUID)
+            await self.repository.delete_by_source("external_document", document_id)
+            raise RuntimeError("embedding unavailable")
+
+    scenario = await _seed_private_document_cache(
+        integration_session,
+        seed=4,
+        file_id="b5-embedding-failure",
+    )
+    assert await _find_private_cache_for_non_member(scenario) is None
+    monkeypatch.setattr(
+        pipeline_module,
+        "IntegrationService",
+        _StaticIntegrationService,
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "EmbeddingService",
+        _DeleteThenFailEmbeddingService,
+    )
+    drive_client = _FakeDriveClient()
+    pipeline = GoogleDriveSyncPipelineService(
+        session_factory=scenario.session_factory,
+        drive_client_factory=lambda: drive_client,
+        google_oauth_client_id="client-id",
+        google_oauth_client_secret="client-secret",
+    )
+    drive_client.metadata[scenario.document.drive_file_id] = _metadata(
+        scenario.document.drive_file_id,
+        "revision-2",
+    )
+    drive_client.exports[scenario.document.drive_file_id] = DriveExport(
+        plain_text="updated private source text",
+        content_hash="content-hash-2",
+    )
+
+    await pipeline.resync_document(scenario.document.id, scenario.workspace.id)
+
+    async with scenario.session_factory() as verification_session:
+        failed_document = (await verification_session.exec(
+            select(ExternalDocument).where(
+                ExternalDocument.id == scenario.document.id
+            )
+        )).one()
+        remaining_chunks = (await verification_session.exec(
+            select(EmbeddingChunk).where(
+                EmbeddingChunk.source_id == scenario.document.id
+            )
+        )).all()
+        remaining_caches = (await verification_session.exec(
+            select(SemanticCache).where(
+                SemanticCache.workspace_id == scenario.workspace.id
+            )
+        )).all()
+    assert failed_document.sync_status == "failed"
+    assert remaining_chunks == []
+    assert await _find_private_cache_for_non_member(scenario) is None
+    assert remaining_caches == []
+
+
+async def test_cancelled_post_invalidation_keeps_nonmember_cache_miss(
+    integration_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _StaticIntegrationService:
+        def __init__(self, repository: object) -> None:
+            self.repository = repository
+
+        async def get_decrypted_refresh_token(
+            self,
+            connection_id: uuid.UUID,
+            workspace_id: uuid.UUID,
+        ) -> str:
+            return "refresh-token"
+
+    class _ReplaceThenCommitEmbeddingService:
+        def __init__(self, repository: EmbeddingRepository) -> None:
+            self.repository = repository
+
+        async def embed_external_document(self, **kwargs: object) -> int:
+            document_id = kwargs["document_id"]
+            workspace_id = kwargs["workspace_id"]
+            source_workspace_id = kwargs["source_workspace_id"]
+            project_id = kwargs["project_id"]
+            plain_text = kwargs["plain_text"]
+            assert isinstance(document_id, uuid.UUID)
+            assert isinstance(workspace_id, uuid.UUID)
+            assert isinstance(source_workspace_id, uuid.UUID)
+            assert project_id is None or isinstance(project_id, uuid.UUID)
+            assert isinstance(plain_text, str)
+            await self.repository.delete_by_source("external_document", document_id)
+            await self.repository.save_chunk(
+                workspace_id=workspace_id,
+                source_workspace_id=source_workspace_id,
+                source_type="external_document",
+                source_id=document_id,
+                chunk_text=plain_text,
+                embedding=_cache_vector(5),
+                chunk_level=2,
+                project_id=project_id,
+                metadata_json={"title": "B5 Drive document"},
+            )
+            await self.repository.commit()
+            return 1
+
+    scenario = await _seed_private_document_cache(
+        integration_session,
+        seed=5,
+        file_id="b5-post-invalidation-cancel",
+    )
+    assert await _find_private_cache_for_non_member(scenario) is None
+    original_invalidate = GoogleDriveSyncPipelineService._invalidate_document_caches
+    invalidation_calls = 0
+
+    async def invalidate_then_cancel(
+        self: GoogleDriveSyncPipelineService,
+        repository: EmbeddingRepository,
+        workspace_id: uuid.UUID,
+    ) -> None:
+        nonlocal invalidation_calls
+        invalidation_calls += 1
+        if invalidation_calls == 2:
+            raise asyncio.CancelledError()
+        await original_invalidate(self, repository, workspace_id)
+
+    monkeypatch.setattr(
+        pipeline_module,
+        "IntegrationService",
+        _StaticIntegrationService,
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "EmbeddingService",
+        _ReplaceThenCommitEmbeddingService,
+    )
+    monkeypatch.setattr(
+        GoogleDriveSyncPipelineService,
+        "_invalidate_document_caches",
+        invalidate_then_cancel,
+    )
+    drive_client = _FakeDriveClient()
+    pipeline = GoogleDriveSyncPipelineService(
+        session_factory=scenario.session_factory,
+        drive_client_factory=lambda: drive_client,
+        google_oauth_client_id="client-id",
+        google_oauth_client_secret="client-secret",
+    )
+    drive_client.metadata[scenario.document.drive_file_id] = _metadata(
+        scenario.document.drive_file_id,
+        "revision-2",
+    )
+    drive_client.exports[scenario.document.drive_file_id] = DriveExport(
+        plain_text="updated private source text",
+        content_hash="content-hash-2",
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        await pipeline.resync_document(scenario.document.id, scenario.workspace.id)
+
+    async with scenario.session_factory() as verification_session:
+        processing_document = (await verification_session.exec(
+            select(ExternalDocument).where(
+                ExternalDocument.id == scenario.document.id
+            )
+        )).one()
+        replacement_chunks = (await verification_session.exec(
+            select(EmbeddingChunk).where(
+                EmbeddingChunk.source_id == scenario.document.id
+            )
+        )).all()
+        remaining_caches = (await verification_session.exec(
+            select(SemanticCache).where(
+                SemanticCache.workspace_id == scenario.workspace.id
+            )
+        )).all()
+    assert invalidation_calls == 2
+    assert processing_document.sync_status == "processing"
+    assert {replacement_chunk.id for replacement_chunk in replacement_chunks}.isdisjoint(
+        {scenario.chunk.id}
+    )
+    assert remaining_caches == []
+    assert await _find_private_cache_for_non_member(scenario) is None
+
+
+@pytest.mark.parametrize(
+    "has_project_id",
+    [False, True],
+    ids=("workspace-scope", "project-scope"),
+)
+async def test_reembedding_invalidates_workspace_cache_scope(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+    has_project_id: bool,
+) -> None:
+    state, pipeline, drive_client, _ = pipeline_environment
+    project_id = uuid.uuid4() if has_project_id else None
+    document = _make_document(state)
+    document.project_id = project_id
+    drive_client.metadata[document.drive_file_id] = _metadata(
+        document.drive_file_id,
+        "revision-2",
+    )
+    drive_client.exports[document.drive_file_id] = DriveExport(
+        plain_text="갱신 본문",
+        content_hash="content-hash-2",
+    )
+
+    await pipeline.resync_document(document.id, state.workspace_id)
+
+    assert state.embedded_documents[0]["project_id"] == project_id
+    assert state.deleted_caches == [
+        (state.workspace_id, None),
+        (state.workspace_id, None),
+    ]
+
+
+async def test_external_document_resync_invalidates_workspace_cache_before_chunk_replacement(
+    integration_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _StaticIntegrationService:
+        def __init__(self, repository: object) -> None:
+            self.repository = repository
+
+        async def get_decrypted_refresh_token(
+            self,
+            connection_id: uuid.UUID,
+            workspace_id: uuid.UUID,
+        ) -> str:
+            return "refresh-token"
+
+    class _ReplacingEmbeddingService:
+        def __init__(self, repository: EmbeddingRepository) -> None:
+            self.repository = repository
+
+        async def embed_external_document(self, **kwargs: object) -> int:
+            document_id = kwargs["document_id"]
+            workspace_id = kwargs["workspace_id"]
+            source_workspace_id = kwargs["source_workspace_id"]
+            project_id = kwargs["project_id"]
+            plain_text = kwargs["plain_text"]
+            assert isinstance(document_id, uuid.UUID)
+            assert isinstance(workspace_id, uuid.UUID)
+            assert isinstance(source_workspace_id, uuid.UUID)
+            assert project_id is None or isinstance(project_id, uuid.UUID)
+            assert isinstance(plain_text, str)
+
+            await self.repository.delete_by_source("external_document", document_id)
+            level1_chunk = await self.repository.save_chunk(
+                workspace_id=workspace_id,
+                source_workspace_id=source_workspace_id,
+                source_type="external_document",
+                source_id=document_id,
+                chunk_text=plain_text,
+                embedding=_cache_vector(2),
+                chunk_level=1,
+                project_id=project_id,
+                metadata_json={"title": "Drive document"},
+            )
+            await self.repository.save_chunk(
+                workspace_id=workspace_id,
+                source_workspace_id=source_workspace_id,
+                source_type="external_document",
+                source_id=document_id,
+                chunk_text=plain_text,
+                embedding=_cache_vector(2),
+                chunk_level=2,
+                parent_chunk_id=level1_chunk.id,
+                project_id=project_id,
+                metadata_json={"title": "Drive document"},
+            )
+            await self.repository.commit()
+            return 2
 
     engine = integration_session.bind
     assert engine is not None
@@ -624,6 +1136,11 @@ async def test_purge_invalidates_workspace_cache_while_sync_keeps_other_project_
         clerk_id=f"drive-cache-user-{uuid.uuid4().hex}",
         display_name="Drive Cache Tester",
         email=f"drive-cache-{uuid.uuid4().hex}@kairos.test",
+    )
+    non_member = User(
+        clerk_id=f"drive-cache-non-member-{uuid.uuid4().hex}",
+        display_name="Drive Cache Non-member",
+        email=f"drive-cache-non-member-{uuid.uuid4().hex}@kairos.test",
     )
     workspace = Workspace(name="Drive Cache Workspace", owner_id=user.id)
     document_project = Project(
@@ -663,12 +1180,14 @@ async def test_purge_invalidates_workspace_cache_while_sync_keeps_other_project_
         source_type="external_document",
         chunk_text="private source text",
         chunk_level=2,
+        embedding=_cache_vector(1),
     )
     global_cache = SemanticCache(
         workspace_id=workspace.id,
         question="global question",
+        question_embedding=_cache_vector(1),
         answer="private source text",
-        sources=[str(chunk.id)],
+        sources=[_rag_cache_source(chunk, document)],
         max_visibility="private",
     )
     document_cache = SemanticCache(
@@ -676,7 +1195,7 @@ async def test_purge_invalidates_workspace_cache_while_sync_keeps_other_project_
         project_id=document_project.id,
         question="project question",
         answer="private source text",
-        sources=[str(chunk.id)],
+        sources=[_rag_cache_source(chunk, document)],
         max_visibility="private",
     )
     other_project_cache = SemanticCache(
@@ -686,11 +1205,27 @@ async def test_purge_invalidates_workspace_cache_while_sync_keeps_other_project_
         answer="other project answer",
         sources=[],
     )
-    integration_session.add(user)
+    integration_session.add_all([user, non_member])
     await integration_session.commit()
     integration_session.add(workspace)
     await integration_session.commit()
-    integration_session.add_all([document_project, other_project, connection])
+    integration_session.add_all(
+        [
+            WorkspaceMember(
+                workspace_id=workspace.id,
+                user_id=user.id,
+                role="owner",
+            ),
+            WorkspaceMember(
+                workspace_id=workspace.id,
+                user_id=non_member.id,
+                role="member",
+            ),
+            document_project,
+            other_project,
+            connection,
+        ]
+    )
     await integration_session.commit()
     integration_session.add(document)
     await integration_session.commit()
@@ -698,6 +1233,17 @@ async def test_purge_invalidates_workspace_cache_while_sync_keeps_other_project_
         [chunk, global_cache, document_cache, other_project_cache]
     )
     await integration_session.commit()
+
+    async with session_factory() as verification_session:
+        cache_hit = await EmbeddingRepository(
+            verification_session
+        ).find_similar_cache(
+            question_embedding=_cache_vector(1),
+            workspace_id=workspace.id,
+            requester_user_id=non_member.id,
+            requester_role="member",
+        )
+    assert cache_hit is None
 
     monkeypatch.setattr(
         pipeline_module,
@@ -707,7 +1253,7 @@ async def test_purge_invalidates_workspace_cache_while_sync_keeps_other_project_
     monkeypatch.setattr(
         pipeline_module,
         "EmbeddingService",
-        _NoopEmbeddingService,
+        _ReplacingEmbeddingService,
     )
     drive_client = _FakeDriveClient()
     pipeline = GoogleDriveSyncPipelineService(
@@ -731,21 +1277,55 @@ async def test_purge_invalidates_workspace_cache_while_sync_keeps_other_project_
         remaining_caches = (await verification_session.exec(
             select(SemanticCache).where(SemanticCache.workspace_id == workspace.id)
         )).all()
-    assert {cache.project_id for cache in remaining_caches} == {
-        None,
-        other_project.id,
-    }
+        replacement_chunks = (await verification_session.exec(
+            select(EmbeddingChunk).where(EmbeddingChunk.source_id == document.id)
+        )).all()
+        cache_hit = await EmbeddingRepository(
+            verification_session
+        ).find_similar_cache(
+            question_embedding=_cache_vector(1),
+            workspace_id=workspace.id,
+            requester_user_id=non_member.id,
+            requester_role="member",
+        )
+    assert cache_hit is None
+    assert remaining_caches == []
+    assert {replacement_chunk.id for replacement_chunk in replacement_chunks}.isdisjoint(
+        {chunk.id}
+    )
 
     async with session_factory() as cache_session:
+        replacement_chunk = next(
+            chunk for chunk in replacement_chunks if chunk.chunk_level == 2
+        )
         cache_session.add(
             SemanticCache(
                 workspace_id=workspace.id,
                 project_id=document_project.id,
                 question="project question after sync",
                 answer="updated private source text",
-                sources=[str(chunk.id)],
+                sources=[_rag_cache_source(replacement_chunk, document)],
                 max_visibility="private",
             )
+        )
+        cache_session.add_all(
+            [
+                SemanticCache(
+                    workspace_id=workspace.id,
+                    question="global question after sync",
+                    question_embedding=_cache_vector(1),
+                    answer="updated private source text",
+                    sources=[_rag_cache_source(replacement_chunk, document)],
+                    max_visibility="private",
+                ),
+                SemanticCache(
+                    workspace_id=workspace.id,
+                    project_id=other_project.id,
+                    question="other project question after sync",
+                    answer="other project answer",
+                    sources=[],
+                ),
+            ]
         )
         await cache_session.commit()
 
@@ -762,9 +1342,167 @@ async def test_purge_invalidates_workspace_cache_while_sync_keeps_other_project_
         purged_document = (await verification_session.exec(
             select(ExternalDocument).where(ExternalDocument.id == document.id)
         )).one()
+        cache_hit = await EmbeddingRepository(
+            verification_session
+        ).find_similar_cache(
+            question_embedding=_cache_vector(1),
+            workspace_id=workspace.id,
+            requester_user_id=non_member.id,
+            requester_role="member",
+        )
+    assert cache_hit is None
     assert remaining_caches == []
     assert remaining_chunks == []
     assert purged_document.sync_status == "purged"
+
+
+async def test_unpublish_invalidates_workspace_cache_and_prevents_nonmember_cache_hit(
+    integration_session: AsyncSession,
+) -> None:
+    engine = integration_session.bind
+    assert engine is not None
+    session_factory = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    owner = User(
+        clerk_id=f"unpublish-cache-owner-{uuid.uuid4().hex}",
+        display_name="Unpublish Cache Owner",
+        email=f"unpublish-cache-owner-{uuid.uuid4().hex}@kairos.test",
+    )
+    non_member = User(
+        clerk_id=f"unpublish-cache-non-member-{uuid.uuid4().hex}",
+        display_name="Unpublish Cache Non-member",
+        email=f"unpublish-cache-non-member-{uuid.uuid4().hex}@kairos.test",
+    )
+    integration_session.add_all([owner, non_member])
+    await integration_session.commit()
+
+    workspace = Workspace(name="Unpublish Cache Workspace", owner_id=owner.id)
+    integration_session.add(workspace)
+    await integration_session.commit()
+    private_project = Project(
+        workspace_id=workspace.id,
+        title="Unpublish Private Project",
+        created_by_id=owner.id,
+        visibility="private",
+    )
+    other_project = Project(
+        workspace_id=workspace.id,
+        title="Unpublish Other Project",
+        created_by_id=owner.id,
+    )
+    connection = IntegrationConnection(
+        workspace_id=workspace.id,
+        authorized_by_id=owner.id,
+        encrypted_refresh_token="encrypted-refresh-token",
+        scope="drive.file",
+    )
+    integration_session.add_all(
+        [
+            WorkspaceMember(
+                workspace_id=workspace.id,
+                user_id=owner.id,
+                role="owner",
+            ),
+            WorkspaceMember(
+                workspace_id=workspace.id,
+                user_id=non_member.id,
+                role="member",
+            ),
+            private_project,
+            other_project,
+            connection,
+        ]
+    )
+    await integration_session.commit()
+
+    document = ExternalDocument(
+        workspace_id=workspace.id,
+        connection_id=connection.id,
+        project_id=private_project.id,
+        drive_file_id="unpublish-document-1",
+        title="Unpublish Drive document",
+        mime_type="application/vnd.google-apps.document",
+        origin_url="https://docs.google.com/document/d/unpublish-document-1/edit",
+        revision_id="revision-1",
+        content_hash="content-hash-1",
+        plain_text="private source text",
+        sync_status="completed",
+    )
+    integration_session.add(document)
+    await integration_session.commit()
+    chunk = EmbeddingChunk(
+        workspace_id=workspace.id,
+        project_id=private_project.id,
+        source_id=document.id,
+        source_type="external_document",
+        chunk_text="private source text",
+        chunk_level=2,
+        embedding=_cache_vector(3),
+    )
+    global_cache = SemanticCache(
+        workspace_id=workspace.id,
+        question="unpublish global question",
+        question_embedding=_cache_vector(3),
+        answer="private source text",
+        sources=[_rag_cache_source(chunk, document)],
+        max_visibility="private",
+    )
+    integration_session.add_all(
+        [
+            chunk,
+            global_cache,
+            SemanticCache(
+                workspace_id=workspace.id,
+                project_id=private_project.id,
+                question="unpublish project question",
+                answer="private source text",
+                sources=[_rag_cache_source(chunk, document)],
+                max_visibility="private",
+            ),
+            SemanticCache(
+                workspace_id=workspace.id,
+                project_id=other_project.id,
+                question="unpublish other project question",
+                answer="other project answer",
+                sources=[],
+            ),
+        ]
+    )
+    await integration_session.commit()
+
+    pipeline = GoogleDriveSyncPipelineService(
+        session_factory=session_factory,
+        drive_client_factory=_FakeDriveClient,
+        google_oauth_client_id="client-id",
+        google_oauth_client_secret="client-secret",
+    )
+    await pipeline.unpublish_document(document.id, workspace.id)
+
+    async with session_factory() as verification_session:
+        cache_hit = await EmbeddingRepository(
+            verification_session
+        ).find_similar_cache(
+            question_embedding=_cache_vector(3),
+            workspace_id=workspace.id,
+            requester_user_id=non_member.id,
+            requester_role="member",
+        )
+        remaining_caches = (await verification_session.exec(
+            select(SemanticCache).where(SemanticCache.workspace_id == workspace.id)
+        )).all()
+        remaining_chunks = (await verification_session.exec(
+            select(EmbeddingChunk).where(EmbeddingChunk.source_id == document.id)
+        )).all()
+        removed_document = (await verification_session.exec(
+            select(ExternalDocument).where(ExternalDocument.id == document.id)
+        )).one_or_none()
+    assert cache_hit is None
+    assert remaining_caches == []
+    assert remaining_chunks == []
+    assert removed_document is None
 
 
 async def test_import_continues_after_document_failure_and_closes_sync_run(
@@ -1047,6 +1785,14 @@ def test_scrub_pii_hook_redacts_exception_and_thread_frame_vars() -> None:
                                         "apiKey": refresh_token,
                                         "label": "keep",
                                     },
+                                    "safe_metadata": {
+                                        "apiKey": refresh_token,
+                                        "label": "keep",
+                                        "items": [
+                                            {"token": refresh_token},
+                                            {"label": "keep"},
+                                        ],
+                                    },
                                 }
                             }
                         ]
@@ -1084,10 +1830,140 @@ def test_scrub_pii_hook_redacts_exception_and_thread_frame_vars() -> None:
         "vars"
     ]
     assert exception_vars["refresh_token"] == "[redacted]"
-    assert exception_vars["safe_context"]["apiKey"] == "[redacted]"
-    assert exception_vars["safe_context"]["label"] == "keep"
+    assert exception_vars["safe_context"] == "[redacted]"
+    assert exception_vars["safe_metadata"]["apiKey"] == "[redacted]"
+    assert exception_vars["safe_metadata"]["label"] == "keep"
+    assert exception_vars["safe_metadata"]["items"][0]["token"] == "[redacted]"
+    assert exception_vars["safe_metadata"]["items"][1]["label"] == "keep"
     assert thread_vars["authorization"] == "[redacted]"
-    assert thread_vars["safe_thread_context"] == "keep"
+    assert thread_vars["safe_thread_context"] == "[redacted]"
+
+
+def test_scrub_pii_hook_redacts_document_body_frame_vars() -> None:
+    document_body = "사용자 원문은 Sentry에 남으면 안 됩니다"
+    event = {
+        "exception": {
+            "values": [
+                {
+                    "stacktrace": {
+                        "frames": [
+                            {
+                                "vars": {
+                                    "plain_text": document_body,
+                                    "chunk_text": document_body,
+                                    "paragraphs": document_body,
+                                    "texts": document_body,
+                                    "exported": document_body,
+                                    "document": document_body,
+                                    "body": document_body,
+                                    "content": document_body,
+                                    "answer": document_body,
+                                    "payload": {
+                                        "body": document_body,
+                                        "label": "keep",
+                                    },
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    }
+
+    scrubbed_event = _scrub_pii_hook(event, None)
+    frame_vars = scrubbed_event["exception"]["values"][0]["stacktrace"][
+        "frames"
+    ][0]["vars"]
+
+    assert document_body not in json.dumps(scrubbed_event)
+    for name in (
+        "plain_text",
+        "chunk_text",
+        "paragraphs",
+        "texts",
+        "exported",
+        "document",
+        "body",
+        "content",
+        "answer",
+    ):
+        assert frame_vars[name] == "[redacted]"
+    assert frame_vars["payload"] == {"body": "[redacted]", "label": "keep"}
+
+
+@pytest.mark.parametrize(
+    ("request_value", "user_value"),
+    [("not-a-request-dict", {}), ({}, "not-a-user-dict")],
+)
+def test_scrub_pii_hook_tolerates_non_dict_request_and_user(
+    request_value: object,
+    user_value: object,
+) -> None:
+    event = {"request": request_value, "user": user_value}
+
+    assert _scrub_pii_hook(event, None) is event
+    assert event == {"request": request_value, "user": user_value}
+
+
+async def test_sentry_scrub_redacts_invalid_encryption_key_from_stack_frame(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _EncryptionRepository:
+        async def find_connection_by_workspace(
+            self,
+            workspace_id: uuid.UUID,
+            provider: str,
+        ) -> None:
+            return None
+
+    invalid_key = f"invalid-fernet-key-{uuid.uuid4().hex}"
+    captured_events: list[dict] = []
+
+    def transport(event: dict) -> None:
+        captured_events.append(event)
+
+    monkeypatch.setattr(
+        crypto_module,
+        "get_settings",
+        lambda: SimpleNamespace(
+            integrations_encryption_key=SecretStr(invalid_key),
+        ),
+    )
+    crypto_module._get_fernet.cache_clear()
+    previous_client = sentry_sdk.get_client()
+    sentry_sdk.init(
+        dsn="http://public@example.invalid/1",
+        transport=transport,
+        send_default_pii=False,
+        include_local_variables=True,
+        before_send=_scrub_pii_hook,
+    )
+    try:
+        with pytest.raises(IntegrationEncryptionError):
+            await IntegrationService(_EncryptionRepository()).connect_or_reauthorize(
+                workspace_id=uuid.uuid4(),
+                authorized_by_id=uuid.uuid4(),
+                refresh_token="refresh-token-secret",
+                scope="drive.file",
+            )
+        sentry_sdk.flush()
+    finally:
+        crypto_module._get_fernet.cache_clear()
+        sentry_sdk.get_global_scope().set_client(previous_client)
+
+    assert captured_events
+    serialized_events = json.dumps(captured_events, default=str)
+    assert invalid_key not in serialized_events
+    assert "[redacted]" in serialized_events
+    frame_vars = [
+        frame.get("vars", {})
+        for event in captured_events
+        for exception_value in event.get("exception", {}).get("values", [])
+        for frame in exception_value.get("stacktrace", {}).get("frames", [])
+        if isinstance(frame, dict)
+    ]
+    assert any(vars_.get("key_value") == "[redacted]" for vars_ in frame_vars)
 
 
 @pytest.mark.parametrize("operation", ("encrypt", "decrypt"))

@@ -54,6 +54,19 @@ def _scrub_pii_hook(event, hint):
 
     sensitive_name_parts = (
         "token",
+        # 키 유출 위험이 진단 편의보다 커 일반적인 key 변수명도 과다 마스킹을 수용한다.
+        "key",
+        # 이 이름의 값은 대부분 사용자 원문이므로 진단 편의보다 본문 보호를 우선한다.
+        "text",
+        "paragraph",
+        "transcript",
+        "plain",
+        "export",
+        "document",
+        # 이름 기반 denylist는 구조적으로 완전할 수 없으며, 값 기반 스크럽·local vars 선택 비활성은 백로그다.
+        "body",
+        "content",
+        "answer",
         "secret",
         "password",
         "passwd",
@@ -126,12 +139,13 @@ def _scrub_pii_hook(event, hint):
                 scrub_stacktrace(thread.get("stacktrace"))
 
     request = event.get("request")
-    if request and isinstance(request.get("data"), dict):
+    if isinstance(request, dict) and isinstance(request.get("data"), dict):
         for field in ("transcript", "email", "password", "audio_url"):
             request["data"].pop(field, None)
-    if event.get("user"):
-        event["user"].pop("email", None)
-        event["user"].pop("ip_address", None)
+    user = event.get("user")
+    if isinstance(user, dict):
+        user.pop("email", None)
+        user.pop("ip_address", None)
     return event
 
 
