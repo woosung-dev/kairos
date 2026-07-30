@@ -254,3 +254,47 @@ def test_prod_hardening_enabled_by_default_still_raises(monkeypatch):
     assert Settings.model_fields["clerk_prod_hardening"].default is True
     with pytest.raises(ValueError, match="CLERK_JWT_ISSUER must be Clerk Production"):
         Settings(_env_file=None)
+
+
+def test_google_oauth_redirect_uri_default_is_quiet_in_development(
+    monkeypatch,
+):
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.delenv("GOOGLE_OAUTH_REDIRECT_URI", raising=False)
+
+    import src.core.config as config_mod
+
+    warned: list[str] = []
+    monkeypatch.setattr(
+        config_mod.logger,
+        "warning",
+        lambda msg, *args: warned.append(msg % args if args else msg),
+    )
+    config_mod.Settings(_env_file=None)
+
+    assert not any("GOOGLE_OAUTH_REDIRECT_URI" in message for message in warned)
+
+
+def test_google_oauth_redirect_uri_empty_warns_in_non_dev(
+    monkeypatch,
+):
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("CRON_SECRET_TOKEN", "prod-real-secret-xyz-32bytes-long-aaaa")
+    monkeypatch.setenv("CLERK_JWT_ISSUER", "https://clerk.example-app.com")
+    monkeypatch.setenv("CLERK_JWT_AUDIENCE", "https://api.example.com")
+    monkeypatch.setenv("GOOGLE_OAUTH_REDIRECT_URI", "")
+
+    import src.core.config as config_mod
+
+    warned: list[str] = []
+    monkeypatch.setattr(
+        config_mod.logger,
+        "warning",
+        lambda msg, *args: warned.append(msg % args if args else msg),
+    )
+    settings = config_mod.Settings(_env_file=None)
+
+    assert settings.google_oauth_redirect_uri.startswith("http://localhost:8000/")
+    assert any("GOOGLE_OAUTH_REDIRECT_URI is using the localhost fallback" in message for message in warned)

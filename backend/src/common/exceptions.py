@@ -41,3 +41,11 @@ class EncryptionError(Exception):
     def __init__(self, message: str = "암호화 처리에 실패했습니다") -> None:
         self.message = message
         super().__init__(self.message)
+
+
+class EncryptionConfigurationError(EncryptionError):
+    """암호화 키 설정이 없거나 유효하지 않음."""
+
+
+class EncryptionDecryptionError(EncryptionError):
+    """암호문을 현재 키로 복호화할 수 없음."""

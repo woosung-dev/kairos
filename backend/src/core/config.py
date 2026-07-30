@@ -3,13 +3,16 @@ import logging
 from functools import lru_cache
 
 from cryptography.fernet import Fernet
-from pydantic import SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
 
 # Sprint 15 R-CRON 의 dev fallback 토큰 — production 에선 절대 사용 X (validator 가 차단).
 _CRON_TOKEN_DEV_FALLBACK = "dev-cron-secret-CHANGE-ME-IN-PROD"
+_GOOGLE_OAUTH_REDIRECT_URI_DEV_FALLBACK = (
+    "http://localhost:8000/api/v1/integrations/google-drive/callback"
+)
 
 
 class Settings(BaseSettings):
@@ -79,8 +82,9 @@ class Settings(BaseSettings):
     integrations_encryption_key: SecretStr | None = None
     google_oauth_client_id: str | None = None
     google_oauth_client_secret: SecretStr | None = None
-    google_oauth_redirect_uri: str = (
-        "http://localhost:8000/api/v1/integrations/google-drive/callback"
+    google_oauth_redirect_uri: str = Field(
+        default=_GOOGLE_OAUTH_REDIRECT_URI_DEV_FALLBACK,
+        validate_default=True,
     )
     google_picker_api_key: SecretStr | None = None
 
@@ -143,12 +147,16 @@ class Settings(BaseSettings):
 
     # Sprint 29 — 27e prod 하드닝 위반 처리 게이트.
     @classmethod
-    def _enforce_or_warn(cls, info, message: str) -> None:
+    def _enforce_or_warn(cls, info, message: str, *, warn_only: bool = False) -> None:
         """non-dev 보안 위반 처리. clerk_prod_hardening=True(기본)면 raise(27e 강제 검증 유지),
         False(ADR-022 dev Clerk 유지 명시 opt-out)면 loud warning 으로 전환해 부팅 허용.
-        조용한 무력화 금지 — opt-out 이어도 위반은 항상 WARNING 로 기록."""
-        if info.data.get("clerk_prod_hardening", True):
+        warn_only는 R6상 부팅을 막지 않아야 하는 설정 경고에 사용한다. 조용한 무력화 금지 —
+        opt-out·warn_only 모두 위반은 항상 WARNING 로 기록."""
+        if not warn_only and info.data.get("clerk_prod_hardening", True):
             raise ValueError(message)
+        if warn_only:
+            logger.warning("[CONFIG GUARD · ADR-026 · startup allowed] %s", message)
+            return
         logger.warning(
             "[CONFIG GUARD · gated by CLERK_PROD_HARDENING=false · ADR-022] %s", message
         )
@@ -207,6 +215,21 @@ class Settings(BaseSettings):
                 "CLERK_JWT_AUDIENCE must be explicitly set in non-dev "
                 "(production/staging). implicit aud-skip (None) rejected — "
                 "audience 검증 영구 skip 방지",
+            )
+        return v
+
+    @field_validator("google_oauth_redirect_uri")
+    @classmethod
+    def _warn_google_oauth_redirect_uri_in_non_dev(cls, v: str, info) -> str:
+        if cls._is_non_dev_env(
+            info.data.get("app_env", "development"),
+            info.data.get("environment", "development"),
+        ) and (not v or v == _GOOGLE_OAUTH_REDIRECT_URI_DEV_FALLBACK):
+            cls._enforce_or_warn(
+                info,
+                "GOOGLE_OAUTH_REDIRECT_URI is using the localhost fallback in non-dev; "
+                "set the deployed Google OAuth callback URI",
+                warn_only=True,
             )
         return v
 

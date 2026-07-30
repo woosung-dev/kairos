@@ -3,7 +3,7 @@ from functools import lru_cache
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from src.common.exceptions import EncryptionError
+from src.common.exceptions import EncryptionConfigurationError, EncryptionDecryptionError
 from src.core.config import get_settings
 
 __all__ = ["decrypt_string", "encrypt_string"]
@@ -19,12 +19,12 @@ def _get_configured_fernet() -> Fernet:
     """호출 시점 설정의 연동 암호화 키로 Fernet을 만든다."""
     key = get_settings().integrations_encryption_key
     if key is None:
-        raise EncryptionError("연동 암호화 키가 설정되지 않았습니다")
+        raise EncryptionConfigurationError("연동 암호화 키가 설정되지 않았습니다")
 
     try:
         return _get_fernet(key.get_secret_value())
     except ValueError as exc:
-        raise EncryptionError("연동 암호화 키가 유효하지 않습니다") from exc
+        raise EncryptionConfigurationError("연동 암호화 키가 유효하지 않습니다") from exc
 
 
 def encrypt_string(plaintext: str) -> str:
@@ -37,4 +37,4 @@ def decrypt_string(ciphertext: str) -> str:
     try:
         return _get_configured_fernet().decrypt(ciphertext.encode()).decode()
     except (InvalidToken, UnicodeDecodeError) as exc:
-        raise EncryptionError("암호문을 복호화할 수 없습니다") from exc
+        raise EncryptionDecryptionError("암호문을 복호화할 수 없습니다") from exc

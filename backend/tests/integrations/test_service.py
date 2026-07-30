@@ -234,9 +234,40 @@ async def test_concurrent_reauthorize_upserts_single_connection(
         expire_on_commit=False,
     )
 
+    barrier = asyncio.Barrier(2)
+    precheck_barrier = asyncio.Barrier(2)
+    original_upsert_connection = IntegrationRepository.upsert_connection
+    original_find_connection = IntegrationRepository.find_connection_by_workspace
+
+    async def upsert_with_barrier(
+        repository: IntegrationRepository,
+        **kwargs,
+    ) -> IntegrationConnection:
+        await barrier.wait()
+        return await original_upsert_connection(repository, **kwargs)
+
+    async def find_connection_with_barrier(
+        repository: IntegrationRepository,
+        workspace_id: uuid.UUID,
+        provider: str,
+    ) -> IntegrationConnection | None:
+        connection = await original_find_connection(repository, workspace_id, provider)
+        await precheck_barrier.wait()
+        return connection
+
+    monkeypatch.setattr(
+        IntegrationRepository,
+        "upsert_connection",
+        upsert_with_barrier,
+    )
+    monkeypatch.setattr(
+        IntegrationRepository,
+        "find_connection_by_workspace",
+        find_connection_with_barrier,
+    )
+
     async def reauthorize(refresh_token: str) -> IntegrationConnection:
         async with session_factory() as session:
-            await barrier.wait()
             return await _service(session).connect_or_reauthorize(
                 workspace_id=seed.workspace.id,
                 authorized_by_id=seed.user.id,
@@ -244,7 +275,6 @@ async def test_concurrent_reauthorize_upserts_single_connection(
                 scope="https://www.googleapis.com/auth/drive.file",
             )
 
-    barrier = asyncio.Barrier(2)
     first, second = await asyncio.gather(
         reauthorize("concurrent-refresh-token-a"),
         reauthorize("concurrent-refresh-token-b"),

@@ -22,7 +22,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.auth.rbac import require_owner, require_viewer
 from src.common.crypto import decrypt_string, encrypt_string
 from src.common.database import get_async_session
-from src.common.exceptions import EncryptionError
+from src.common.exceptions import EncryptionDecryptionError, EncryptionError
 from src.common.visibility import ADMIN_BYPASS_ROLES, Access, decide_project_access
 from src.core.config import get_settings
 from src.integrations.dependencies import (
@@ -115,6 +115,8 @@ def _decode_oauth_state(state: str) -> _OAuthState:
         exp = payload["exp"]
         nonce = payload["nonce"]
         code_verifier = payload["code_verifier"]
+        workspace_id = payload["workspace_id"]
+        requester_user_id = payload["requester_user_id"]
         if (
             not isinstance(exp, int)
             or isinstance(exp, bool)
@@ -123,17 +125,21 @@ def _decode_oauth_state(state: str) -> _OAuthState:
             or not nonce
             or not isinstance(code_verifier, str)
             or not code_verifier
+            or not isinstance(workspace_id, str)
+            or not isinstance(requester_user_id, str)
         ):
             raise ValueError
         return _OAuthState(
-            workspace_id=uuid.UUID(payload["workspace_id"]),
-            requester_user_id=uuid.UUID(payload["requester_user_id"]),
+            workspace_id=uuid.UUID(workspace_id),
+            requester_user_id=uuid.UUID(requester_user_id),
             nonce=nonce,
             code_verifier=code_verifier,
         )
+    except EncryptionDecryptionError as exc:
+        # Fernet은 키 회전과 변조를 모두 InvalidToken으로만 알려 구분할 수 없다.
+        # callback state는 둘 다 유효하지 않은 state(400)로 처리한다.
+        raise _invalid_oauth_state() from exc
     except EncryptionError as exc:
-        if str(exc) == "암호문을 복호화할 수 없습니다":
-            raise _invalid_oauth_state() from exc
         raise IntegrationEncryptionError() from exc
     except (KeyError, TypeError, ValueError) as exc:
         raise _invalid_oauth_state() from exc

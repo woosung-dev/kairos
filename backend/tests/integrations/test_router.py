@@ -22,7 +22,11 @@ from src.auth.models import User
 from src.auth.rbac import require_owner, require_viewer
 from src.common import crypto
 from src.common.database import get_async_session
-from src.common.exceptions import EncryptionError
+from src.common.exceptions import (
+    EncryptionConfigurationError,
+    EncryptionDecryptionError,
+    EncryptionError,
+)
 from src.integrations import router as integration_router
 from src.integrations.dependencies import (
     get_google_drive_client,
@@ -538,6 +542,66 @@ async def test_callback_returns_503_when_state_decryption_configuration_fails(
     assert response.status_code == 503
     assert state not in response.text
     assert "authorization-code" not in response.text
+
+
+@pytest.mark.parametrize(
+    ("error_type", "expected_status"),
+    [
+        (EncryptionDecryptionError, 400),
+        (EncryptionConfigurationError, 503),
+    ],
+)
+def test_callback_encryption_error_mapping_does_not_depend_on_message(
+    monkeypatch: pytest.MonkeyPatch,
+    error_type: type[EncryptionError],
+    expected_status: int,
+) -> None:
+    def raise_error(_: str) -> str:
+        raise error_type("메시지를 바꿔도 HTTP 의미는 유지된다")
+
+    monkeypatch.setattr(integration_router, "decrypt_string", raise_error)
+
+    with pytest.raises(HTTPException) as exc_info:
+        integration_router._decode_oauth_state("state")
+
+    assert exc_info.value.status_code == expected_status
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {
+            "workspace_id": str(uuid.uuid4()),
+            "nonce": "nonce",
+            "code_verifier": "code-verifier",
+            "exp": int((datetime.now(UTC) + timedelta(minutes=5)).timestamp()),
+        },
+        {
+            "workspace_id": "not-a-uuid",
+            "requester_user_id": str(uuid.uuid4()),
+            "nonce": "nonce",
+            "code_verifier": "code-verifier",
+            "exp": int((datetime.now(UTC) + timedelta(minutes=5)).timestamp()),
+        },
+        {
+            "workspace_id": 1,
+            "requester_user_id": [],
+            "nonce": "nonce",
+            "code_verifier": "code-verifier",
+            "exp": int((datetime.now(UTC) + timedelta(minutes=5)).timestamp()),
+        },
+    ],
+)
+def test_decode_oauth_state_rejects_invalid_payload_shape(
+    oauth_settings: _OAuthSettings,
+    payload: dict[str, object],
+) -> None:
+    state = crypto.encrypt_string(json.dumps(payload))
+
+    with pytest.raises(HTTPException) as exc_info:
+        integration_router._decode_oauth_state(state)
+
+    assert exc_info.value.status_code == 400
 
 
 @pytest.mark.parametrize(
