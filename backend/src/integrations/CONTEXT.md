@@ -4,7 +4,7 @@
 
 > 상위: `/backend/CONTEXT.md` → `/CONTEXT-MAP.md`. 상세 결정: `docs/adr/026-external-source-ingest-rail.md`.
 >
-> **현재 상태 (2026-07-31)**: ADR-026의 모델·repository/service·GoogleDriveClient·동기화 pipeline·외부 문서 임베딩 경로가 구현됐다. OAuth authorize/callback 라우터 연결은 W8 범위다.
+> **현재 상태 (2026-07-31)**: ADR-026의 모델·repository/service·GoogleDriveClient·동기화 pipeline·외부 문서 임베딩 경로와 OAuth authorize/callback 라우터가 구현됐다.
 
 ---
 
@@ -23,9 +23,9 @@
 - RAG 검색 조립과 visibility 검증은 `rag/RagPipelineService` 및 기존 visibility 경계를 따른다.
 - provider abstraction은 도입하지 않는다. v0는 Google Drive 단일 구현이다.
 
-## 3. 계획 엔티티 (ADR-026 D6/D9, 구현 예정)
+## 3. 엔티티 (ADR-026 D6/D9)
 
-| 엔티티 | 예정 책임 | 핵심 경계 |
+| 엔티티 | 책임 | 핵심 경계 |
 |---|---|---|
 | `IntegrationConnection` | Workspace별 Google OAuth 연결 | 암호화 refresh token, 연결 상태, 승인 사용자 |
 | `ExternalDocument` | 선택된 Drive 문서의 Kairos 내부 원본 | `workspace_id`·`project_id`·Drive file ID·plain text·revision·sync 상태 |
@@ -33,7 +33,7 @@
 
 ## 4. 핵심 불변식
 
-| # | 불변식 | 강제 위치 (구현 시) |
+| # | 불변식 | 강제 위치 |
 |---|---|---|
 | I-EXT-1 | 연결·선택·동기화·발행 취소는 Workspace owner만 실행한다. | router의 `require_owner` |
 | I-EXT-2 | 모든 엔티티와 조회·수정·삭제는 `workspace_id`를 포함해 I-9 격리를 강제한다. | repository + composite FK |
@@ -42,7 +42,7 @@
 | I-EXT-5 | Drive → Kairos는 읽기 전용이며, v0는 Google Docs `text/plain` export만 지원한다. | Google Drive client |
 | I-EXT-6 | 자동 retry를 두지 않는다. 429/5xx/network/circuit open은 stale로 보존하고 사용자가 수동 재동기화한다. | sync 상태 전이 |
 
-## 5. 엔드포인트 (ADR-026 D9, 구현 예정)
+## 5. 엔드포인트 (ADR-026 D9)
 
 ```text
 POST   /api/v1/workspaces/{workspace_id}/integrations/google-drive/authorize

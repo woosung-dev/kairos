@@ -16,6 +16,11 @@ class ExternalDocumentNotFoundError(NotFoundError):
         super().__init__("외부 문서")
 
 
+class IntegrationSyncRunNotFoundError(NotFoundError):
+    def __init__(self) -> None:
+        super().__init__("연동 동기화 실행")
+
+
 class IntegrationEncryptionError(HTTPException):
     """연동 토큰 암호화·복호화 실패를 HTTP 경계에 안전하게 변환한다."""
 

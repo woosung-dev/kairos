@@ -39,22 +39,6 @@ class IntegrationService:
     ) -> IntegrationConnection | None:
         return await self.repo.find_connection_by_workspace(workspace_id, provider)
 
-    async def create_connection(
-        self,
-        workspace_id: uuid.UUID,
-        authorized_by_id: uuid.UUID,
-        refresh_token: str,
-        scope: str,
-        token_expires_at: datetime | None = None,
-    ) -> IntegrationConnection:
-        return await self.connect_or_reauthorize(
-            workspace_id=workspace_id,
-            authorized_by_id=authorized_by_id,
-            refresh_token=refresh_token,
-            scope=scope,
-            token_expires_at=token_expires_at,
-        )
-
     async def connect_or_reauthorize(
         self,
         workspace_id: uuid.UUID,
@@ -64,29 +48,13 @@ class IntegrationService:
         token_expires_at: datetime | None = None,
         provider: str = "google_drive",
     ) -> IntegrationConnection:
-        connection = await self.repo.find_connection_by_workspace(
-            workspace_id,
-            provider,
-        )
         try:
             encrypted_refresh_token = encrypt_string(refresh_token)
         except EncryptionError as exc:
             sentry_sdk.capture_exception(exc)
             raise IntegrationEncryptionError() from exc
 
-        if connection is not None:
-            await self.repo.update_connection_credentials(
-                connection.id,
-                workspace_id,
-                encrypted_refresh_token,
-                scope,
-                token_expires_at,
-                status="active",
-            )
-            await self.repo.commit()
-            return connection
-
-        connection = IntegrationConnection(
+        connection = await self.repo.upsert_connection(
             workspace_id=workspace_id,
             provider=provider,
             authorized_by_id=authorized_by_id,
@@ -94,7 +62,6 @@ class IntegrationService:
             scope=scope,
             token_expires_at=token_expires_at,
         )
-        connection = await self.repo.create_connection(connection, workspace_id)
         await self.repo.commit()
         return connection
 

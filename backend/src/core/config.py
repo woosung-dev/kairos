@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     integrations_encryption_key: SecretStr | None = None
     google_oauth_client_id: str | None = None
     google_oauth_client_secret: SecretStr | None = None
+    google_oauth_redirect_uri: str = (
+        "http://localhost:8000/api/v1/integrations/google-drive/callback"
+    )
     google_picker_api_key: SecretStr | None = None
 
     # DB pool (PERF-r2-5) — 기본값 5+10 유지. PERF-SSE-COMMIT 으로 스트리밍 중

@@ -23,6 +23,8 @@ from src.core.config import get_settings
 from src.core.lifespan import lifespan
 from src.feedback.router import router as feedback_router
 from src.inbox.router import router as inbox_router
+from src.integrations.router import public_router as integrations_public_router
+from src.integrations.router import router as integrations_router
 from src.meetings.router import router as meetings_router
 from src.memory.admin_router import admin_router as memory_admin_router
 from src.memory.router import router as memory_router
@@ -295,6 +297,8 @@ app.include_router(upload_router)
 app.include_router(member_router)
 app.include_router(invite_router)
 app.include_router(invite_public_router)
+app.include_router(integrations_router)
+app.include_router(integrations_public_router)
 app.include_router(audit_router)
 app.include_router(feedback_router)
 

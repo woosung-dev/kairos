@@ -1,7 +1,9 @@
 """Integrations 의존성 주입 — request-scoped repository와 service 조립."""
+from collections.abc import AsyncIterator
+
 import httpx
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -11,6 +13,7 @@ from src.integrations.drive_client import GoogleDriveClient
 from src.integrations.pipeline_service import GoogleDriveSyncPipelineService
 from src.integrations.repository import IntegrationRepository
 from src.integrations.service import IntegrationService
+from src.projects.repository import ProjectRepository
 
 
 async def get_integration_repository(
@@ -23,6 +26,18 @@ async def get_integration_service(
     repo: IntegrationRepository = Depends(get_integration_repository),
 ) -> IntegrationService:
     return IntegrationService(repo)
+
+
+async def get_integration_project_repository(
+    session: AsyncSession = Depends(get_async_session),
+) -> ProjectRepository:
+    return ProjectRepository(session)
+
+
+async def get_google_drive_client() -> AsyncIterator[GoogleDriveClient]:
+    """요청 경계의 OAuth code 교환용 HTTP 클라이언트."""
+    async with httpx.AsyncClient() as client:
+        yield GoogleDriveClient(client)
 
 
 def _create_google_drive_client() -> GoogleDriveClient:
@@ -38,7 +53,7 @@ def get_google_drive_sync_pipeline_service(
     client_id = settings.google_oauth_client_id
     client_secret = settings.google_oauth_client_secret
     if client_id is None or client_secret is None:
-        raise RuntimeError("Google OAuth 설정이 필요합니다.")
+        raise HTTPException(status_code=503, detail="Google OAuth 설정이 필요합니다")
     return GoogleDriveSyncPipelineService(
         session_factory=session_factory,
         drive_client_factory=_create_google_drive_client,

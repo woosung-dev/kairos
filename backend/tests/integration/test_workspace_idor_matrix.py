@@ -42,7 +42,7 @@ from httpx import ASGITransport, AsyncClient
 
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
-from src.auth.rbac import require_viewer
+from src.auth.rbac import require_owner, require_viewer
 from src.common.database import get_async_session
 from src.main import app
 from src.workspaces.models import WorkspaceMember
@@ -85,6 +85,60 @@ WORKSPACE_SCOPED_ENDPOINTS: dict[str, list[dict]] = {
     ],
     "upload": [
         # TODO PR #1 upload commit: 2 endpoint
+    ],
+    "integrations": [
+        {
+            "method": "POST",
+            "path": (
+                "/api/v1/workspaces/{ws}/integrations/google-drive/authorize"
+            ),
+            "service": "_encode_oauth_state",
+            "rid_field": "workspace_id",
+        },
+        {
+            "method": "GET",
+            "path": "/api/v1/workspaces/{ws}/integrations/google-drive",
+            "service": "get_connection_by_provider",
+            "rid_field": "workspace_id",
+        },
+        {
+            "method": "POST",
+            "path": (
+                "/api/v1/workspaces/{ws}/integrations/google-drive/documents"
+            ),
+            "service": "import_documents",
+            "rid_field": "project_id",
+        },
+        {
+            "method": "GET",
+            "path": "/api/v1/workspaces/{ws}/integrations/sync-runs/{rid}",
+            "service": "get_sync_run",
+            "rid_field": "sync_run_id",
+        },
+        {
+            "method": "POST",
+            "path": (
+                "/api/v1/workspaces/{ws}/integrations/google-drive/"
+                "documents/{rid}/sync"
+            ),
+            "service": "get_document",
+            "rid_field": "document_id",
+        },
+        {
+            "method": "DELETE",
+            "path": (
+                "/api/v1/workspaces/{ws}/integrations/google-drive/"
+                "documents/{rid}"
+            ),
+            "service": "unpublish_document",
+            "rid_field": "document_id",
+        },
+        {
+            "method": "GET",
+            "path": "/api/v1/workspaces/{ws}/external-documents/{rid}",
+            "service": "get_document",
+            "rid_field": "document_id",
+        },
     ],
 }
 
@@ -1287,4 +1341,266 @@ class TestUploadIDORMatrix:
         )
         assert src_text.count("Depends(require_member)") >= 2, (
             f"BUG-C01-EXT v3 upload: 2 endpoint 모두 Depends(require_member) 필수."
+        )
+
+
+class TestIntegrationsIDORMatrix:
+    """integrations workspace 경계 — router → service의 정확한 tenant 전달 고정."""
+
+    @pytest.mark.asyncio
+    async def test_sync_run_polling_passes_workspace_id_to_service(
+        self,
+        client,
+        user_a,
+        member_a,
+        workspace_a_id,
+    ):
+        from datetime import UTC, datetime
+        from types import SimpleNamespace
+
+        from src.integrations.dependencies import get_integration_service
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_owner] = lambda: member_a
+        sync_run_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.get_sync_run.return_value = SimpleNamespace(
+            id=sync_run_id,
+            status="completed",
+            started_at=datetime.now(UTC).replace(tzinfo=None),
+            completed_at=None,
+            error_summary=None,
+        )
+        mock_service.list_documents_by_sync_run.return_value = []
+        app.dependency_overrides[get_integration_service] = lambda: mock_service
+
+        response = await client.get(
+            f"/api/v1/workspaces/{workspace_a_id}/integrations/sync-runs/{sync_run_id}",
+        )
+
+        assert response.status_code == 200
+        assert mock_service.get_sync_run.await_args.args == (
+            sync_run_id,
+            workspace_a_id,
+        )
+        assert mock_service.list_documents_by_sync_run.await_args.args == (
+            sync_run_id,
+            workspace_a_id,
+        )
+
+    @pytest.mark.asyncio
+    async def test_authorize_passes_workspace_id_to_state_encoder(
+        self,
+        client,
+        member_a,
+        monkeypatch,
+        workspace_a_id,
+    ):
+        from src.integrations import router as integrations_router
+
+        captured: dict[str, uuid.UUID] = {}
+
+        def encode_state(
+            workspace_id: uuid.UUID,
+            _requester_user_id: uuid.UUID,
+            _code_verifier: str,
+        ) -> str:
+            captured["workspace_id"] = workspace_id
+            return "encrypted-state"
+
+        app.dependency_overrides[require_owner] = lambda: member_a
+        monkeypatch.setattr(
+            integrations_router,
+            "_oauth_credentials",
+            lambda: ("client-id", "client-secret"),
+        )
+        monkeypatch.setattr(integrations_router, "_encode_oauth_state", encode_state)
+
+        response = await client.post(
+            f"/api/v1/workspaces/{workspace_a_id}/integrations/google-drive/authorize",
+        )
+
+        assert response.status_code == 200
+        assert captured["workspace_id"] == workspace_a_id
+
+    @pytest.mark.asyncio
+    async def test_connection_status_passes_workspace_id_to_service(
+        self,
+        client,
+        member_a,
+        workspace_a_id,
+    ):
+        from src.integrations.dependencies import get_integration_service
+
+        service = AsyncMock()
+        service.get_connection_by_provider.return_value = None
+        app.dependency_overrides[require_owner] = lambda: member_a
+        app.dependency_overrides[get_integration_service] = lambda: service
+
+        response = await client.get(
+            f"/api/v1/workspaces/{workspace_a_id}/integrations/google-drive",
+        )
+
+        assert response.status_code == 200
+        assert service.get_connection_by_provider.await_args.args == (
+            workspace_a_id,
+            "google_drive",
+        )
+
+    @pytest.mark.asyncio
+    async def test_import_passes_workspace_id_to_pipeline(
+        self,
+        client,
+        member_a,
+        workspace_a_id,
+    ):
+        from src.integrations.dependencies import (
+            get_google_drive_sync_pipeline_service,
+            get_integration_project_repository,
+            get_integration_repository,
+            get_integration_service,
+        )
+
+        connection_id = uuid.uuid4()
+        service = AsyncMock()
+        service.get_connection_by_provider.return_value = MagicMock(id=connection_id)
+        repository = AsyncMock()
+        pipeline = MagicMock()
+        pipeline.import_documents = AsyncMock()
+        app.dependency_overrides[require_owner] = lambda: member_a
+        app.dependency_overrides[get_integration_service] = lambda: service
+        app.dependency_overrides[get_integration_repository] = lambda: repository
+        app.dependency_overrides[get_integration_project_repository] = lambda: MagicMock()
+        app.dependency_overrides[get_google_drive_sync_pipeline_service] = lambda: pipeline
+
+        response = await client.post(
+            f"/api/v1/workspaces/{workspace_a_id}/integrations/google-drive/documents",
+            json={"fileIds": ["drive-file-id"]},
+        )
+
+        assert response.status_code == 202
+        assert service.get_connection_by_provider.await_args.args == (
+            workspace_a_id,
+            "google_drive",
+        )
+        assert repository.create_sync_run.await_args.args[1] == workspace_a_id
+        assert pipeline.import_documents.await_args.args[1] == workspace_a_id
+
+    @pytest.mark.asyncio
+    async def test_cross_tenant_delete_document_is_not_found(
+        self,
+        client,
+        member_a,
+        workspace_a_id,
+    ):
+        from src.integrations.dependencies import (
+            get_google_drive_sync_pipeline_service,
+            get_integration_service,
+        )
+
+        document_id = uuid.uuid4()
+        service = AsyncMock()
+        service.get_document.return_value = None
+        app.dependency_overrides[require_owner] = lambda: member_a
+        app.dependency_overrides[get_integration_service] = lambda: service
+        app.dependency_overrides[get_google_drive_sync_pipeline_service] = lambda: MagicMock()
+
+        response = await client.delete(
+            f"/api/v1/workspaces/{workspace_a_id}/integrations/google-drive/"
+            f"documents/{document_id}",
+        )
+
+        assert response.status_code == 404
+        assert service.get_document.await_args.args == (document_id, workspace_a_id)
+
+    @pytest.mark.asyncio
+    async def test_cross_tenant_external_document_is_not_found_for_viewer(
+        self,
+        client,
+        member_a,
+        workspace_a_id,
+    ):
+        from src.integrations.dependencies import get_integration_service
+
+        document_id = uuid.uuid4()
+        service = AsyncMock()
+        service.get_document.return_value = None
+        app.dependency_overrides[require_viewer] = lambda: member_a
+        app.dependency_overrides[get_integration_service] = lambda: service
+
+        response = await client.get(
+            f"/api/v1/workspaces/{workspace_a_id}/external-documents/{document_id}",
+        )
+
+        assert response.status_code == 404
+        assert service.get_document.await_args.args == (document_id, workspace_a_id)
+
+    @pytest.mark.asyncio
+    async def test_import_hides_cross_tenant_project_id(
+        self,
+        client,
+        member_a,
+        workspace_a_id,
+    ):
+        from src.integrations.dependencies import (
+            get_google_drive_sync_pipeline_service,
+            get_integration_project_repository,
+            get_integration_repository,
+            get_integration_service,
+        )
+
+        project_id = uuid.uuid4()
+        service = AsyncMock()
+        service.get_connection_by_provider.return_value = MagicMock(id=uuid.uuid4())
+        project_repository = AsyncMock()
+        project_repository.find_by_id.return_value = None
+        app.dependency_overrides[require_owner] = lambda: member_a
+        app.dependency_overrides[get_integration_service] = lambda: service
+        app.dependency_overrides[get_integration_repository] = lambda: AsyncMock()
+        app.dependency_overrides[get_integration_project_repository] = (
+            lambda: project_repository
+        )
+        app.dependency_overrides[get_google_drive_sync_pipeline_service] = lambda: MagicMock()
+
+        response = await client.post(
+            f"/api/v1/workspaces/{workspace_a_id}/integrations/google-drive/documents",
+            json={"fileIds": ["drive-file-id"], "projectId": str(project_id)},
+        )
+
+        assert response.status_code == 404
+        assert project_repository.find_by_id.await_args.args == (
+            project_id,
+            workspace_a_id,
+        )
+
+    @pytest.mark.asyncio
+    async def test_cross_tenant_external_document_is_not_found(
+        self,
+        client,
+        user_a,
+        member_a,
+        workspace_a_id,
+    ):
+        from src.integrations.dependencies import (
+            get_google_drive_sync_pipeline_service,
+            get_integration_service,
+        )
+
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        app.dependency_overrides[require_owner] = lambda: member_a
+        cross_tenant_document_id = uuid.uuid4()
+        mock_service = AsyncMock()
+        mock_service.get_document.return_value = None
+        app.dependency_overrides[get_integration_service] = lambda: mock_service
+        app.dependency_overrides[get_google_drive_sync_pipeline_service] = lambda: MagicMock()
+
+        response = await client.post(
+            f"/api/v1/workspaces/{workspace_a_id}/integrations/google-drive/"
+            f"documents/{cross_tenant_document_id}/sync",
+        )
+
+        assert response.status_code == 404
+        assert mock_service.get_document.await_args.args == (
+            cross_tenant_document_id,
+            workspace_a_id,
         )

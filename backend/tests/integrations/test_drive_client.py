@@ -8,6 +8,7 @@ import pytest
 from src.integrations.drive_client import (
     GOOGLE_DOC_MIME_TYPE,
     GoogleDriveClient,
+    GoogleAuthorizationCodeToken,
 )
 from src.integrations.exceptions import (
     DriveClientError,
@@ -77,6 +78,39 @@ async def test_refresh_access_token() -> None:
     assert access_token == "new-access-token"
 
 
+async def test_exchange_authorization_code_uses_pkce_and_returns_minimum_token() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/token"
+        assert request.content == (
+            b"client_id=client-id&client_secret=client-secret&code=authorization-code"
+            b"&code_verifier=pkce-verifier&grant_type=authorization_code"
+            b"&redirect_uri=https%3A%2F%2Fapi.kairos.test%2Fcallback"
+        )
+        return httpx.Response(
+            200,
+            json={
+                "access_token": "must-not-be-returned",
+                "refresh_token": "refresh-token",
+                "expires_in": 3600,
+            },
+            request=request,
+        )
+
+    async with _client(handler) as http_client:
+        token = await GoogleDriveClient(http_client).exchange_authorization_code(
+            "authorization-code",
+            "pkce-verifier",
+            "https://api.kairos.test/callback",
+            client_id="client-id",
+            client_secret="client-secret",
+        )
+
+    assert token == GoogleAuthorizationCodeToken(
+        refresh_token="refresh-token",
+        expires_in=3600,
+    )
+
+
 @pytest.mark.parametrize(
     ("status_code", "payload", "expected_error"),
     [
@@ -88,10 +122,29 @@ async def test_refresh_access_token() -> None:
             {"error": {"errors": [{"reason": "insufficientFilePermissions"}]}},
             DriveReauthenticationRequiredError,
         ),
+        (
+            403,
+            {"error": {"errors": [{"reason": "rateLimitExceeded"}]}},
+            DriveTemporaryError,
+        ),
+        (
+            403,
+            {"error": {"errors": [{"reason": "userRateLimitExceeded"}]}},
+            DriveTemporaryError,
+        ),
         (429, {"error": {}}, DriveTemporaryError),
         (503, {"error": {}}, DriveTemporaryError),
     ],
-    ids=("400", "401", "404", "permission-revoked-403", "429", "5xx"),
+    ids=(
+        "400",
+        "401",
+        "404",
+        "permission-revoked-403",
+        "rate-limit-403",
+        "user-rate-limit-403",
+        "429",
+        "5xx",
+    ),
 )
 async def test_refresh_errors_never_allow_purge(
     status_code: int,

@@ -114,6 +114,7 @@ jobs:
             INTEGRATIONS_ENCRYPTION_KEY=${{ secrets.INTEGRATIONS_ENCRYPTION_KEY }}
             GOOGLE_OAUTH_CLIENT_ID=${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
             GOOGLE_OAUTH_CLIENT_SECRET=${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+            GOOGLE_OAUTH_REDIRECT_URI=${{ vars.GOOGLE_OAUTH_REDIRECT_URI }}
             GOOGLE_PICKER_API_KEY=${{ secrets.GOOGLE_PICKER_API_KEY }}
 
       # ── Smoke test ─────────────────────────────────────────────────────

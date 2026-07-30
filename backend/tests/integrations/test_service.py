@@ -1,11 +1,15 @@
 """ADR-026 integrations service 회귀 테스트."""
+import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from cryptography.fernet import Fernet
 from pydantic import SecretStr
+from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -91,6 +95,7 @@ def _set_fernet_key(monkeypatch: pytest.MonkeyPatch) -> None:
         "get_settings",
         lambda: _CryptoSettings(integrations_encryption_key=SecretStr(key)),
     )
+    crypto._get_fernet.cache_clear()
 
 
 async def test_connection_lookup_is_workspace_scoped(
@@ -147,7 +152,7 @@ async def test_refresh_token_is_encrypted_and_decrypted(
     await integration_session.delete(seed.connection)
     await integration_session.commit()
 
-    connection = await service.create_connection(
+    connection = await service.connect_or_reauthorize(
         workspace_id=seed.workspace.id,
         authorized_by_id=seed.user.id,
         refresh_token="refresh-token-value",
@@ -161,7 +166,7 @@ async def test_refresh_token_is_encrypted_and_decrypted(
     ) == "refresh-token-value"
 
 
-async def test_create_disconnect_reconnect_reuses_connection(
+async def test_connect_disconnect_reauthorize_reuses_connection(
     integration_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -170,7 +175,7 @@ async def test_create_disconnect_reconnect_reuses_connection(
     await integration_session.delete(seed.connection)
     await integration_session.commit()
     service = _service(integration_session)
-    first = await service.create_connection(
+    first = await service.connect_or_reauthorize(
         workspace_id=seed.workspace.id,
         authorized_by_id=seed.user.id,
         refresh_token="first-refresh-token",
@@ -180,9 +185,16 @@ async def test_create_disconnect_reconnect_reuses_connection(
 
     await service.disconnect_connection(first.id, seed.workspace.id)
     token_expires_at = datetime.now(UTC).replace(tzinfo=None)
-    reconnected = await service.create_connection(
+    reauthorizing_user = User(
+        clerk_id=f"clerk_service_reauthorize_{uuid.uuid4().hex[:8]}",
+        display_name="Reauthorize User",
+        email=f"reauthorize_{uuid.uuid4().hex[:8]}@k.test",
+    )
+    integration_session.add(reauthorizing_user)
+    await integration_session.flush()
+    reconnected = await service.connect_or_reauthorize(
         workspace_id=seed.workspace.id,
-        authorized_by_id=seed.user.id,
+        authorized_by_id=reauthorizing_user.id,
         refresh_token="second-refresh-token",
         scope="scope-second",
         token_expires_at=token_expires_at,
@@ -201,10 +213,70 @@ async def test_create_disconnect_reconnect_reuses_connection(
     assert reconnected.scope == "scope-second"
     assert reconnected.token_expires_at == token_expires_at
     assert reconnected.status == "active"
+    assert reconnected.authorized_by_id == reauthorizing_user.id
     assert await service.get_decrypted_refresh_token(
         reconnected.id,
         seed.workspace.id,
     ) == "second-refresh-token"
+
+
+async def test_concurrent_reauthorize_upserts_single_connection(
+    integration_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _set_fernet_key(monkeypatch)
+    seed = await _seed_service_workspace(integration_session, "concurrent-upsert")
+    await integration_session.delete(seed.connection)
+    await integration_session.commit()
+    session_factory = async_sessionmaker(
+        integration_session.bind,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async def reauthorize(refresh_token: str) -> IntegrationConnection:
+        async with session_factory() as session:
+            await barrier.wait()
+            return await _service(session).connect_or_reauthorize(
+                workspace_id=seed.workspace.id,
+                authorized_by_id=seed.user.id,
+                refresh_token=refresh_token,
+                scope="https://www.googleapis.com/auth/drive.file",
+            )
+
+    barrier = asyncio.Barrier(2)
+    first, second = await asyncio.gather(
+        reauthorize("concurrent-refresh-token-a"),
+        reauthorize("concurrent-refresh-token-b"),
+    )
+
+    async with session_factory() as verification_session:
+        connections = list((await verification_session.exec(
+            select(IntegrationConnection).where(
+                IntegrationConnection.workspace_id == seed.workspace.id,
+                IntegrationConnection.provider == "google_drive",
+            )
+        )).all())
+
+    assert first.id == second.id
+    assert len(connections) == 1
+
+
+async def test_upsert_connection_raises_when_returning_row_cannot_be_reloaded() -> None:
+    session = AsyncMock()
+    session.execute.return_value = SimpleNamespace(scalar_one=lambda: uuid.uuid4())
+    repository = IntegrationRepository(session)
+    repository.find_connection_by_id = AsyncMock(return_value=None)
+
+    with pytest.raises(RuntimeError, match="다시 조회"):
+        await repository.upsert_connection(
+            workspace_id=uuid.uuid4(),
+            provider="google_drive",
+            authorized_by_id=uuid.uuid4(),
+            encrypted_refresh_token="encrypted-token",
+            scope="scope",
+            token_expires_at=None,
+        )
 
 
 async def test_decryption_error_is_converted_to_domain_error(

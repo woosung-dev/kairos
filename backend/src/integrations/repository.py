@@ -2,6 +2,7 @@
 import uuid
 from datetime import datetime
 
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import defer
 from sqlmodel import delete, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -50,15 +51,44 @@ class IntegrationRepository:
             )
         )).one_or_none()
 
-    async def create_connection(
+    async def upsert_connection(
         self,
-        connection: IntegrationConnection,
+        *,
         workspace_id: uuid.UUID,
+        provider: str,
+        authorized_by_id: uuid.UUID,
+        encrypted_refresh_token: str,
+        scope: str,
+        token_expires_at: datetime | None,
     ) -> IntegrationConnection:
-        if connection.workspace_id != workspace_id:
-            raise ValueError("connection workspace_id가 일치하지 않습니다")
-        self.session.add(connection)
-        await self.session.flush()
+        """OAuth callback 경쟁을 원자적으로 연결·재승인한다."""
+        stmt = (
+            pg_insert(IntegrationConnection.__table__)
+            .values(
+                workspace_id=workspace_id,
+                provider=provider,
+                authorized_by_id=authorized_by_id,
+                encrypted_refresh_token=encrypted_refresh_token,
+                scope=scope,
+                token_expires_at=token_expires_at,
+                status="active",
+            )
+            .on_conflict_do_update(
+                index_elements=["workspace_id", "provider"],
+                set_={
+                    "authorized_by_id": authorized_by_id,
+                    "encrypted_refresh_token": encrypted_refresh_token,
+                    "scope": scope,
+                    "token_expires_at": token_expires_at,
+                    "status": "active",
+                },
+            )
+            .returning(IntegrationConnection.id)
+        )
+        connection_id = (await self.session.execute(stmt)).scalar_one()
+        connection = await self.find_connection_by_id(connection_id, workspace_id)
+        if connection is None:
+            raise RuntimeError("upsert된 연동 연결을 다시 조회할 수 없습니다")
         return connection
 
     async def update_connection_status(
@@ -80,29 +110,6 @@ class IntegrationRepository:
         else:
             stmt = stmt.values(status=status)
         await self.session.exec(stmt)
-
-    async def update_connection_credentials(
-        self,
-        connection_id: uuid.UUID,
-        workspace_id: uuid.UUID,
-        encrypted_refresh_token: str,
-        scope: str,
-        token_expires_at: datetime | None,
-        status: str,
-    ) -> None:
-        await self.session.exec(
-            update(IntegrationConnection)
-            .where(
-                IntegrationConnection.id == connection_id,
-                IntegrationConnection.workspace_id == workspace_id,
-            )
-            .values(
-                encrypted_refresh_token=encrypted_refresh_token,
-                scope=scope,
-                token_expires_at=token_expires_at,
-                status=status,
-            )
-        )
 
     async def find_document_by_id(
         self,
