@@ -1,5 +1,26 @@
 # Kairos 배포 가이드
 
+> ## 🔴 배포 전 필수 확인 (2026-07-30 등록 — 해소되면 이 블록 삭제)
+>
+> **dev DB 의 `alembic_version` 이 `a48095872e14` 로 stamp 되어 있다.**
+> 이 리비전은 미머지 브랜치 `spike/gdrive-integrations` 에만 존재한다.
+>
+> Dockerfile `CMD` 가 시작 시 `alembic upgrade head` 를 실행하므로,
+> `main` 이미지가 이 DB 에 붙으면 **`Can't locate revision 'a48095872e14'` 로 crash-loop 한다.**
+>
+> **배포 전 정리 (integrations 3 테이블만 되돌린다):**
+> ```bash
+> cd /Users/woosung/project/agy-project/kairos-gdrive/backend   # spike worktree
+> DATABASE_URL='<dev DB 연결 문자열>' uv run alembic downgrade -1
+> ```
+> 대상은 `external_documents` · `integration_sync_runs` · `integration_connections` **3개뿐**이며
+> 2026-07-30 기준 **전부 0 rows** 로 확인됐다.
+>
+> ⚠️ **`alembic downgrade base` 를 쓰지 마라.** 2026-07-30 에 그 명령으로 dev DB 전체가 비워졌다
+> (PITR 로 복구 완료). 백업 브랜치 `restore-20260730` / `production-wiped-20260730` 보존 중.
+>
+> 관련: `kairos-gdrive/.claude/spike-gdrive/HANDOFF.md` §5
+
 ---
 
 ## 사전 준비
