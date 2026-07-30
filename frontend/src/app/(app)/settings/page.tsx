@@ -3,7 +3,7 @@
 // Sprint 23 D2 Variant C — 워크스페이스 설정 페이지 (Compact Header + Geist Mono + ?tab=*)
 
 import { Suspense } from "react";
-import { Settings, Users, Link2, Building2, ShieldCheck } from "lucide-react";
+import { Settings, Users, Link2, Building2, PlugZap, ShieldCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MemberList } from "@/features/members/components/member-list";
@@ -16,12 +16,13 @@ import {
   useUpdateWorkspaceSettings,
 } from "@/features/workspaces/hooks";
 import { DangerZone } from "@/features/workspaces/components/DangerZone";
+import { GoogleDrivePrototype } from "@/features/workspaces/components/google-drive-prototype";
 import { inferWorkspaceType } from "@/features/workspaces/utils";
 
 const THRESHOLD_PRESETS = [0.7, 0.8, 0.9, 0.95] as const;
 // Sprint 24 Wave 2 T-AUDIT-VIEW: audit tab 추가 — admin/owner 만 노출.
-const VALID_TABS = ["members", "invites", "general", "audit"] as const;
-type TabValue = (typeof VALID_TABS)[number];
+const VALID_TABS = ["members", "invites", "general", "audit", "integrations"] as const;
+const IS_GOOGLE_DRIVE_PROTOTYPE_ENABLED = process.env.NODE_ENV !== "production";
 
 const ROLE_LABEL: Record<string, string> = {
   owner: "owner",
@@ -79,10 +80,9 @@ function SettingsContent() {
   const currentThreshold = workspace?.inboxThreshold ?? 0.9;
 
   const tabParam = searchParams.get("tab");
-  const activeTab: TabValue = (VALID_TABS as readonly string[]).includes(
-    tabParam ?? "",
-  )
-    ? (tabParam as TabValue)
+  const activeTab = (VALID_TABS as readonly string[]).includes(tabParam ?? "") &&
+    (tabParam !== "integrations" || (isOwner && IS_GOOGLE_DRIVE_PROTOTYPE_ENABLED))
+    ? tabParam ?? "members"
     : "members";
 
   const handleTabChange = (value: string) => {
@@ -182,6 +182,25 @@ function SettingsContent() {
             <Building2 className="w-4 h-4" aria-hidden />
             일반
           </TabsTrigger>
+          {isOwner && IS_GOOGLE_DRIVE_PROTOTYPE_ENABLED && (
+            <TabsTrigger
+              value="integrations"
+              className="gap-1.5 cursor-pointer text-sm"
+            >
+              <PlugZap className="w-4 h-4" aria-hidden />
+              연동
+              <span
+                style={{
+                  ...MONO_STYLE,
+                  fontSize: 10,
+                  color: "var(--accent)",
+                  marginLeft: 2,
+                }}
+              >
+                P
+              </span>
+            </TabsTrigger>
+          )}
           {/* Sprint 24 Wave 2 T-AUDIT-VIEW: Audit 탭 — admin/owner 만 노출.
               viewer/member 에게는 tab trigger 자체를 미렌더 → URL 직접 접근도 BE 403 fall-through. */}
           {isAdminOrOwner && (
@@ -354,6 +373,15 @@ function SettingsContent() {
             )}
           </div>
         </TabsContent>
+
+        {isOwner && IS_GOOGLE_DRIVE_PROTOTYPE_ENABLED && (
+          <TabsContent value="integrations">
+            <GoogleDrivePrototype
+              workspaceName={workspace?.name ?? "이 워크스페이스"}
+              variant={searchParams.get("variant")}
+            />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
