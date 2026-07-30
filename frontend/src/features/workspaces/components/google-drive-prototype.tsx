@@ -6,7 +6,6 @@ import {
   Cloud,
   Database,
   FileText,
-  FolderOpen,
   LockKeyhole,
   RefreshCw,
   SearchCheck,
@@ -102,7 +101,7 @@ function VariantA({ workspaceName }: { workspaceName: string }) {
               Google Drive
             </p>
             <p className="text-caption" style={{ color: "var(--text-muted)" }}>
-              선택한 Docs · PDF · Markdown만 Kairos에 추가
+              선택한 Google Docs만 Kairos에 추가
             </p>
           </div>
         </div>
@@ -144,7 +143,7 @@ function VariantA({ workspaceName }: { workspaceName: string }) {
 function VariantB() {
   const steps = [
     ["01", Cloud, "연결", "Google 계정을 연결하고, Kairos가 요청할 범위를 확인합니다."],
-    ["02", FolderOpen, "선택", "파일 또는 폴더를 고릅니다. 선택된 하위 파일 수를 보여줍니다."],
+    ["02", FileText, "선택", "파일을 고릅니다. 선택한 파일을 팀 지식으로 추가합니다."],
     ["03", Database, "팀 지식화", "텍스트 추출 → 프로젝트 연결 → 임베딩이 백그라운드에서 진행됩니다."],
   ] as const;
 

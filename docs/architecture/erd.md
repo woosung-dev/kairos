@@ -151,7 +151,7 @@ erDiagram
         uuid workspace_id FK
         uuid project_id FK "프로젝트 범위 검색용"
         uuid source_id
-        enum source_type "meeting | note | action | memory"
+        enum source_type "meeting | note | action | inbox | memory | external_document (ADR-026 구현 예정)"
         halfvec embedding "1536차원 fp16 (Sprint 16 ADR-020)"
         string chunk_text
         int chunk_index
@@ -245,6 +245,45 @@ erDiagram
         timestamp created_at
     }
 
+    %% ADR-026 — 구현 예정 external source ingest entities
+    IntegrationConnection {
+        uuid id PK "UNIQUE(id, workspace_id)"
+        uuid workspace_id FK "I-9 격리"
+        string provider "google_drive"
+        uuid authorized_by_id FK
+        string encrypted_refresh_token
+        string status
+        string scope
+        timestamp token_expires_at
+    }
+
+    ExternalDocument {
+        uuid id PK "UNIQUE(id, workspace_id)"
+        uuid workspace_id FK "I-9 격리"
+        uuid connection_id FK
+        uuid project_id FK "(workspace_id, project_id) → projects(workspace_id, id)"
+        string drive_file_id "Drive file ID; EmbeddingChunk.source_id에는 사용 금지"
+        string title
+        string mime_type
+        string origin_url
+        string revision_id
+        string content_hash
+        string plain_text
+        string sync_status
+        timestamp last_synced_at
+    }
+
+    IntegrationSyncRun {
+        uuid id PK "UNIQUE(id, workspace_id)"
+        uuid workspace_id FK "I-9 격리"
+        uuid connection_id FK
+        string status
+        uuid requested_by_id FK
+        timestamp started_at
+        timestamp completed_at
+        string error_summary
+    }
+
     User ||--o{ Workspace : "소유"
     Workspace ||--o{ WorkspaceMember : "멤버"
     User ||--o{ WorkspaceMember : "소속"
@@ -287,6 +326,17 @@ erDiagram
     Workspace ||--o{ MemoryQueryEmbeddingCache : "C3 cache (workspace 격리)"
     Workspace ||--o{ MemoryEvent : "R7 metrics 원천"
     User ||--o{ MemoryEvent : "actor"
+
+    %% ADR-026 — 구현 예정 relations
+    Workspace ||--o{ IntegrationConnection : "OAuth 연결 (I-9)"
+    User ||--o{ IntegrationConnection : "승인자"
+    IntegrationConnection ||--o{ ExternalDocument : "선택 Drive 문서"
+    Workspace ||--o{ ExternalDocument : "외부 원본 (I-9)"
+    Project ||--o{ ExternalDocument : "복합 FK 범위"
+    IntegrationConnection ||--o{ IntegrationSyncRun : "동기화 실행"
+    Workspace ||--o{ IntegrationSyncRun : "I-9 격리"
+    User ||--o{ IntegrationSyncRun : "요청자"
+    ExternalDocument ||--o{ EmbeddingChunk : "source_type=external_document; source_id=ExternalDocument.id"
 ```
 
 ---
@@ -347,6 +397,23 @@ erDiagram
 - BL-050 composite FK 패턴은 도메인 model 만 적용. 본 audit 테이블은 item_type 으로 분기 = soft FK 유지.
 - Codex 가 BL-050 정합 trip 시 본 commit message + I-18 변경 line 참조 (Sprint 23 commit message lock-in).
 
+## ADR-026 추가 예정 엔티티 (external source ingest)
+
+> 아래는 ADR-026 설계이며 아직 구현되지 않았다. 모든 엔티티는 `workspace_id`를 가지며 I-9 repository filter를 적용한다.
+
+### IntegrationConnection
+- Workspace의 Google OAuth 연결. `provider`, `authorized_by_id`, 암호화 refresh token, scope, token 만료와 연결 상태를 소유한다.
+- `(id, workspace_id)`에 `UNIQUE`를 두어 같은 Workspace 범위의 composite FK 대상이 될 수 있게 한다.
+
+### ExternalDocument
+- 선택한 Drive 문서의 Kairos 내부 원본. `drive_file_id`는 Drive 식별자이고, 임베딩 연결에는 사용하지 않는다.
+- `project_id`는 `(workspace_id, project_id) → projects(workspace_id, id)` composite FK로 같은 Workspace의 Project만 연결한다.
+- `(id, workspace_id)`에 `UNIQUE`를 둔다. `EmbeddingChunk.source_type='external_document'`일 때 `source_id`는 UUID인 `ExternalDocument.id`를 가리키는 폴리모픽 참조다.
+
+### IntegrationSyncRun
+- `202 Accepted` 뒤 status polling과 감사 가능한 동기화 실행을 기록한다. 요청자·시작/완료 시각·오류 요약을 가진다.
+- `(id, workspace_id)`에 `UNIQUE`를 두어 같은 Workspace 범위의 composite FK 대상이 될 수 있게 한다.
+
 ## 관계 설명
 
 ### N:M 관계
@@ -368,7 +435,7 @@ erDiagram
 - **EmbeddingChunk → EmbeddingChunk**: `parentChunkId`로 계층적 청킹 구현. Level 2(문단)가 Level 1(화자 구간)을 부모로 참조.
 
 ### 임베딩 (폴리모픽)
-- **EmbeddingChunk**: `sourceType`과 `sourceId`로 Meeting, Note, ActionItem, MemoryItem 등 다양한 소스와 연결
+- **EmbeddingChunk**: `sourceType`과 `sourceId`로 Meeting, Note, ActionItem, MemoryItem, `ExternalDocument` 등 다양한 소스와 연결. `external_document`에서는 UUID인 `ExternalDocument.id`를 사용하며 Drive file ID를 넣지 않는다.
 - 1536차원 **halfvec** 벡터 (text-embedding-3-small 기준 + fp16 저장, Sprint 16 ADR-020 — `pgvector.sqlalchemy.HALFVEC`)
 - 인덱스: HNSW `halfvec_cosine_ops` (`m=16, ef_construction=64`). 세션 변수 `hnsw.ef_search=40` + `iterative_scan='relaxed_order'` (I-21)
 - `chunkLevel`: 0(document) / 1(section) / 2(paragraph) — 검색 대상은 Level 2만

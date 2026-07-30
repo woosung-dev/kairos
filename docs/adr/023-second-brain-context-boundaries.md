@@ -2,6 +2,7 @@
 
 **Status**: Accepted  
 **Date**: 2026-05-23  
+**Updated**: 2026-07-30 (ADR-026 D7에 따른 D-6.5 부분 개정)<br>
 **Sprint**: 27a (luminous-anchor)  
 **관련**: ADR-004 (PARA → second-brain pivot) · ADR-014 (서비스 경계) · ADR-016 (Personal/Team IA) · ADR-022 (Clerk webhook SKIP)  
 **부채 종결**: `CONTEXT-MAP.md` §7 D-6, `docs/requirements/second-brain.md` §8
@@ -44,6 +45,9 @@
 
 - **audio 원본**: R2 30일 TTL (Cloud Scheduler cron — `docs/guides/r2-cleanup-cron.md`, 이미 구현). MemoryItem.voice 도 동일 30일.
 - **텍스트 (트랜스크립트 / 노트 / 액션)**: 무기한 보존. 사용자 명시적 삭제만.
+- **외부 원본 예외 (`external_document`)**: Drive가 source of truth다. Drive 문서의 삭제·휴지통 이동·실제 권한 회수가 확인되면 Kairos의 추출 plain text, `EmbeddingChunk`, 관련 `SemanticCache`를 즉시 제거한다. 내부 텍스트의 무기한 보존 원칙은 변경하지 않는다. (ADR-026 D7)
+  - `429`/`5xx`/network/circuit open은 일시 장애로 보고 절대 삭제하지 않는다. `stale`과 마지막 동기화 시각을 보존하고 사용자 수동 재동기화만 제공하며 자동 retry는 두지 않는다.
+  - `401`/`403`은 세부 reason을 판별한다. reason을 판별할 수 없으면 purge하지 않고 `reauth_required`로 보류한다.
 - **Project archive**: `Completed → Archived` 전환 시 AI 인사이트 자동 추출 (second-brain §5 구현됨). RAG 검색 포함.
 - **신선도 라벨 + 6개월 알림**: D-6.2 의 BL-S27-2 와 합쳐 처리.
 - **결정**: 현 동작 유지. archive 가 곧 "오래된 지식의 정착" 시점 — 자동 인사이트 추출로 보존 가치 증대.

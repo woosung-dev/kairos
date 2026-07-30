@@ -1186,3 +1186,20 @@ Response: SSE stream (event: thinking → search_results → answer → done)
 | # | Method | Path | 설명 |
 |:-:|--------|------|------|
 | 35 | `GET` | `/api/v1/users/me/onboarding` | 현재 user 의 onboarding 진행도 (`{ step, totalSteps: 4, onboardedAt, isCompleted }`). step lifecycle: 가입(1) → 첫 project(2) → 첫 meeting distillation(3) → 첫 RAG ask(4). |
+
+---
+
+## ADR-026 — 외부 소스 ingest 레일 v0 (구현 예정)
+
+> 이 섹션의 endpoint는 ADR-026 설계 기록이며 아직 구현되지 않았다. Drive v0는 Google Docs `text/plain` export만 지원하고 Drive → Kairos 단방향 읽기 전용이다.
+
+| Method | Path | 권한 | 성공 | 주요 오류 / 비고 |
+|--------|------|------|------|------------------|
+| `POST` | `/api/v1/workspaces/{workspace_id}/integrations/google-drive/authorize` | owner | `200 OK`(authorization URL 반환) 또는 `302 Found`(Google로 redirect) | `403` owner 아님. 구현 시 응답 방식은 하나로 확정한다. |
+| `GET` | `/api/v1/integrations/google-drive/callback` | 서명 state의 요청자(owner) | `302 Found` 설정 화면 복귀 | I-13 예외: 고정 redirect URI에는 `workspace_id`를 둘 수 없으므로 state의 workspace·요청자·nonce·PKCE·만료를 검증한다. `400` invalid/expired state, `403` 요청자가 더 이상 owner가 아님. |
+| `GET` | `/api/v1/workspaces/{workspace_id}/integrations/google-drive` | owner | `200 OK` connection 상태와 마지막 동기화 | `403` owner 아님. |
+| `POST` | `/api/v1/workspaces/{workspace_id}/integrations/google-drive/documents` | owner | `202 Accepted` `{ syncRunId }` | 선택 file IDs와 `projectId`를 받아 BackgroundTask import 시작. `400` 지원하지 않는 MIME/잘못된 Project, `403` owner 아님. |
+| `GET` | `/api/v1/workspaces/{workspace_id}/integrations/sync-runs/{sync_run_id}` | owner | `200 OK` 파일별 status polling | `403` owner 아님, `404` 같은 workspace의 sync run 없음. |
+| `POST` | `/api/v1/workspaces/{workspace_id}/integrations/google-drive/documents/{document_id}/sync` | owner | `202 Accepted` | 단일 문서 수동 재동기화. `403` owner 아님, `404` 같은 workspace의 문서 없음. |
+| `DELETE` | `/api/v1/workspaces/{workspace_id}/integrations/google-drive/documents/{document_id}` | owner | `204 No Content` | RAG 발행 취소와 파생 데이터 cleanup. `403` owner 아님, `404` 같은 workspace의 문서 없음. |
+| `GET` | `/api/v1/workspaces/{workspace_id}/external-documents/{document_id}` | 접근 가능한 멤버 | `200 OK` Source Viewer full content | 기존 Project visibility 규칙을 따른다. `403` 접근 불가, `404` 같은 workspace의 문서 없음. |
