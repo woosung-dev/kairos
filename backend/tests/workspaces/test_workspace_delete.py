@@ -14,6 +14,11 @@ from src.common.promote_models import ItemPromotionAudit
 from src.embeddings.models import EmbeddingChunk, SemanticCache
 from src.feedback.models import FeedbackEntry
 from src.inbox.models import InboxItem
+from src.integrations.models import (
+    ExternalDocument,
+    IntegrationConnection,
+    IntegrationSyncRun,
+)
 from src.main import app
 from src.meetings.models import Meeting, MeetingSummary, TranscriptSegment
 from src.memory.models import (
@@ -167,6 +172,36 @@ async def _seed_full_workspace(session, owner: User, member_user: User) -> Works
     )
     session.add(FeedbackEntry(user_id=owner.id, workspace_id=ws.id, body="fb"))
 
+    connection = IntegrationConnection(
+        workspace_id=ws.id,
+        authorized_by_id=owner.id,
+        encrypted_refresh_token="test-encrypted-refresh-token",
+        scope="https://www.googleapis.com/auth/drive.file",
+    )
+    session.add(connection)
+    await session.flush()
+    session.add(
+        ExternalDocument(
+            workspace_id=ws.id,
+            connection_id=connection.id,
+            project_id=project.id,
+            drive_file_id=f"drive-{uuid.uuid4().hex}",
+            title="외부 문서",
+            mime_type="application/vnd.google-apps.document",
+            origin_url="https://docs.google.com/document/d/test",
+            revision_id="1",
+            content_hash="test-content-hash",
+            plain_text="외부 문서 본문",
+        )
+    )
+    session.add(
+        IntegrationSyncRun(
+            workspace_id=ws.id,
+            connection_id=connection.id,
+            requested_by_id=owner.id,
+        )
+    )
+
     await session.flush()
     return ws
 
@@ -178,6 +213,9 @@ _WS_SCOPED_TABLES = [
     "memory_query_embedding_cache",
     "semantic_caches",
     "embedding_chunks",
+    "external_documents",
+    "integration_sync_runs",
+    "integration_connections",
     "action_items",
     "meeting_project_links",
     "inbox_items",

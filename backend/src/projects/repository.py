@@ -252,8 +252,8 @@ class ProjectRepository:
         # embeddings/caches = DELETE: 재생성 가능한 파생 인덱스 + SET NULL 시 project_id
         #   IS NULL 이 RAG visibility 필터를 무조건 통과 → private 청크 누수(헌법 위반)라
         #   삭제로 원천 차단.
-        # inbox 제안 / promotion_audit 타깃 = SET NULL: 항목 자체는 워크스페이스에 보존,
-        #   죽은 프로젝트 포인터만 정리 (RAG 비대상이라 누수 없음).
+        # inbox 제안 / promotion_audit 타깃 / 외부 문서 project = SET NULL: 항목 자체는
+        #   워크스페이스에 보존하고, 죽은 프로젝트 포인터만 정리한다.
         await self.session.exec(
             text(
                 "DELETE FROM embedding_chunks "
@@ -277,6 +277,12 @@ class ProjectRepository:
                 "UPDATE promotion_audit SET target_project_id = NULL "
                 "WHERE target_project_id = :pid"
             ).bindparams(pid=project.id)
+        )
+        await self.session.exec(
+            text(
+                "UPDATE external_documents SET project_id = NULL "
+                "WHERE project_id = :pid AND workspace_id = :wid"
+            ).bindparams(pid=project.id, wid=project.workspace_id)
         )
         await self.session.delete(project)
         await self.session.flush()

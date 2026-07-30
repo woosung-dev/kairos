@@ -4,7 +4,7 @@
 
 > 상위: `/backend/CONTEXT.md` → `/CONTEXT-MAP.md`. 상세 결정: `docs/adr/026-external-source-ingest-rail.md`.
 >
-> **현재 상태**: 구현 코드 0줄. ADR-026 설계만 확정됐으며 구현은 예정이다.
+> **현재 상태 (2026-07-30)**: ADR-026 모델과 마이그레이션은 구현됐다(W4). integrations repository/service/router/schemas와 Google API 호출은 미구현이다.
 
 ---
 

@@ -13,6 +13,7 @@ from src.actions.models import ActionItem
 from src.auth.models import User
 from src.embeddings.models import EmbeddingChunk, SemanticCache
 from src.inbox.models import InboxItem
+from src.integrations.models import ExternalDocument, IntegrationConnection
 from src.meetings.models import Meeting
 from src.memory.models import MemoryItem, PromotionAudit
 from src.notes.models import Note
@@ -235,6 +236,27 @@ async def test_delete_project_nulls_inbox_and_audit_pointers(integration_session
         ai_suggested_project_id=project.id,
     )
     session.add(inbox)
+    connection = IntegrationConnection(
+        workspace_id=ws.id,
+        authorized_by_id=owner.id,
+        encrypted_refresh_token="test-encrypted-refresh-token",
+        scope="https://www.googleapis.com/auth/drive.file",
+    )
+    session.add(connection)
+    await session.flush()
+    document = ExternalDocument(
+        workspace_id=ws.id,
+        connection_id=connection.id,
+        project_id=project.id,
+        drive_file_id=f"project-delete-{uuid.uuid4().hex}",
+        title="프로젝트 외부 문서",
+        mime_type="application/vnd.google-apps.document",
+        origin_url="https://docs.google.com/document/d/project-delete",
+        revision_id="1",
+        content_hash="project-delete-hash",
+        plain_text="외부 문서 본문",
+    )
+    session.add(document)
     mem = MemoryItem(user_id=owner.id, workspace_id=ws.id, type="text", raw_content="")
     session.add(mem)
     await session.flush()
@@ -259,6 +281,11 @@ async def test_delete_project_nulls_inbox_and_audit_pointers(integration_session
         {"i": str(audit_id)},
     )).scalar_one()
     assert audit_ptr is None
+    document_ptr = (await session.execute(
+        sa_text("SELECT project_id FROM external_documents WHERE id = :i"),
+        {"i": str(document.id)},
+    )).scalar_one()
+    assert document_ptr is None
     assert await _project_count(session, project.id) == 0
 
 
@@ -299,7 +326,7 @@ async def test_all_project_fk_tables_are_handled(integration_session):
         # 파생 RAG (repo.delete DELETE)
         "embedding_chunks", "semantic_caches",
         # 참조 포인터 (repo.delete SET NULL)
-        "inbox_items", "promotion_audit",
+        "inbox_items", "promotion_audit", "external_documents",
     }
     assert tables == expected, (
         f"projects.id 참조 FK 테이블 변경 감지: {tables ^ expected}. "
