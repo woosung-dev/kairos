@@ -328,11 +328,16 @@ def _make_document(
     return document
 
 
-def _metadata(file_id: str, revision_id: str) -> DriveFileMetadata:
+def _metadata(
+    file_id: str,
+    revision_id: str,
+    *,
+    mime_type: str = "application/vnd.google-apps.document",
+) -> DriveFileMetadata:
     return DriveFileMetadata(
         file_id=file_id,
         title="Drive 제목",
-        mime_type="application/vnd.google-apps.document",
+        mime_type=mime_type,
         revision_id=revision_id,
     )
 
@@ -1594,6 +1599,93 @@ async def test_import_continues_after_document_failure_and_closes_sync_run(
     assert state.sync_run.completed_at is not None
     assert state.sync_run.error_summary is not None
     assert drive_client.aclose_calls == 1
+
+
+async def test_initial_import_records_unsupported_mime_without_export_or_embedding(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    state, pipeline, drive_client, _ = pipeline_environment
+    unsupported_sync_run_id = uuid.uuid4()
+    state.sync_run = SimpleNamespace(
+        id=unsupported_sync_run_id,
+        workspace_id=state.workspace_id,
+        connection_id=state.connection_id,
+        status="pending",
+        completed_at=None,
+        error_summary=None,
+    )
+    drive_client.metadata["spreadsheet-document"] = _metadata(
+        "spreadsheet-document",
+        "revision-1",
+        mime_type="application/vnd.google-apps.spreadsheet",
+    )
+
+    await pipeline.import_documents(
+        unsupported_sync_run_id,
+        state.workspace_id,
+        state.connection_id,
+        ["spreadsheet-document"],
+        state.project_id,
+    )
+
+    failed_document = next(
+        document
+        for document in state.documents.values()
+        if document.drive_file_id == "spreadsheet-document"
+    )
+    assert failed_document.sync_status == "failed"
+    assert failed_document.plain_text == ""
+    assert failed_document.content_hash == ""
+    assert failed_document.origin_url == (
+        "https://drive.google.com/open?id=spreadsheet-document"
+    )
+    assert not failed_document.origin_url.startswith(
+        "https://docs.google.com/document/"
+    )
+    assert state.embedded_documents == []
+    assert drive_client.export_calls == []
+    assert state.sync_run.error_summary is not None
+    failed_error_summary = state.sync_run.error_summary
+
+    successful_sync_run_id = uuid.uuid4()
+    state.sync_run = SimpleNamespace(
+        id=successful_sync_run_id,
+        workspace_id=state.workspace_id,
+        connection_id=state.connection_id,
+        status="pending",
+        completed_at=None,
+        error_summary=None,
+    )
+    drive_client.metadata["google-doc-document"] = _metadata(
+        "google-doc-document",
+        "revision-1",
+    )
+    drive_client.exports["google-doc-document"] = DriveExport(
+        plain_text="Google Docs 본문",
+        content_hash="google-doc-content-hash",
+    )
+
+    await pipeline.import_documents(
+        successful_sync_run_id,
+        state.workspace_id,
+        state.connection_id,
+        ["google-doc-document"],
+        state.project_id,
+    )
+
+    completed_document = next(
+        document
+        for document in state.documents.values()
+        if document.drive_file_id == "google-doc-document"
+    )
+    assert completed_document.sync_status == "completed"
+    assert completed_document.origin_url == (
+        "https://docs.google.com/document/d/google-doc-document/edit"
+    )
+    assert len(state.embedded_documents) == 1
+    assert drive_client.export_calls == ["google-doc-document"]
+    assert state.sync_run.error_summary is None
+    assert state.sync_run.error_summary != failed_error_summary
 
 
 async def test_refresh_failure_closes_sync_run_as_failed(

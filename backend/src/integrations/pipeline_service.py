@@ -8,7 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.embeddings.repository import EmbeddingRepository
 from src.embeddings.service import EmbeddingService
-from src.integrations.drive_client import GoogleDriveClient
+from src.integrations.drive_client import GoogleDriveClient, is_supported_mime_type
 from src.integrations.exceptions import (
     DriveClientError,
     DrivePermissionRevokedError,
@@ -341,6 +341,32 @@ class GoogleDriveSyncPipelineService:
                 )
 
         metadata = await drive_client.get_file_metadata(access_token, file_id)
+        is_supported_mime = is_supported_mime_type(metadata.mime_type)
+        origin_url = (
+            f"https://docs.google.com/document/d/{metadata.file_id}/edit"
+            if is_supported_mime
+            else f"https://drive.google.com/open?id={metadata.file_id}"
+        )
+        if not is_supported_mime:
+            if document is None:
+                document = ExternalDocument(
+                    workspace_id=workspace_id,
+                    connection_id=connection_id,
+                    project_id=project_id,
+                    sync_run_id=sync_run_id,
+                    drive_file_id=metadata.file_id,
+                    title=metadata.title,
+                    mime_type=metadata.mime_type,
+                    origin_url=origin_url,
+                    revision_id=metadata.revision_id,
+                    content_hash="",
+                    plain_text="",
+                    sync_status="processing",
+                )
+                await repository.create_document(document, workspace_id)
+                await repository.commit()
+            raise DriveUnsupportedMimeTypeError()
+
         # 동일 revision의 export 생략은 completed 문서에만 적용해 실패 상태의 복구 경로를 보존한다.
         if (
             document is not None
@@ -381,7 +407,6 @@ class GoogleDriveSyncPipelineService:
             file_id,
             metadata.mime_type,
         )
-        origin_url = f"https://docs.google.com/document/d/{metadata.file_id}/edit"
         last_synced_at = datetime.now(UTC).replace(tzinfo=None)
 
         if (

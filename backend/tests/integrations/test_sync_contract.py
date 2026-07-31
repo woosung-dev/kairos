@@ -23,6 +23,7 @@ from src.integrations.drive_client import (
     DriveExport,
     DriveFileMetadata,
     GoogleDriveClient,
+    is_supported_mime_type,
 )
 from src.integrations.exceptions import (
     DrivePermissionRevokedError,
@@ -80,7 +81,7 @@ class _StubDriveClient:
     ) -> DriveExport:
         assert access_token == "access-token"
         self.export_calls.append(file_id)
-        if mime_type != GOOGLE_DOC_MIME_TYPE:
+        if not is_supported_mime_type(mime_type):
             raise DriveUnsupportedMimeTypeError()
         result = self.exports[file_id]
         if isinstance(result, Exception):

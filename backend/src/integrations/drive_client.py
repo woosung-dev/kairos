@@ -31,6 +31,11 @@ _PERMISSION_REVOKED_REASONS = frozenset({"insufficientFilePermissions"})
 RequestFactory = Callable[[], Awaitable[httpx.Response]]
 
 
+def is_supported_mime_type(mime_type: str) -> bool:
+    """Google Docs plain-text export 지원 여부를 반환한다."""
+    return mime_type == GOOGLE_DOC_MIME_TYPE
+
+
 @dataclass(frozen=True)
 class DriveFileMetadata:
     """동기화 변경 감지에 필요한 Drive 파일 메타데이터."""
@@ -194,7 +199,7 @@ class GoogleDriveClient:
     ) -> DriveExport:
         """Google Docs 원본만 ``text/plain`` 형식으로 export한다."""
 
-        if mime_type != GOOGLE_DOC_MIME_TYPE:
+        if not is_supported_mime_type(mime_type):
             raise DriveUnsupportedMimeTypeError()
 
         response = await self._request(
