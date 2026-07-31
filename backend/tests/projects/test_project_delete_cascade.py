@@ -12,6 +12,7 @@ from sqlalchemy import text as sa_text
 from src.actions.models import ActionItem
 from src.auth.models import User
 from src.embeddings.models import EmbeddingChunk, SemanticCache
+from src.embeddings.repository import EmbeddingRepository
 from src.inbox.models import InboxItem
 from src.integrations.models import ExternalDocument, IntegrationConnection
 from src.meetings.models import Meeting
@@ -303,6 +304,146 @@ async def test_delete_empty_private_project_succeeds(integration_session):
 
     assert await _project_count(session, project.id) == 0
     assert await _count(session, "project_members", project.id) == 0
+
+
+# ── BL-EXT-CACHE-1: 삭제 후 잔존 전역 캐시로 인한 비-멤버 누수 회귀 가드 ──
+
+
+def _axis_vec(axis: int, dim: int = 1536) -> list[float]:
+    """축이 다르면 코사인 유사도 0 — 캐시행끼리 간섭 없이 결정적으로 매칭된다."""
+    vec = [0.0] * dim
+    vec[axis] = 1.0
+    return vec
+
+
+def _rag_cache_source(chunk: EmbeddingChunk) -> dict:
+    """RAGService._format_sources 가 저장하는 production sources 형태."""
+    return {
+        "id": str(chunk.id),
+        "sourceId": str(chunk.source_id),
+        "text": chunk.chunk_text[:200],
+        "source": "비공개 노트",
+        "sourceType": chunk.source_type,
+        "date": "",
+        "speaker": None,
+        "score": 0.0,
+        "freshness": "recent",
+    }
+
+
+async def _seed_cache_leak_scenario(session):
+    """private 프로젝트 + 청크 + 전역/해당 project/타 project 캐시 + 비-멤버 시드.
+
+    반환 (ws, project, other_project, non_member).
+    """
+    owner, ws, project = await _seed_base(session, "private")
+    other_project = Project(
+        workspace_id=ws.id, title="pdel-other", created_by_id=owner.id,
+        visibility="public",
+    )
+    non_member = User(
+        clerk_id=f"clerk_pdel_nm_{uuid.uuid4()}",
+        display_name="비-멤버",
+        email=f"pdel_nm_{uuid.uuid4()}@del.test",
+    )
+    session.add_all([other_project, non_member])
+    await session.flush()
+    # 위협 모델: 같은 워크스페이스 멤버지만 private 프로젝트 멤버는 아닌 사용자.
+    session.add(
+        WorkspaceMember(workspace_id=ws.id, user_id=non_member.id, role="member")
+    )
+    chunk = EmbeddingChunk(
+        workspace_id=ws.id, project_id=project.id, source_id=uuid.uuid4(),
+        source_type="note", chunk_text="PD-LEAK-ANSWER private 본문", chunk_level=2,
+        embedding=_axis_vec(0),
+    )
+    session.add(chunk)
+    await session.flush()
+    sources = [_rag_cache_source(chunk)]
+    session.add_all([
+        # 전역 질의 캐시 (project_id IS NULL) — project scope 삭제가 놓치는 행.
+        SemanticCache(
+            workspace_id=ws.id, project_id=None, question="전역 질문",
+            question_embedding=_axis_vec(0), answer="PD-LEAK-ANSWER private 본문",
+            sources=sources, max_visibility="private",
+        ),
+        SemanticCache(
+            workspace_id=ws.id, project_id=project.id, question="프로젝트 질문",
+            question_embedding=_axis_vec(1), answer="PD-LEAK-ANSWER private 본문",
+            sources=sources, max_visibility="private",
+        ),
+        SemanticCache(
+            workspace_id=ws.id, project_id=other_project.id,
+            question="타 프로젝트 질문", question_embedding=_axis_vec(2),
+            answer="타 프로젝트 답변",
+        ),
+    ])
+    await session.commit()
+    return ws, project, other_project, non_member
+
+
+async def _non_member_probe(session, workspace_id: uuid.UUID, user_id: uuid.UUID):
+    """RAG 진입점과 동일한 전역 scope(project_id=None) 캐시 조회."""
+    return await EmbeddingRepository(session).find_similar_cache(
+        question_embedding=_axis_vec(0),
+        workspace_id=workspace_id,
+        requester_user_id=user_id,
+        requester_role="member",
+    )
+
+
+@pytest.mark.asyncio
+async def test_delete_project_leaves_no_cache_hit_for_non_member(integration_session):
+    """BL-EXT-CACHE-1: 삭제 전 MISS(대조군) → 삭제 후에도 비-멤버 probe MISS.
+
+    캐시를 project scope 로만 지우면 전역 캐시행이 살아남고 그 sources 가 가리키는
+    청크는 이미 삭제된 상태다. ALL_CHUNKS_VISIBLE_SQL 은 *존재하는* 청크만 검사하는
+    anti-join 이라 사라진 id 는 위반을 만들지 못하고(fail-open) 비-멤버가 삭제된
+    private 본문을 HIT 으로 받는다. 행 개수가 아니라 실제 probe 결과로 단언한다.
+    """
+    session = integration_session
+    ws, project, _other_project, non_member = await _seed_cache_leak_scenario(session)
+
+    # 대조군 — 삭제 전에는 청크가 살아 있어 anti-join 이 위반을 잡아낸다.
+    assert await _non_member_probe(session, ws.id, non_member.id) is None
+
+    await _service(session).delete_project(ws.id, project.id)
+
+    leaked = await _non_member_probe(session, ws.id, non_member.id)
+    assert leaked is None, (
+        "삭제된 private 프로젝트 본문이 전역 캐시 HIT 으로 노출됐다: "
+        f"{leaked and leaked['answer']}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_delete_project_invalidates_whole_workspace_caches(integration_session):
+    """전량 무효화 정책 고정 — 같은 workspace 캐시는 전부, 타 workspace 는 보존.
+
+    좁은 scope 가 안전할 수 없는 이유(anti-join fail-open)는 위 테스트가 지키고,
+    이 테스트는 그 대가로 넓힌 범위가 workspace 경계를 넘지 않음을 고정한다.
+    """
+    session = integration_session
+    ws, project, other_project, _non_member = await _seed_cache_leak_scenario(session)
+    _owner2, other_ws, _p2 = await _seed_base(session)
+    session.add(SemanticCache(
+        workspace_id=other_ws.id, question="타 워크스페이스 질문", answer="보존 대상",
+    ))
+    await session.commit()
+
+    await _service(session).delete_project(ws.id, project.id)
+
+    remaining = (await session.execute(
+        sa_text("SELECT COUNT(*) FROM semantic_caches WHERE workspace_id = :w"),
+        {"w": str(ws.id)},
+    )).scalar_one()
+    assert int(remaining) == 0  # 전역 + 삭제 project + 타 project 캐시 모두 무효화
+    assert await _count(session, "semantic_caches", other_project.id) == 0
+    survived = (await session.execute(
+        sa_text("SELECT COUNT(*) FROM semantic_caches WHERE workspace_id = :w"),
+        {"w": str(other_ws.id)},
+    )).scalar_one()
+    assert int(survived) == 1  # 무효화는 workspace 경계 안에서만
 
 
 @pytest.mark.asyncio
