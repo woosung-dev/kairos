@@ -1,4 +1,4 @@
-<!-- Kairos 디렉토리 구조 맵. BE 17 모듈(14 도메인 + common/core/services, 2026-07-30 문서 기준·integrations는 ADR-026 구현 예정) + FE 15 features 정합. -->
+<!-- Kairos 디렉토리 구조 맵. BE 17 모듈(14 도메인 + common/core/services, 2026-07-30 문서 기준) + FE features 정합 (2026-07-31 기준 16). -->
 
 # 디렉토리 구조 맵
 
@@ -7,8 +7,10 @@
 > stale 보강. (2026-07-01 arch-verification: feedback 도메인/feature 반영해 CONTEXT-MAP §4.1/§4.3 + AGENTS.md 를 BE 16 + FE 15 로 재정합.)
 >
 > 2026-07-30: ADR-026의 `integrations` 구현 예정 도메인을 CONTEXT-MAP §4.1 및 AGENTS.md와 정합해 BE 17 모듈 = 14 도메인 + common/core/services로 갱신했다.
+>
+> 2026-07-31: `integrations` 도메인 구현 완료(ADR-026 Wave 3). FE 에 `features/integrations/`(외부 문서 상세 조회 API·hooks)를 추가했다.
 
-## 프론트엔드 (FSD 기반, FE 15 features)
+## 프론트엔드 (FSD 기반, FE features — 2026-07-31 기준 16)
 
 ```
 frontend/
@@ -34,12 +36,13 @@ frontend/
     │   └── shared/                    # 도메인 횡단 공통 (Sprint 23 D4)
     │       └── ItemPromoteModal.tsx   # 5 도메인 generic promote modal
     │
-    ├── features/                      # FE 15 도메인 features (FSD)
+    ├── features/                      # FE 도메인 features (FSD, 2026-07-31 기준 16)
     │   ├── actions/                   # 액션 아이템 list / detail
     │   ├── audit/                     # AdminAccessAudit / role 변경 trail (Sprint 25)
     │   ├── feedback/                  # dogfooding 피드백 위젯 (user-level, BE feedback 도메인 대응)
     │   ├── home/                      # 대시보드 + ActivityFeed + RecommendedQuestions
     │   ├── inbox/                     # Inbox 적재 + 분류 dialog
+    │   ├── integrations/              # 외부 문서 상세 조회 (Google Drive)
     │   ├── meetings/                  # 회의 list / upload / detail / retry
     │   ├── members/                   # WorkspaceMember CRUD + invite UI
     │   ├── memory/                    # Sprint 15 Recall-first wedge (capture/recall/promote)
