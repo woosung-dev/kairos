@@ -313,6 +313,57 @@ async def test_postgres_create_document_returns_existing_document_on_conflict(
         assert persisted_document.content_hash == "winning-content-hash"
 
 
+async def test_postgres_update_document_compare_and_swap_preserves_newer_revision(
+    sync_contract: _ContractEnvironment,
+) -> None:
+    _, document = await _import_document(
+        sync_contract,
+        file_id="postgres-cas-document",
+        revision_id="10",
+        plain_text="initial document text",
+    )
+
+    async with sync_contract.session_factory() as fast_session:
+        fast_repository = IntegrationRepository(fast_session)
+        updated = await fast_repository.update_document(
+            document.id,
+            sync_contract.workspace.id,
+            title=document.title,
+            mime_type=document.mime_type,
+            origin_url=document.origin_url,
+            revision_id="12",
+            content_hash="fast-content-hash",
+            plain_text="fast document text",
+            sync_status="completed",
+            last_synced_at=None,
+            expected_revision_id="10",
+        )
+        assert updated is True
+        await fast_repository.commit()
+
+    async with sync_contract.session_factory() as slow_session:
+        slow_repository = IntegrationRepository(slow_session)
+        updated = await slow_repository.update_document(
+            document.id,
+            sync_contract.workspace.id,
+            title=document.title,
+            mime_type=document.mime_type,
+            origin_url=document.origin_url,
+            revision_id="11",
+            content_hash="slow-content-hash",
+            plain_text="slow document text",
+            sync_status="completed",
+            last_synced_at=None,
+            expected_revision_id="10",
+        )
+        assert updated is False
+
+    stored_document = await _document(sync_contract, document.id)
+    assert stored_document is not None
+    assert stored_document.revision_id == "12"
+    assert stored_document.plain_text == "fast document text"
+
+
 async def _document(
     environment: _ContractEnvironment,
     document_id: uuid.UUID,

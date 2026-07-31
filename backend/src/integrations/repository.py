@@ -21,6 +21,13 @@ class _SyncRunIdUnchanged:
 _SYNC_RUN_ID_UNCHANGED = _SyncRunIdUnchanged()
 
 
+class _ExpectedRevisionIdUnchanged:
+    """update_document 호출에서 revision 조건 생략 sentinel."""
+
+
+_EXPECTED_REVISION_ID_UNCHANGED = _ExpectedRevisionIdUnchanged()
+
+
 class IntegrationRepository:
     """Integrations 모델의 workspace-scoped 데이터 접근."""
 
@@ -233,11 +240,16 @@ class IntegrationRepository:
         sync_run_id: uuid.UUID | None | _SyncRunIdUnchanged = (
             _SYNC_RUN_ID_UNCHANGED
         ),
-    ) -> None:
+        expected_revision_id: str | _ExpectedRevisionIdUnchanged = (
+            _EXPECTED_REVISION_ID_UNCHANGED
+        ),
+    ) -> bool:
         stmt = update(ExternalDocument).where(
             ExternalDocument.id == document_id,
             ExternalDocument.workspace_id == workspace_id,
         )
+        if expected_revision_id is not _EXPECTED_REVISION_ID_UNCHANGED:
+            stmt = stmt.where(ExternalDocument.revision_id == expected_revision_id)
         values = {
             "title": title,
             "mime_type": mime_type,
@@ -250,7 +262,8 @@ class IntegrationRepository:
         }
         if sync_run_id is not _SYNC_RUN_ID_UNCHANGED:
             values["sync_run_id"] = sync_run_id
-        await self.session.exec(stmt.values(**values))
+        result = await self.session.execute(stmt.values(**values))
+        return result.rowcount == 1  # type: ignore[return-value]
 
     async def update_document_sync_status(
         self,

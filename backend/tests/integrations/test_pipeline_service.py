@@ -4,6 +4,7 @@ import gc
 import json
 import uuid
 import weakref
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -53,6 +54,7 @@ class _PipelineState:
     sync_run: SimpleNamespace | None = None
     sync_runs: dict[uuid.UUID, SimpleNamespace] = field(default_factory=dict)
     hidden_document_lookups: dict[str, int] = field(default_factory=dict)
+    before_document_update: Callable[[SimpleNamespace], None] | None = None
     deleted_sources: list[tuple[str, uuid.UUID]] = field(default_factory=list)
     deleted_caches: list[tuple[uuid.UUID, uuid.UUID | None]] = field(default_factory=list)
     chunk_project_ids: dict[tuple[str, uuid.UUID], set[uuid.UUID | None]] = field(
@@ -139,11 +141,23 @@ class _FakeIntegrationRepository:
         document_id: uuid.UUID,
         workspace_id: uuid.UUID,
         **values: object,
-    ) -> None:
+    ) -> bool:
+        expected_revision_id = values.pop("expected_revision_id", None)
         document = await self.find_document_by_id(document_id, workspace_id)
-        if document is not None:
-            for key, value in values.items():
-                setattr(document, key, value)
+        if document is None:
+            return False
+        if self.state.before_document_update is not None:
+            before_document_update = self.state.before_document_update
+            self.state.before_document_update = None
+            before_document_update(document)
+        if (
+            expected_revision_id is not None
+            and document.revision_id != expected_revision_id
+        ):
+            return False
+        for key, value in values.items():
+            setattr(document, key, value)
+        return True
 
     async def update_document_sync_status(
         self,
@@ -1739,6 +1753,56 @@ async def test_single_import_creates_completed_document(
     assert document.sync_status == "completed"
     assert state.sync_run.status == "completed"
     assert state.embedded_documents[0]["document_id"] == document.id
+
+
+async def test_cas_failure_preserves_newer_document_and_completes_sync_run(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    state, pipeline, drive_client, _ = pipeline_environment
+    sync_run_id = uuid.uuid4()
+    state.sync_run = SimpleNamespace(
+        id=sync_run_id,
+        workspace_id=state.workspace_id,
+        connection_id=state.connection_id,
+        status="pending",
+        completed_at=None,
+        error_summary=None,
+    )
+    document = _make_document(
+        state,
+        file_id="cas-document",
+        revision_id="10",
+        plain_text="initial document text",
+    )
+    drive_client.metadata[document.drive_file_id] = _metadata(
+        document.drive_file_id,
+        "11",
+    )
+    drive_client.exports[document.drive_file_id] = DriveExport(
+        plain_text="slow document text",
+        content_hash="slow-content-hash",
+    )
+
+    def apply_newer_update(current_document: SimpleNamespace) -> None:
+        current_document.revision_id = "12"
+        current_document.plain_text = "fast document text"
+        current_document.content_hash = "fast-content-hash"
+        current_document.sync_status = "completed"
+
+    state.before_document_update = apply_newer_update
+    await pipeline.import_documents(
+        sync_run_id,
+        state.workspace_id,
+        state.connection_id,
+        [document.drive_file_id],
+        state.project_id,
+    )
+
+    assert document.revision_id == "12"
+    assert document.plain_text == "fast document text"
+    assert state.embedded_documents == []
+    assert state.sync_run.status == "completed"
+    assert state.sync_run.error_summary is None
 
 
 async def test_concurrent_unsupported_mime_keeps_failed_document(

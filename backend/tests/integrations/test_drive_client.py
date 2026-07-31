@@ -32,15 +32,19 @@ def _metadata_response(
     request: httpx.Request,
     *,
     revision_id: str = "revision-1",
+    head_revision_id: str | None = None,
 ) -> httpx.Response:
+    payload: dict[str, str] = {
+        "id": "document-1",
+        "name": "회의록",
+        "mimeType": GOOGLE_DOC_MIME_TYPE,
+        "version": revision_id,
+    }
+    if head_revision_id is not None:
+        payload["headRevisionId"] = head_revision_id
     return httpx.Response(
         200,
-        json={
-            "id": "document-1",
-            "name": "회의록",
-            "mimeType": GOOGLE_DOC_MIME_TYPE,
-            "headRevisionId": revision_id,
-        },
+        json=payload,
         request=request,
     )
 
@@ -188,11 +192,16 @@ async def test_refresh_network_error_is_temporary_without_purge() -> None:
     assert request_count == 1
 
 
-async def test_get_metadata_and_export_google_doc_plain_text() -> None:
+async def test_get_metadata_uses_version_for_revision() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.headers["Authorization"] == "Bearer access-token"
         if request.url.path == "/drive/v3/files/document-1":
-            return _metadata_response(request)
+            assert request.url.params["fields"] == "id,name,mimeType,version,trashed"
+            return _metadata_response(
+                request,
+                revision_id="12",
+                head_revision_id="opaque-head-revision",
+            )
         if request.url.path == "/drive/v3/files/document-1/export":
             assert request.url.params["mimeType"] == "text/plain"
             return httpx.Response(200, text="회의록 본문", request=request)
@@ -207,7 +216,7 @@ async def test_get_metadata_and_export_google_doc_plain_text() -> None:
             metadata.mime_type,
         )
 
-    assert metadata.revision_id == "revision-1"
+    assert metadata.revision_id == "12"
     assert exported.plain_text == "회의록 본문"
     assert exported.content_hash == "a62fd36dc1ae40459825a13cc0dccb964d00b774658b0fdfac81eee03c054b49"
 

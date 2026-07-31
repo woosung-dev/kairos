@@ -457,7 +457,7 @@ class GoogleDriveSyncPipelineService:
                 # 문서가 연결되지 않으며, 실제 신규 import가 없었던 run으로 정상 종료한다.
                 return
         else:
-            await self._update_document(
+            updated = await self._update_document(
                 repository,
                 document,
                 workspace_id,
@@ -471,6 +471,8 @@ class GoogleDriveSyncPipelineService:
                 last_synced_at=None,
                 sync_run_id=sync_run_id,
             )
+            if not updated:
+                return
 
         if document.project_id is not None:
             # 같은 세션의 실패 상태 commit이 미완료 청크 DELETE를 확정할 수 있으므로,
@@ -616,9 +618,10 @@ class GoogleDriveSyncPipelineService:
         sync_status: str,
         last_synced_at: datetime | None,
         sync_run_id: uuid.UUID | None,
-    ) -> None:
+    ) -> bool:
+        expected_revision_id = document.revision_id
         if sync_run_id is None:
-            await repository.update_document(
+            updated = await repository.update_document(
                 document.id,
                 workspace_id,
                 title=title,
@@ -629,9 +632,10 @@ class GoogleDriveSyncPipelineService:
                 plain_text=plain_text,
                 sync_status=sync_status,
                 last_synced_at=last_synced_at,
+                expected_revision_id=expected_revision_id,
             )
         else:
-            await repository.update_document(
+            updated = await repository.update_document(
                 document.id,
                 workspace_id,
                 title=title,
@@ -643,8 +647,12 @@ class GoogleDriveSyncPipelineService:
                 sync_status=sync_status,
                 last_synced_at=last_synced_at,
                 sync_run_id=sync_run_id,
+                expected_revision_id=expected_revision_id,
             )
+        if not updated:
+            return False
         await repository.commit()
+        return True
 
     async def _invalidate_document_caches(
         self,
