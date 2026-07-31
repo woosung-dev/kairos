@@ -73,11 +73,7 @@ export function SearchScope() {
           value={searchFilter.timeRange || ""}
           onChange={(e) =>
             setSearchFilter({
-              timeRange: (e.target.value || null) as
-                | "1m"
-                | "3m"
-                | "6m"
-                | null,
+              timeRange: (e.target.value || null) as SearchFilter["timeRange"],
             })
           }
           className="px-2 py-1 rounded text-xs bg-transparent border outline-none"
