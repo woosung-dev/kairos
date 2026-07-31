@@ -67,7 +67,7 @@ frontend/
         └── index.ts
 ```
 
-## 백엔드 (도메인 모듈러 구조, BE 17 모듈 = 14 도메인 + common/core/services — 2026-07-30 문서 기준, `integrations`는 ADR-026 구현 예정)
+## 백엔드 (도메인 모듈러 구조, BE 17 모듈 = 14 도메인 + common/core/services — 2026-07-31 기준)
 
 ```
 backend/
@@ -85,7 +85,7 @@ backend/
     ├── memory/                        # Sprint 15 Recall-first wedge — MemoryItem capture/distill/recall/promote + admin_router (R2 cleanup cron) + pipeline_service (Sprint 24 BL-006)
     ├── embeddings/                    # EmbeddingChunk + SemanticCache (cross-domain shared service, ADR-014 옵션 A). source_type 'memory' 추가 (Sprint 15)
     ├── upload/                        # R2 presigned URL + proxy + MIME validation
-    ├── integrations/                  # ADR-026 구현 예정 — Google OAuth 연결·선택 외부 파일/ExternalDocument·sync 상태·외부 소스 생명주기
+    ├── integrations/                  # ADR-026 — Google OAuth 연결·선택 외부 파일/ExternalDocument·sync 상태·외부 소스 생명주기 (PR #143 구현 완료)
     ├── services/                      # 외부 wrapper (cross-domain shared service)
     │   ├── transcription.py           # Whisper 1hr 이하 단일 호출
     │   ├── chunked_transcription.py   # 1hr 초과 ffmpeg duration probe + 1hr chunk + 5초 overlap + 병렬 Whisper + merge

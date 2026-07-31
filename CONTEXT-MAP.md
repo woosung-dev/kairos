@@ -40,9 +40,9 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 ## 4. 도메인 경계
 
-### 4.1 백엔드 모듈 (2026-07-30 문서 기준 17, `integrations` 구현 예정)
+### 4.1 백엔드 모듈 (2026-07-31 기준 17)
 
-`auth · workspaces · projects · inbox · meetings · notes · actions · feedback · memory · onboarding · upload · integrations (ADR-026, 구현 예정 — Google OAuth 연결 · 선택 외부 파일/ExternalDocument · sync 상태 · 외부 소스 생명주기) · embeddings · rag · common · core · services`. 폴더 표준: `router/service/repository/schemas/models/dependencies/exceptions.py`. 상세: `docs/architecture/directory-map.md`.
+`auth · workspaces · projects · inbox · meetings · notes · actions · feedback · memory · onboarding · upload · integrations (ADR-026 — Google OAuth 연결 · 선택 외부 파일/ExternalDocument · sync 상태 · 외부 소스 생명주기. PR #143 구현 완료) · embeddings · rag · common · core · services`. 폴더 표준: `router/service/repository/schemas/models/dependencies/exceptions.py`. 상세: `docs/architecture/directory-map.md`.
 
 ### 4.2 의존 규칙 (헌법 결정 #1, ADR-014)
 
