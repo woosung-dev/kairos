@@ -1195,8 +1195,8 @@ Response: SSE stream (event: thinking → search_results → answer → done)
 
 | Method | Path | 권한 | 성공 | 주요 오류 / 비고 |
 |--------|------|------|------|------------------|
-| `POST` | `/api/v1/workspaces/{workspace_id}/integrations/google-drive/authorize` | owner | `200 OK` `{ authorizationUrl }` | `403` owner 아님. FE가 OAuth 팝업·redirect를 제어한다. |
-| `GET` | `/api/v1/integrations/google-drive/callback` | 서명 state의 요청자(owner) | `302 Found` 설정 화면 복귀 | I-13 예외: 고정 redirect URI에는 `workspace_id`를 둘 수 없으므로 state의 workspace·요청자·nonce·PKCE·만료를 검증한다. `400` invalid/expired state, `403` 요청자가 더 이상 owner가 아님, `503` 암호화 키 설정 오류. |
+| `POST` | `/api/v1/workspaces/{workspace_id}/integrations/google-drive/authorize` | owner | `200 OK` `{ authorizationUrl }` | `403` owner 아님, `503` Google OAuth 설정 누락 또는 암호화 키 오류. FE가 OAuth 팝업·redirect를 제어한다. 호출마다 단명 `nonce` 행을 저장하고 자기 workspace의 만료 행을 정리한다. |
+| `GET` | `/api/v1/integrations/google-drive/callback` | 서명 state의 요청자(owner) | `302 Found` 설정 화면 복귀 | I-13 예외: 고정 redirect URI에는 `workspace_id`를 둘 수 없으므로 state의 workspace·요청자·nonce·PKCE·만료를 검증한다. **`nonce`는 `DELETE ... RETURNING` 단문으로 1회만 소비되며, 소비는 Google 토큰 교환보다 앞이다** — 재사용·만료 state는 외부 호출 없이 `400`으로 차단된다(성공한 callback의 브라우저 재전송도 같은 `400`). `403` 요청자가 더 이상 owner가 아님, `503` 암호화 키 설정 오류. |
 | `GET` | `/api/v1/workspaces/{workspace_id}/integrations/google-drive` | owner | `200 OK` connection 상태와 마지막 동기화. 연결이 없으면 `null` | `403` owner 아님. |
 | `POST` | `/api/v1/workspaces/{workspace_id}/integrations/google-drive/documents` | owner | `202 Accepted` `{ syncRunId }` | 선택 file IDs와 `projectId`를 받아 BackgroundTask import 시작. `404` 연결 또는 같은 workspace의 Project 없음, `403` owner 아님, `503` Google OAuth 설정 누락. 지원하지 않는 MIME은 pipeline이 문서별 `failed`로 기록한다. |
 | `GET` | `/api/v1/workspaces/{workspace_id}/integrations/sync-runs/{sync_run_id}` | owner | `200 OK` 파일별 status polling | `403` owner 아님, `404` 같은 workspace의 sync run 없음. |

@@ -30,15 +30,25 @@
 ## Next Actions
 
 > **2026-07-31 Drive Spike codex 리뷰 (PR #143) — 미해소 발견** (`.claude/spike-gdrive/artifacts/CARRY.md` 상세)
-> CDX-1(프로젝트 미선택 문서 RAG 노출)은 같은 날 수정됨. 아래는 이월분.
+> CDX-1(프로젝트 미선택 문서 RAG 노출)은 같은 날 수정됨.
+> **2026-08-01 브랜치 `fix/bl-ext-backlog` 에서 코드 6건 해소** — 아래 체크 표시 참조.
 
-- [ ] **BL-EXT-OAUTH-1** (P1) OAuth `nonce` 가 생성만 되고 **소비되지 않는다** (`integrations/router.py:96,116,135`). 서버 측 일회성 저장·삭제가 없어 exp 창(10분) 안에서 state 재사용 가능 → 탈취된 authorize URL 로 공격자가 자기 Google 계정을 대상 workspace 에 연결(콘텐츠 주입/혼동된 대리자). **Phase 3 실 OAuth 켜기 전 필수.**
-- [ ] **BL-EXT-CACHE-3** (P1) 캐시 무효화 이중화로 **노출 창이 닫히지 않는다**. purge/청크 교체 **전에 시작된** RAG 요청이 사후 `delete_caches` **이후에** 옛 청크 기반 `SemanticCache` 를 커밋한다. 실제 창은 RAG 요청 1건 소요 시간(수 초). 캐시 write fence/epoch 또는 직렬화 필요. BL-EXT-CACHE-1(anti-join fail-open)과 한 묶음.
-- [ ] **BL-EXT-REVISION-2** (P1) revision guard 가 **경쟁 동기화에서 무력**. guard 는 조기 반환일 뿐 최종 `_update_document`(`pipeline_service.py:364,398`)가 무조건 갱신 → 느린 rev-11 이 빠른 rev-12 를 덮어쓴다. 추가로 `drive_client.py:168` 의 `headRevisionId or version` 이 불투명 값으로 숫자 `version` 을 가려 guard 를 우회한다.
-- [ ] **BL-EXT-SYNC-1** (P2) 최초 import 의 unsupported MIME 이 `ExternalDocument` 생성 전 예외로 상태를 안 남겨 polling `documents` 에서 파일이 사라진다 (ADR-026 D4 / `integrations/CONTEXT.md` §6 미충족).
-- [ ] **BL-EXT-EMBED-1** (P2) L1 임베딩이 `plain_text` 전체를 무제한 입력으로 보낸다 (`embeddings/service.py:263-264`). 토큰 한도 초과 문서에서 실패하고, resync 면 청크·캐시가 이미 지워진 뒤다.
-- [ ] **BL-EXT-HTTP-1** (P2) background sync 의 `httpx.AsyncClient` 가 `aclose()` 되지 않는다 (`integrations/dependencies.py:43-45`). OAuth 경로만 `async with` 로 정리 → 장기 worker 소켓 누적.
-- [ ] **BL-EXT-SYNC-2** (P2) 같은 Drive file 중복 import 경쟁 시 unique 위반 → 같은 세션 재조회로 `PendingRollbackError` → sync run 이 `processing` 에 갇힌다 (`pipeline_service.py:380-396`). document 생성을 upsert 로.
+- [x] **BL-EXT-OAUTH-1** (P1) OAuth `nonce` 미소비 → **해소** (`6bc5ab8`). `integration_oauth_states` 테이블 + callback 의 `DELETE ... RETURNING` 단문 원자 소비. 소비를 Google 토큰 교환보다 앞에 두어 재사용 요청이 외부 호출에 도달하지 않는다. 브라우저 실측 — callback 3회에 Google 아웃바운드 1회.
+- [ ] **BL-EXT-CACHE-3** (P1) 캐시 무효화 이중화로 **노출 창이 닫히지 않는다**. → **설계 라운드 완료, 사용자 결정 대기.** `.claude/spike-gdrive/artifacts/CACHE-DESIGN.md` 참조. 후보 2안 중 어느 것도 단독으로 닫지 못하며, 권고는 안0(notes commit fix) → 안1a+1b(fail-closed anti-join + 비-admin fast path 제거) → 안2(쓰기 fence) 조합. 마이그레이션 0.
+- [ ] **BL-EXT-CACHE-1** (P1) `ALL_CHUNKS_VISIBLE_SQL` anti-join fail-open. CACHE-3 과 한 묶음 — 같은 설계 문서에서 다룬다.
+- [x] **BL-EXT-REVISION-2** (P1) revision guard 가 경쟁 동기화에서 무력 → **해소** (`87e1963`). `version` 단독 + 본문 갱신 CAS. ⚠ CAS 는 "최신 보존" 이 아니라 **"선착순 보존"** 이며 완료·오류 상태 전이는 CAS 미보호 (`integrations/CONTEXT.md` §6 기록).
+- [x] **BL-EXT-SYNC-1** (P2) 최초 import 의 unsupported MIME 무상태 → **해소** (`5af8261`). metadata 직후 판별 → 빈 행 생성 → raise. ⚠ ADR-026 D4 **부분 충족** — 사유는 문서별로 남지 않는다 (아래 신규 BL 참조).
+- [x] **BL-EXT-EMBED-1** (P2) L1 임베딩 무제한 입력 → **해소** (`8038e27`). 임베딩 입력만 절단하고 `chunk_text` 는 전문 유지 (L1 텍스트가 LLM 프롬프트 근거 본문이므로).
+- [x] **BL-EXT-HTTP-1** (P2) background sync 의 `AsyncClient` 미종료 → **해소** (`f985d2f`). `aclose()` + `try/finally`.
+- [x] **BL-EXT-SYNC-2** (P2) 중복 import 경쟁 → **해소** (`6a43541`). `ON CONFLICT DO NOTHING` + 경쟁 패자 조기 반환.
+
+> **2026-08-01 BL-EXT 세션에서 신규 발견 — 미해소**
+
+- [ ] **BL-NOTES-CACHE-1** (P1, 프로덕션 결함) **notes 경로의 캐시 무효화 DELETE 가 커밋되지 않고 롤백된다.** `notes/pipeline_service.py` `embed_note_async` 는 `invalidate_cache` 뒤에 commit 이 없고 `delete_note_with_cleanup` 은 `note_repo.commit()` **이후**에 `invalidate_cache` 를 호출한다. `delete_caches` 는 `flush()` 로만 끝난다. → **노트 삭제·재임베딩 시 무효화가 아예 일어나지 않아 삭제한 노트 내용이 캐시에서 계속 서빙된다.** 일회용 컨테이너 실측 확인(`A_after_close=3`, 3행 전부 복귀). CACHE-DESIGN.md 의 "안0" 이며 SSOT 무관·2줄 수정이라 hotfix 분리 가능.
+- [ ] **BL-EXT-REASON-1** (P2) `ExternalDocument` 에 문서별 실패 **사유** 컬럼이 없다. ADR-026 D4 "문서별 `failed` 상태와 사유를 남긴다" 의 사유 절반이 미충족. 현재는 sync run `error_summary` 한 줄뿐. 마이그레이션 필요.
+- [ ] **BL-EXT-SYNC-3** (P2) 최초 import 의 export 5xx/timeout 은 여전히 문서 행을 남기지 않는다. BL-EXT-SYNC-1 과 같은 UX 결함 클래스이나 트리거가 다르다 (이번엔 미지원 MIME 만 좁게 수정).
+- [ ] **BL-EMBED-2** (P2) `embed_note` 도 노트 전문을 L1 임베딩 입력으로 보내고 단일 `generate_embeddings` 호출을 쓴다 — BL-EXT-EMBED-1 과 동일한 구조적 결함. `embed_meeting` 은 요청당 입력 배열 한도 쪽 노출이 더 크다.
+- [ ] **BL-EMBED-3** (P3) external_document 의 L1 `embedding` 컬럼은 **소비처가 없다** (검색은 `chunk_level = 2` 만, enrich 는 `chunk_text` 만). 생성 비용 + halfvec(1536) 저장이 낭비다. L1 행 자체는 부모 컨텍스트 본문 때문에 필요하다.
 
 > **2026-06-17 멀티 에이전트 팀 QA 후속** (`git history`)
 - [ ] **(선택) 풍부한 음성 샘플 1개 확보** — 알려진 트랜스크립트 + 명명된 사실 2개 이상. 현재 픽스처는 무음 10초 webm + test.m4a 뿐 → 회의 오디오 파이프라인의 **콘텐츠** 검증(transcription/화자분리/요약 품질) 갭. 텍스트 캡처로 RAG 경로는 검증 완료(오디오는 기계동작만).

@@ -284,6 +284,14 @@ erDiagram
         string error_summary
     }
 
+    IntegrationOAuthState {
+        string nonce PK "authorize가 발급한 단명 OAuth nonce"
+        uuid workspace_id FK "I-9 격리"
+        uuid requester_user_id FK
+        timestamp expires_at "인덱스 — 만료 GC"
+        timestamp created_at
+    }
+
     User ||--o{ Workspace : "소유"
     Workspace ||--o{ WorkspaceMember : "멤버"
     User ||--o{ WorkspaceMember : "소속"
@@ -414,6 +422,12 @@ erDiagram
 ### IntegrationSyncRun
 - `202 Accepted` 뒤 status polling과 감사 가능한 동기화 실행을 기록한다. 요청자·시작/완료 시각·오류 요약을 가진다.
 - `(workspace_id, connection_id) → integration_connections(workspace_id, id)` composite FK와 `(id, workspace_id)` `UNIQUE`로 같은 Workspace 연결을 참조한다.
+
+### IntegrationOAuthState
+- authorize가 발급한 OAuth `nonce`의 서버 측 단명 저장소. callback이 `DELETE ... RETURNING` 단문으로 **1회만 소비**해 state 재사용을 차단한다 (BL-EXT-OAUTH-1).
+- `nonce`가 PK다. 소비는 `nonce` + `workspace_id` + `expires_at > now()` 를 함께 만족할 때만 성공한다.
+- `expires_at`에 인덱스를 둔다. 만료 행 GC는 authorize 진입 시 **자기 workspace 범위로만** 수행한다 (I-9).
+- Workspace 삭제 cascade에 등재되어 있다 (`workspaces/repository.py` `_CASCADE_DELETE_STATEMENTS`).
 
 ## 관계 설명
 
