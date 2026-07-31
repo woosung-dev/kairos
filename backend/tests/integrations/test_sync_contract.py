@@ -34,6 +34,7 @@ from src.integrations.exceptions import (
 )
 from src.integrations.models import ExternalDocument, IntegrationConnection
 from src.integrations.pipeline_service import GoogleDriveSyncPipelineService
+from src.integrations.repository import IntegrationRepository
 from src.integrations.service import IntegrationService
 from src.main import app
 from src.projects.models import Project
@@ -258,6 +259,58 @@ async def _import_document(
             )
         )).one()
     return sync_run_id, document
+
+
+async def test_postgres_create_document_returns_existing_document_on_conflict(
+    sync_contract: _ContractEnvironment,
+) -> None:
+    winning_document = ExternalDocument(
+        workspace_id=sync_contract.workspace.id,
+        connection_id=sync_contract.connection.id,
+        project_id=sync_contract.project.id,
+        drive_file_id="postgres-conflict-document",
+        title="winning document",
+        mime_type=GOOGLE_DOC_MIME_TYPE,
+        origin_url="https://docs.google.com/document/d/postgres-conflict-document/edit",
+        revision_id="revision-1",
+        content_hash="winning-content-hash",
+        plain_text="winning document text",
+        sync_status="completed",
+    )
+    async with sync_contract.session_factory() as winning_session:
+        winning_repository = IntegrationRepository(winning_session)
+        persisted_document, created = await winning_repository.create_document(
+            winning_document,
+            sync_contract.workspace.id,
+        )
+        assert created is True
+        assert persisted_document.id == winning_document.id
+        await winning_repository.commit()
+
+    losing_document = ExternalDocument(
+        workspace_id=sync_contract.workspace.id,
+        connection_id=sync_contract.connection.id,
+        project_id=sync_contract.project.id,
+        drive_file_id="postgres-conflict-document",
+        title="losing document",
+        mime_type=GOOGLE_DOC_MIME_TYPE,
+        origin_url="https://docs.google.com/document/d/postgres-conflict-document/edit",
+        revision_id="revision-2",
+        content_hash="losing-content-hash",
+        plain_text="losing document text",
+        sync_status="processing",
+    )
+    async with sync_contract.session_factory() as losing_session:
+        losing_repository = IntegrationRepository(losing_session)
+        persisted_document, created = await losing_repository.create_document(
+            losing_document,
+            sync_contract.workspace.id,
+        )
+
+        assert created is False
+        assert persisted_document.id == winning_document.id
+        assert persisted_document.plain_text == "winning document text"
+        assert persisted_document.content_hash == "winning-content-hash"
 
 
 async def _document(

@@ -363,8 +363,12 @@ class GoogleDriveSyncPipelineService:
                     plain_text="",
                     sync_status="processing",
                 )
-                await repository.create_document(document, workspace_id)
-                await repository.commit()
+                document, created = await repository.create_document(
+                    document,
+                    workspace_id,
+                )
+                if created:
+                    await repository.commit()
             raise DriveUnsupportedMimeTypeError()
 
         # 동일 revision의 export 생략은 completed 문서에만 적용해 실패 상태의 복구 경로를 보존한다.
@@ -445,8 +449,13 @@ class GoogleDriveSyncPipelineService:
                 plain_text=exported.plain_text,
                 sync_status="processing",
             )
-            await repository.create_document(document, workspace_id)
-            await repository.commit()
+            document, created = await repository.create_document(document, workspace_id)
+            if created:
+                await repository.commit()
+            else:
+                # 경쟁 패자는 winner 행을 갱신·임베딩·완료 처리하지 않는다. 따라서 이 sync run에는
+                # 문서가 연결되지 않으며, 실제 신규 import가 없었던 run으로 정상 종료한다.
+                return
         else:
             await self._update_document(
                 repository,

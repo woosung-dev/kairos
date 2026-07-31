@@ -51,6 +51,8 @@ class _PipelineState:
     project_id: uuid.UUID = field(default_factory=uuid.uuid4)
     documents: dict[uuid.UUID, SimpleNamespace] = field(default_factory=dict)
     sync_run: SimpleNamespace | None = None
+    sync_runs: dict[uuid.UUID, SimpleNamespace] = field(default_factory=dict)
+    hidden_document_lookups: dict[str, int] = field(default_factory=dict)
     deleted_sources: list[tuple[str, uuid.UUID]] = field(default_factory=list)
     deleted_caches: list[tuple[uuid.UUID, uuid.UUID | None]] = field(default_factory=list)
     chunk_project_ids: dict[tuple[str, uuid.UUID], set[uuid.UUID | None]] = field(
@@ -103,6 +105,10 @@ class _FakeIntegrationRepository:
         workspace_id: uuid.UUID,
         drive_file_id: str,
     ) -> uuid.UUID | None:
+        hidden_lookups = self.state.hidden_document_lookups.get(drive_file_id, 0)
+        if hidden_lookups:
+            self.state.hidden_document_lookups[drive_file_id] = hidden_lookups - 1
+            return None
         for document in self.state.documents.values():
             if (
                 document.connection_id == connection_id
@@ -116,10 +122,17 @@ class _FakeIntegrationRepository:
         self,
         document: SimpleNamespace,
         workspace_id: uuid.UUID,
-    ) -> SimpleNamespace:
+    ) -> tuple[SimpleNamespace, bool]:
         assert document.workspace_id == workspace_id
+        for existing_document in self.state.documents.values():
+            if (
+                existing_document.workspace_id == workspace_id
+                and existing_document.connection_id == document.connection_id
+                and existing_document.drive_file_id == document.drive_file_id
+            ):
+                return existing_document, False
         self.state.documents[document.id] = document
-        return document
+        return document, True
 
     async def update_document(
         self,
@@ -177,13 +190,14 @@ class _FakeIntegrationRepository:
         sync_run_id: uuid.UUID,
         workspace_id: uuid.UUID,
     ) -> SimpleNamespace | None:
+        sync_run = self.state.sync_runs.get(sync_run_id, self.state.sync_run)
         if (
-            self.state.sync_run is None
-            or self.state.sync_run.id != sync_run_id
-            or self.state.sync_run.workspace_id != workspace_id
+            sync_run is None
+            or sync_run.id != sync_run_id
+            or sync_run.workspace_id != workspace_id
         ):
             return None
-        return self.state.sync_run
+        return sync_run
 
     async def update_sync_run_status(
         self,
@@ -1599,6 +1613,195 @@ async def test_import_continues_after_document_failure_and_closes_sync_run(
     assert state.sync_run.completed_at is not None
     assert state.sync_run.error_summary is not None
     assert drive_client.aclose_calls == 1
+
+
+async def test_concurrent_import_preserves_winning_document_values(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    state, pipeline, drive_client, _ = pipeline_environment
+    winning_project_id = state.project_id
+    losing_project_id = uuid.uuid4()
+    winning_sync_run_id = uuid.uuid4()
+    losing_sync_run_id = uuid.uuid4()
+    winning_sync_run = SimpleNamespace(
+        id=winning_sync_run_id,
+        workspace_id=state.workspace_id,
+        connection_id=state.connection_id,
+        status="pending",
+        completed_at=None,
+        error_summary=None,
+    )
+    losing_sync_run = SimpleNamespace(
+        id=losing_sync_run_id,
+        workspace_id=state.workspace_id,
+        connection_id=state.connection_id,
+        status="pending",
+        completed_at=None,
+        error_summary=None,
+    )
+    state.sync_runs = {
+        winning_sync_run_id: winning_sync_run,
+        losing_sync_run_id: losing_sync_run,
+    }
+    drive_client.metadata["shared-document"] = _metadata(
+        "shared-document",
+        "revision-1",
+    )
+    drive_client.exports["shared-document"] = DriveExport(
+        plain_text="winning document text",
+        content_hash="winning-content-hash",
+    )
+
+    await pipeline.import_documents(
+        winning_sync_run_id,
+        state.workspace_id,
+        state.connection_id,
+        ["shared-document"],
+        winning_project_id,
+    )
+
+    winning_document = next(iter(state.documents.values()))
+    winning_document.sync_status = "processing"
+    winning_last_synced_at = winning_document.last_synced_at
+    winning_embedding_count = len(state.embedded_documents)
+    assert winning_last_synced_at is not None
+    state.hidden_document_lookups["shared-document"] = 1
+    drive_client.metadata["shared-document"] = _metadata(
+        "shared-document",
+        "revision-2",
+    )
+    drive_client.exports["shared-document"] = DriveExport(
+        plain_text="losing document text",
+        content_hash="losing-content-hash",
+    )
+
+    await pipeline.import_documents(
+        losing_sync_run_id,
+        state.workspace_id,
+        state.connection_id,
+        ["shared-document"],
+        losing_project_id,
+    )
+
+    assert list(state.documents) == [winning_document.id]
+    assert winning_document.project_id == winning_project_id
+    assert winning_document.plain_text == "winning document text"
+    assert winning_document.revision_id == "revision-1"
+    assert (
+        winning_document.sync_run_id,
+        winning_document.sync_status,
+        winning_document.last_synced_at,
+        len(state.embedded_documents),
+    ) == (
+        winning_sync_run_id,
+        "processing",
+        winning_last_synced_at,
+        winning_embedding_count,
+    )
+    assert winning_sync_run.status == "completed"
+    assert losing_sync_run.status == "completed"
+    assert winning_sync_run.completed_at is not None
+    assert losing_sync_run.completed_at is not None
+    assert losing_sync_run.error_summary is None
+
+
+async def test_single_import_creates_completed_document(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    state, pipeline, drive_client, _ = pipeline_environment
+    sync_run_id = uuid.uuid4()
+    state.sync_run = SimpleNamespace(
+        id=sync_run_id,
+        workspace_id=state.workspace_id,
+        connection_id=state.connection_id,
+        status="pending",
+        completed_at=None,
+        error_summary=None,
+    )
+    drive_client.metadata["single-document"] = _metadata(
+        "single-document",
+        "revision-1",
+    )
+    drive_client.exports["single-document"] = DriveExport(
+        plain_text="single document text",
+        content_hash="single-content-hash",
+    )
+
+    await pipeline.import_documents(
+        sync_run_id,
+        state.workspace_id,
+        state.connection_id,
+        ["single-document"],
+        state.project_id,
+    )
+
+    document = next(iter(state.documents.values()))
+    assert document.sync_status == "completed"
+    assert state.sync_run.status == "completed"
+    assert state.embedded_documents[0]["document_id"] == document.id
+
+
+async def test_concurrent_unsupported_mime_keeps_failed_document(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    state, pipeline, drive_client, _ = pipeline_environment
+    winning_sync_run_id = uuid.uuid4()
+    losing_sync_run_id = uuid.uuid4()
+    winning_sync_run = SimpleNamespace(
+        id=winning_sync_run_id,
+        workspace_id=state.workspace_id,
+        connection_id=state.connection_id,
+        status="pending",
+        completed_at=None,
+        error_summary=None,
+    )
+    losing_sync_run = SimpleNamespace(
+        id=losing_sync_run_id,
+        workspace_id=state.workspace_id,
+        connection_id=state.connection_id,
+        status="pending",
+        completed_at=None,
+        error_summary=None,
+    )
+    state.sync_runs = {
+        winning_sync_run_id: winning_sync_run,
+        losing_sync_run_id: losing_sync_run,
+    }
+    drive_client.metadata["shared-spreadsheet"] = _metadata(
+        "shared-spreadsheet",
+        "revision-1",
+        mime_type="application/vnd.google-apps.spreadsheet",
+    )
+
+    await pipeline.import_documents(
+        winning_sync_run_id,
+        state.workspace_id,
+        state.connection_id,
+        ["shared-spreadsheet"],
+        state.project_id,
+    )
+
+    state.hidden_document_lookups["shared-spreadsheet"] = 1
+    await pipeline.import_documents(
+        losing_sync_run_id,
+        state.workspace_id,
+        state.connection_id,
+        ["shared-spreadsheet"],
+        uuid.uuid4(),
+    )
+
+    failed_documents = [
+        document
+        for document in state.documents.values()
+        if document.drive_file_id == "shared-spreadsheet"
+    ]
+    assert len(failed_documents) == 1
+    assert failed_documents[0].sync_status == "failed"
+    assert winning_sync_run.status == "completed"
+    assert losing_sync_run.status == "completed"
+    assert winning_sync_run.error_summary is not None
+    assert losing_sync_run.error_summary is not None
+    assert drive_client.export_calls == []
 
 
 async def test_initial_import_records_unsupported_mime_without_export_or_embedding(

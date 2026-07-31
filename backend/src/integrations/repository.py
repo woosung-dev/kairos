@@ -171,12 +171,51 @@ class IntegrationRepository:
         self,
         document: ExternalDocument,
         workspace_id: uuid.UUID,
-    ) -> ExternalDocument:
+    ) -> tuple[ExternalDocument, bool]:
+        """문서를 생성하거나 경쟁에서 먼저 생성된 문서를 반환한다."""
         if document.workspace_id != workspace_id:
             raise ValueError("document workspace_id가 일치하지 않습니다")
-        self.session.add(document)
-        await self.session.flush()
-        return document
+        stmt = (
+            pg_insert(ExternalDocument.__table__)
+            .values(
+                id=document.id,
+                workspace_id=document.workspace_id,
+                connection_id=document.connection_id,
+                project_id=document.project_id,
+                sync_run_id=document.sync_run_id,
+                drive_file_id=document.drive_file_id,
+                title=document.title,
+                mime_type=document.mime_type,
+                origin_url=document.origin_url,
+                revision_id=document.revision_id,
+                content_hash=document.content_hash,
+                plain_text=document.plain_text,
+                sync_status=document.sync_status,
+                last_synced_at=document.last_synced_at,
+            )
+            .on_conflict_do_nothing(
+                index_elements=["workspace_id", "connection_id", "drive_file_id"]
+            )
+            .returning(ExternalDocument.id)
+        )
+        document_id = (await self.session.execute(stmt)).scalar_one_or_none()
+        if document_id is not None:
+            return document, True
+
+        existing_document_id = await self.find_document_id_by_drive_file_id(
+            document.connection_id,
+            workspace_id,
+            document.drive_file_id,
+        )
+        if existing_document_id is None:
+            raise RuntimeError("경쟁 문서를 다시 조회할 수 없습니다")
+        existing_document = await self.find_document_by_id(
+            existing_document_id,
+            workspace_id,
+        )
+        if existing_document is None:
+            raise RuntimeError("경쟁 문서를 다시 로드할 수 없습니다")
+        return existing_document, False
 
     async def update_document(
         self,
