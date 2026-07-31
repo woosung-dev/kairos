@@ -737,23 +737,108 @@ async def test_same_document_revision_request_keeps_document_and_chunk_identity(
     assert stored_document.last_synced_at > before_last_synced_at
 
 
-async def test_characterization_revision_monotonic_guard_is_currently_absent(
+async def test_older_numeric_revision_does_not_overwrite_newer_document(
     sync_contract: _ContractEnvironment,
 ) -> None:
-    """알려진 BL-EXT-REVISION-1 결함의 현재 동작을 기록한다.
-
-    단조성 guard가 추가되면 이 characterization 테스트는 보존 계약으로 갱신해야 한다.
-    """
-    _, document = await _import_document(sync_contract)
-    sync_contract.drive.metadata[document.drive_file_id] = _metadata(document.drive_file_id, "revision-2")
+    """BL-EXT-REVISION-1 부분 해소: 숫자 revision의 구 버전은 최신 본문을 덮어쓰지 않는다."""
+    _, document = await _import_document(
+        sync_contract,
+        revision_id="1",
+        plain_text="initial content",
+    )
+    sync_contract.drive.metadata[document.drive_file_id] = _metadata(document.drive_file_id, "2")
     sync_contract.drive.exports[document.drive_file_id] = _export("newer content")
     await _resync(sync_contract, document.id)
-    sync_contract.drive.metadata[document.drive_file_id] = _metadata(document.drive_file_id, "revision-1")
+
+    newer_document = await _document(sync_contract, document.id)
+    assert newer_document is not None
+    assert newer_document.last_synced_at is not None
+    sync_contract.drive.export_calls.clear()
+    sync_contract.drive.metadata[document.drive_file_id] = _metadata(document.drive_file_id, "1")
     sync_contract.drive.exports[document.drive_file_id] = _export("older content")
 
     await _resync(sync_contract, document.id)
 
     stored_document = await _document(sync_contract, document.id)
     assert stored_document is not None
-    assert stored_document.revision_id == "revision-1"
-    assert stored_document.plain_text == "older content"
+    assert stored_document.revision_id == "2"
+    assert stored_document.plain_text == "newer content"
+    assert stored_document.content_hash == _export("newer content").content_hash
+    assert stored_document.sync_status == "completed"
+    assert stored_document.last_synced_at > newer_document.last_synced_at
+    assert sync_contract.drive.export_calls == []
+
+
+@pytest.mark.parametrize(
+    ("metadata_error", "expected_status"),
+    [
+        pytest.param(DriveTemporaryError(), "stale", id="stale"),
+        pytest.param(
+            DriveReauthenticationRequiredError(),
+            "reauth_required",
+            id="reauth-required",
+        ),
+        pytest.param(ValueError("sync failed"), "failed", id="failed"),
+    ],
+)
+async def test_older_numeric_revision_preserves_document_after_noncompleted_status(
+    sync_contract: _ContractEnvironment,
+    metadata_error: Exception,
+    expected_status: str,
+) -> None:
+    """BL-EXT-REVISION-1 부분 해소: 비완료 상태도 구 숫자 revision으로 덮어쓰지 않는다."""
+    _, document = await _import_document(
+        sync_contract,
+        revision_id="5",
+        plain_text="newest body",
+    )
+    newest_hash = _export("newest body").content_hash
+    sync_contract.drive.metadata[document.drive_file_id] = metadata_error
+
+    await _resync(sync_contract, document.id)
+
+    preserved_document = await _document(sync_contract, document.id)
+    assert preserved_document is not None
+    assert preserved_document.sync_status == expected_status
+    assert preserved_document.revision_id == "5"
+    assert preserved_document.plain_text == "newest body"
+    assert preserved_document.content_hash == newest_hash
+    sync_contract.drive.export_calls.clear()
+    sync_contract.drive.metadata[document.drive_file_id] = _metadata(document.drive_file_id, "3")
+    sync_contract.drive.exports[document.drive_file_id] = _export("older body")
+
+    await _resync(sync_contract, document.id)
+
+    stored_document = await _document(sync_contract, document.id)
+    assert stored_document is not None
+    assert stored_document.revision_id == "5"
+    assert stored_document.plain_text == "newest body"
+    assert stored_document.content_hash == newest_hash
+    assert sync_contract.drive.export_calls == []
+    assert stored_document.sync_status == expected_status
+
+
+async def test_opaque_revision_does_not_apply_monotonic_guard_and_updates_document(
+    sync_contract: _ContractEnvironment,
+) -> None:
+    """알려진 한계: 불투명 Drive revision은 순서를 비교하지 않고 갱신한다."""
+    _, document = await _import_document(
+        sync_contract,
+        revision_id="opaque-initial",
+        plain_text="initial content",
+    )
+    sync_contract.drive.export_calls.clear()
+    sync_contract.drive.metadata[document.drive_file_id] = _metadata(
+        document.drive_file_id,
+        "opaque-next",
+    )
+    sync_contract.drive.exports[document.drive_file_id] = _export("updated content")
+
+    await _resync(sync_contract, document.id)
+
+    stored_document = await _document(sync_contract, document.id)
+    assert stored_document is not None
+    assert stored_document.revision_id == "opaque-next"
+    assert stored_document.plain_text == "updated content"
+    assert stored_document.content_hash == _export("updated content").content_hash
+    assert sync_contract.drive.export_calls == [document.drive_file_id]

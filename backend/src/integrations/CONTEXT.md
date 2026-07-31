@@ -63,3 +63,4 @@ OAuth callback은 고정 redirect URI 제약으로 I-13 예외이며, 서명 sta
 - 401/403은 세부 reason을 판별한다. 판별할 수 없으면 purge하지 않고 `reauth_required`로 보류한다.
 - unsupported MIME은 조용히 건너뛰지 않고 문서별 `failed` 상태와 사유를 남긴다.
 - `purged`는 원본 소실·권한 회수가 확인된 상태이며, `stale`·`reauth_required`·`failed`는 본문과 청크를 보존한다.
+- BL-EXT-REVISION-1은 부분 해소 상태다. 저장된 값과 수신한 Drive revision이 모두 숫자이면 문서 상태와 무관하게 구 revision의 본문 덮어쓰기를 막고 기존 상태를 보존한다. 불투명 revision은 순서를 비교하지 못하므로 guard를 적용하지 않고 갱신한다.

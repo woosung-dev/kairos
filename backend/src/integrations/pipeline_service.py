@@ -313,6 +313,7 @@ class GoogleDriveSyncPipelineService:
             )
 
         metadata = await drive_client.get_file_metadata(access_token, file_id)
+        # 동일 revision의 export 생략은 completed 문서에만 적용해 실패 상태의 복구 경로를 보존한다.
         if (
             document is not None
             and document.revision_id == metadata.revision_id
@@ -326,6 +327,26 @@ class GoogleDriveSyncPipelineService:
                 sync_run_id=sync_run_id,
             )
             return
+
+        # Drive revision은 문서를 되돌려도 새 상위 revision이 생기는 단조 값이다.
+        # 더 작은 숫자 revision은 stale read이므로 상태와 무관하게 최신 본문을 덮어쓰지 않는다.
+        if document is not None:
+            try:
+                stored_revision = int(document.revision_id)
+                incoming_revision = int(metadata.revision_id)
+            except ValueError:
+                # Drive revision은 불투명 문자열일 수 있으므로 비교하지 못하면 갱신을 진행한다.
+                pass
+            else:
+                if incoming_revision < stored_revision:
+                    await self._update_document_status(
+                        repository,
+                        document,
+                        workspace_id,
+                        sync_status=document.sync_status,
+                        sync_run_id=sync_run_id,
+                    )
+                    return
 
         exported = await drive_client.export_plain_text(
             access_token,
