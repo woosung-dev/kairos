@@ -10,9 +10,12 @@ from httpx import ASGITransport, AsyncClient
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
 from src.common.database import get_async_session
-from src.main import app
+from src.main import ALLOWED_ORIGINS, app
 
-ALLOWED_ORIGIN = "http://localhost:3000"
+# 허용 Origin 은 설정에서 가져온다 — main.py 의 ALLOWED_ORIGINS 와 같은 소스다.
+# 하드코딩하면 로컬 .env 의 CORS_ORIGINS 가 그 값을 포함하지 않을 때 코드와 무관하게 깨진다
+# (2026-07-31: CORS_ORIGINS 에 3000 이 없어 3건이 실패했다).
+ALLOWED_ORIGIN = ALLOWED_ORIGINS[0]
 DISALLOWED_ORIGIN = "http://evil.com"
 
 
