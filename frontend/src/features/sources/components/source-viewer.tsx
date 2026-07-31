@@ -99,6 +99,7 @@ function useFullSourceContent(source: SourceDocument): {
   content: string;
   isLoading: boolean;
   originUrl?: string;
+  isExternalDocumentFallback?: boolean;
 } {
   const wid = useWorkspaceStore((s) => s.activeWorkspaceId) ?? undefined;
 
@@ -154,6 +155,7 @@ function useFullSourceContent(source: SourceDocument): {
       content: source.content,
       isLoading: externalDocumentDetail.isLoading,
       originUrl: externalDocumentDetail.data?.originUrl,
+      isExternalDocumentFallback: externalDocumentDetail.isError,
     };
   }
 
@@ -169,7 +171,7 @@ export function SourceViewer({
   const contentRef = useRef<HTMLDivElement>(null);
   const [isCopied, setIsCopied] = useState(false);
 
-  const { content, isLoading, originUrl } = useFullSourceContent(source);
+  const { content, isLoading, originUrl, isExternalDocumentFallback } = useFullSourceContent(source);
 
   // 첫 번째 하이라이트 위치로 자동 스크롤
   useEffect(() => {
@@ -323,7 +325,7 @@ export function SourceViewer({
             day: "numeric",
           })}
         </span>
-        {originUrl && (
+        {originUrl ? (
           <>
             <span>|</span>
             <a
@@ -337,7 +339,12 @@ export function SourceViewer({
               <ExternalLink size={12} />
             </a>
           </>
-        )}
+        ) : source.type === "external_document" && isLoading ? (
+          <>
+            <span>|</span>
+            <span aria-live="polite">Drive 원본 불러오는 중...</span>
+          </>
+        ) : null}
       </div>
 
       {/* 본문 */}
@@ -351,6 +358,14 @@ export function SourceViewer({
             style={{ color: "var(--text-muted)" }}
           >
             전체 내용 불러오는 중...
+          </div>
+        )}
+        {isExternalDocumentFallback && (
+          <div
+            className="mb-3 text-caption"
+            style={{ color: "var(--text-muted)" }}
+          >
+            원문을 불러오지 못해 인용 스니펫을 표시합니다.
           </div>
         )}
         <div

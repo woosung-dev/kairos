@@ -1,12 +1,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { externalDocumentKeys } from "@/lib/query-keys";
 import { useApiClient } from "@/lib/use-api-client";
 import { fetchExternalDocumentDetail } from "./api";
-
-const externalDocumentKeys = {
-  detail: (wid: string, id: string) => ["external-documents", "detail", wid, id] as const,
-};
 
 export function useExternalDocumentDetail(wid: string | undefined, id: string) {
   const api = useApiClient();

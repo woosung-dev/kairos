@@ -93,3 +93,9 @@ export const onboardingKeys = {
   all: ["onboarding"] as const,
   status: (wid: string | null) => [...onboardingKeys.all, "status", wid] as const,
 };
+
+export const externalDocumentKeys = {
+  all: ["external-documents"] as const,
+  detail: (wid: string, id: string) =>
+    [...externalDocumentKeys.all, "detail", wid, id] as const,
+};

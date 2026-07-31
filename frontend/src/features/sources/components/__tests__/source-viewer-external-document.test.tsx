@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SourceViewer } from "../source-viewer";
 import { useWorkspaceStore } from "@/features/workspaces/store";
@@ -57,6 +57,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   useWorkspaceStore.setState({ activeWorkspaceId: null });
   vi.unstubAllGlobals();
   vi.clearAllMocks();
@@ -115,6 +116,7 @@ describe("SourceViewer external_document", () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(screen.getByText("전체 내용 불러오는 중...")).toBeInTheDocument();
+      expect(screen.getByText("Drive 원본 불러오는 중...")).toBeInTheDocument();
     });
 
     rejectFirstRequest!(new Error("네트워크 실패"));
@@ -128,5 +130,7 @@ describe("SourceViewer external_document", () => {
     );
 
     expect(screen.getByText("RAG 스니펫 폴백 본문")).toBeInTheDocument();
+    expect(screen.getByText("원문을 불러오지 못해 인용 스니펫을 표시합니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Drive 원본/ })).not.toBeInTheDocument();
   });
 });
