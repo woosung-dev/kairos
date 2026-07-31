@@ -1,0 +1,43 @@
+# 워크트리 생성 시 메인 체크아웃에서 복사할 gitignore 파일 (Claude Code `copyWorktreeIncludeFiles`).
+#
+# gitignore 스타일 glob. 트래킹되는 파일은 워크트리가 알아서 체크아웃하므로 여기 적지 않는다.
+# 여기 적을 것 = "gitignore 인데 없으면 워크트리가 작동하지 않는 것" 뿐.
+#
+# ⚠️ 심볼릭 링크는 복사되지 않는다 (Claude Code 가 "Skipping symlink in .worktreeinclude" 로 건너뜀).
+#    `.claude/skills/*` 가 `.agents/skills/*` 를 가리키는 링크라 안 따라온다.
+#    프로젝트 스킬 13종이 필요하면 워크트리에서 한 번 건다 (실측 확인):
+#      ln -s ../.agents/skills .claude/skills
+#    ★ `../../` 가 아니다. 메인의 링크는 `.claude/skills/<이름>` 안에 있어서 두 단계지만,
+#      여기서는 `.claude/skills` 자체가 링크라 한 단계다. 틀리면 조용히 dangling 이 된다(실측).
+#    `.claude/CLAUDE.md -> ../AGENTS.md` 는 git 이 추적하는 링크라 워크트리가 알아서 체크아웃한다.
+#
+# ⚠️ Claude Code 의 EnterWorktree / `claude --worktree` 기능이지 git 기능이 아니다.
+#    `git worktree add` 나 herdr 로 만든 워크트리에는 적용되지 않는다 — 그때는 메인에서 직접 복사한다.
+#
+# ⚠️ 여기 나열된 파일에는 시크릿(Clerk·R2·Gemini·OpenAI 키, E2E 계정 암호)이 들어 있다.
+#    워크트리는 `.claude/worktrees/` 안(= gitignore)이므로 커밋 경로에 노출되지 않지만,
+#    워크트리 디렉터리를 레포 밖으로 옮기지 마라.
+#
+# 의존성(frontend/node_modules · backend/.venv)은 복사하지 않는다 — 워크트리에서 직접 설치한다.
+#   (cd frontend && pnpm install) && (cd backend && uv sync)      # pnpm store 하드링크라 ~10초
+
+# AI 규칙 SSOT — AGENTS.md 가 .ai/common/global.md 를 7회, .ai/templates/workflow.md 를 4회 참조한다.
+# 없으면 워크트리 세션이 Plan→Code→Test 규율과 Atomic Update 라우팅을 통째로 못 읽는다.
+.ai
+
+# 프로젝트 스킬 실체 — .claude/skills/* 가 여기를 가리키는 링크다.
+.agents
+
+# playwright MCP. 없으면 워크트리 세션에서 e2e 도구가 붙지 않는다.
+.mcp.json
+
+# 워크트리 세션의 권한 allow 목록. 없으면 매 명령마다 권한 프롬프트가 뜬다.
+.claude/settings.local.json
+
+# 백엔드 시크릿 — DATABASE_URL(Neon dev)·Clerk·R2·Gemini·OpenAI.
+# ⚠️ 메인과 같은 Neon dev DB 를 가리킨다. 워크트리에서 alembic upgrade/downgrade 를 돌리면
+#    메인과 다른 워크트리에 그대로 영향이 간다 (2026-07-30 dev DB 전삭제 사고 참조).
+backend/.env
+
+# 프론트 Clerk 키 + E2E/QA 계정. 없으면 dev 서버가 부팅 단계에서 죽고 e2e 가 전멸한다.
+frontend/.env.local
