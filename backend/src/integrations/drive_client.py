@@ -80,6 +80,10 @@ class GoogleDriveClient:
         self._client = client
         self._timeout_sec = timeout_sec
 
+    async def aclose(self) -> None:
+        """주입받은 HTTP transport를 닫는다."""
+        await self._client.aclose()
+
     async def refresh_access_token(
         self,
         refresh_token: str,

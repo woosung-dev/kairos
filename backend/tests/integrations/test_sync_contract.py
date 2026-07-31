@@ -48,10 +48,14 @@ class _StubDriveClient:
     """실제 HTTP 없이 pipeline에 Drive 응답·오류를 주입한다."""
 
     def __init__(self) -> None:
+        self.aclose_calls = 0
         self.metadata_calls: list[str] = []
         self.export_calls: list[str] = []
         self.metadata: dict[str, DriveFileMetadata | Exception] = {}
         self.exports: dict[str, DriveExport | Exception] = {}
+
+    async def aclose(self) -> None:
+        self.aclose_calls += 1
 
     async def refresh_access_token(self, *_args: object, **_kwargs: object) -> str:
         return "access-token"

@@ -258,11 +258,15 @@ class _FakeEmbeddingService:
 class _FakeDriveClient:
     def __init__(self) -> None:
         self.refresh_calls = 0
+        self.aclose_calls = 0
         self.metadata_calls: list[str] = []
         self.export_calls: list[str] = []
         self.metadata: dict[str, DriveFileMetadata | Exception] = {}
         self.exports: dict[str, DriveExport | Exception] = {}
         self.refresh_error: Exception | None = None
+
+    async def aclose(self) -> None:
+        self.aclose_calls += 1
 
     async def refresh_access_token(self, *args: object, **kwargs: object) -> str:
         self.refresh_calls += 1
@@ -1589,6 +1593,7 @@ async def test_import_continues_after_document_failure_and_closes_sync_run(
     assert state.sync_run.status == "completed"
     assert state.sync_run.completed_at is not None
     assert state.sync_run.error_summary is not None
+    assert drive_client.aclose_calls == 1
 
 
 async def test_refresh_failure_closes_sync_run_as_failed(
@@ -1617,6 +1622,34 @@ async def test_refresh_failure_closes_sync_run_as_failed(
     assert state.sync_run.status == "failed"
     assert state.sync_run.completed_at is not None
     assert state.sync_run.error_summary is not None
+    assert drive_client.aclose_calls == 1
+
+
+async def test_resync_success_closes_drive_client(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    state, pipeline, drive_client, _ = pipeline_environment
+    document = _make_document(state)
+    drive_client.metadata[document.drive_file_id] = _metadata(
+        document.drive_file_id,
+        document.revision_id,
+    )
+
+    await pipeline.resync_document(document.id, state.workspace_id)
+
+    assert drive_client.aclose_calls == 1
+
+
+async def test_resync_refresh_failure_closes_drive_client(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    state, pipeline, drive_client, _ = pipeline_environment
+    document = _make_document(state)
+    drive_client.refresh_error = DriveTemporaryError()
+
+    await pipeline.resync_document(document.id, state.workspace_id)
+
+    assert drive_client.aclose_calls == 1
 
 
 async def test_cross_workspace_document_is_not_processed(
