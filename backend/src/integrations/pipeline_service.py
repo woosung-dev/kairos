@@ -312,6 +312,28 @@ class GoogleDriveSyncPipelineService:
                 file_id,
             )
 
+        if document is not None and document.project_id is None:
+            existing_chunk_project_ids = await embedding_repository.find_chunk_project_ids(
+                "external_document",
+                document.id,
+            )
+            if existing_chunk_project_ids:
+                # 미지정 문서의 청크 0개는 Drive metadata·본문 변화와 무관한 DB 불변식이다.
+                # metadata/export 실패와 조기 반환 이전에 cache를 삭제 전후로 무효화해
+                # anti-join fail-open으로 레거시 본문이 남지 않게 한다.
+                await self._invalidate_document_caches(
+                    embedding_repository,
+                    document.workspace_id,
+                )
+                await embedding_repository.delete_by_source(
+                    "external_document",
+                    document.id,
+                )
+                await self._invalidate_document_caches(
+                    embedding_repository,
+                    document.workspace_id,
+                )
+
         metadata = await drive_client.get_file_metadata(access_token, file_id)
         # 동일 revision의 export 생략은 completed 문서에만 적용해 실패 상태의 복구 경로를 보존한다.
         if (
@@ -410,26 +432,27 @@ class GoogleDriveSyncPipelineService:
                 sync_run_id=sync_run_id,
             )
 
-        # 같은 세션의 실패 상태 commit이 미완료 청크 DELETE를 확정할 수 있으므로,
-        # 청크 변형 전 cache를 먼저 비우고 commit해 노출 창을 닫는다.
-        await self._invalidate_document_caches(
-            embedding_repository,
-            document.workspace_id,
-        )
-        await embedding_service.embed_external_document(
-            document_id=document.id,
-            workspace_id=workspace_id,
-            source_workspace_id=document.workspace_id,
-            project_id=document.project_id,
-            title=metadata.title,
-            origin_url=origin_url,
-            plain_text=exported.plain_text,
-        )
-        # 동기화 중 생성된 cache도 옛 청크를 참조할 수 있어 사후 무효화도 유지한다.
-        await self._invalidate_document_caches(
-            embedding_repository,
-            document.workspace_id,
-        )
+        if document.project_id is not None:
+            # 같은 세션의 실패 상태 commit이 미완료 청크 DELETE를 확정할 수 있으므로,
+            # 청크 변형 전 cache를 먼저 비우고 commit해 노출 창을 닫는다.
+            await self._invalidate_document_caches(
+                embedding_repository,
+                document.workspace_id,
+            )
+            await embedding_service.embed_external_document(
+                document_id=document.id,
+                workspace_id=workspace_id,
+                source_workspace_id=document.workspace_id,
+                project_id=document.project_id,
+                title=metadata.title,
+                origin_url=origin_url,
+                plain_text=exported.plain_text,
+            )
+            # 동기화 중 생성된 cache도 옛 청크를 참조할 수 있어 사후 무효화도 유지한다.
+            await self._invalidate_document_caches(
+                embedding_repository,
+                document.workspace_id,
+            )
         await self._update_document_status(
             repository,
             document,

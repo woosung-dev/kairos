@@ -53,6 +53,9 @@ class _PipelineState:
     sync_run: SimpleNamespace | None = None
     deleted_sources: list[tuple[str, uuid.UUID]] = field(default_factory=list)
     deleted_caches: list[tuple[uuid.UUID, uuid.UUID | None]] = field(default_factory=list)
+    chunk_project_ids: dict[tuple[str, uuid.UUID], set[uuid.UUID | None]] = field(
+        default_factory=dict
+    )
     operations: list[str] = field(default_factory=list)
     embedded_documents: list[dict[str, object]] = field(default_factory=list)
     generated_chunk_count: int = 0
@@ -215,6 +218,13 @@ class _FakeEmbeddingRepository:
     def __init__(self, session: _FakeSession) -> None:
         self.state = session.state
 
+    async def find_chunk_project_ids(
+        self,
+        source_type: str,
+        source_id: uuid.UUID,
+    ) -> set[uuid.UUID | None]:
+        return self.state.chunk_project_ids.get((source_type, source_id), set())
+
     async def delete_by_source(
         self,
         source_type: str,
@@ -222,6 +232,7 @@ class _FakeEmbeddingRepository:
     ) -> None:
         self.state.operations.append("delete_chunks")
         self.state.deleted_sources.append((source_type, source_id))
+        self.state.chunk_project_ids.pop((source_type, source_id), None)
 
     async def delete_caches(
         self,
@@ -1060,11 +1071,40 @@ async def test_reembedding_invalidates_workspace_cache_scope(
 
     await pipeline.resync_document(document.id, state.workspace_id)
 
+    if not has_project_id:
+        assert state.embedded_documents == []
+        assert state.deleted_caches == []
+        return
+
     assert state.embedded_documents[0]["project_id"] == project_id
     assert state.deleted_caches == [
         (state.workspace_id, None),
         (state.workspace_id, None),
     ]
+
+
+async def test_unprojected_legacy_chunks_are_reclaimed_with_cache_invalidation_before_same_revision_return(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    state, pipeline, drive_client, _ = pipeline_environment
+    document = _make_document(state)
+    document.project_id = None
+    state.chunk_project_ids[("external_document", document.id)] = {None}
+    drive_client.metadata[document.drive_file_id] = _metadata(
+        document.drive_file_id,
+        document.revision_id,
+    )
+
+    await pipeline.resync_document(document.id, state.workspace_id)
+
+    assert drive_client.export_calls == []
+    assert state.deleted_sources == [("external_document", document.id)]
+    assert state.operations == ["delete_caches", "delete_chunks", "delete_caches"]
+    assert state.deleted_caches == [
+        (state.workspace_id, None),
+        (state.workspace_id, None),
+    ]
+    assert state.chunk_project_ids == {}
 
 
 async def test_external_document_resync_invalidates_workspace_cache_before_chunk_replacement(

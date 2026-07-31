@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient, MockTransport, Request, Response
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -231,12 +232,16 @@ async def _import_document(
     file_id: str = "drive-document-1",
     revision_id: str = "revision-1",
     plain_text: str = "외부 문서의 최초 본문",
+    include_project: bool = True,
 ) -> tuple[uuid.UUID, ExternalDocument]:
     environment.drive.metadata[file_id] = _metadata(file_id, revision_id)
     environment.drive.exports[file_id] = _export(plain_text)
+    payload: dict[str, list[str] | str] = {"fileIds": [file_id]}
+    if include_project:
+        payload["projectId"] = str(environment.project.id)
     response = await environment.client.post(
         f"/api/v1/workspaces/{environment.workspace.id}/integrations/google-drive/documents",
-        json={"fileIds": [file_id], "projectId": str(environment.project.id)},
+        json=payload,
     )
     assert response.status_code == 202
     sync_run_id = uuid.UUID(response.json()["syncRunId"])
@@ -372,6 +377,267 @@ async def test_http_import_persists_chunks_polling_and_project_search(
             source_type="external_document",
         )
     assert any(result["source_id"] == document.id for result in results)
+
+
+async def _seed_legacy_unprojected_document(
+    environment: _ContractEnvironment,
+    *,
+    file_id: str,
+    revision_id: str,
+    plain_text: str,
+) -> ExternalDocument:
+    async with environment.session_factory() as session:
+        await session.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+        await session.commit()
+
+    _, unprojected_document = await _import_document(
+        environment,
+        file_id=file_id,
+        revision_id=revision_id,
+        plain_text=plain_text,
+        include_project=False,
+    )
+
+    stored_unprojected = await _document(environment, unprojected_document.id)
+    assert stored_unprojected is not None
+    assert stored_unprojected.sync_status == "completed"
+    assert stored_unprojected.revision_id == revision_id
+    assert stored_unprojected.plain_text == plain_text
+    assert len(await _document_chunks(environment, unprojected_document.id)) == 0
+
+    # F3-B1: 이전 정책에서 남은 project_id=NULL 청크·전역 cache를 실제 DB에 심는다.
+    async with environment.session_factory() as session:
+        legacy_parent_chunk = EmbeddingChunk(
+            workspace_id=environment.workspace.id,
+            project_id=None,
+            source_id=unprojected_document.id,
+            source_type="external_document",
+            chunk_text="legacy unprojected parent",
+            chunk_level=1,
+            embedding=list(_VECTOR),
+            metadata_json={"title": unprojected_document.title},
+        )
+        session.add(legacy_parent_chunk)
+        await session.flush()
+        legacy_chunk = EmbeddingChunk(
+            workspace_id=environment.workspace.id,
+            project_id=None,
+            source_id=unprojected_document.id,
+            source_type="external_document",
+            chunk_text="legacy unprojected body",
+            chunk_level=2,
+            parent_chunk_id=legacy_parent_chunk.id,
+            embedding=list(_VECTOR),
+            metadata_json={"title": unprojected_document.title},
+        )
+        session.add(legacy_chunk)
+        await session.flush()
+        session.add(
+            SemanticCache(
+                workspace_id=environment.workspace.id,
+                project_id=None,
+                question="legacy unprojected cache question",
+                question_embedding=list(_VECTOR),
+                answer="legacy unprojected cache answer",
+                sources=[_cache_source(legacy_chunk, unprojected_document)],
+                max_visibility="public",
+            )
+        )
+        await session.commit()
+
+    return unprojected_document
+
+
+async def _assert_member_search_visibility(
+    environment: _ContractEnvironment,
+    document: ExternalDocument,
+    *,
+    is_visible: bool,
+) -> None:
+    async with environment.session_factory() as session:
+        embedding_repository = EmbeddingRepository(session)
+        vector_results = await embedding_repository.vector_search(
+            query_embedding=list(_VECTOR),
+            workspace_id=environment.workspace.id,
+            requester_user_id=environment.viewer.id,
+            requester_role="member",
+            source_type="external_document",
+        )
+        text_results = await embedding_repository.text_search(
+            query_text="legacy unprojected body",
+            workspace_id=environment.workspace.id,
+            requester_user_id=environment.viewer.id,
+            requester_role="member",
+            source_type="external_document",
+        )
+    cache_result = await _cache_probe(environment, environment.viewer, "member")
+    if is_visible:
+        assert any(result["source_id"] == document.id for result in vector_results)
+        assert any(result["source_id"] == document.id for result in text_results)
+        assert cache_result is not None
+        assert any(
+            source["sourceId"] == str(document.id)
+            for source in cache_result["sources"]
+        )
+    else:
+        assert not any(result["source_id"] == document.id for result in vector_results)
+        assert not any(result["source_id"] == document.id for result in text_results)
+        assert cache_result is None
+
+
+async def test_http_unprojected_legacy_chunks_reclaimed_after_changed_content_with_projected_control(
+    sync_contract: _ContractEnvironment,
+) -> None:
+    unprojected_document = await _seed_legacy_unprojected_document(
+        sync_contract,
+        file_id="unprojected-changed-content",
+        revision_id="7",
+        plain_text="unprojected body",
+    )
+    await _assert_member_search_visibility(
+        sync_contract,
+        unprojected_document,
+        is_visible=True,
+    )
+
+    sync_contract.drive.metadata[unprojected_document.drive_file_id] = _metadata(
+        unprojected_document.drive_file_id,
+        "8",
+    )
+    sync_contract.drive.exports[unprojected_document.drive_file_id] = _export(
+        "unprojected updated body"
+    )
+    await _resync(sync_contract, unprojected_document.id)
+
+    resynced_unprojected = await _document(sync_contract, unprojected_document.id)
+    assert resynced_unprojected is not None
+    assert resynced_unprojected.sync_status == "completed"
+    assert resynced_unprojected.revision_id == "8"
+    assert resynced_unprojected.plain_text == "unprojected updated body"
+
+    await _assert_member_search_visibility(
+        sync_contract,
+        unprojected_document,
+        is_visible=False,
+    )
+    assert len(await _document_chunks(sync_contract, unprojected_document.id)) == 0
+
+    _, projected_document = await _import_document(
+        sync_contract,
+        file_id="projected-control-document",
+        plain_text="projected control body",
+    )
+    projected_chunks = await _document_chunks(sync_contract, projected_document.id)
+    assert len(projected_chunks) > 0
+
+    async with sync_contract.session_factory() as session:
+        results = await EmbeddingRepository(session).vector_search(
+            query_embedding=list(_VECTOR),
+            workspace_id=sync_contract.workspace.id,
+            requester_user_id=sync_contract.viewer.id,
+            requester_role="member",
+            source_type="external_document",
+        )
+    assert not any(result["source_id"] == unprojected_document.id for result in results)
+    assert any(result["source_id"] == projected_document.id for result in results)
+
+
+async def test_http_unprojected_legacy_chunks_reclaimed_on_same_revision(
+    sync_contract: _ContractEnvironment,
+) -> None:
+    unprojected_document = await _seed_legacy_unprojected_document(
+        sync_contract,
+        file_id="unprojected-same-revision",
+        revision_id="7",
+        plain_text="unprojected body",
+    )
+    await _assert_member_search_visibility(
+        sync_contract,
+        unprojected_document,
+        is_visible=True,
+    )
+    sync_contract.drive.export_calls.clear()
+
+    await _resync(sync_contract, unprojected_document.id)
+
+    assert sync_contract.drive.export_calls == []
+    await _assert_member_search_visibility(
+        sync_contract,
+        unprojected_document,
+        is_visible=False,
+    )
+    assert len(await _document_chunks(sync_contract, unprojected_document.id)) == 0
+
+
+async def test_http_unprojected_legacy_chunks_reclaimed_on_same_content_hash(
+    sync_contract: _ContractEnvironment,
+) -> None:
+    unprojected_document = await _seed_legacy_unprojected_document(
+        sync_contract,
+        file_id="unprojected-same-content",
+        revision_id="7",
+        plain_text="unprojected body",
+    )
+    await _assert_member_search_visibility(
+        sync_contract,
+        unprojected_document,
+        is_visible=True,
+    )
+    sync_contract.drive.metadata[unprojected_document.drive_file_id] = _metadata(
+        unprojected_document.drive_file_id,
+        "8",
+    )
+    sync_contract.drive.exports[unprojected_document.drive_file_id] = _export(
+        "unprojected body"
+    )
+    sync_contract.drive.export_calls.clear()
+
+    await _resync(sync_contract, unprojected_document.id)
+
+    stored_document = await _document(sync_contract, unprojected_document.id)
+    assert stored_document is not None
+    assert stored_document.revision_id == "8"
+    assert sync_contract.drive.export_calls == [unprojected_document.drive_file_id]
+    await _assert_member_search_visibility(
+        sync_contract,
+        unprojected_document,
+        is_visible=False,
+    )
+    assert len(await _document_chunks(sync_contract, unprojected_document.id)) == 0
+
+
+async def test_http_unprojected_legacy_chunks_reclaimed_before_older_revision_guard(
+    sync_contract: _ContractEnvironment,
+) -> None:
+    unprojected_document = await _seed_legacy_unprojected_document(
+        sync_contract,
+        file_id="unprojected-older-revision",
+        revision_id="7",
+        plain_text="unprojected body",
+    )
+    await _assert_member_search_visibility(
+        sync_contract,
+        unprojected_document,
+        is_visible=True,
+    )
+    sync_contract.drive.metadata[unprojected_document.drive_file_id] = _metadata(
+        unprojected_document.drive_file_id,
+        "6",
+    )
+    sync_contract.drive.export_calls.clear()
+
+    await _resync(sync_contract, unprojected_document.id)
+
+    stored_document = await _document(sync_contract, unprojected_document.id)
+    assert stored_document is not None
+    assert stored_document.revision_id == "7"
+    assert sync_contract.drive.export_calls == []
+    await _assert_member_search_visibility(
+        sync_contract,
+        unprojected_document,
+        is_visible=False,
+    )
+    assert len(await _document_chunks(sync_contract, unprojected_document.id)) == 0
 
 
 async def test_http_resync_same_revision_skips_export_and_reuses_chunks(

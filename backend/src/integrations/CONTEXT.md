@@ -64,3 +64,4 @@ OAuth callback은 고정 redirect URI 제약으로 I-13 예외이며, 서명 sta
 - unsupported MIME은 조용히 건너뛰지 않고 문서별 `failed` 상태와 사유를 남긴다.
 - `purged`는 원본 소실·권한 회수가 확인된 상태이며, `stale`·`reauth_required`·`failed`는 본문과 청크를 보존한다.
 - BL-EXT-REVISION-1은 부분 해소 상태다. 저장된 값과 수신한 Drive revision이 모두 숫자이면 문서 상태와 무관하게 구 revision의 본문 덮어쓰기를 막고 기존 상태를 보존한다. 불투명 revision은 순서를 비교하지 못하므로 guard를 적용하지 않고 갱신한다.
+- Project를 선택하지 않은 문서는 Drive 동기화 성공 후 본문을 저장하지만 `EmbeddingChunk`를 만들지 않아 기본 RAG 제외 상태를 유지한다. 이전 정책에서 남은 청크가 있으면 문서 조회 직후 cache를 삭제 전·후로 무효화하고 청크를 회수하므로 revision·본문 변화·Drive metadata 실패와 무관하게 불변식을 복구한다.
