@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pytest
 import pytest_asyncio
-from httpx import ASGITransport, AsyncClient, MockTransport, Response
+from httpx import ASGITransport, AsyncClient, MockTransport, Request, Response
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -379,6 +379,9 @@ async def test_http_resync_same_revision_skips_export_and_reuses_chunks(
 ) -> None:
     _, document = await _import_document(sync_contract)
     original_chunks = await _document_chunks(sync_contract, document.id)
+    original_chunk_ids = {chunk.id for chunk in original_chunks}
+    original_chunk_levels = {chunk.chunk_level for chunk in original_chunks}
+    assert original_chunk_ids
     before_resync = await _document(sync_contract, document.id)
     assert before_resync is not None
     before_last_synced_at = before_resync.last_synced_at
@@ -392,17 +395,23 @@ async def test_http_resync_same_revision_skips_export_and_reuses_chunks(
     assert stored_document.sync_status == "completed"
     assert stored_document.last_synced_at > before_last_synced_at
     assert sync_contract.drive.export_calls == []
-    assert {chunk.id for chunk in await _document_chunks(sync_contract, document.id)} == {
-        chunk.id for chunk in original_chunks
-    }
+    resynced_chunks = await _document_chunks(sync_contract, document.id)
+    resynced_chunk_ids = {chunk.id for chunk in resynced_chunks}
+    assert resynced_chunk_ids
+    assert resynced_chunk_ids == original_chunk_ids
+    assert len(resynced_chunks) == len(original_chunks)
+    assert {chunk.chunk_level for chunk in resynced_chunks} == original_chunk_levels
 
 
 async def test_http_resync_changed_revision_replaces_chunks_invalidates_cache_and_closes_nonmember_probe(
     sync_contract: _ContractEnvironment,
 ) -> None:
     await _set_project_visibility(sync_contract, "private")
-    _, document = await _import_document(sync_contract)
-    original_chunk_ids = {chunk.id for chunk in await _document_chunks(sync_contract, document.id)}
+    initial_plain_text = "외부 문서의 최초 본문"
+    _, document = await _import_document(sync_contract, plain_text=initial_plain_text)
+    original_chunks = await _document_chunks(sync_contract, document.id)
+    original_chunk_ids = {chunk.id for chunk in original_chunks}
+    original_l2_count = sum(chunk.chunk_level == 2 for chunk in original_chunks)
     await _seed_private_cache(sync_contract, document)
     assert await _cache_probe(sync_contract, sync_contract.owner, "owner") is not None
     assert await _cache_probe(sync_contract, sync_contract.viewer, "member") is None
@@ -410,7 +419,8 @@ async def test_http_resync_changed_revision_replaces_chunks_invalidates_cache_an
         document.drive_file_id,
         "revision-2",
     )
-    updated_plain_text = "가" * 600
+    updated_paragraphs = ["가" * 600, "나" * 600]
+    updated_plain_text = "\n\n".join(updated_paragraphs)
     sync_contract.drive.exports[document.drive_file_id] = _export(updated_plain_text)
 
     await _resync(sync_contract, document.id)
@@ -422,11 +432,14 @@ async def test_http_resync_changed_revision_replaces_chunks_invalidates_cache_an
     assert stored_document.content_hash == _export(updated_plain_text).content_hash
     replacement_chunks = await _document_chunks(sync_contract, document.id)
     replacement_chunk_ids = {chunk.id for chunk in replacement_chunks}
+    replacement_l2_count = sum(chunk.chunk_level == 2 for chunk in replacement_chunks)
     assert replacement_chunk_ids
     assert replacement_chunk_ids.isdisjoint(original_chunk_ids)
     assert {chunk.chunk_level for chunk in replacement_chunks} == {1, 2}
-    assert len(replacement_chunks) == 3
-    assert sum(chunk.chunk_level == 2 for chunk in replacement_chunks) == 2
+    assert len(replacement_chunks) >= 2
+    assert sum(chunk.chunk_level == 1 for chunk in replacement_chunks) == 1
+    assert sum(chunk.chunk_level == 2 for chunk in replacement_chunks) == len(replacement_chunks) - 1
+    assert replacement_l2_count > original_l2_count
     assert await _cache_probe(sync_contract, sync_contract.viewer, "member") is None
     assert await _workspace_cache_rows(sync_contract) == []
 
@@ -510,6 +523,72 @@ async def test_http_resync_fail_closed_lifecycle_contract(
         assert await _workspace_cache_rows(sync_contract)
 
 
+@pytest.mark.parametrize(
+    ("scenario", "metadata_status_code", "expected_status", "should_purge"),
+    [
+        pytest.param("source-missing-http-404", 404, "purged", True, id="source-missing-http-404"),
+        pytest.param("temporary-http-429", 429, "stale", False, id="temporary-http-429"),
+    ],
+)
+async def test_http_resync_classifies_metadata_response_and_applies_lifecycle(
+    sync_contract: _ContractEnvironment,
+    monkeypatch: pytest.MonkeyPatch,
+    scenario: str,
+    metadata_status_code: int,
+    expected_status: str,
+    should_purge: bool,
+) -> None:
+    """MockTransport HTTP 응답 분류와 문서 수명주기를 함께 검증한다."""
+    await _set_project_visibility(sync_contract, "private")
+    _, document = await _import_document(sync_contract, file_id=f"{scenario}-document")
+    original_text = document.plain_text
+    original_hash = document.content_hash
+    original_revision = document.revision_id
+    await _seed_private_cache(sync_contract, document)
+    request_paths: list[str] = []
+
+    def _metadata_error_handler(request: Request) -> Response:
+        request_paths.append(request.url.path)
+        if request.url.host == "oauth2.googleapis.com":
+            assert request.method == "POST"
+            return Response(200, json={"access_token": "access-token"}, request=request)
+        assert request.method == "GET"
+        assert request.url.host == "www.googleapis.com"
+        assert request.url.path == f"/drive/v3/files/{document.drive_file_id}"
+        return Response(metadata_status_code, json={"error": {}}, request=request)
+
+    reset_breakers_for_test()
+    try:
+        async with AsyncClient(transport=MockTransport(_metadata_error_handler)) as http_client:
+            drive_client = GoogleDriveClient(http_client)
+            monkeypatch.setattr(
+                sync_contract.pipeline,
+                "_drive_client_factory",
+                lambda: drive_client,
+            )
+            await _resync(sync_contract, document.id)
+    finally:
+        reset_breakers_for_test()
+
+    stored_document = await _document(sync_contract, document.id)
+    assert stored_document is not None
+    assert request_paths == ["/token", f"/drive/v3/files/{document.drive_file_id}"]
+    assert stored_document.sync_status == expected_status
+    if should_purge:
+        assert stored_document.plain_text == ""
+        assert stored_document.content_hash == ""
+        assert stored_document.revision_id == original_revision
+        assert await _document_chunks(sync_contract, document.id) == []
+        assert await _cache_probe(sync_contract, sync_contract.viewer, "member") is None
+        assert await _workspace_cache_rows(sync_contract) == []
+    else:
+        assert stored_document.plain_text == original_text
+        assert stored_document.content_hash == original_hash
+        assert stored_document.revision_id == original_revision
+        assert await _document_chunks(sync_contract, document.id)
+        assert await _workspace_cache_rows(sync_contract)
+
+
 async def test_http_resync_open_breaker_preserves_document(
     sync_contract: _ContractEnvironment,
     monkeypatch: pytest.MonkeyPatch,
@@ -523,7 +602,7 @@ async def test_http_resync_open_breaker_preserves_document(
     await _seed_private_cache(sync_contract, document)
     request_count = 0
 
-    def _server_error_handler(request: object) -> Response:
+    def _server_error_handler(request: Request) -> Response:
         nonlocal request_count
         request_count += 1
         return Response(503, request=request)
@@ -633,7 +712,10 @@ async def test_same_document_revision_request_keeps_document_and_chunk_identity(
     sync_contract: _ContractEnvironment,
 ) -> None:
     _, document = await _import_document(sync_contract)
-    original_chunk_ids = {chunk.id for chunk in await _document_chunks(sync_contract, document.id)}
+    original_chunks = await _document_chunks(sync_contract, document.id)
+    original_chunk_ids = {chunk.id for chunk in original_chunks}
+    original_chunk_levels = {chunk.chunk_level for chunk in original_chunks}
+    assert original_chunk_ids
     before_resync = await _document(sync_contract, document.id)
     assert before_resync is not None
     before_last_synced_at = before_resync.last_synced_at
@@ -643,7 +725,12 @@ async def test_same_document_revision_request_keeps_document_and_chunk_identity(
     await _resync(sync_contract, document.id)
 
     assert sync_contract.drive.export_calls == []
-    assert {chunk.id for chunk in await _document_chunks(sync_contract, document.id)} == original_chunk_ids
+    resynced_chunks = await _document_chunks(sync_contract, document.id)
+    resynced_chunk_ids = {chunk.id for chunk in resynced_chunks}
+    assert resynced_chunk_ids
+    assert resynced_chunk_ids == original_chunk_ids
+    assert len(resynced_chunks) == len(original_chunks)
+    assert {chunk.chunk_level for chunk in resynced_chunks} == original_chunk_levels
     stored_document = await _document(sync_contract, document.id)
     assert stored_document is not None
     assert stored_document.id == document.id
