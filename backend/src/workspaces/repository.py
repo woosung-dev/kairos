@@ -72,6 +72,7 @@ class WorkspaceRepository:
         "DELETE FROM embedding_chunks WHERE workspace_id = :ws",
         "DELETE FROM external_documents WHERE workspace_id = :ws",
         "DELETE FROM integration_sync_runs WHERE workspace_id = :ws",
+        "DELETE FROM integration_oauth_states WHERE workspace_id = :ws",
         "DELETE FROM integration_connections WHERE workspace_id = :ws",
         "DELETE FROM transcript_segments WHERE meeting_id IN"
         " (SELECT id FROM meetings WHERE workspace_id = :ws)",

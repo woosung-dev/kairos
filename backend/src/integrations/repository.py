@@ -10,6 +10,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.integrations.models import (
     ExternalDocument,
     IntegrationConnection,
+    IntegrationOAuthState,
     IntegrationSyncRun,
 )
 
@@ -117,6 +118,44 @@ class IntegrationRepository:
         else:
             stmt = stmt.values(status=status)
         await self.session.exec(stmt)
+
+    async def create_oauth_state(
+        self,
+        oauth_state: IntegrationOAuthState,
+    ) -> None:
+        self.session.add(oauth_state)
+        await self.session.flush()
+
+    async def delete_expired_oauth_states(
+        self,
+        workspace_id: uuid.UUID,
+        now: datetime,
+    ) -> None:
+        await self.session.exec(
+            delete(IntegrationOAuthState).where(
+                IntegrationOAuthState.workspace_id == workspace_id,
+                IntegrationOAuthState.expires_at <= now
+            )
+        )
+
+    async def consume_oauth_state(
+        self,
+        *,
+        nonce: str,
+        workspace_id: uuid.UUID,
+        now: datetime,
+    ) -> bool:
+        """유효한 nonce를 한 SQL 문장으로 소비해 callback 재사용을 막는다."""
+        result = await self.session.exec(
+            delete(IntegrationOAuthState)
+            .where(
+                IntegrationOAuthState.nonce == nonce,
+                IntegrationOAuthState.workspace_id == workspace_id,
+                IntegrationOAuthState.expires_at > now,
+            )
+            .returning(IntegrationOAuthState.nonce)
+        )
+        return result.one_or_none() is not None
 
     async def find_document_by_id(
         self,

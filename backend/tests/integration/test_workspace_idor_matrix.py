@@ -34,6 +34,7 @@
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -92,7 +93,7 @@ WORKSPACE_SCOPED_ENDPOINTS: dict[str, list[dict]] = {
             "path": (
                 "/api/v1/workspaces/{ws}/integrations/google-drive/authorize"
             ),
-            "service": "_encode_oauth_state",
+            "service": "create_oauth_state",
             "rid_field": "workspace_id",
         },
         {
@@ -1389,7 +1390,7 @@ class TestIntegrationsIDORMatrix:
         )
 
     @pytest.mark.asyncio
-    async def test_authorize_passes_workspace_id_to_state_encoder(
+    async def test_authorize_saves_workspace_id_to_state_repository(
         self,
         client,
         member_a,
@@ -1397,17 +1398,21 @@ class TestIntegrationsIDORMatrix:
         workspace_a_id,
     ):
         from src.integrations import router as integrations_router
-
-        captured: dict[str, uuid.UUID] = {}
+        from src.integrations.dependencies import get_integration_repository
 
         def encode_state(
-            workspace_id: uuid.UUID,
+            _workspace_id: uuid.UUID,
             _requester_user_id: uuid.UUID,
             _code_verifier: str,
+            **_kwargs: object,
         ) -> str:
-            captured["workspace_id"] = workspace_id
             return "encrypted-state"
 
+        repository = SimpleNamespace(
+            delete_expired_oauth_states=AsyncMock(),
+            create_oauth_state=AsyncMock(),
+            commit=AsyncMock(),
+        )
         app.dependency_overrides[require_owner] = lambda: member_a
         monkeypatch.setattr(
             integrations_router,
@@ -1415,13 +1420,17 @@ class TestIntegrationsIDORMatrix:
             lambda: ("client-id", "client-secret"),
         )
         monkeypatch.setattr(integrations_router, "_encode_oauth_state", encode_state)
+        app.dependency_overrides[get_integration_repository] = lambda: repository
 
         response = await client.post(
             f"/api/v1/workspaces/{workspace_a_id}/integrations/google-drive/authorize",
         )
 
         assert response.status_code == 200
-        assert captured["workspace_id"] == workspace_a_id
+        oauth_state = repository.create_oauth_state.await_args.args[0]
+        assert oauth_state.workspace_id == workspace_a_id
+        assert oauth_state.requester_user_id == member_a.user_id
+        assert repository.delete_expired_oauth_states.await_args.args[0] == workspace_a_id
 
     @pytest.mark.asyncio
     async def test_connection_status_passes_workspace_id_to_service(

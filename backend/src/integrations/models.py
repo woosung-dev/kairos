@@ -33,6 +33,18 @@ class IntegrationConnection(SQLModel, table=True):
     last_synced_at: datetime | None = None
 
 
+class IntegrationOAuthState(SQLModel, table=True):
+    """한 번만 소비할 수 있는 Google OAuth callback state."""
+
+    __tablename__ = "integration_oauth_states"
+
+    nonce: str = Field(primary_key=True)
+    workspace_id: uuid.UUID = Field(foreign_key="workspaces.id", index=True)
+    requester_user_id: uuid.UUID = Field(foreign_key="users.id")
+    expires_at: datetime = Field(index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class ExternalDocument(SQLModel, table=True):
     """선택한 Drive 문서의 Kairos 내부 원본."""
 

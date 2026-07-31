@@ -40,7 +40,7 @@ from src.integrations.exceptions import (
     IntegrationEncryptionError,
     IntegrationSyncRunNotFoundError,
 )
-from src.integrations.models import IntegrationSyncRun
+from src.integrations.models import IntegrationOAuthState, IntegrationSyncRun
 from src.integrations.pipeline_service import GoogleDriveSyncPipelineService
 from src.integrations.repository import IntegrationRepository
 from src.integrations.schemas import (
@@ -89,13 +89,17 @@ def _encode_oauth_state(
     workspace_id: uuid.UUID,
     requester_user_id: uuid.UUID,
     code_verifier: str,
+    *,
+    nonce: str | None = None,
+    expires_at: datetime | None = None,
 ) -> str:
+    expires_at = expires_at or (datetime.now(UTC) + _OAUTH_STATE_TTL)
     payload = {
         "workspace_id": str(workspace_id),
         "requester_user_id": str(requester_user_id),
-        "nonce": secrets.token_urlsafe(24),
+        "nonce": nonce or secrets.token_urlsafe(24),
         "code_verifier": code_verifier,
-        "exp": int((datetime.now(UTC) + _OAUTH_STATE_TTL).timestamp()),
+        "exp": int(expires_at.timestamp()),
     }
     try:
         return encrypt_string(json.dumps(payload, separators=(",", ":")))
@@ -184,11 +188,34 @@ async def _verify_external_document_visibility(
 async def authorize_google_drive(
     workspace_id: uuid.UUID,
     member: WorkspaceMember = Depends(require_owner),
+    repository: IntegrationRepository = Depends(get_integration_repository),
 ) -> AuthorizationUrlResponse:
     client_id, _ = _oauth_credentials()
     settings = get_settings()
     code_verifier = _create_code_verifier()
-    state = _encode_oauth_state(workspace_id, member.user_id, code_verifier)
+    now = datetime.now(UTC)
+    expires_at = now + _OAUTH_STATE_TTL
+    nonce = secrets.token_urlsafe(24)
+    state = _encode_oauth_state(
+        workspace_id,
+        member.user_id,
+        code_verifier,
+        nonce=nonce,
+        expires_at=expires_at,
+    )
+    await repository.delete_expired_oauth_states(
+        workspace_id,
+        now.replace(tzinfo=None),
+    )
+    await repository.create_oauth_state(
+        IntegrationOAuthState(
+            nonce=nonce,
+            workspace_id=workspace_id,
+            requester_user_id=member.user_id,
+            expires_at=expires_at.replace(tzinfo=None),
+        )
+    )
+    await repository.commit()
     authorization_url = f"{_GOOGLE_AUTHORIZE_URL}?{urlencode({
         'client_id': client_id,
         'redirect_uri': settings.google_oauth_redirect_uri,
@@ -208,12 +235,20 @@ async def google_drive_callback(
     code: str | None = Query(default=None),
     state: str | None = Query(default=None),
     session: AsyncSession = Depends(get_async_session),
+    repository: IntegrationRepository = Depends(get_integration_repository),
     service: IntegrationService = Depends(get_integration_service),
     drive_client: GoogleDriveClient = Depends(get_google_drive_client),
 ) -> RedirectResponse:
     if not code or not state:
         raise _invalid_oauth_state()
     oauth_state = _decode_oauth_state(state)
+    if not await repository.consume_oauth_state(
+        nonce=oauth_state.nonce,
+        workspace_id=oauth_state.workspace_id,
+        now=datetime.now(UTC).replace(tzinfo=None),
+    ):
+        raise _invalid_oauth_state()
+    await repository.commit()
     workspace_repository = WorkspaceRepository(session)
     member = await workspace_repository.find_member(
         oauth_state.workspace_id,
