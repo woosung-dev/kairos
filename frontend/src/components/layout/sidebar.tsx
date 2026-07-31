@@ -56,7 +56,7 @@ interface SidebarProps {
 /** 프로젝트 하위 소스 아이템 */
 interface SourceItem {
   id: string;
-  type: "meeting" | "note" | "file";
+  type: "meeting" | "note" | "file" | "external_document";
   title: string;
   href: string;
 }
@@ -65,6 +65,7 @@ const SOURCE_ICON = {
   meeting: MessageSquare,
   note: FileText,
   file: Paperclip,
+  external_document: Paperclip,
 } as const;
 
 const SOURCES_LIMIT = 20;

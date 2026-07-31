@@ -13,11 +13,11 @@ export interface RagMessage {
 
 export interface RagSource {
   id: string;
-  /** CAND-E: source 엔티티(meeting/note) PK. SourceViewer full-detail fetch 용. id 는 chunk PK. */
+  /** CAND-E: source 엔티티(meeting/note/external_document) PK. SourceViewer full-detail fetch 용. id 는 chunk PK. */
   sourceId: string;
   text: string;
   source: string;
-  sourceType: "meeting" | "note";
+  sourceType: "meeting" | "note" | "external_document";
   date: string;
   speaker?: string;
   score: number;
@@ -27,7 +27,7 @@ export interface RagSource {
 export interface SearchFilter {
   projectId?: UUID;
   timeRange?: "1m" | "3m" | "6m" | null;
-  sourceType?: "meeting" | "note" | null;
+  sourceType?: "meeting" | "note" | "external_document" | null;
 }
 
 export interface RagAskRequest {

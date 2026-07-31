@@ -21,6 +21,7 @@ const SOURCE_OPTIONS = [
   { value: "", label: "모든 유형" },
   { value: "meeting", label: "회의" },
   { value: "note", label: "노트" },
+  { value: "external_document", label: "외부 문서" },
 ] as const;
 
 export function SearchScope() {
@@ -96,6 +97,7 @@ export function SearchScope() {
               sourceType: (e.target.value || null) as
                 | "meeting"
                 | "note"
+                | "external_document"
                 | null,
             })
           }
