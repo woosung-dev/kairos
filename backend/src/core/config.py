@@ -2,13 +2,17 @@
 import logging
 from functools import lru_cache
 
-from pydantic import SecretStr, field_validator
+from cryptography.fernet import Fernet
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
 
 # Sprint 15 R-CRON 의 dev fallback 토큰 — production 에선 절대 사용 X (validator 가 차단).
 _CRON_TOKEN_DEV_FALLBACK = "dev-cron-secret-CHANGE-ME-IN-PROD"
+_GOOGLE_OAUTH_REDIRECT_URI_DEV_FALLBACK = (
+    "http://localhost:8000/api/v1/integrations/google-drive/callback"
+)
 
 
 class Settings(BaseSettings):
@@ -74,6 +78,16 @@ class Settings(BaseSettings):
     # 미설정 시 send_slack_message 는 no-op (피드백은 DB 에 항상 저장). Sentry SKIP 정책과 정합.
     slack_feedback_webhook_url: str | None = None
 
+    # Integrations (ADR-026 D10 — Google Drive v0, 미구현 상태에서는 모두 선택값)
+    integrations_encryption_key: SecretStr | None = None
+    google_oauth_client_id: str | None = None
+    google_oauth_client_secret: SecretStr | None = None
+    google_oauth_redirect_uri: str = Field(
+        default=_GOOGLE_OAUTH_REDIRECT_URI_DEV_FALLBACK,
+        validate_default=True,
+    )
+    google_picker_api_key: SecretStr | None = None
+
     # DB pool (PERF-r2-5) — 기본값 5+10 유지. PERF-SSE-COMMIT 으로 스트리밍 중
     # 커넥션 점유가 제거돼 상향 필요성은 낮아짐 — 상향 시 Neon max_connections
     # (compute 크기 의존) × Cloud Run 인스턴스 수 곱 초과 금지.
@@ -100,6 +114,28 @@ class Settings(BaseSettings):
         extra="ignore",         # 선언되지 않은 변수 무시
     )
 
+    # ADR-026 D10 / ADR-024: Fernet 키는 길이 비교 대신 Fernet() 생성으로 검증한다.
+    # `_enforce_or_warn` 은 `clerk_prod_hardening=True`(기본)일 때 `raise` 한다. 현재
+    # `deploy.yml` 이 `CLERK_PROD_HARDENING=false` 로 게이팅해 warning 으로 동작하지만,
+    # Clerk Production 컷오버 시 그 게이트를 제거하면 integrations 키 검증까지 부팅 차단으로
+    # 재무장된다. ADR-024 의 2026-06-30 prod crash-loop 교훈(부팅 차단형 validator 가 prod
+    # 전체를 다운시킴)에 따라 integrations 키는 Clerk 하드닝 플래그와 분리해 항상 warning 으로
+    # 처리한다.
+    @field_validator("integrations_encryption_key")
+    @classmethod
+    def _validate_integrations_encryption_key(cls, v: SecretStr | None) -> SecretStr | None:
+        if v is None:
+            return v
+
+        try:
+            Fernet(v.get_secret_value().encode())
+        except ValueError:
+            logger.warning(
+                "[CONFIG GUARD · ADR-026] INTEGRATIONS_ENCRYPTION_KEY is invalid; "
+                "Fernet key validation failed"
+            )
+        return v
+
     # Sprint 27e Round 2 BUG-S27e-SEC-r2-4 — production 판별 분기 통합.
     # main.py 의 _is_production (OR + lower) 와 validator 의 분기 일관성 회복.
     # app_env / environment 둘 중 하나라도 production 이면 prod 판정.
@@ -111,12 +147,16 @@ class Settings(BaseSettings):
 
     # Sprint 29 — 27e prod 하드닝 위반 처리 게이트.
     @classmethod
-    def _enforce_or_warn(cls, info, message: str) -> None:
+    def _enforce_or_warn(cls, info, message: str, *, warn_only: bool = False) -> None:
         """non-dev 보안 위반 처리. clerk_prod_hardening=True(기본)면 raise(27e 강제 검증 유지),
         False(ADR-022 dev Clerk 유지 명시 opt-out)면 loud warning 으로 전환해 부팅 허용.
-        조용한 무력화 금지 — opt-out 이어도 위반은 항상 WARNING 로 기록."""
-        if info.data.get("clerk_prod_hardening", True):
+        warn_only는 R6상 부팅을 막지 않아야 하는 설정 경고에 사용한다. 조용한 무력화 금지 —
+        opt-out·warn_only 모두 위반은 항상 WARNING 로 기록."""
+        if not warn_only and info.data.get("clerk_prod_hardening", True):
             raise ValueError(message)
+        if warn_only:
+            logger.warning("[CONFIG GUARD · ADR-026 · startup allowed] %s", message)
+            return
         logger.warning(
             "[CONFIG GUARD · gated by CLERK_PROD_HARDENING=false · ADR-022] %s", message
         )
@@ -175,6 +215,21 @@ class Settings(BaseSettings):
                 "CLERK_JWT_AUDIENCE must be explicitly set in non-dev "
                 "(production/staging). implicit aud-skip (None) rejected — "
                 "audience 검증 영구 skip 방지",
+            )
+        return v
+
+    @field_validator("google_oauth_redirect_uri")
+    @classmethod
+    def _warn_google_oauth_redirect_uri_in_non_dev(cls, v: str, info) -> str:
+        if cls._is_non_dev_env(
+            info.data.get("app_env", "development"),
+            info.data.get("environment", "development"),
+        ) and (not v or v == _GOOGLE_OAUTH_REDIRECT_URI_DEV_FALLBACK):
+            cls._enforce_or_warn(
+                info,
+                "GOOGLE_OAUTH_REDIRECT_URI is using the localhost fallback in non-dev; "
+                "set the deployed Google OAuth callback URI",
+                warn_only=True,
             )
         return v
 

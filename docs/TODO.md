@@ -29,6 +29,17 @@
 
 ## Next Actions
 
+> **2026-07-31 Drive Spike codex 리뷰 (PR #143) — 미해소 발견** (`.claude/spike-gdrive/artifacts/CARRY.md` 상세)
+> CDX-1(프로젝트 미선택 문서 RAG 노출)은 같은 날 수정됨. 아래는 이월분.
+
+- [ ] **BL-EXT-OAUTH-1** (P1) OAuth `nonce` 가 생성만 되고 **소비되지 않는다** (`integrations/router.py:96,116,135`). 서버 측 일회성 저장·삭제가 없어 exp 창(10분) 안에서 state 재사용 가능 → 탈취된 authorize URL 로 공격자가 자기 Google 계정을 대상 workspace 에 연결(콘텐츠 주입/혼동된 대리자). **Phase 3 실 OAuth 켜기 전 필수.**
+- [ ] **BL-EXT-CACHE-3** (P1) 캐시 무효화 이중화로 **노출 창이 닫히지 않는다**. purge/청크 교체 **전에 시작된** RAG 요청이 사후 `delete_caches` **이후에** 옛 청크 기반 `SemanticCache` 를 커밋한다. 실제 창은 RAG 요청 1건 소요 시간(수 초). 캐시 write fence/epoch 또는 직렬화 필요. BL-EXT-CACHE-1(anti-join fail-open)과 한 묶음.
+- [ ] **BL-EXT-REVISION-2** (P1) revision guard 가 **경쟁 동기화에서 무력**. guard 는 조기 반환일 뿐 최종 `_update_document`(`pipeline_service.py:364,398`)가 무조건 갱신 → 느린 rev-11 이 빠른 rev-12 를 덮어쓴다. 추가로 `drive_client.py:168` 의 `headRevisionId or version` 이 불투명 값으로 숫자 `version` 을 가려 guard 를 우회한다.
+- [ ] **BL-EXT-SYNC-1** (P2) 최초 import 의 unsupported MIME 이 `ExternalDocument` 생성 전 예외로 상태를 안 남겨 polling `documents` 에서 파일이 사라진다 (ADR-026 D4 / `integrations/CONTEXT.md` §6 미충족).
+- [ ] **BL-EXT-EMBED-1** (P2) L1 임베딩이 `plain_text` 전체를 무제한 입력으로 보낸다 (`embeddings/service.py:263-264`). 토큰 한도 초과 문서에서 실패하고, resync 면 청크·캐시가 이미 지워진 뒤다.
+- [ ] **BL-EXT-HTTP-1** (P2) background sync 의 `httpx.AsyncClient` 가 `aclose()` 되지 않는다 (`integrations/dependencies.py:43-45`). OAuth 경로만 `async with` 로 정리 → 장기 worker 소켓 누적.
+- [ ] **BL-EXT-SYNC-2** (P2) 같은 Drive file 중복 import 경쟁 시 unique 위반 → 같은 세션 재조회로 `PendingRollbackError` → sync run 이 `processing` 에 갇힌다 (`pipeline_service.py:380-396`). document 생성을 upsert 로.
+
 > **2026-06-17 멀티 에이전트 팀 QA 후속** (`git history`)
 - [ ] **(선택) 풍부한 음성 샘플 1개 확보** — 알려진 트랜스크립트 + 명명된 사실 2개 이상. 현재 픽스처는 무음 10초 webm + test.m4a 뿐 → 회의 오디오 파이프라인의 **콘텐츠** 검증(transcription/화자분리/요약 품질) 갭. 텍스트 캡처로 RAG 경로는 검증 완료(오디오는 기계동작만).
 - [ ] **(선택) 전용 admin/viewer Clerk dev 계정 발급** — 현재 2계정(owner d@e.com + member a@e.com)으로 role 변경하며 4 role 전수했으나, 동시 다중 role 라이브 시나리오엔 전용 계정이 편함. `frontend/.env.local` QA_LOCAL_ADMIN_*/QA_LOCAL_VIEWER_* 추가.

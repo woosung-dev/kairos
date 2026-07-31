@@ -1,12 +1,16 @@
-<!-- Kairos 디렉토리 구조 맵. BE 16 모듈(13 도메인 + common/core/services) + FE 15 features 정합 (2026-07-01 arch-verification fix — feedback 도메인/feature 등재). -->
+<!-- Kairos 디렉토리 구조 맵. BE 17 모듈(14 도메인 + common/core/services, 2026-07-30 문서 기준) + FE features 정합 (2026-07-31 기준 16). -->
 
 # 디렉토리 구조 맵
 
 > baseline: `sprint-28/fixes` 머지 직전 (2026-05-26). Sprint 28 BUG-S28-ARCH-3 fix —
 > Round A Architecture 측정 결과 FE 7→14 / BE common 5→10 / services chunked 누락
 > stale 보강. (2026-07-01 arch-verification: feedback 도메인/feature 반영해 CONTEXT-MAP §4.1/§4.3 + AGENTS.md 를 BE 16 + FE 15 로 재정합.)
+>
+> 2026-07-30: ADR-026의 `integrations` 구현 예정 도메인을 CONTEXT-MAP §4.1 및 AGENTS.md와 정합해 BE 17 모듈 = 14 도메인 + common/core/services로 갱신했다.
+>
+> 2026-07-31: `integrations` 도메인 구현 완료(ADR-026 Wave 3). FE 에 `features/integrations/`(외부 문서 상세 조회 API·hooks)를 추가했다.
 
-## 프론트엔드 (FSD 기반, FE 15 features)
+## 프론트엔드 (FSD 기반, FE features — 2026-07-31 기준 16)
 
 ```
 frontend/
@@ -32,12 +36,13 @@ frontend/
     │   └── shared/                    # 도메인 횡단 공통 (Sprint 23 D4)
     │       └── ItemPromoteModal.tsx   # 5 도메인 generic promote modal
     │
-    ├── features/                      # FE 15 도메인 features (FSD)
+    ├── features/                      # FE 도메인 features (FSD, 2026-07-31 기준 16)
     │   ├── actions/                   # 액션 아이템 list / detail
     │   ├── audit/                     # AdminAccessAudit / role 변경 trail (Sprint 25)
     │   ├── feedback/                  # dogfooding 피드백 위젯 (user-level, BE feedback 도메인 대응)
     │   ├── home/                      # 대시보드 + ActivityFeed + RecommendedQuestions
     │   ├── inbox/                     # Inbox 적재 + 분류 dialog
+    │   ├── integrations/              # 외부 문서 상세 조회 (Google Drive)
     │   ├── meetings/                  # 회의 list / upload / detail / retry
     │   ├── members/                   # WorkspaceMember CRUD + invite UI
     │   ├── memory/                    # Sprint 15 Recall-first wedge (capture/recall/promote)
@@ -62,7 +67,7 @@ frontend/
         └── index.ts
 ```
 
-## 백엔드 (도메인 모듈러 구조, BE 16 모듈 = 13 도메인 + common/core/services)
+## 백엔드 (도메인 모듈러 구조, BE 17 모듈 = 14 도메인 + common/core/services — 2026-07-30 문서 기준, `integrations`는 ADR-026 구현 예정)
 
 ```
 backend/
@@ -80,6 +85,7 @@ backend/
     ├── memory/                        # Sprint 15 Recall-first wedge — MemoryItem capture/distill/recall/promote + admin_router (R2 cleanup cron) + pipeline_service (Sprint 24 BL-006)
     ├── embeddings/                    # EmbeddingChunk + SemanticCache (cross-domain shared service, ADR-014 옵션 A). source_type 'memory' 추가 (Sprint 15)
     ├── upload/                        # R2 presigned URL + proxy + MIME validation
+    ├── integrations/                  # ADR-026 구현 예정 — Google OAuth 연결·선택 외부 파일/ExternalDocument·sync 상태·외부 소스 생명주기
     ├── services/                      # 외부 wrapper (cross-domain shared service)
     │   ├── transcription.py           # Whisper 1hr 이하 단일 호출
     │   ├── chunked_transcription.py   # 1hr 초과 ffmpeg duration probe + 1hr chunk + 5초 overlap + 병렬 Whisper + merge
@@ -113,7 +119,7 @@ backend/
 
 **common 의 audit / promote 도메인 분리 권고**: `common/audit_*.py` + `common/promote_*.py`
 5 파일은 사실상 audit 도메인 — Sprint 27e BUG-S27e-ARCH-3 + Sprint 28 BUG-S28-ARCH-1 carry.
-BL-S27e-F (architecture deepening sprint) 진입 시 `backend/src/audit/` 신설 → BE 17 모듈 권고 (현재 16 — audit 추가 시 17).
+BL-S27e-F (architecture deepening sprint) 진입 시 `backend/src/audit/` 신설 권고 (2026-07-30 문서 기준 BE 17 — `audit` 추가 시 18).
 
 **의존성 cycle**: Sprint 28 BUG-S28-ARCH-4 측정 — 11 쌍 양방향 (`core ↔ common` layered
 최하위 cycle 포함). runtime 은 lazy import + model-only 회피로 ImportError 0 (Round B verify),

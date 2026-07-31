@@ -251,20 +251,27 @@ class ProjectRepository:
         # notes/action_items(콘텐츠)는 service.delete_project 가 사전 count 로 409-block.
         # embeddings/caches = DELETE: 재생성 가능한 파생 인덱스 + SET NULL 시 project_id
         #   IS NULL 이 RAG visibility 필터를 무조건 통과 → private 청크 누수(헌법 위반)라
-        #   삭제로 원천 차단.
-        # inbox 제안 / promotion_audit 타깃 = SET NULL: 항목 자체는 워크스페이스에 보존,
-        #   죽은 프로젝트 포인터만 정리 (RAG 비대상이라 누수 없음).
+        #   삭제로 원천 차단. 캐시는 같은 논리를 workspace 전량으로 확장한다 (아래 참조).
+        # inbox 제안 / promotion_audit 타깃 / 외부 문서 project = SET NULL: 항목 자체는
+        #   워크스페이스에 보존하고, 죽은 프로젝트 포인터만 정리한다.
         await self.session.exec(
             text(
                 "DELETE FROM embedding_chunks "
                 "WHERE project_id = :pid AND workspace_id = :wid"
             ).bindparams(pid=project.id, wid=project.workspace_id)
         )
+        # BL-EXT-CACHE-1 (2026-07-31 실 DB 관측): 캐시는 workspace 전량 무효화한다.
+        #   project scope 로 좁히면 전역 캐시행(project_id IS NULL)이 살아남는데 그 행의
+        #   sources 는 방금 지운 청크를 가리킨다. ALL_CHUNKS_VISIBLE_SQL 은 *존재하는*
+        #   청크만 검사하는 anti-join 이라 사라진 id 는 위반을 만들지 못하고(fail-open)
+        #   비-멤버가 삭제된 private 프로젝트 본문을 캐시 HIT 으로 받는다.
+        #   프로젝트 삭제는 드문 연산이고 캐시는 재생성 가능한 파생물이라 전량 무효화가
+        #   맞는 트레이드오프 — integrations 의 purge/unpublish/재동기화도 같은 결론으로
+        #   delete_caches(workspace_id, None) 을 쓴다 (2026-07-31 기준).
         await self.session.exec(
             text(
-                "DELETE FROM semantic_caches "
-                "WHERE project_id = :pid AND workspace_id = :wid"
-            ).bindparams(pid=project.id, wid=project.workspace_id)
+                "DELETE FROM semantic_caches WHERE workspace_id = :wid"
+            ).bindparams(wid=project.workspace_id)
         )
         await self.session.exec(
             text(
@@ -277,6 +284,12 @@ class ProjectRepository:
                 "UPDATE promotion_audit SET target_project_id = NULL "
                 "WHERE target_project_id = :pid"
             ).bindparams(pid=project.id)
+        )
+        await self.session.exec(
+            text(
+                "UPDATE external_documents SET project_id = NULL "
+                "WHERE project_id = :pid AND workspace_id = :wid"
+            ).bindparams(pid=project.id, wid=project.workspace_id)
         )
         await self.session.delete(project)
         await self.session.flush()

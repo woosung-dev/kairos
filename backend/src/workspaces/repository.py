@@ -70,6 +70,9 @@ class WorkspaceRepository:
         "DELETE FROM memory_query_embedding_cache WHERE workspace_id = :ws",
         "DELETE FROM semantic_caches WHERE workspace_id = :ws",
         "DELETE FROM embedding_chunks WHERE workspace_id = :ws",
+        "DELETE FROM external_documents WHERE workspace_id = :ws",
+        "DELETE FROM integration_sync_runs WHERE workspace_id = :ws",
+        "DELETE FROM integration_connections WHERE workspace_id = :ws",
         "DELETE FROM transcript_segments WHERE meeting_id IN"
         " (SELECT id FROM meetings WHERE workspace_id = :ws)",
         "DELETE FROM meeting_summaries WHERE meeting_id IN"

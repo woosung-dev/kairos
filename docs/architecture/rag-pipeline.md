@@ -40,9 +40,9 @@ Kairos의 RAG(Retrieval-Augmented Generation)는 쌓인 회의록·노트·액�
 Query Processing (범위 필터 결정, 질문 정규화)
     ↓
 ┌──────────────────┬──────────────────┬──────────────────┐
-│ 회의록 청크       │ 노트 청크         │ 액션 아이템 청크    │  ← 동일 테이블, source_type 구분
-│ (meeting)        │ (note)           │ (action)         │
-└───────┬──────────┴───────┬──────────┴───────┬──────────┘
+│ 회의록 청크       │ 노트 청크         │ 액션 아이템 청크    │ 외부 문서 청크        │  ← 동일 테이블, source_type 구분
+│ (meeting)        │ (note)           │ (action)         │ (external_document) │
+└───────┬──────────┴───────┬──────────┴───────┬──────────┴──────────┘
         └──────────────────┼──────────────────┘
                            ↓
                    Re-ranker (Cross-encoder Top-10 선별)
@@ -343,7 +343,7 @@ async def search_with_context(
   ↓
 [선택] 시간 범위 (created_at) — "최근 3개월"
   ↓
-[선택] 소스 타입 (source_type) — "회의만" | "노트만" | "전체"
+[선택] 소스 타입 (source_type) — "회의만" | "노트만" | "외부 문서만" | "전체"
 ```
 
 ### SQL 구현
@@ -635,7 +635,7 @@ UI 옵션: [전체 워크스페이스 검색 ▾]
 CREATE TABLE embedding_chunks (
     id UUID PRIMARY KEY,
     source_id UUID NOT NULL,
-    source_type VARCHAR NOT NULL,       -- meeting | note | action
+    source_type VARCHAR NOT NULL,       -- meeting | note | action | external_document
     embedding vector(1536),
     chunk_text TEXT,
     chunk_index INTEGER,
@@ -648,7 +648,7 @@ CREATE TABLE embedding_chunks (
     workspace_id UUID NOT NULL REFERENCES workspaces(id),
     project_id UUID REFERENCES projects(id),
     source_id UUID NOT NULL,
-    source_type VARCHAR NOT NULL,           -- meeting | note | action
+    source_type VARCHAR NOT NULL,           -- meeting | note | action | external_document
     embedding vector(1536) NOT NULL,
     chunk_text TEXT NOT NULL,
     chunk_index INTEGER NOT NULL,

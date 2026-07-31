@@ -17,6 +17,7 @@ const FRESHNESS_LABELS: Record<string, string> = {
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   meeting: "회의",
   note: "노트",
+  external_document: "외부 문서",
 };
 
 export function RagSources({ sources }: RagSourcesProps) {

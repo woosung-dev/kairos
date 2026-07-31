@@ -5,6 +5,7 @@ import { X, Copy, ExternalLink, Check } from "lucide-react";
 import { getCitationColor } from "@/lib/citation-colors";
 import { useMeetingDetail } from "@/features/meetings/hooks";
 import { useNote } from "@/features/notes/hooks";
+import { useExternalDocumentDetail } from "@/features/integrations/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { triggerDownload } from "@/lib/download";
 import type { SourceDocument, HighlightChunk } from "../types";
@@ -32,6 +33,7 @@ const SOURCE_TYPE_ICON: Record<string, string> = {
   meeting: "\uD83C\uDF99\uFE0F",
   note: "\uD83D\uDCDD",
   file: "\uD83D\uDCC4",
+  external_document: "\uD83D\uDCCE",
 };
 
 /** 콘텐츠에 하이라이트를 적용하여 ReactNode 배열로 변환 */
@@ -90,17 +92,20 @@ function renderHighlightedContent(
 }
 
 /**
- * source.type이 meeting/note일 때 풀콘텐츠를 조회한다.
+ * source.type이 meeting/note/external_document일 때 풀콘텐츠를 조회한다.
  * 로딩 중이거나 API 실패 시 RAG 응답의 스니펫(source.content)으로 폴백.
  */
 function useFullSourceContent(source: SourceDocument): {
   content: string;
   isLoading: boolean;
+  originUrl?: string;
+  isExternalDocumentFallback?: boolean;
 } {
   const wid = useWorkspaceStore((s) => s.activeWorkspaceId) ?? undefined;
 
   const isMeeting = source.type === "meeting";
   const isNote = source.type === "note";
+  const isExternalDocument = source.type === "external_document";
 
   // CAND-E: full-detail fetch 는 source 엔티티 PK(sourceId)로 — source.id 는 chunk PK 라
   // /meetings/{chunkId} 가 항상 404 → console retry storm. sourceId 미지정 시 id 폴백(하위호환).
@@ -111,6 +116,10 @@ function useFullSourceContent(source: SourceDocument): {
     entityId,
   );
   const noteDetail = useNote(isNote ? wid : undefined, entityId);
+  const externalDocumentDetail = useExternalDocumentDetail(
+    isExternalDocument ? wid : undefined,
+    entityId,
+  );
 
   if (isMeeting) {
     const transcript = meetingDetail.data?.transcript;
@@ -133,6 +142,23 @@ function useFullSourceContent(source: SourceDocument): {
     return { content: source.content, isLoading: noteDetail.isLoading };
   }
 
+  if (isExternalDocument) {
+    const plainText = externalDocumentDetail.data?.plainText;
+    if (plainText) {
+      return {
+        content: plainText,
+        isLoading: false,
+        originUrl: externalDocumentDetail.data?.originUrl,
+      };
+    }
+    return {
+      content: source.content,
+      isLoading: externalDocumentDetail.isLoading,
+      originUrl: externalDocumentDetail.data?.originUrl,
+      isExternalDocumentFallback: externalDocumentDetail.isError,
+    };
+  }
+
   // file 타입은 전용 API가 없어 RAG 스니펫 그대로
   return { content: source.content, isLoading: false };
 }
@@ -145,7 +171,7 @@ export function SourceViewer({
   const contentRef = useRef<HTMLDivElement>(null);
   const [isCopied, setIsCopied] = useState(false);
 
-  const { content, isLoading } = useFullSourceContent(source);
+  const { content, isLoading, originUrl, isExternalDocumentFallback } = useFullSourceContent(source);
 
   // 첫 번째 하이라이트 위치로 자동 스크롤
   useEffect(() => {
@@ -282,7 +308,15 @@ export function SourceViewer({
           color: "var(--text-muted)",
         }}
       >
-        <span>{source.type === "meeting" ? "회의" : source.type === "note" ? "노트" : "파일"}</span>
+        <span>
+          {source.type === "meeting"
+            ? "회의"
+            : source.type === "note"
+              ? "노트"
+              : source.type === "external_document"
+                ? "외부 문서"
+                : "파일"}
+        </span>
         <span>|</span>
         <span>
           {new Date(source.createdAt).toLocaleDateString("ko-KR", {
@@ -291,6 +325,26 @@ export function SourceViewer({
             day: "numeric",
           })}
         </span>
+        {originUrl ? (
+          <>
+            <span>|</span>
+            <a
+              href={originUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 transition-colors"
+              style={{ color: "var(--accent)" }}
+            >
+              Drive 원본
+              <ExternalLink size={12} />
+            </a>
+          </>
+        ) : source.type === "external_document" && isLoading ? (
+          <>
+            <span>|</span>
+            <span aria-live="polite">Drive 원본 불러오는 중...</span>
+          </>
+        ) : null}
       </div>
 
       {/* 본문 */}
@@ -304,6 +358,14 @@ export function SourceViewer({
             style={{ color: "var(--text-muted)" }}
           >
             전체 내용 불러오는 중...
+          </div>
+        )}
+        {isExternalDocumentFallback && (
+          <div
+            className="mb-3 text-caption"
+            style={{ color: "var(--text-muted)" }}
+          >
+            원문을 불러오지 못해 인용 스니펫을 표시합니다.
           </div>
         )}
         <div

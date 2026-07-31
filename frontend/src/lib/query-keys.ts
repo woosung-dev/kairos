@@ -1,4 +1,4 @@
-// React Query key factory 중앙 레지스트리 — 15 feature 의 캐시 키 형태를 한 곳에서 관리 (PR-3 c9)
+// React Query key factory 중앙 레지스트리 — feature 별 캐시 키 형태를 한 곳에서 관리 (PR-3 c9)
 // 키 배열 구조는 각 feature api.ts 에서 형태 불변으로 이동했다. 변경 시 캐시 무효화/교차
 // invalidate 가 깨지므로 __tests__/query-keys.test.ts 스냅샷으로 회귀를 가드한다.
 // param 타입은 feature 소유를 유지 — import type 은 컴파일 시 제거되어 런타임 순환 없음.
@@ -92,4 +92,10 @@ export const auditKeys = {
 export const onboardingKeys = {
   all: ["onboarding"] as const,
   status: (wid: string | null) => [...onboardingKeys.all, "status", wid] as const,
+};
+
+export const externalDocumentKeys = {
+  all: ["external-documents"] as const,
+  detail: (wid: string, id: string) =>
+    [...externalDocumentKeys.all, "detail", wid, id] as const,
 };

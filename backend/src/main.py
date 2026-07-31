@@ -23,6 +23,8 @@ from src.core.config import get_settings
 from src.core.lifespan import lifespan
 from src.feedback.router import router as feedback_router
 from src.inbox.router import router as inbox_router
+from src.integrations.router import public_router as integrations_public_router
+from src.integrations.router import router as integrations_router
 from src.meetings.router import router as meetings_router
 from src.memory.admin_router import admin_router as memory_admin_router
 from src.memory.router import router as memory_router
@@ -49,13 +51,103 @@ logger = logging.getLogger(__name__)
 
 def _scrub_pii_hook(event, hint):
     """Sentry before_send PII 스크럽 — transcript / email / password / audio_url 제거."""
+    if not isinstance(event, dict):
+        return event
+
+    sensitive_name_parts = (
+        "token",
+        # 키 유출 위험이 진단 편의보다 커 일반적인 key 변수명도 과다 마스킹을 수용한다.
+        "key",
+        # 이 이름의 값은 대부분 사용자 원문이므로 진단 편의보다 본문 보호를 우선한다.
+        "text",
+        "paragraph",
+        "transcript",
+        "plain",
+        "export",
+        "document",
+        # 이름 기반 denylist는 구조적으로 완전할 수 없으며, 값 기반 스크럽·local vars 선택 비활성은 백로그다.
+        "body",
+        "content",
+        "answer",
+        "secret",
+        "password",
+        "passwd",
+        "plaintext",
+        "ciphertext",
+        "credential",
+        "api_key",
+        "apikey",
+        "private_key",
+        "authorization",
+        "code_verifier",
+        "nonce",
+    )
+    max_depth = 4
+    max_items = 100
+
+    def is_sensitive_name(name):
+        return isinstance(name, str) and any(
+            part in name.lower() for part in sensitive_name_parts
+        )
+
+    def scrub_value(value, depth=0):
+        if depth >= max_depth:
+            return "[truncated]" if isinstance(value, (dict, list, tuple)) else value
+        if isinstance(value, dict):
+            scrubbed = {}
+            for index, (name, nested_value) in enumerate(value.items()):
+                if index >= max_items:
+                    scrubbed["[truncated]"] = "[truncated]"
+                    break
+                scrubbed[name] = (
+                    "[redacted]"
+                    if is_sensitive_name(name)
+                    else scrub_value(nested_value, depth + 1)
+                )
+            return scrubbed
+        if isinstance(value, (list, tuple)):
+            scrubbed = [
+                scrub_value(item, depth + 1) for item in value[:max_items]
+            ]
+            if len(value) > max_items:
+                scrubbed.append("[truncated]")
+            return scrubbed
+        return value
+
+    def scrub_stacktrace(stacktrace):
+        if not isinstance(stacktrace, dict):
+            return
+        frames = stacktrace.get("frames")
+        if not isinstance(frames, list):
+            return
+        for frame in frames:
+            if isinstance(frame, dict) and isinstance(frame.get("vars"), dict):
+                frame["vars"] = scrub_value(frame["vars"])
+
+    exception = event.get("exception")
+    exception_values = (
+        exception.get("values") if isinstance(exception, dict) else exception
+    )
+    if isinstance(exception_values, list):
+        for exception_value in exception_values:
+            if isinstance(exception_value, dict):
+                scrub_stacktrace(exception_value.get("stacktrace"))
+
+    threads = event.get("threads")
+    thread_values = threads.get("values") if isinstance(threads, dict) else threads
+    if isinstance(thread_values, list):
+        for thread in thread_values:
+            if isinstance(thread, dict):
+                scrub_stacktrace(thread.get("stacktrace"))
+
     request = event.get("request")
-    if request and isinstance(request.get("data"), dict):
+    if isinstance(request, dict) and isinstance(request.get("data"), dict):
         for field in ("transcript", "email", "password", "audio_url"):
             request["data"].pop(field, None)
-    if event.get("user"):
-        event["user"].pop("email", None)
-        event["user"].pop("ip_address", None)
+    user = event.get("user")
+    if isinstance(user, dict):
+        user.pop("email", None)
+        user.pop("ip_address", None)
     return event
 
 
@@ -205,6 +297,8 @@ app.include_router(upload_router)
 app.include_router(member_router)
 app.include_router(invite_router)
 app.include_router(invite_public_router)
+app.include_router(integrations_router)
+app.include_router(integrations_public_router)
 app.include_router(audit_router)
 app.include_router(feedback_router)
 

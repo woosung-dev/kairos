@@ -1186,3 +1186,20 @@ Response: SSE stream (event: thinking → search_results → answer → done)
 | # | Method | Path | 설명 |
 |:-:|--------|------|------|
 | 35 | `GET` | `/api/v1/users/me/onboarding` | 현재 user 의 onboarding 진행도 (`{ step, totalSteps: 4, onboardedAt, isCompleted }`). step lifecycle: 가입(1) → 첫 project(2) → 첫 meeting distillation(3) → 첫 RAG ask(4). |
+
+---
+
+## ADR-026 — 외부 소스 ingest 레일 v0
+
+> Drive v0는 Google Docs `text/plain` export만 지원하고 Drive → Kairos 단방향 읽기 전용이다.
+
+| Method | Path | 권한 | 성공 | 주요 오류 / 비고 |
+|--------|------|------|------|------------------|
+| `POST` | `/api/v1/workspaces/{workspace_id}/integrations/google-drive/authorize` | owner | `200 OK` `{ authorizationUrl }` | `403` owner 아님. FE가 OAuth 팝업·redirect를 제어한다. |
+| `GET` | `/api/v1/integrations/google-drive/callback` | 서명 state의 요청자(owner) | `302 Found` 설정 화면 복귀 | I-13 예외: 고정 redirect URI에는 `workspace_id`를 둘 수 없으므로 state의 workspace·요청자·nonce·PKCE·만료를 검증한다. `400` invalid/expired state, `403` 요청자가 더 이상 owner가 아님, `503` 암호화 키 설정 오류. |
+| `GET` | `/api/v1/workspaces/{workspace_id}/integrations/google-drive` | owner | `200 OK` connection 상태와 마지막 동기화. 연결이 없으면 `null` | `403` owner 아님. |
+| `POST` | `/api/v1/workspaces/{workspace_id}/integrations/google-drive/documents` | owner | `202 Accepted` `{ syncRunId }` | 선택 file IDs와 `projectId`를 받아 BackgroundTask import 시작. `404` 연결 또는 같은 workspace의 Project 없음, `403` owner 아님, `503` Google OAuth 설정 누락. 지원하지 않는 MIME은 pipeline이 문서별 `failed`로 기록한다. |
+| `GET` | `/api/v1/workspaces/{workspace_id}/integrations/sync-runs/{sync_run_id}` | owner | `200 OK` 파일별 status polling | `403` owner 아님, `404` 같은 workspace의 sync run 없음. |
+| `POST` | `/api/v1/workspaces/{workspace_id}/integrations/google-drive/documents/{document_id}/sync` | owner | `202 Accepted` | 단일 문서 수동 재동기화. `403` owner 아님, `404` 같은 workspace의 문서 없음, `503` Google OAuth 설정 누락. |
+| `DELETE` | `/api/v1/workspaces/{workspace_id}/integrations/google-drive/documents/{document_id}` | owner | `204 No Content` | RAG 발행 취소와 파생 데이터 cleanup. `403` owner 아님, `404` 같은 workspace의 문서 없음, `503` Google OAuth 설정 누락. |
+| `GET` | `/api/v1/workspaces/{workspace_id}/external-documents/{document_id}` | 접근 가능한 멤버 | `200 OK` Source Viewer full content | 기존 Project visibility 규칙을 따른다. 접근 불가는 존재성 누출 방지를 위해 `404`, 같은 workspace의 문서 없음도 `404`. |

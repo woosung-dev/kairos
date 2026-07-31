@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   actionKeys,
   auditKeys,
+  externalDocumentKeys,
   inboxKeys,
   inviteKeys,
   meetingKeys,
@@ -93,5 +94,15 @@ describe("query-keys 형태 스냅샷", () => {
     ]);
     expect(onboardingKeys.status(WID)).toEqual(["onboarding", "status", WID]);
     expect(onboardingKeys.status(null)).toEqual(["onboarding", "status", null]);
+  });
+
+  it("externalDocumentKeys", () => {
+    expect(externalDocumentKeys.all).toEqual(["external-documents"]);
+    expect(externalDocumentKeys.detail(WID, ID)).toEqual([
+      "external-documents",
+      "detail",
+      WID,
+      ID,
+    ]);
   });
 });

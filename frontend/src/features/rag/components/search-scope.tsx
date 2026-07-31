@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import { useRagStore } from "../store";
+import type { SearchFilter } from "../types";
 
 // "현재 프로젝트" 는 글로벌 /search 에 현재 프로젝트 컨텍스트가 없어 무동작(전체와 동일)이라 제거
 // (BUG-SEARCH-CURRENT-PROJECT-NOOP). searchFilter.projectId 인프라는 향후 in-project RAG 용으로 store 에 유지.
@@ -21,7 +22,11 @@ const SOURCE_OPTIONS = [
   { value: "", label: "모든 유형" },
   { value: "meeting", label: "회의" },
   { value: "note", label: "노트" },
-] as const;
+  { value: "external_document", label: "외부 문서" },
+] as const satisfies ReadonlyArray<{
+  value: NonNullable<SearchFilter["sourceType"]> | "";
+  label: string;
+}>;
 
 export function SearchScope() {
   const { searchFilter, setSearchFilter } = useRagStore();
@@ -68,11 +73,7 @@ export function SearchScope() {
           value={searchFilter.timeRange || ""}
           onChange={(e) =>
             setSearchFilter({
-              timeRange: (e.target.value || null) as
-                | "1m"
-                | "3m"
-                | "6m"
-                | null,
+              timeRange: (e.target.value || null) as SearchFilter["timeRange"],
             })
           }
           className="px-2 py-1 rounded text-xs bg-transparent border outline-none"
@@ -93,10 +94,7 @@ export function SearchScope() {
           value={searchFilter.sourceType || ""}
           onChange={(e) =>
             setSearchFilter({
-              sourceType: (e.target.value || null) as
-                | "meeting"
-                | "note"
-                | null,
+              sourceType: (e.target.value || null) as SearchFilter["sourceType"],
             })
           }
           className="px-2 py-1 rounded text-xs bg-transparent border outline-none"
