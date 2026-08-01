@@ -1,6 +1,6 @@
 "use client";
 
-import { memberKeys, inviteKeys } from "@/lib/query-keys";
+import { memberKeys, inviteKeys, workspaceKeys } from "@/lib/query-keys";
 import { useApiClient } from "@/lib/use-api-client";
 import { useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
@@ -198,8 +198,18 @@ export function useInviteInfo(code: string) {
 
 export function useAcceptInvite() {
   const api = useApiClient();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (code: string) => acceptInvite(api, code),
+    // 수락하면 내 워크스페이스 목록이 바뀐다. 목록을 갱신하지 않으면 새 ws 가
+    // switcher 에 안 보이고, panel-layout self-heal 이 '목록에 없음' 으로 보고
+    // 방금 고른 ws 를 덮어쓴다 (BL-FE-WS-HEAL-SCOPE-1 의 목록 대조 전제).
+    // useCreateWorkspace 는 setQueryData 로 같은 불변식을 지키고 있었다.
+    // ⚠ 현재 앱 안에 /invite 로 가는 링크가 없어 초대는 항상 전체 로드(빈 캐시)로
+    // 열리므로 이 경로는 아직 도달 불가다. 불변식을 균일하게 하는 방어다.
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.list() });
+    },
   });
 }

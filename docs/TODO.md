@@ -94,15 +94,31 @@
 
 > **2026-08-01 BL-FE 라운드 브라우저 QA 부수 발견 — 이번 변경과 무관한 기존 결함.**
 
-- [ ] **BL-FE-WS-STALE-1** (P1) **계정이 바뀌어도 `activeWorkspaceId` 가 이전 계정 워크스페이스로 남아
-  화면이 죽는다.** member 로 전환 후 `localStorage.kairos-workspace` 가
-  `{activeWorkspaceId: owner 개인 ws, ownerUserId: member clerkId}` 였다 — `ensureOwner` 가드가
-  `ownerUserId` 만 갱신하고 그 워크스페이스에 현재 사용자가 접근 가능한지는 검증하지 않는다. 결과로
-  `/members`·`/projects`·`/inbox`·`/projects/<id>` 에서 403 이 쏟아지고 "프로젝트 데이터를 불러올 수
-  없습니다" 로 렌더가 죽는다. **BE 는 fail-closed 로 정확히 거부했으므로 FE 상태 결함이다.**
-  워크스페이스 전환 UI 로 재선택하면 복구된다. 앵커 = `frontend/src/features/workspaces/store` (ensureOwner)
-  + panel-layout self-heal. ⚠ QA 의 계정 전환은 페이지 내 Clerk JS 였으므로 **앱 UI 로그아웃 경로 재현은
-  미확인** — 재현 조건이 한정될 가능성이 있다.
+- [x] **BL-FE-WS-STALE-1** (P1 → 정보성) → **실사용자 경로에서 재현되지 않음. 등재 서술 2건이 틀렸다.**
+  2026-08-02 대조 실험(같은 스택·같은 DB·같은 코드, **전환 방식만 다름**)으로 판정.
+  - **경로 A (앱 UI 계정 메뉴 로그아웃 → `/sign-in` 폼 재로그인), 방향 섞어 3회 — 0/3 재현.**
+    매 회 전환 후 `activeWorkspaceId` 가 새 계정이 접근 가능한 ws 였고 앱 BE 403 **0건**, `console.error` 0건.
+    신원은 매 관측마다 `GET /users/me` id 를 DB 의 팀 ws `owner_user_id` 와 대조해 확정.
+  - **경로 B (페이지 내 Clerk JS `signOut`+`signIn.create`+`setActive`) — 재현됨.** 403 18건, 20초 뒤에도 자가 복구 없음.
+  - **두 경로를 가른 것**: `header.tsx:167-171` 로그아웃 핸들러의 `queryClient.clear()`. 앱 UI 로그아웃은
+    owner 의 ws 목록 캐시를 지우므로 이어지는 self-heal 이 **새 계정 기준 목록**의 첫 항목을 집는다.
+    페이지 내 Clerk JS 전환은 이 핸들러를 통째로 우회해 stale 목록이 캐시에 살아남는다
+    (전환 전 심은 `window.__qaMark` 가 전환 후에도 생존 = 풀 리로드 부재 실증).
+  - ⚠ **등재 오류 1**: "`ensureOwner` 가드가 `ownerUserId` 만 갱신한다" 는 사실이 아니다.
+    `store.ts:42-47` 은 사용자 불일치 시 `activeWorkspaceId` 를 **null 로 초기화한다.**
+  - ⚠ **등재 오류 2**: 앵커로 지목한 "panel-layout self-heal" 은 이 결함의 원인이 아니라
+    **별개 갭**(아래 BL-FE-WS-HEAL-SCOPE-1)의 위치였다.
+- [x] **BL-FE-WS-HEAL-SCOPE-1** (P2, 위 조사에서 분리 등재) → **해소.**
+  접근 불가 `activeWorkspaceId` 자가 교정이 **`/dashboard` 페이지 컴포넌트에만** 있었다
+  (`dashboard/page.tsx:25-35`). 공용 레이아웃에는 없어서 `/projects`·`/inbox`·`/projects/<id>` 로
+  **직접 진입하면 21초 뒤에도 고착**한다(403 계속 + 화면 사망). `/dashboard` 를 한 번 거치면 즉시 교정.
+  북마크·새로고침·딥링크 사용자는 스스로 빠져나올 단서가 없다(전환 UI 재선택은 가능하나 안내 없음).
+  계정 전환과 **무관하게 같은 계정에서** 도달한다 — 팀 ws 에서 제거됨 / 다른 탭·기기에서 ws 삭제 / DB 리셋.
+  `ensureOwner` 는 user id 만 비교하므로 원리적으로 못 잡는다. 실측 재현: owner 개인 ws id(실재·비멤버)와
+  미존재 UUID 둘 다 동일 증상. **BE 는 미존재 wid 에도 404 가 아니라 403** 을 주므로(정보 노출 회피)
+  FE 가 상태 코드로 분기하는 설계는 성립하지 않는다 → **워크스페이스 목록 대조**가 근거다
+  (목록은 `WorkspaceMember` 조인으로 멤버인 것만 반환 — `workspaces/repository.py:39-40`).
+  → 보정을 `panel-layout.tsx` 로 끌어올리고 `dashboard/page.tsx` 중복 제거(R4 재사용 우선).
 - [x] **BL-DX-E2E-API-URL-1** (P1) **로컬 e2e 시드가 프로덕션 DB 를 오염시킬 수 있었다** → **코드 가드 완료.**
   `frontend/.env.local` 의 `E2E_API_URL` 이 프로덕션 Cloud Run 을 가리키는데 `e2e/team-helpers.ts` 가
   그 값을 그대로 쓴다 → override 없이 team-setup 을 돌리면 프로덕션에 팀 워크스페이스·초대·프로젝트·
@@ -112,19 +128,64 @@
   - ⚠ **사용자 잔여**: `.env.local` 의 `E2E_API_URL` 값 자체는 여전히 프로덕션을 가리킨다. 가드가
     시드 경로는 막지만 `auth.setup.ts`·`qa-regression.spec.ts` 는 그 값으로 프로덕션에 로그인한다.
     `http://localhost:8001` 로 바꾸는 것을 권장한다 (사용자 로컬 파일이라 코드로 고치지 않았다).
-- [ ] **BL-FE-A11Y-DROPDOWN-1** (P3) 프로젝트 상세 헤더의 관리 드롭다운 트리거(`…`)에 접근성 이름이 없다
-  (aria-label·title·텍스트 전무). 스크린리더가 용도를 알 수 없고, 테스트도 base-ui 자동생성 id 에
-  의존해야 해 셀렉터가 불안정하다. 같은 화면의 다른 트리거들은 aria-label 이 있어 이 하나만 누락이다.
-  앵커 = `dashboard-header.tsx` 의 `DropdownMenuTrigger`.
-- [ ] **BL-NOTE-DELETE-POLICY-1** (P2) `[확인 필요]` **member 가 남의 노트 상세에서도 삭제 버튼을 본다.**
-  게이트가 `canWrite = hasRole("member")` 로 역할 기반이고 작성자 기반이 아니다. SUCCESS-CRITERIA 가 요구한
-  `canWrite` 게이트 자체는 충족하므로 스펙 위반은 아니지만, 팀 워크스페이스에서 일반 멤버가 남의 노트를
-  지울 수 있어야 하는지는 **제품 결정**이다. BE 가 실제로 그 DELETE 를 인가하는지는 나온스 노트를 파괴해야
-  확인 가능해 미검증.
-- [ ] **BL-RAG-PROMPT-HYGIENE-1** (P3) RAG 답변이 제외한 소스의 **제목과 성격을 언급**한다. owner 관측에서
-  `"MAGENTA99 노트에 포함된 비공개 프로젝트 기밀 내용은 보안 정책에 따라 제외되었습니다"` 가 나왔다.
-  권한 있는 사용자라 누출은 아니고(member 관측에서 `MAGENTA99` 부재 = 누출 없음 확인), "제외했다"고
-  선언하며 대상을 노출하는 LLM 서술 패턴이다. 앵커 = `RAG_SYSTEM_PROMPT` 소스 취급 규칙.
+- [x] **BL-FE-A11Y-DROPDOWN-1** (P3) → **해소.** `dashboard-header.tsx` 의 `DropdownMenuTrigger` 에
+  `aria-label="프로젝트 관리 메뉴"` 부여. 테스트는 태그를 가정하지 않고 `getByLabelText` 로만 찾아
+  열고 항목 클릭까지 단언한다(같은 배지가 화면에 따라 button/span 으로 갈리는 전례 때문).
+- [ ] **BL-NOTE-DELETE-POLICY-1** (P2) **제품 결정 완료 — 구현 대기.** member 가 남의 노트 상세에서도
+  삭제 버튼을 본다. 게이트가 `canWrite = hasRole("member")` 로 역할 기반이고 작성자 기반이 아니다.
+  - **결정 (2026-08-02 사용자)**: **작성자 본인 + admin 이상만 삭제 가능.** 근거 — 삭제는 되돌릴 수
+    없는 파괴적 액션이고 노트는 개인 저작물 성격이 강하다.
+  - 구현 범위: **FE 게이트 + BE 인가를 같은 PR 에서** 맞춘다(FE 만 고치면 API 로 우회 가능).
+    BE 가 현재 그 DELETE 를 실제 인가하는지는 여전히 미검증 — 임시 노트로 확인할 것
+    (나온스 노트를 파괴하면 다른 관측이 무너진다).
+- [x] **BL-RAG-PROMPT-HYGIENE-1** (P3) → **해소. ⚠ 등재된 원인이 틀렸다.** 앵커를
+  "`RAG_SYSTEM_PROMPT` 소스 취급 규칙" 으로 적었으나 **그런 규칙은 없었다** — PR #146 이 규칙 4를
+  제거한 뒤 프롬프트에 소스 제외를 지시하는 문장은 0건이고, `rag/service.py` `_format_sources_for_prompt`
+  도 제목/발언자/날짜/본문만 넘기고 visibility 를 넘기지 않는다(실측: `제외`·`보안`·`정책`·`기밀`·`필터`·
+  `비공개` 전부 프롬프트에 부재). 즉 `"…보안 정책에 따라 제외되었습니다"` 는 **LLM 이 자발적으로 붙인
+  메타 서술**이다. 제거할 규칙이 없으므로 **제약을 추가**했다 — 답변에 소스 선정 과정·시스템 처리 설명을
+  넣지 말 것. ⚠ 제약 문구에 "제외" 같은 단어를 쓰면 오히려 그 서술을 프라이밍하므로 쓰지 않았고,
+  테스트가 그 단어들의 부재를 함께 단언한다. **결정적 근거는 프롬프트 문자열(BE 테스트)이고 브라우저는
+  보조다** — LLM 비결정성 때문에 부재 관측만으로는 증명이 되지 않는다.
+
+> **2026-08-02 WS-STALE 라운드 브라우저 QA 부수 발견 — 이번 변경과 무관한 기존 결함.**
+
+- [ ] **BL-FE-LOGOUT-RESET-DEAD-1** (P3) **로그아웃 핸들러의 `setActiveWorkspaceId("")` 가 실효 없다.**
+  실측(경로 A run1·run3): 로그아웃 직후 localStorage 의 `activeWorkspaceId` 가 `""` 가 아니라 owner
+  개인 ws 였다 — 값을 비운 직후 아직 언마운트되지 않은 self-heal 이 즉시 되채운다(run2 는 팀 ws 가
+  그대로 남아, 어느 값이 남는지도 캐시 상태에 따라 갈린다). 계정 전환 안전을 실제로 지탱하는 것은
+  `ensureOwner` 하나뿐이고 이 정리 코드는 이름값을 못 한다 = 단일 실패점.
+  앵커 = `header.tsx:169` + `panel-layout.tsx` self-heal.
+- [ ] **BL-FE-DASHBOARD-RAW-ANCHOR-1** (P3) 대시보드 "빠른 접근" 타일 4개가 `next/link` 가 아니라
+  원시 `<a href>` 라 클릭마다 풀 페이지 리로드가 일어난다(실측: `window.__qaMark` 소실). 같은 앱의
+  사이드바·하단 내비는 `next/link` 를 쓴다. SPA 내비게이션 상실 + 캐시·상태 폐기.
+  앵커 = `dashboard/page.tsx` 의 "빠른 접근" 타일 map.
+- [ ] **BL-FE-403-DOUBLE-FETCH-1** (P3) `[가정]` 접근 불가 워크스페이스 상태에서 같은 API 경로로 403 이
+  2회씩 중복 발사된다(`/projects` 진입 시 4종 각 2건). 앞 라운드 QA 도 같은 배수를 관측했다. 정상
+  상태에서는 드러나지 않으나 실패 시 오류 노이즈와 서버 부하가 2배다. **중복 원인은 코드로 특정하지
+  않았다** — Header/Sidebar 가 같은 wid-scoped 쿼리를 각자 구독하는 것으로 추정만 했다.
+- [ ] **BL-FE-WS-FALLBACK-LABEL-1** (P3) 접근 불가 ws 고착 시 사용자에게 원인 단서가 없다. 헤더가
+  `active?.name ?? "Kairos"` 폴백 라벨을 표시하고 사이드바는 "프로젝트 없음", 본문은 경고 한 줄뿐이다.
+  전환 UI 로 다른 ws 를 고르면 즉시 복구되는데 그 안내가 화면 어디에도 없다.
+  BL-FE-WS-HEAL-SCOPE-1 자동 교정으로 대부분 사라지지만 폴백 라벨 자체는 남는다.
+  앵커 = `WorkspaceSwitcher.tsx:91`.
+- [ ] **BL-DX-CONSOLE-ERROR-COUNT-1** (P3) **프로세스** — "console.error 0건" 합격 조건이 집계 방식에
+  따라 뒤집힌다. 앱 코드가 던진 `console.error`/`pageerror` 는 0건이어도 브라우저 generic
+  `Failed to load resource ... 403` raw 라인은 수십 건이 기록된다. `e2e/team-helpers.ts`
+  `collectConsoleErrors` 는 그 문자열을 노이즈로 거르면서 별도 response 리스너로 4xx 를 에러로 집계한다.
+  향후 라운드의 브라우저 신호는 **어느 집계인지까지** 못박아야 한다.
+- [ ] **BL-FE-WID-GUARD-PREFETCH-1** (P3) 접근 불가 wid 교정 **전 첫 렌더**에서 라우트당 403 이 4~5건
+  나간다(교정과 함께 멈추므로 기능 영향은 없다). `header.tsx:27` 은 이미 `isValidWid` 가드로 members
+  조회를 보류하는 선례가 있는데 projects/inbox 데이터 훅에는 같은 가드가 없다. 워크스페이스 목록이
+  도착하기 전 wid-scoped 요청을 보류하면 잔여 403 을 더 줄일 수 있다.
+- [ ] **BL-RAG-EMPTY-CITATION-1** (P3) RAG 가 `"제공된 소스에서 관련 정보를 찾지 못했습니다."` 라고
+  답하면서 인용 번호 `[1], [2]` 를 함께 붙인다(실측 1회). 정보를 못 찾았으면 인용할 소스도 없어야
+  하는데 번호가 남아, 사용자가 클릭 가능한 인용을 보고 근거가 있다고 오인할 수 있다.
+  `RAG_SYSTEM_PROMPT` 의 "정보 없음" 지시와 "사용한 소스를 번호로 인용" 지시가 충돌하는 것으로 보인다.
+- [ ] **BL-FE-MEMBERS-PANEL-NOOP-1** (P3) `[가정]` public 프로젝트 상세에도 "Project Members 0 /
+  명시적 멤버 없음" 섹션이 뜨고, 같은 화면에 "visibility=Private 시에만 명시 멤버 매핑 의미 있음"
+  이라는 안내가 함께 표시된다 — 아무 효과가 없다고 스스로 밝히는 섹션을 노출한다(owner 는 멤버 추가
+  입력창까지 본다). public/draft 에서는 숨기는 편이 자연스럽다. **정확한 앵커 파일은 미특정.**
 
 
 > **2026-06-17 멀티 에이전트 팀 QA 후속** (`git history`)

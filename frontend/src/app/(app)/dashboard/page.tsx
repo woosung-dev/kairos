@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Building2, Mic, StickyNote, Inbox, Folder } from "lucide-react";
 import { useWorkspaces } from "@/features/workspaces/hooks";
-import { useWorkspaceStore } from "@/features/workspaces/store";
 import { CreateWorkspaceDialog } from "@/features/workspaces/components/create-workspace-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { useUIStore } from "@/store/ui";
@@ -18,21 +17,11 @@ export default function DashboardPage() {
   // 추천 질문 UI 는 DashboardSuggestions 컴포넌트로 분리 (vitest 단위 테스트 가능).
 
   const { data: workspaces, isLoading: isLoadingWs } = useWorkspaces();
-  const { activeWorkspaceId, setActiveWorkspaceId } = useWorkspaceStore();
 
-  // 워크스페이스가 있고 active가 없으면 첫 번째를 선택
+  // active 워크스페이스 동기화는 panel-layout 이 소유한다 (BL-FE-WS-HEAL-SCOPE-1).
+  // 여기 있던 같은 보정은 이 페이지에 진입해야만 돌아서 /projects·/inbox 직접 진입 시
+  // 접근 불가 wid 가 고착됐다. 공용 레이아웃으로 올리며 중복을 제거했다.
   const hasWorkspaces = workspaces && workspaces.length > 0;
-  const currentWid =
-    activeWorkspaceId && workspaces?.find((w) => w.id === activeWorkspaceId)
-      ? activeWorkspaceId
-      : workspaces?.[0]?.id;
-
-  // active 동기화 — Sprint 23 D1 fix: render-time setState → useEffect (React 19 anti-pattern + strict mode double-invoke 회피)
-  useEffect(() => {
-    if (currentWid && currentWid !== activeWorkspaceId) {
-      setActiveWorkspaceId(currentWid);
-    }
-  }, [currentWid, activeWorkspaceId, setActiveWorkspaceId]);
 
   // 로딩 상태
   if (isLoadingWs) {

@@ -58,10 +58,20 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
     if (userId) ensureOwner(userId);
   }, [userId, ensureOwner]);
 
-  // activeWorkspaceId 가 비어있으면(초기/소유자 가드 직후) 첫 워크스페이스로 self-heal.
-  // 비어있을 때만 채우므로 워크스페이스 생성/전환으로 막 설정된 wid 를 덮어쓰지 않는다.
+  // activeWorkspaceId 가 비어있거나(초기/소유자 가드 직후) 현재 사용자가 접근할 수 없는
+  // 워크스페이스를 가리키면 첫 워크스페이스로 self-heal (BL-FE-WS-HEAL-SCOPE-1).
+  // 목록은 멤버인 워크스페이스만 반환하므로(workspaces/repository.py 의 WorkspaceMember 조인)
+  // 목록 대조가 접근 가능성 판정의 근거다. BE 는 미존재 wid 에도 404 가 아니라 403 을 주므로
+  // 상태 코드로는 '접근 불가' 와 '존재하지 않음' 을 가를 수 없다.
+  // 접근 불가 도달 경로: 팀 ws 에서 제거됨 · 다른 탭/기기에서 ws 삭제 · DB 리셋.
+  // ensureOwner 는 user id 만 비교하므로 같은 계정에서 생기는 이 경우를 잡지 못한다.
+  // 같은 보정이 dashboard/page.tsx 에만 있어 /projects·/inbox·/projects/<id> 직접 진입 시
+  // 무기한 403 고착이었다 → 모든 (app) 라우트를 감싸는 이 레이아웃으로 끌어올렸다.
+  // workspaces 가 undefined(로딩 중)면 아무것도 하지 않는다 — 그때 건드리면 race 다.
+  // 목록에 있는 wid 는 덮어쓰지 않으므로 생성/전환으로 막 설정된 wid 는 그대로 유지된다.
   useEffect(() => {
-    if (workspaces?.length && !activeWorkspaceId) {
+    if (!workspaces?.length) return;
+    if (!workspaces.some((w) => w.id === activeWorkspaceId)) {
       setActiveWorkspaceId(workspaces[0].id);
     }
   }, [workspaces, activeWorkspaceId, setActiveWorkspaceId]);

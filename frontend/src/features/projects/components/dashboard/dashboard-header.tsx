@@ -78,6 +78,7 @@ export function DashboardHeader({
         {canManage && (
           <DropdownMenu>
             <DropdownMenuTrigger
+              aria-label="프로젝트 관리 메뉴"
               className="inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-[var(--surface-hover)] transition-colors"
             >
               <MoreHorizontal className="h-4 w-4" style={{ color: "var(--text-muted)" }} />
