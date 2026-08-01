@@ -62,10 +62,66 @@
 > (QA 셀렉터 오류), 후자는 `core/config.py` 기본값과 `.env.example` 이 모두 `http://localhost:3000` 이라
 > repo 는 정상이고 관측 대상이 로컬 `.env` 였다.
 
-- [ ] **BL-FE-NOTE-DELETE-1** (P2) **노트를 UI 로 삭제할 수 없다.** `deleteNote`(`frontend/src/features/notes/api.ts`)와 `useDeleteNote`(`frontend/src/features/notes/hooks.ts`)는 구현돼 있으나 **호출자가 없다** (2026-08-01 grep 기준). 노트 목록 카드에도 노트 상세(편집 / 팀으로 올리기 / 내보내기)에도 삭제 어포던스가 없다. BE `DELETE` 엔드포인트는 정상 동작한다(QA 가 실 JWT 로 204 확인). → dormant hook 을 화면에 연결하거나 hook 을 제거해 의도를 명확히 할 것.
-- [ ] **BL-FE-PROJECT-NOTES-1** (P2) **프로젝트 상세가 그 프로젝트에 속한 노트를 보여주지 않는다.** 노트가 실재(`notes` · `embedding_chunks` 확인)하는데도 "프로젝트를 시작하세요" 빈 상태를 렌더한다. 앵커 = `frontend/src/features/projects/components/project-detail.tsx` 본문. 노트 목록 화면에서는 해당 노트에 프로젝트가 표시된다 → 조회 조건 또는 탭 필터 쪽 의심.
-- [ ] **BL-FE-RAG-STALE-BANNER-1** (P3) **캐시 답변에 잘못된 "오래된 소스" 배너.** 소스 노트가 당일 생성인데도 `⚠️ 오래된 소스입니다 (2026-08-01 기준)` 배너가 뜬다. freshness 판정이 틀렸거나 문구가 오해를 부른다. 앵커 = FE RAG 답변 렌더의 freshness 배너.
-- [ ] **BL-FE-VISIBILITY-DIALOG-1** (P2) `[확인 필요]` **프로젝트 상세의 Visibility 배지 클릭이 조용히 실패한다** (관측: 클릭 후 6초 폴링에도 `[role=dialog]` 0개, console error 0건). 단 **배선은 완전하다** — `project-detail.tsx` 가 `VisibilityBadge` 에 `interactive={canManage}` + `onClick` 으로 `setVisibilityDialogOpen(true)` 를 넘기고 `VisibilityChangeDialog` 를 `onOpenChange` 와 함께 렌더한다 (2026-08-01 코드 기준). 배지 자체도 활성 상태였다(`disabled=false`, `title='클릭하여 변경'`). 따라서 확정 결함이 아니라 **재현 과제**다. 의심 지점 = 클릭 시점의 `canManage` 평가(BUG-H02 가드) 또는 클릭 이벤트가 핸들러에 도달하지 않는 경우. visibility 는 권한 통제 수단이므로 우선 재현할 것.
+> **2026-08-01 BL-FE 4건 종결.** 브라우저 QA 가 BEFORE 에서 4건 전부를 재현하고 AFTER 에서 해소를 확인했다
+> (일회용 컨테이너 DB + 2계정 팀 워크스페이스, BEFORE FE = `9f59822` 스냅샷 worktree, 같은 DB·시드 위에서
+> FE 코드만 교체). ⚠ **등재 내용 3건이 사실과 달랐다** — 앵커·원인·도메인이 각각 틀렸고 아래에 정정을 남긴다.
+> 다음 세션이 같은 앵커를 다시 쫓지 않도록 사유를 반드시 읽을 것.
+
+- [x] **BL-FE-NOTE-DELETE-1** (P2) → **해소.** `note-detail.tsx` 툴바에 삭제 버튼 + 확인 `AlertDialog` +
+  `useDeleteNote` + toast + `/notes` 리다이렉트를 연결했다 (프로젝트 삭제 패턴 재사용, hook 제거가 아니라
+  UI 연결로 결정). 부수 결함 1건을 같이 잡았다 — `useDeleteNote` 의 `noteKeys.all` 무효화가 방금 삭제한
+  노트의 `detail` 키까지 걸어, 아직 마운트된 상세 화면의 `useNote` 가 재조회해 **404 + console.error** 를
+  남겼다(QA 2/2 재현). 무효화를 list 키로 좁혀 해소하고 회귀 테스트를 붙였다.
+- [x] **BL-FE-PROJECT-NOTES-1** (P2) → **해소.** ⚠ **등재된 원인이 틀렸다.** 조회 조건도 탭 필터도 아니었다
+  (`useNotes(wid, projectId)` 는 정상). 실제 원인은 `dashboard-content.tsx` 의 **"콘텐츠 3개 미만 → 온보딩 뷰"
+  게이트**로, 노트 1건짜리 프로젝트에서 실 콘텐츠가 온보딩 뷰에 덮였다. 게이트를 `=== 0` 으로 좁혔고
+  `docs/adr/006-app-redesign-brainstorm.md` §6 에 갱신 이력을 남겼다(ADR 에 문서화된 설계 결정이었으므로).
+- [x] **BL-FE-RAG-STALE-BANNER-1** (P3) → **해소.** ⚠ **FE 결함이 아니었다.** `⚠️ 오래된 소스입니다 (…기준)`
+  문자열은 FE 어디에도 없다. 출처는 `backend/src/common/prompts.py` `RAG_SYSTEM_PROMPT` 규칙 4 —
+  LLM 에게 답변 본문에 그 경고를 넣으라는 지시였고, LLM 이 당일 소스에 잘못 붙였다(QA BEFORE 4라운드 중 2회
+  재현 = 실재하나 비결정적). BE 는 이미 `rag/service.py _format_sources` 로 freshness 를 결정론적으로
+  계산해 FE 배지로 노출하므로 규칙 4는 중복이자 비결정적 두 번째 판정 경로였다 → 규칙 4 제거.
+  **결정적 근거는 프롬프트 문자열 제거(BE 테스트)이고 브라우저 신호는 보조다** — LLM 비결정성 때문에
+  AFTER 4라운드 부재만으로는 증명이 되지 않는다.
+- [x] **BL-FE-VISIBILITY-DIALOG-1** (P2) → **해소.** ⚠ **등재된 앵커가 틀렸다.** `project-detail.tsx` 는
+  라우트가 쓰지 않는 dead 컴포넌트였다 — `/projects/[id]` 는 `ProjectDashboard` 를 렌더한다.
+  "배선은 완전하다" 는 화면에 없는 파일을 보고 내린 판단이었다. 실제 원인은 위 온보딩 게이트가
+  early return 하며 `children` 을 렌더하지 않은 것이고, 그 `children` 에 `ProjectAdminDialogs`
+  (`VisibilityChangeDialog` + 편집/아카이브/삭제)가 들어 있어 **다이얼로그가 아예 마운트되지 않았다**
+  (state 만 바뀌고 열릴 것이 없음 = console error 0건의 조용한 실패). `ProjectAdminDialogs` 를 게이트 밖
+  형제로 옮겨 해소. 편집 다이얼로그도 같은 이유로 죽어 있었고 함께 살아났다(QA 확인).
+  dead `project-detail.tsx`(349줄)는 이번 PR 에서 삭제했다 — 이 오진의 직접 원인이었다.
+
+> **2026-08-01 BL-FE 라운드 브라우저 QA 부수 발견 — 이번 변경과 무관한 기존 결함.**
+
+- [ ] **BL-FE-WS-STALE-1** (P1) **계정이 바뀌어도 `activeWorkspaceId` 가 이전 계정 워크스페이스로 남아
+  화면이 죽는다.** member 로 전환 후 `localStorage.kairos-workspace` 가
+  `{activeWorkspaceId: owner 개인 ws, ownerUserId: member clerkId}` 였다 — `ensureOwner` 가드가
+  `ownerUserId` 만 갱신하고 그 워크스페이스에 현재 사용자가 접근 가능한지는 검증하지 않는다. 결과로
+  `/members`·`/projects`·`/inbox`·`/projects/<id>` 에서 403 이 쏟아지고 "프로젝트 데이터를 불러올 수
+  없습니다" 로 렌더가 죽는다. **BE 는 fail-closed 로 정확히 거부했으므로 FE 상태 결함이다.**
+  워크스페이스 전환 UI 로 재선택하면 복구된다. 앵커 = `frontend/src/features/workspaces/store` (ensureOwner)
+  + panel-layout self-heal. ⚠ QA 의 계정 전환은 페이지 내 Clerk JS 였으므로 **앱 UI 로그아웃 경로 재현은
+  미확인** — 재현 조건이 한정될 가능성이 있다.
+- [ ] **BL-DX-E2E-API-URL-1** (P1) **로컬 e2e 시드가 프로덕션 DB 를 오염시킬 수 있다.**
+  `frontend/.env.local` 의 `E2E_API_URL` 이 프로덕션 Cloud Run 을 가리키는데 `e2e/team-helpers.ts` 가
+  그 값을 그대로 쓴다 → override 없이 team-setup 을 돌리면 프로덕션에 팀 워크스페이스·초대·프로젝트·
+  나온스 노트가 생성된다. 같은 파일의 `NEXT_PUBLIC_API_URL` 은 localhost 라 두 값이 다른 환경을 가리킨다.
+  코드 쪽 완화책 = 로컬 시드가 프로덕션 호스트를 만나면 거부하는 가드. (`.env.local` 자체는 사용자 파일.)
+- [ ] **BL-FE-A11Y-DROPDOWN-1** (P3) 프로젝트 상세 헤더의 관리 드롭다운 트리거(`…`)에 접근성 이름이 없다
+  (aria-label·title·텍스트 전무). 스크린리더가 용도를 알 수 없고, 테스트도 base-ui 자동생성 id 에
+  의존해야 해 셀렉터가 불안정하다. 같은 화면의 다른 트리거들은 aria-label 이 있어 이 하나만 누락이다.
+  앵커 = `dashboard-header.tsx` 의 `DropdownMenuTrigger`.
+- [ ] **BL-NOTE-DELETE-POLICY-1** (P2) `[확인 필요]` **member 가 남의 노트 상세에서도 삭제 버튼을 본다.**
+  게이트가 `canWrite = hasRole("member")` 로 역할 기반이고 작성자 기반이 아니다. SUCCESS-CRITERIA 가 요구한
+  `canWrite` 게이트 자체는 충족하므로 스펙 위반은 아니지만, 팀 워크스페이스에서 일반 멤버가 남의 노트를
+  지울 수 있어야 하는지는 **제품 결정**이다. BE 가 실제로 그 DELETE 를 인가하는지는 나온스 노트를 파괴해야
+  확인 가능해 미검증.
+- [ ] **BL-RAG-PROMPT-HYGIENE-1** (P3) RAG 답변이 제외한 소스의 **제목과 성격을 언급**한다. owner 관측에서
+  `"MAGENTA99 노트에 포함된 비공개 프로젝트 기밀 내용은 보안 정책에 따라 제외되었습니다"` 가 나왔다.
+  권한 있는 사용자라 누출은 아니고(member 관측에서 `MAGENTA99` 부재 = 누출 없음 확인), "제외했다"고
+  선언하며 대상을 노출하는 LLM 서술 패턴이다. 앵커 = `RAG_SYSTEM_PROMPT` 소스 취급 규칙.
+
 
 > **2026-06-17 멀티 에이전트 팀 QA 후속** (`git history`)
 - [ ] **(선택) 풍부한 음성 샘플 1개 확보** — 알려진 트랜스크립트 + 명명된 사실 2개 이상. 현재 픽스처는 무음 10초 webm + test.m4a 뿐 → 회의 오디오 파이프라인의 **콘텐츠** 검증(transcription/화자분리/요약 품질) 갭. 텍스트 캡처로 RAG 경로는 검증 완료(오디오는 기계동작만).
