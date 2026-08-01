@@ -103,11 +103,15 @@
   워크스페이스 전환 UI 로 재선택하면 복구된다. 앵커 = `frontend/src/features/workspaces/store` (ensureOwner)
   + panel-layout self-heal. ⚠ QA 의 계정 전환은 페이지 내 Clerk JS 였으므로 **앱 UI 로그아웃 경로 재현은
   미확인** — 재현 조건이 한정될 가능성이 있다.
-- [ ] **BL-DX-E2E-API-URL-1** (P1) **로컬 e2e 시드가 프로덕션 DB 를 오염시킬 수 있다.**
+- [x] **BL-DX-E2E-API-URL-1** (P1) **로컬 e2e 시드가 프로덕션 DB 를 오염시킬 수 있었다** → **코드 가드 완료.**
   `frontend/.env.local` 의 `E2E_API_URL` 이 프로덕션 Cloud Run 을 가리키는데 `e2e/team-helpers.ts` 가
   그 값을 그대로 쓴다 → override 없이 team-setup 을 돌리면 프로덕션에 팀 워크스페이스·초대·프로젝트·
-  나온스 노트가 생성된다. 같은 파일의 `NEXT_PUBLIC_API_URL` 은 localhost 라 두 값이 다른 환경을 가리킨다.
-  코드 쪽 완화책 = 로컬 시드가 프로덕션 호스트를 만나면 거부하는 가드. (`.env.local` 자체는 사용자 파일.)
+  나온스 노트가 생성된다. 같은 파일의 `NEXT_PUBLIC_API_URL` 은 localhost 라 두 값이 다른 환경을 가리켰다.
+  `assertLocalSeedTarget()` 이 시드 첫 수에서 비-로컬 대상을 거부한다(`E2E_ALLOW_REMOTE_SEED=1` 명시 옵트인).
+  CI 는 `LOCAL_API_URL`(localhost)을 주입하므로 영향 없다.
+  - ⚠ **사용자 잔여**: `.env.local` 의 `E2E_API_URL` 값 자체는 여전히 프로덕션을 가리킨다. 가드가
+    시드 경로는 막지만 `auth.setup.ts`·`qa-regression.spec.ts` 는 그 값으로 프로덕션에 로그인한다.
+    `http://localhost:8001` 로 바꾸는 것을 권장한다 (사용자 로컬 파일이라 코드로 고치지 않았다).
 - [ ] **BL-FE-A11Y-DROPDOWN-1** (P3) 프로젝트 상세 헤더의 관리 드롭다운 트리거(`…`)에 접근성 이름이 없다
   (aria-label·title·텍스트 전무). 스크린리더가 용도를 알 수 없고, 테스트도 base-ui 자동생성 id 에
   의존해야 해 셀렉터가 불안정하다. 같은 화면의 다른 트리거들은 aria-label 이 있어 이 하나만 누락이다.
