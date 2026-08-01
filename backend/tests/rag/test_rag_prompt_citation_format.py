@@ -21,3 +21,8 @@ def test_rag_prompt_instructs_numbered_bracket_citation() -> None:
 def test_rag_prompt_bracket_digit_pattern_present() -> None:
     # FE 가 실제로 파싱하는 패턴 `[<digit>]` 이 프롬프트 안내에 등장.
     assert re.search(r"\[\d+\]", RAG_SYSTEM_PROMPT) is not None
+
+
+def test_rag_prompt_does_not_instruct_stale_source_warning() -> None:
+    # freshness 표시는 결정론적 source metadata 경로만 소유한다.
+    assert "오래된 소스입니다" not in RAG_SYSTEM_PROMPT
