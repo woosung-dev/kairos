@@ -3,6 +3,30 @@ import type { Page, APIResponse } from "@playwright/test";
 
 export const API_URL = process.env.E2E_API_URL ?? "http://localhost:8000";
 
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
+
+/**
+ * 팀 시드는 워크스페이스·초대·프로젝트·노트를 **실제로 생성**한다. `E2E_API_URL` 이 로컬이 아니면
+ * 그 대상 DB 가 오염되므로 기본적으로 거부한다 (BL-DX-E2E-API-URL-1).
+ *
+ * 배경: `frontend/.env.local` 의 `E2E_API_URL` 이 프로덕션 Cloud Run 을 가리키는 동안
+ * `NEXT_PUBLIC_API_URL` 은 localhost 였다. override 없이 team-setup 을 돌리면 프로덕션에
+ * 시드가 들어간다. CI 는 `LOCAL_API_URL`(localhost)을 주입하므로 이 가드에 걸리지 않는다.
+ *
+ * 원격 대상 시드가 의도된 경우에만 `E2E_ALLOW_REMOTE_SEED=1` 로 명시 허용한다.
+ */
+export function assertLocalSeedTarget(apiUrl: string = API_URL): void {
+  if (process.env.E2E_ALLOW_REMOTE_SEED === "1") return;
+  const host = new URL(apiUrl).hostname;
+  if (LOCAL_HOSTS.has(host)) return;
+  throw new Error(
+    `[team seed 차단] E2E_API_URL 이 로컬이 아니다: ${apiUrl}\n` +
+      `이 시드는 워크스페이스·초대·프로젝트·노트를 실제로 생성하므로 대상 DB 를 오염시킨다.\n` +
+      `로컬 백엔드로 돌리려면 E2E_API_URL=http://localhost:8001 을 명시하라.\n` +
+      `원격 대상이 의도한 것이면 E2E_ALLOW_REMOTE_SEED=1 을 함께 지정하라.`,
+  );
+}
+
 // 결정적 팀 시드 — 고정 식별자로 discover-or-create (멱등, 누적 방지)
 export const TEAM_WS_NAME = "E2E Team Workspace";
 export const RAG_PUBLIC_TITLE = "[E2E] RAG public";

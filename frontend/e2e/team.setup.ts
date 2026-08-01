@@ -11,6 +11,7 @@ import {
   TOKEN_PRIVATE,
   PUBLIC_NOTE_TEXT,
   PRIVATE_NOTE_TEXT,
+  assertLocalSeedTarget,
   clerkLogin,
   api,
   getMe,
@@ -129,6 +130,9 @@ async function ensureSingleEmbeddedNote(
 
 setup("team seed", async ({ browser }) => {
   setup.setTimeout(180_000);
+
+  // 네트워크 호출 전 첫 수 — 원격 대상 시드 차단 (BL-DX-E2E-API-URL-1)
+  assertLocalSeedTarget();
 
   const ownerEmail = process.env.QA_LOCAL_OWNER_EMAIL;
   const ownerPw = process.env.QA_LOCAL_OWNER_PASSWORD;

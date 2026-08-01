@@ -63,7 +63,9 @@ export function useDeleteNote(wid: string | undefined) {
   return useMutation({
     mutationFn: (id: string) => deleteNote(api, wid!, id),
     onSuccess: () => {
-      if (wid) queryClient.invalidateQueries({ queryKey: noteKeys.all });
+      // 목록만 무효화한다. noteKeys.all 로 무효화하면 방금 삭제한 노트의 detail 키까지 걸려서,
+      // 아직 마운트돼 있는 상세 화면의 useNote 가 삭제된 리소스를 재조회해 404 를 낸다.
+      if (wid) queryClient.invalidateQueries({ queryKey: [...noteKeys.all, "list"] });
     },
   });
 }

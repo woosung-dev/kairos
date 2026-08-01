@@ -80,7 +80,7 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
         onDeleteClick={() => setDeleteAlertOpen(true)}
       />
 
-      {/* 본문 게이트 통과 시에만 멤버 패널 + 관리 다이얼로그 렌더 (원본 거동 보존) */}
+      {/* 본문 게이트는 가시 UI인 멤버 패널만 제어한다. */}
       <DashboardContent wid={wid} projectId={projectId}>
         {wid && (
           <ProjectMembersPanel
@@ -90,21 +90,21 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
             canManage={canManage}
           />
         )}
-
-        <ProjectAdminDialogs
-          wid={wid}
-          projectId={projectId}
-          project={project}
-          visibilityDialogOpen={visibilityDialogOpen}
-          onVisibilityDialogOpenChange={setVisibilityDialogOpen}
-          editDialogOpen={editDialogOpen}
-          onEditDialogOpenChange={setEditDialogOpen}
-          archiveAlertOpen={archiveAlertOpen}
-          onArchiveAlertOpenChange={setArchiveAlertOpen}
-          deleteAlertOpen={deleteAlertOpen}
-          onDeleteAlertOpenChange={setDeleteAlertOpen}
-        />
       </DashboardContent>
+
+      <ProjectAdminDialogs
+        wid={wid}
+        projectId={projectId}
+        project={project}
+        visibilityDialogOpen={visibilityDialogOpen}
+        onVisibilityDialogOpenChange={setVisibilityDialogOpen}
+        editDialogOpen={editDialogOpen}
+        onEditDialogOpenChange={setEditDialogOpen}
+        archiveAlertOpen={archiveAlertOpen}
+        onArchiveAlertOpenChange={setArchiveAlertOpen}
+        deleteAlertOpen={deleteAlertOpen}
+        onDeleteAlertOpenChange={setDeleteAlertOpen}
+      />
     </div>
   );
 }
