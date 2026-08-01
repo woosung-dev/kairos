@@ -26,3 +26,19 @@ def test_rag_prompt_bracket_digit_pattern_present() -> None:
 def test_rag_prompt_does_not_instruct_stale_source_warning() -> None:
     # freshness 표시는 결정론적 source metadata 경로만 소유한다.
     assert "오래된 소스입니다" not in RAG_SYSTEM_PROMPT
+
+
+def test_rag_prompt_forbids_source_selection_narration() -> None:
+    """BL-RAG-PROMPT-HYGIENE-1: 소스 선정 과정을 답변 본문에 서술하지 말라는 제약.
+
+    관측된 답변에 "…는 보안 정책에 따라 제외되었습니다" 가 나왔다. 프롬프트에 그런
+    지시는 없었고(규칙 4는 PR #146 에서 제거됨) _format_sources_for_prompt 도
+    visibility 를 넘기지 않으므로, LLM 이 자발적으로 붙인 메타 서술이다.
+    제거할 규칙이 없으니 제약을 더한다.
+
+    ⚠ 제약 문구에 "제외" 같은 단어를 쓰면 오히려 그 서술을 프라이밍한다. 쓰지 않는다.
+    """
+    assert "질문에 대한 내용만" in RAG_SYSTEM_PROMPT
+    assert "소스가 어떻게 선정" in RAG_SYSTEM_PROMPT
+    for priming_word in ("제외", "보안", "정책", "기밀"):
+        assert priming_word not in RAG_SYSTEM_PROMPT
