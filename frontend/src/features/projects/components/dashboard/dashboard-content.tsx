@@ -1,4 +1,4 @@
-// 대시보드 본문 — 최근 회의/노트 조회 소유 + '콘텐츠 3개 미만 → 온보딩 뷰' 게이트 (BL-AV-1 분해)
+// 대시보드 본문 — 최근 회의/노트 조회 소유 + '콘텐츠 없음 → 온보딩 뷰' 게이트 (BL-AV-1 분해)
 "use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,7 +18,7 @@ export function DashboardContent({
 }: {
   wid: string | undefined;
   projectId: string;
-  /** 온보딩 게이트 통과(로딩 중 포함) 시에만 렌더되는 하위 섹션 — 멤버 패널/관리 다이얼로그. */
+  /** 콘텐츠 로딩 중이거나 콘텐츠가 하나 이상일 때 렌더되는 하위 섹션 — 멤버 패널. */
   children?: React.ReactNode;
 }) {
   /* 회의: projectId 필터 지원 */
@@ -43,8 +43,8 @@ export function DashboardContent({
 
   const isContentLoading = actionsLoading || meetingsLoading || notesLoading;
 
-  /* 콘텐츠 3개 미만이면 온보딩 뷰 — 멤버 패널/다이얼로그(children)는 렌더하지 않는다 (원본 거동). */
-  if (!isContentLoading && recentItems.length < 3) {
+  /* 콘텐츠가 없으면 온보딩 뷰 — 멤버 패널(children)은 렌더하지 않는다. */
+  if (!isContentLoading && recentItems.length === 0) {
     return <OnboardingView />;
   }
 
