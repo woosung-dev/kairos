@@ -44,7 +44,9 @@
 
 > **2026-08-01 BL-EXT 세션에서 신규 발견 — 미해소**
 
-- [ ] **BL-NOTES-CACHE-1** (P1, 프로덕션 결함) **notes 경로의 캐시 무효화 DELETE 가 커밋되지 않고 롤백된다.** `notes/pipeline_service.py` `embed_note_async` 는 `invalidate_cache` 뒤에 commit 이 없고 `delete_note_with_cleanup` 은 `note_repo.commit()` **이후**에 `invalidate_cache` 를 호출한다. `delete_caches` 는 `flush()` 로만 끝난다. → **노트 삭제·재임베딩 시 무효화가 아예 일어나지 않아 삭제한 노트 내용이 캐시에서 계속 서빙된다.** 일회용 컨테이너 실측 확인(`A_after_close=3`, 3행 전부 복귀). CACHE-DESIGN.md 의 "안0" 이며 SSOT 무관·2줄 수정이라 hotfix 분리 가능.
+- [ ] **BL-NOTES-CACHE-2** (P2) **노트 캐시 무효화의 scope 갭.** `embed_note_async` 는 `invalidate_cache(workspace_id, note.project_id)` 로 **project scope** 만 무효화한다. 전역 질의로 만들어진 `project_id IS NULL` 캐시행은 그 노트의 청크를 참조해도 살아남는다. `ALL_CHUNKS_VISIBLE_SQL` anti-join fail-open(BL-EXT-CACHE-1)과 결합하면 삭제·교체된 청크를 참조하는 전역 캐시행이 계속 서빙된다. → CACHE-1 fail-closed 로 읽기 시점에 닫는 것이 근본 해법.
+  - ⚠ **정정 기록**: 2026-08-01 설계 라운드가 이 항목을 "무효화 DELETE 가 커밋되지 않고 롤백된다(P1 프로덕션 결함)" 로 보고했으나 **사실이 아니다.** `EmbeddingService.invalidate_cache`(`embeddings/service.py:307-308`)가 `delete_caches` 뒤에 이미 commit 한다. 설계 에이전트는 `delete_caches`(flush만)와 호출부만 읽고 그 사이 한 줄짜리 함수를 열지 않았으며, "실측" 은 실제 코드 경로가 아니라 **가설한 패턴을 합성 재현**한 것이었다. 회귀 테스트를 쓰고 결함 상태로 mutation 했을 때 테스트가 죽지 않아 발견했다. 남는 것은 위의 scope 갭뿐이다.
+
 - [ ] **BL-EXT-REASON-1** (P2) `ExternalDocument` 에 문서별 실패 **사유** 컬럼이 없다. ADR-026 D4 "문서별 `failed` 상태와 사유를 남긴다" 의 사유 절반이 미충족. 현재는 sync run `error_summary` 한 줄뿐. 마이그레이션 필요.
 - [ ] **BL-EXT-SYNC-3** (P2) 최초 import 의 export 5xx/timeout 은 여전히 문서 행을 남기지 않는다. BL-EXT-SYNC-1 과 같은 UX 결함 클래스이나 트리거가 다르다 (이번엔 미지원 MIME 만 좁게 수정).
 - [ ] **BL-EMBED-2** (P2) `embed_note` 도 노트 전문을 L1 임베딩 입력으로 보내고 단일 `generate_embeddings` 호출을 쓴다 — BL-EXT-EMBED-1 과 동일한 구조적 결함. `embed_meeting` 은 요청당 입력 배열 한도 쪽 노출이 더 크다.
