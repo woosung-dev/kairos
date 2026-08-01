@@ -10,6 +10,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.integrations.models import (
     ExternalDocument,
     IntegrationConnection,
+    IntegrationOAuthState,
     IntegrationSyncRun,
 )
 
@@ -19,6 +20,13 @@ class _SyncRunIdUnchanged:
 
 
 _SYNC_RUN_ID_UNCHANGED = _SyncRunIdUnchanged()
+
+
+class _ExpectedRevisionIdUnchanged:
+    """update_document 호출에서 revision 조건 생략 sentinel."""
+
+
+_EXPECTED_REVISION_ID_UNCHANGED = _ExpectedRevisionIdUnchanged()
 
 
 class IntegrationRepository:
@@ -111,6 +119,44 @@ class IntegrationRepository:
             stmt = stmt.values(status=status)
         await self.session.exec(stmt)
 
+    async def create_oauth_state(
+        self,
+        oauth_state: IntegrationOAuthState,
+    ) -> None:
+        self.session.add(oauth_state)
+        await self.session.flush()
+
+    async def delete_expired_oauth_states(
+        self,
+        workspace_id: uuid.UUID,
+        now: datetime,
+    ) -> None:
+        await self.session.exec(
+            delete(IntegrationOAuthState).where(
+                IntegrationOAuthState.workspace_id == workspace_id,
+                IntegrationOAuthState.expires_at <= now
+            )
+        )
+
+    async def consume_oauth_state(
+        self,
+        *,
+        nonce: str,
+        workspace_id: uuid.UUID,
+        now: datetime,
+    ) -> bool:
+        """유효한 nonce를 한 SQL 문장으로 소비해 callback 재사용을 막는다."""
+        result = await self.session.exec(
+            delete(IntegrationOAuthState)
+            .where(
+                IntegrationOAuthState.nonce == nonce,
+                IntegrationOAuthState.workspace_id == workspace_id,
+                IntegrationOAuthState.expires_at > now,
+            )
+            .returning(IntegrationOAuthState.nonce)
+        )
+        return result.one_or_none() is not None
+
     async def find_document_by_id(
         self,
         document_id: uuid.UUID,
@@ -171,12 +217,51 @@ class IntegrationRepository:
         self,
         document: ExternalDocument,
         workspace_id: uuid.UUID,
-    ) -> ExternalDocument:
+    ) -> tuple[ExternalDocument, bool]:
+        """문서를 생성하거나 경쟁에서 먼저 생성된 문서를 반환한다."""
         if document.workspace_id != workspace_id:
             raise ValueError("document workspace_id가 일치하지 않습니다")
-        self.session.add(document)
-        await self.session.flush()
-        return document
+        stmt = (
+            pg_insert(ExternalDocument.__table__)
+            .values(
+                id=document.id,
+                workspace_id=document.workspace_id,
+                connection_id=document.connection_id,
+                project_id=document.project_id,
+                sync_run_id=document.sync_run_id,
+                drive_file_id=document.drive_file_id,
+                title=document.title,
+                mime_type=document.mime_type,
+                origin_url=document.origin_url,
+                revision_id=document.revision_id,
+                content_hash=document.content_hash,
+                plain_text=document.plain_text,
+                sync_status=document.sync_status,
+                last_synced_at=document.last_synced_at,
+            )
+            .on_conflict_do_nothing(
+                index_elements=["workspace_id", "connection_id", "drive_file_id"]
+            )
+            .returning(ExternalDocument.id)
+        )
+        document_id = (await self.session.execute(stmt)).scalar_one_or_none()
+        if document_id is not None:
+            return document, True
+
+        existing_document_id = await self.find_document_id_by_drive_file_id(
+            document.connection_id,
+            workspace_id,
+            document.drive_file_id,
+        )
+        if existing_document_id is None:
+            raise RuntimeError("경쟁 문서를 다시 조회할 수 없습니다")
+        existing_document = await self.find_document_by_id(
+            existing_document_id,
+            workspace_id,
+        )
+        if existing_document is None:
+            raise RuntimeError("경쟁 문서를 다시 로드할 수 없습니다")
+        return existing_document, False
 
     async def update_document(
         self,
@@ -194,11 +279,16 @@ class IntegrationRepository:
         sync_run_id: uuid.UUID | None | _SyncRunIdUnchanged = (
             _SYNC_RUN_ID_UNCHANGED
         ),
-    ) -> None:
+        expected_revision_id: str | _ExpectedRevisionIdUnchanged = (
+            _EXPECTED_REVISION_ID_UNCHANGED
+        ),
+    ) -> bool:
         stmt = update(ExternalDocument).where(
             ExternalDocument.id == document_id,
             ExternalDocument.workspace_id == workspace_id,
         )
+        if expected_revision_id is not _EXPECTED_REVISION_ID_UNCHANGED:
+            stmt = stmt.where(ExternalDocument.revision_id == expected_revision_id)
         values = {
             "title": title,
             "mime_type": mime_type,
@@ -211,7 +301,8 @@ class IntegrationRepository:
         }
         if sync_run_id is not _SYNC_RUN_ID_UNCHANGED:
             values["sync_run_id"] = sync_run_id
-        await self.session.exec(stmt.values(**values))
+        result = await self.session.execute(stmt.values(**values))
+        return result.rowcount == 1  # type: ignore[return-value]
 
     async def update_document_sync_status(
         self,

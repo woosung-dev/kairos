@@ -36,6 +36,7 @@ from src.memory.models import (  # noqa: F401
 from src.integrations.models import (  # noqa: F401
     ExternalDocument,
     IntegrationConnection,
+    IntegrationOAuthState,
     IntegrationSyncRun,
 )
 from src.common.promote_models import ItemPromotionAudit  # noqa: F401

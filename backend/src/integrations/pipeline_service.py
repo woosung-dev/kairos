@@ -8,7 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.embeddings.repository import EmbeddingRepository
 from src.embeddings.service import EmbeddingService
-from src.integrations.drive_client import GoogleDriveClient
+from src.integrations.drive_client import GoogleDriveClient, is_supported_mime_type
 from src.integrations.exceptions import (
     DriveClientError,
     DrivePermissionRevokedError,
@@ -58,77 +58,80 @@ class GoogleDriveSyncPipelineService:
             integration_service = IntegrationService(repository)
             embedding_repository = EmbeddingRepository(session)
             embedding_service = EmbeddingService(embedding_repository)
-            sync_run = await repository.find_sync_run_by_id(sync_run_id, workspace_id)
-            if sync_run is None:
-                return
-            if sync_run.connection_id != connection_id:
-                await self._finish_sync_run(
-                    repository,
-                    sync_run_id,
-                    workspace_id,
-                    status="failed",
-                )
-                return
-
-            await repository.update_sync_run_status(
-                sync_run_id,
-                workspace_id,
-                status="processing",
-            )
-            await repository.commit()
-
+            drive_client = self._drive_client_factory()
             try:
-                drive_client = self._drive_client_factory()
-                refresh_token = await integration_service.get_decrypted_refresh_token(
-                    connection_id,
+                sync_run = await repository.find_sync_run_by_id(sync_run_id, workspace_id)
+                if sync_run is None:
+                    return
+                if sync_run.connection_id != connection_id:
+                    await self._finish_sync_run(
+                        repository,
+                        sync_run_id,
+                        workspace_id,
+                        status="failed",
+                    )
+                    return
+
+                await repository.update_sync_run_status(
+                    sync_run_id,
                     workspace_id,
+                    status="processing",
                 )
-                access_token = await drive_client.refresh_access_token(
-                    refresh_token,
-                    client_id=self._google_oauth_client_id,
-                    client_secret=self._google_oauth_client_secret,
-                )
-            except DriveClientError:
+                await repository.commit()
+
+                try:
+                    refresh_token = await integration_service.get_decrypted_refresh_token(
+                        connection_id,
+                        workspace_id,
+                    )
+                    access_token = await drive_client.refresh_access_token(
+                        refresh_token,
+                        client_id=self._google_oauth_client_id,
+                        client_secret=self._google_oauth_client_secret,
+                    )
+                except DriveClientError:
+                    await self._finish_sync_run(
+                        repository,
+                        sync_run_id,
+                        workspace_id,
+                        status="failed",
+                    )
+                    return
+                except Exception:
+                    await self._finish_sync_run(
+                        repository,
+                        sync_run_id,
+                        workspace_id,
+                        status="failed",
+                    )
+                    return
+
+                has_document_failure = False
+                for file_id in file_ids:
+                    failed = await self._process_document_with_safety(
+                        repository=repository,
+                        embedding_repository=embedding_repository,
+                        embedding_service=embedding_service,
+                        drive_client=drive_client,
+                        access_token=access_token,
+                        workspace_id=workspace_id,
+                        connection_id=connection_id,
+                        file_id=file_id,
+                        project_id=project_id,
+                        sync_run_id=sync_run_id,
+                        document=None,
+                    )
+                    has_document_failure = has_document_failure or failed
+
                 await self._finish_sync_run(
                     repository,
                     sync_run_id,
                     workspace_id,
-                    status="failed",
+                    status="completed",
+                    has_document_failure=has_document_failure,
                 )
-                return
-            except Exception:
-                await self._finish_sync_run(
-                    repository,
-                    sync_run_id,
-                    workspace_id,
-                    status="failed",
-                )
-                return
-
-            has_document_failure = False
-            for file_id in file_ids:
-                failed = await self._process_document_with_safety(
-                    repository=repository,
-                    embedding_repository=embedding_repository,
-                    embedding_service=embedding_service,
-                    drive_client=drive_client,
-                    access_token=access_token,
-                    workspace_id=workspace_id,
-                    connection_id=connection_id,
-                    file_id=file_id,
-                    project_id=project_id,
-                    sync_run_id=sync_run_id,
-                    document=None,
-                )
-                has_document_failure = has_document_failure or failed
-
-            await self._finish_sync_run(
-                repository,
-                sync_run_id,
-                workspace_id,
-                status="completed",
-                has_document_failure=has_document_failure,
-            )
+            finally:
+                await drive_client.aclose()
 
     async def resync_document(
         self,
@@ -141,52 +144,55 @@ class GoogleDriveSyncPipelineService:
             integration_service = IntegrationService(repository)
             embedding_repository = EmbeddingRepository(session)
             embedding_service = EmbeddingService(embedding_repository)
-            document = await repository.find_document_by_id(document_id, workspace_id)
-            if document is None:
-                return
-
+            drive_client = self._drive_client_factory()
             try:
-                drive_client = self._drive_client_factory()
-                refresh_token = await integration_service.get_decrypted_refresh_token(
-                    document.connection_id,
-                    workspace_id,
-                )
-                access_token = await drive_client.refresh_access_token(
-                    refresh_token,
-                    client_id=self._google_oauth_client_id,
-                    client_secret=self._google_oauth_client_secret,
-                )
-            except DriveClientError as exc:
-                await self._preserve_document_for_drive_error(
-                    repository,
-                    document,
-                    workspace_id,
-                    exc,
-                    sync_run_id=None,
-                )
-                return
-            except Exception:
-                await self._mark_document_failed(
-                    repository,
-                    document,
-                    workspace_id,
-                    sync_run_id=None,
-                )
-                return
+                document = await repository.find_document_by_id(document_id, workspace_id)
+                if document is None:
+                    return
 
-            await self._process_document_with_safety(
-                repository=repository,
-                embedding_repository=embedding_repository,
-                embedding_service=embedding_service,
-                drive_client=drive_client,
-                access_token=access_token,
-                workspace_id=workspace_id,
-                connection_id=document.connection_id,
-                file_id=document.drive_file_id,
-                project_id=document.project_id,
-                sync_run_id=None,
-                document=document,
-            )
+                try:
+                    refresh_token = await integration_service.get_decrypted_refresh_token(
+                        document.connection_id,
+                        workspace_id,
+                    )
+                    access_token = await drive_client.refresh_access_token(
+                        refresh_token,
+                        client_id=self._google_oauth_client_id,
+                        client_secret=self._google_oauth_client_secret,
+                    )
+                except DriveClientError as exc:
+                    await self._preserve_document_for_drive_error(
+                        repository,
+                        document,
+                        workspace_id,
+                        exc,
+                        sync_run_id=None,
+                    )
+                    return
+                except Exception:
+                    await self._mark_document_failed(
+                        repository,
+                        document,
+                        workspace_id,
+                        sync_run_id=None,
+                    )
+                    return
+
+                await self._process_document_with_safety(
+                    repository=repository,
+                    embedding_repository=embedding_repository,
+                    embedding_service=embedding_service,
+                    drive_client=drive_client,
+                    access_token=access_token,
+                    workspace_id=workspace_id,
+                    connection_id=document.connection_id,
+                    file_id=document.drive_file_id,
+                    project_id=document.project_id,
+                    sync_run_id=None,
+                    document=document,
+                )
+            finally:
+                await drive_client.aclose()
 
     async def unpublish_document(
         self,
@@ -335,6 +341,36 @@ class GoogleDriveSyncPipelineService:
                 )
 
         metadata = await drive_client.get_file_metadata(access_token, file_id)
+        is_supported_mime = is_supported_mime_type(metadata.mime_type)
+        origin_url = (
+            f"https://docs.google.com/document/d/{metadata.file_id}/edit"
+            if is_supported_mime
+            else f"https://drive.google.com/open?id={metadata.file_id}"
+        )
+        if not is_supported_mime:
+            if document is None:
+                document = ExternalDocument(
+                    workspace_id=workspace_id,
+                    connection_id=connection_id,
+                    project_id=project_id,
+                    sync_run_id=sync_run_id,
+                    drive_file_id=metadata.file_id,
+                    title=metadata.title,
+                    mime_type=metadata.mime_type,
+                    origin_url=origin_url,
+                    revision_id=metadata.revision_id,
+                    content_hash="",
+                    plain_text="",
+                    sync_status="processing",
+                )
+                document, created = await repository.create_document(
+                    document,
+                    workspace_id,
+                )
+                if created:
+                    await repository.commit()
+            raise DriveUnsupportedMimeTypeError()
+
         # 동일 revision의 export 생략은 completed 문서에만 적용해 실패 상태의 복구 경로를 보존한다.
         if (
             document is not None
@@ -375,7 +411,6 @@ class GoogleDriveSyncPipelineService:
             file_id,
             metadata.mime_type,
         )
-        origin_url = f"https://docs.google.com/document/d/{metadata.file_id}/edit"
         last_synced_at = datetime.now(UTC).replace(tzinfo=None)
 
         if (
@@ -414,10 +449,15 @@ class GoogleDriveSyncPipelineService:
                 plain_text=exported.plain_text,
                 sync_status="processing",
             )
-            await repository.create_document(document, workspace_id)
-            await repository.commit()
+            document, created = await repository.create_document(document, workspace_id)
+            if created:
+                await repository.commit()
+            else:
+                # 경쟁 패자는 winner 행을 갱신·임베딩·완료 처리하지 않는다. 따라서 이 sync run에는
+                # 문서가 연결되지 않으며, 실제 신규 import가 없었던 run으로 정상 종료한다.
+                return
         else:
-            await self._update_document(
+            updated = await self._update_document(
                 repository,
                 document,
                 workspace_id,
@@ -431,6 +471,8 @@ class GoogleDriveSyncPipelineService:
                 last_synced_at=None,
                 sync_run_id=sync_run_id,
             )
+            if not updated:
+                return
 
         if document.project_id is not None:
             # 같은 세션의 실패 상태 commit이 미완료 청크 DELETE를 확정할 수 있으므로,
@@ -576,9 +618,10 @@ class GoogleDriveSyncPipelineService:
         sync_status: str,
         last_synced_at: datetime | None,
         sync_run_id: uuid.UUID | None,
-    ) -> None:
+    ) -> bool:
+        expected_revision_id = document.revision_id
         if sync_run_id is None:
-            await repository.update_document(
+            updated = await repository.update_document(
                 document.id,
                 workspace_id,
                 title=title,
@@ -589,9 +632,10 @@ class GoogleDriveSyncPipelineService:
                 plain_text=plain_text,
                 sync_status=sync_status,
                 last_synced_at=last_synced_at,
+                expected_revision_id=expected_revision_id,
             )
         else:
-            await repository.update_document(
+            updated = await repository.update_document(
                 document.id,
                 workspace_id,
                 title=title,
@@ -603,8 +647,12 @@ class GoogleDriveSyncPipelineService:
                 sync_status=sync_status,
                 last_synced_at=last_synced_at,
                 sync_run_id=sync_run_id,
+                expected_revision_id=expected_revision_id,
             )
+        if not updated:
+            return False
         await repository.commit()
+        return True
 
     async def _invalidate_document_caches(
         self,

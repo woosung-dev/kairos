@@ -15,6 +15,18 @@ from src.embeddings.repository import EmbeddingRepository
 
 logger = logging.getLogger(__name__)
 
+# BL-EXT-EMBED-1: 외부 문서 L1 입력 문자 상한.
+# text-embedding-3-small 의 입력 상한은 8191 토큰이다. cl100k_base BPE 는 UTF-8 바이트
+# 위에서 동작하므로 토큰 수는 바이트 수를 넘지 않고, 코드포인트 하나는 최대 4 바이트다
+# → 토큰 수 <= 4 * 문자 수. 2000 자면 한글(3 바이트/자)·영어(1 바이트/자) 혼합 문서 어느
+# 쪽이든 최악 8000 토큰으로 상한 아래에 머문다.
+_EXTERNAL_L1_MAX_CHARS = 2_000
+
+# BL-EXT-EMBED-1: 외부 문서 임베딩 요청당 입력 개수 상한.
+# L2 청크는 _chunk_text 기본값상 500 자(위 환산으로 최악 2000 토큰)이므로 128 개면
+# 최악 256k 토큰 — 요청당 입력 배열 한도(2048)와 토큰 한도(300k) 양쪽 아래다.
+_EXTERNAL_EMBED_BATCH_SIZE = 128
+
 # PERF-r2-2: 요청마다 AsyncOpenAI 재생성(TLS/커넥션 풀 재수립) 방지 — 모듈 싱글턴.
 # 캐시 키 = 생성자 identity: 테스트가 AsyncOpenAI 를 patch 하면 자동으로 새(mock)
 # 클라이언트를 만들고, patch 해제 후엔 실 클라이언트로 자가 복원 (테스트 진입점 보존).
@@ -260,8 +272,24 @@ class EmbeddingService:
             await self.repo.commit()
             return 0
 
+        # BL-EXT-EMBED-1: 절단은 **임베딩 입력에만** 적용하고 저장되는 chunk_text 는
+        # 전문을 유지한다. 이 비대칭은 의도적이다 (2026-08-01 코드 확인).
+        # · L1 벡터는 검색 경로에 오르지 않는다 — repository.py:206(vector_search) /
+        #   :266(text_search) 이 `chunk_level = 2` 로 하드 필터한다 (CONTEXT.md E-2).
+        # · 반대로 L1 의 chunk_text 는 rag/service.py:323 이 parent_text 로 읽어
+        #   :381 에서 LLM 프롬프트의 근거 본문이 된다 → 절단하면 근거가 잘린다.
+        level1_embed_input = plain_text[:_EXTERNAL_L1_MAX_CHARS]
         paragraphs = self._chunk_text(plain_text)
-        embeddings = await self.generate_embeddings([plain_text, *paragraphs])
+        texts_to_embed = [level1_embed_input, *paragraphs]
+        # 요청당 한도를 넘지 않도록 슬라이스 반복 호출 — 결과를 순서대로 이어붙여
+        # 인덱스 0 = L1, 이후 L2 문단 순의 대응을 유지한다.
+        embeddings: list[list[float]] = []
+        for batch_start in range(0, len(texts_to_embed), _EXTERNAL_EMBED_BATCH_SIZE):
+            embeddings.extend(
+                await self.generate_embeddings(
+                    texts_to_embed[batch_start : batch_start + _EXTERNAL_EMBED_BATCH_SIZE]
+                )
+            )
         metadata_json = {"title": title, "originUrl": origin_url}
 
         level1_chunk = await self.repo.save_chunk(

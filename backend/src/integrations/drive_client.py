@@ -31,6 +31,11 @@ _PERMISSION_REVOKED_REASONS = frozenset({"insufficientFilePermissions"})
 RequestFactory = Callable[[], Awaitable[httpx.Response]]
 
 
+def is_supported_mime_type(mime_type: str) -> bool:
+    """Google Docs plain-text export 지원 여부를 반환한다."""
+    return mime_type == GOOGLE_DOC_MIME_TYPE
+
+
 @dataclass(frozen=True)
 class DriveFileMetadata:
     """동기화 변경 감지에 필요한 Drive 파일 메타데이터."""
@@ -79,6 +84,10 @@ class GoogleDriveClient:
     ) -> None:
         self._client = client
         self._timeout_sec = timeout_sec
+
+    async def aclose(self) -> None:
+        """주입받은 HTTP transport를 닫는다."""
+        await self._client.aclose()
 
     async def refresh_access_token(
         self,
@@ -155,7 +164,7 @@ class GoogleDriveClient:
             lambda: self._client.get(
                 self._file_url(file_id),
                 headers=self._authorization_headers(access_token),
-                params={"fields": "id,name,mimeType,headRevisionId,version,trashed"},
+                params={"fields": "id,name,mimeType,version,trashed"},
             ),
         )
         payload = self._response_object(response)
@@ -165,7 +174,13 @@ class GoogleDriveClient:
         response_file_id = payload.get("id")
         title = payload.get("name")
         mime_type = payload.get("mimeType")
-        revision = payload.get("headRevisionId") or payload.get("version")
+        # v0 지원 타입의 revision guard에는 version만 사용한다.
+        # 근거 — Drive API v3 File 리소스 문서 (2026-07-31 조회):
+        #   headRevisionId "is currently only available for files with binary content"
+        #     → Google Docs에는 제공되지 않는다.
+        #   version "A monotonically increasing version number for the file."
+        # 불투명 문자열이 숫자 version을 가리면 단조성 비교가 무력해지므로 fallback을 두지 않는다.
+        revision = payload.get("version")
         if (
             not isinstance(response_file_id, str)
             or not response_file_id
@@ -190,7 +205,7 @@ class GoogleDriveClient:
     ) -> DriveExport:
         """Google Docs 원본만 ``text/plain`` 형식으로 export한다."""
 
-        if mime_type != GOOGLE_DOC_MIME_TYPE:
+        if not is_supported_mime_type(mime_type):
             raise DriveUnsupportedMimeTypeError()
 
         response = await self._request(

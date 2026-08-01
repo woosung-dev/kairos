@@ -14,6 +14,7 @@ from cryptography.fernet import Fernet
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 from pydantic import SecretStr
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -36,7 +37,12 @@ from src.integrations.dependencies import (
     get_integration_service,
 )
 from src.integrations.drive_client import GoogleAuthorizationCodeToken
-from src.integrations.models import ExternalDocument, IntegrationConnection
+from src.integrations.models import (
+    ExternalDocument,
+    IntegrationConnection,
+    IntegrationOAuthState,
+)
+from src.integrations.repository import IntegrationRepository
 from src.main import app
 from src.workspaces.models import Workspace, WorkspaceMember
 
@@ -127,6 +133,10 @@ def _install_callback_dependencies(
     app.dependency_overrides[get_integration_service] = lambda: SimpleNamespace(
         connect_or_reauthorize=connect,
     )
+    app.dependency_overrides[get_integration_repository] = lambda: SimpleNamespace(
+        consume_oauth_state=AsyncMock(return_value=True),
+        commit=AsyncMock(),
+    )
     app.dependency_overrides[get_google_drive_client] = lambda: SimpleNamespace(
         exchange_authorization_code=exchange,
     )
@@ -150,6 +160,31 @@ def _expired_state(workspace_id: uuid.UUID, requester_user_id: uuid.UUID) -> str
             }
         )
     )
+
+
+async def _seed_callback_owner(
+    session: AsyncSession,
+    tag: str,
+) -> tuple[User, Workspace, WorkspaceMember]:
+    suffix = uuid.uuid4().hex[:8]
+    user = User(
+        clerk_id=f"clerk_oauth_{tag}_{suffix}",
+        display_name=f"OAuth {tag}",
+        email=f"oauth_{tag}_{suffix}@k.test",
+    )
+    session.add(user)
+    await session.flush()
+    workspace = Workspace(name=f"OAuth {tag}", owner_id=user.id)
+    session.add(workspace)
+    await session.flush()
+    member = WorkspaceMember(
+        workspace_id=workspace.id,
+        user_id=user.id,
+        role="owner",
+    )
+    session.add(member)
+    await session.commit()
+    return user, workspace, member
 
 
 def test_integration_route_paths_match_endpoint_contract() -> None:
@@ -403,6 +438,11 @@ async def test_authorize_uses_encrypted_state_without_plaintext_secrets(
     workspace_id = uuid.uuid4()
     owner = _member(workspace_id)
     app.dependency_overrides[require_owner] = lambda: owner
+    app.dependency_overrides[get_integration_repository] = lambda: SimpleNamespace(
+        delete_expired_oauth_states=AsyncMock(),
+        create_oauth_state=AsyncMock(),
+        commit=AsyncMock(),
+    )
 
     response = await client.post(
         f"/api/v1/workspaces/{workspace_id}/integrations/google-drive/authorize",
@@ -436,6 +476,11 @@ async def test_authorize_returns_503_when_state_encryption_fails(
         raise EncryptionError()
 
     app.dependency_overrides[require_owner] = lambda: _member(workspace_id)
+    app.dependency_overrides[get_integration_repository] = lambda: SimpleNamespace(
+        delete_expired_oauth_states=AsyncMock(),
+        create_oauth_state=AsyncMock(),
+        commit=AsyncMock(),
+    )
     monkeypatch.setattr(integration_router, "encrypt_string", raise_encryption_error)
 
     response = await client.post(
@@ -444,6 +489,183 @@ async def test_authorize_returns_503_when_state_encryption_fails(
 
     assert response.status_code == 503
     assert "암호화" not in response.text
+
+
+async def test_callback_consumes_state_once_before_google_exchange(
+    client: AsyncClient,
+    integration_session: AsyncSession,
+    oauth_settings: _OAuthSettings,
+) -> None:
+    """정상 callback은 한 번만 Google 교환으로 진행하고 자기 workspace stale nonce만 정리한다."""
+    user, workspace, owner = await _seed_callback_owner(
+        integration_session,
+        "single-use",
+    )
+    other_user, other_workspace, _ = await _seed_callback_owner(
+        integration_session,
+        "other-workspace",
+    )
+    expired_nonce = "expired-authorize-nonce"
+    other_expired_nonce = "other-expired-authorize-nonce"
+    integration_session.add(
+        IntegrationOAuthState(
+            nonce=expired_nonce,
+            workspace_id=workspace.id,
+            requester_user_id=user.id,
+            expires_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(seconds=1),
+        )
+    )
+    integration_session.add(
+        IntegrationOAuthState(
+            nonce=other_expired_nonce,
+            workspace_id=other_workspace.id,
+            requester_user_id=other_user.id,
+            expires_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(seconds=1),
+        )
+    )
+    await integration_session.commit()
+
+    exchange = AsyncMock(
+        return_value=GoogleAuthorizationCodeToken(
+            refresh_token="single-use-refresh-token",
+            expires_in=3600,
+        )
+    )
+    app.dependency_overrides[require_owner] = lambda: owner
+    app.dependency_overrides[get_async_session] = lambda: integration_session
+    app.dependency_overrides[get_google_drive_client] = lambda: SimpleNamespace(
+        exchange_authorization_code=exchange,
+    )
+
+    authorize_response = await client.post(
+        f"/api/v1/workspaces/{workspace.id}/integrations/google-drive/authorize",
+    )
+    assert authorize_response.status_code == 200
+    state = parse_qs(
+        urlparse(authorize_response.json()["authorizationUrl"]).query
+    )["state"][0]
+    assert (await integration_session.exec(
+        select(IntegrationOAuthState).where(
+            IntegrationOAuthState.nonce == expired_nonce
+        )
+    )).one_or_none() is None
+    assert (await integration_session.exec(
+        select(IntegrationOAuthState).where(
+            IntegrationOAuthState.nonce == other_expired_nonce
+        )
+    )).one_or_none() is not None
+
+    first_response = await client.get(
+        "/api/v1/integrations/google-drive/callback",
+        params={"code": "first-authorization-code", "state": state},
+        follow_redirects=False,
+    )
+    second_response = await client.get(
+        "/api/v1/integrations/google-drive/callback",
+        params={"code": "second-authorization-code", "state": state},
+        follow_redirects=False,
+    )
+
+    assert first_response.status_code == 302
+    assert second_response.status_code == 400
+    assert second_response.json()["detail"] == "유효하지 않거나 만료된 OAuth state입니다"
+    assert exchange.await_count == 1
+
+
+async def test_consume_oauth_state_executes_single_delete_returning_statement(
+    integration_session: AsyncSession,
+) -> None:
+    """nonce 소비는 pre-check 없이 단일 DELETE ... RETURNING SQL이어야 한다."""
+    user, workspace, _ = await _seed_callback_owner(
+        integration_session,
+        "statement-shape",
+    )
+    nonce = "statement-shape-nonce"
+    integration_session.add(
+        IntegrationOAuthState(
+            nonce=nonce,
+            workspace_id=workspace.id,
+            requester_user_id=user.id,
+            expires_at=datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=5),
+        )
+    )
+    await integration_session.commit()
+    statements: list[str] = []
+    bind = integration_session.bind
+    assert bind is not None
+
+    def capture_statement(
+        _connection,
+        _cursor,
+        statement,
+        _parameters,
+        _context,
+        _executemany,
+    ) -> None:
+        if "integration_oauth_states" in statement:
+            statements.append(statement)
+
+    event.listen(bind.sync_engine, "before_cursor_execute", capture_statement)
+    try:
+        consumed = await IntegrationRepository(integration_session).consume_oauth_state(
+            nonce=nonce,
+            workspace_id=workspace.id,
+            now=datetime.now(UTC).replace(tzinfo=None),
+        )
+        await integration_session.commit()
+    finally:
+        event.remove(bind.sync_engine, "before_cursor_execute", capture_statement)
+
+    assert consumed is True
+    assert len(statements) == 1
+    statement = " ".join(statements[0].upper().split())
+    assert statement.startswith("DELETE FROM INTEGRATION_OAUTH_STATES")
+    assert "RETURNING INTEGRATION_OAUTH_STATES.NONCE" in statement
+
+
+async def test_callback_keeps_expired_nonce_unconsumed(
+    client: AsyncClient,
+    integration_session: AsyncSession,
+    oauth_settings: _OAuthSettings,
+) -> None:
+    user, workspace, _ = await _seed_callback_owner(
+        integration_session,
+        "expired",
+    )
+    nonce = "expired-callback-nonce"
+    state = integration_router._encode_oauth_state(
+        workspace.id,
+        user.id,
+        "expired-callback-verifier",
+        nonce=nonce,
+        expires_at=datetime.now(UTC) + timedelta(minutes=5),
+    )
+    integration_session.add(
+        IntegrationOAuthState(
+            nonce=nonce,
+            workspace_id=workspace.id,
+            requester_user_id=user.id,
+            expires_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(seconds=1),
+        )
+    )
+    await integration_session.commit()
+    exchange = AsyncMock()
+    app.dependency_overrides[get_async_session] = lambda: integration_session
+    app.dependency_overrides[get_google_drive_client] = lambda: SimpleNamespace(
+        exchange_authorization_code=exchange,
+    )
+
+    response = await client.get(
+        "/api/v1/integrations/google-drive/callback",
+        params={"code": "expired-authorization-code", "state": state},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 400
+    assert exchange.await_count == 0
+    assert (await integration_session.exec(
+        select(IntegrationOAuthState).where(IntegrationOAuthState.nonce == nonce)
+    )).one_or_none() is not None
 
 
 async def test_callback_revalidates_state_owner_and_hides_tokens(
@@ -745,6 +967,17 @@ async def test_concurrent_callbacks_upsert_one_connection_without_500(
         user.id,
         "concurrent-callback-verifier-b",
     )
+    for state in (first_state, second_state):
+        oauth_state = integration_router._decode_oauth_state(state)
+        integration_session.add(
+            IntegrationOAuthState(
+                nonce=oauth_state.nonce,
+                workspace_id=workspace.id,
+                requester_user_id=user.id,
+                expires_at=datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=5),
+            )
+        )
+    await integration_session.commit()
 
     first, second = await asyncio.gather(
         client.get(
@@ -771,3 +1004,84 @@ async def test_concurrent_callbacks_upsert_one_connection_without_500(
     assert second.status_code == 302
     assert len(connections) == 1
     assert exchange.await_count == 2
+
+
+async def test_concurrent_callbacks_consume_same_nonce_once(
+    client: AsyncClient,
+    integration_session: AsyncSession,
+    oauth_settings: _OAuthSettings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """동시에 같은 callback state를 보내도 한 요청만 Google 교환까지 진행한다."""
+    user, workspace, _ = await _seed_callback_owner(
+        integration_session,
+        "same-nonce",
+    )
+    nonce = "concurrent-callback-nonce"
+    state = integration_router._encode_oauth_state(
+        workspace.id,
+        user.id,
+        "concurrent-callback-verifier",
+        nonce=nonce,
+        expires_at=datetime.now(UTC) + timedelta(minutes=5),
+    )
+    integration_session.add(
+        IntegrationOAuthState(
+            nonce=nonce,
+            workspace_id=workspace.id,
+            requester_user_id=user.id,
+            expires_at=datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=5),
+        )
+    )
+    await integration_session.commit()
+    session_factory = async_sessionmaker(
+        integration_session.bind,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async def request_session():
+        async with session_factory() as session:
+            yield session
+
+    consume_barrier = asyncio.Barrier(2)
+    consume_oauth_state = IntegrationRepository.consume_oauth_state
+
+    async def synchronized_consume(
+        repository: IntegrationRepository,
+        **kwargs: object,
+    ) -> bool:
+        await consume_barrier.wait()
+        return await consume_oauth_state(repository, **kwargs)
+
+    exchange = AsyncMock(
+        return_value=GoogleAuthorizationCodeToken(
+            refresh_token="same-nonce-refresh-token",
+            expires_in=3600,
+        )
+    )
+    monkeypatch.setattr(
+        IntegrationRepository,
+        "consume_oauth_state",
+        synchronized_consume,
+    )
+    app.dependency_overrides[get_async_session] = request_session
+    app.dependency_overrides[get_google_drive_client] = lambda: SimpleNamespace(
+        exchange_authorization_code=exchange,
+    )
+
+    first, second = await asyncio.gather(
+        client.get(
+            "/api/v1/integrations/google-drive/callback",
+            params={"code": "same-nonce-code-a", "state": state},
+            follow_redirects=False,
+        ),
+        client.get(
+            "/api/v1/integrations/google-drive/callback",
+            params={"code": "same-nonce-code-b", "state": state},
+            follow_redirects=False,
+        ),
+    )
+
+    assert sorted((first.status_code, second.status_code)) == [302, 400]
+    assert exchange.await_count == 1

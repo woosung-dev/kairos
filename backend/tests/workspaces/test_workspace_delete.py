@@ -1,5 +1,6 @@
 # 워크스페이스 삭제 API — cascade 완전성 + personal 차단 + 타 ws 격리 회귀 가드
 import uuid
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -17,6 +18,7 @@ from src.inbox.models import InboxItem
 from src.integrations.models import (
     ExternalDocument,
     IntegrationConnection,
+    IntegrationOAuthState,
     IntegrationSyncRun,
 )
 from src.main import app
@@ -201,6 +203,14 @@ async def _seed_full_workspace(session, owner: User, member_user: User) -> Works
             requested_by_id=owner.id,
         )
     )
+    session.add(
+        IntegrationOAuthState(
+            nonce=f"workspace-delete-{uuid.uuid4().hex}",
+            workspace_id=ws.id,
+            requester_user_id=owner.id,
+            expires_at=datetime.now(UTC).replace(tzinfo=None),
+        )
+    )
 
     await session.flush()
     return ws
@@ -215,6 +225,7 @@ _WS_SCOPED_TABLES = [
     "embedding_chunks",
     "external_documents",
     "integration_sync_runs",
+    "integration_oauth_states",
     "integration_connections",
     "action_items",
     "meeting_project_links",
