@@ -7,6 +7,7 @@ import uuid
 import pytest
 from unittest.mock import AsyncMock
 
+from src.embeddings.repository import EmbeddingRepository
 from src.rag.service import RagService
 
 
@@ -299,6 +300,7 @@ async def test_gemini_successful_answer_saves_cache():
     ]
     mock_repo.text_search.return_value = []
     mock_repo.find_chunks_by_ids.return_value = {}
+    mock_repo.all_chunks_exist.return_value = True
 
     mock_embedding_service = AsyncMock()
     mock_embedding_service.generate_embeddings.return_value = [[0.1] * 1536]
@@ -318,6 +320,82 @@ async def test_gemini_successful_answer_saves_cache():
     mock_repo.save_cache.assert_called_once()
     # PERF-SSE-COMMIT: 스트리밍 진입 전 커넥션 반납 commit + 캐시 저장 commit = 2회
     assert mock_repo.commit.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_gemini_successful_answer_skips_cache_when_source_chunks_disappear():
+    """F1: 존재 fence 가 실패하면 정상 done 뒤 캐시 저장을 건너뛴다."""
+    mock_repo = AsyncMock()
+    mock_repo.find_similar_cache.return_value = None
+    mock_repo.vector_search.return_value = [
+        {"id": _uuid.uuid4(), "chunk_text": "콘텐츠", "score": 0.9, "source_type": "meeting"}
+    ]
+    mock_repo.text_search.return_value = []
+    mock_repo.find_chunks_by_ids.return_value = {}
+    mock_repo.compute_max_visibility.return_value = "public"
+    mock_repo.count_existing_chunks.return_value = 0
+
+    existence_session = AsyncMock()
+    existence_result = MagicMock()
+    existence_result.first.return_value = object()
+    existence_session.execute.return_value = existence_result
+    existence_repo = EmbeddingRepository(existence_session)
+    mock_repo.all_chunks_exist.side_effect = existence_repo.all_chunks_exist
+
+    mock_embedding_service = AsyncMock()
+    mock_embedding_service.generate_embeddings.return_value = [[0.1] * 1536]
+
+    mock_ai = AsyncMock()
+    mock_ai.stream_rag_answer = _make_async_iter("정상 답변")
+
+    service = RagService(
+        embedding_repo=mock_repo,
+        embedding_service=mock_embedding_service,
+        ai_service=mock_ai,
+    )
+
+    events = []
+    async for event in service.ask(
+        "정상 질문?", _uuid.uuid4(), requester_user_id=_uuid.uuid4(), requester_role="owner"
+    ):
+        events.append(event)
+
+    mock_repo.save_cache.assert_not_called()
+    done_events = [event for event in events if event["event"] == "done"]
+    assert len(done_events) == 1
+    assert json.loads(done_events[0]["data"])["cached"] is False
+
+
+@pytest.mark.asyncio
+async def test_gemini_successful_answer_saves_cache_when_source_chunks_exist():
+    """F2: 존재 fence 가 통과하면 기존 캐시 저장 경로를 유지한다."""
+    mock_repo = AsyncMock()
+    mock_repo.find_similar_cache.return_value = None
+    mock_repo.vector_search.return_value = [
+        {"id": _uuid.uuid4(), "chunk_text": "콘텐츠", "score": 0.9, "source_type": "meeting"}
+    ]
+    mock_repo.text_search.return_value = []
+    mock_repo.find_chunks_by_ids.return_value = {}
+    mock_repo.all_chunks_exist.return_value = True
+
+    mock_embedding_service = AsyncMock()
+    mock_embedding_service.generate_embeddings.return_value = [[0.1] * 1536]
+
+    mock_ai = AsyncMock()
+    mock_ai.stream_rag_answer = _make_async_iter("정상 답변")
+
+    service = RagService(
+        embedding_repo=mock_repo,
+        embedding_service=mock_embedding_service,
+        ai_service=mock_ai,
+    )
+
+    async for _event in service.ask(
+        "정상 질문?", _uuid.uuid4(), requester_user_id=_uuid.uuid4(), requester_role="owner"
+    ):
+        pass
+
+    mock_repo.save_cache.assert_awaited_once()
 
 
 class _TimingLogCollector(logging.Handler):
