@@ -34,8 +34,10 @@
 > **2026-08-01 브랜치 `fix/bl-ext-backlog` 에서 코드 6건 해소** — 아래 체크 표시 참조.
 
 - [x] **BL-EXT-OAUTH-1** (P1) OAuth `nonce` 미소비 → **해소** (`6bc5ab8`). `integration_oauth_states` 테이블 + callback 의 `DELETE ... RETURNING` 단문 원자 소비. 소비를 Google 토큰 교환보다 앞에 두어 재사용 요청이 외부 호출에 도달하지 않는다. 브라우저 실측 — callback 3회에 Google 아웃바운드 1회.
-- [ ] **BL-EXT-CACHE-3** (P1) 캐시 무효화 이중화로 **노출 창이 닫히지 않는다**. → **설계 라운드 완료, 사용자 결정 대기.** `.claude/spike-gdrive/artifacts/CACHE-DESIGN.md` 참조. 후보 2안 중 어느 것도 단독으로 닫지 못하며, 권고는 안0(notes commit fix) → 안1a+1b(fail-closed anti-join + 비-admin fast path 제거) → 안2(쓰기 fence) 조합. 마이그레이션 0.
-- [ ] **BL-EXT-CACHE-1** (P1) `ALL_CHUNKS_VISIBLE_SQL` anti-join fail-open. CACHE-3 과 한 묶음 — 같은 설계 문서에서 다룬다.
+- [x] **BL-EXT-CACHE-3** (P1) **해소 (2026-08-01).** 비-admin `max_visibility='public'` fast path를 제거하고, 캐시 저장 직전에 source chunk 존재 fence를 둬 사라진 source를 참조하는 캐시행을 저장하지 않는다.
+- [x] **BL-EXT-CACHE-1** (P1) **해소 (2026-08-01).** `ALL_CHUNKS_VISIBLE_SQL` anti-join이 source chunk 행 부재를 위반으로 판정하는 fail-closed가 됐다.
+  - (2026-08-01 사용자 결정; `backend/src/embeddings/repository.py:389-400`, `backend/src/rag/service.py:234-265` 기준) 기존 캐시행은 일회성 전량 무효화하지 않고 TTL 7일로 자연 배출한다. admin/owner 우회는 유지하며, 안3 epoch 카운터는 기각했고 fence에 `FOR SHARE`를 도입하지 않는다.
+  - 비-admin source 재검사에 따른 캐시 miss 증가는 노출 차단을 위한 감수한 트레이드오프다.
 - [x] **BL-EXT-REVISION-2** (P1) revision guard 가 경쟁 동기화에서 무력 → **해소** (`87e1963`). `version` 단독 + 본문 갱신 CAS. ⚠ CAS 는 "최신 보존" 이 아니라 **"선착순 보존"** 이며 완료·오류 상태 전이는 CAS 미보호 (`integrations/CONTEXT.md` §6 기록).
 - [x] **BL-EXT-SYNC-1** (P2) 최초 import 의 unsupported MIME 무상태 → **해소** (`5af8261`). metadata 직후 판별 → 빈 행 생성 → raise. ⚠ ADR-026 D4 **부분 충족** — 사유는 문서별로 남지 않는다 (아래 신규 BL 참조).
 - [x] **BL-EXT-EMBED-1** (P2) L1 임베딩 무제한 입력 → **해소** (`8038e27`). 임베딩 입력만 절단하고 `chunk_text` 는 전문 유지 (L1 텍스트가 LLM 프롬프트 근거 본문이므로).
@@ -44,13 +46,26 @@
 
 > **2026-08-01 BL-EXT 세션에서 신규 발견 — 미해소**
 
-- [ ] **BL-NOTES-CACHE-2** (P2) **노트 캐시 무효화의 scope 갭.** `embed_note_async` 는 `invalidate_cache(workspace_id, note.project_id)` 로 **project scope** 만 무효화한다. 전역 질의로 만들어진 `project_id IS NULL` 캐시행은 그 노트의 청크를 참조해도 살아남는다. `ALL_CHUNKS_VISIBLE_SQL` anti-join fail-open(BL-EXT-CACHE-1)과 결합하면 삭제·교체된 청크를 참조하는 전역 캐시행이 계속 서빙된다. → CACHE-1 fail-closed 로 읽기 시점에 닫는 것이 근본 해법.
-  - ⚠ **정정 기록**: 2026-08-01 설계 라운드가 이 항목을 "무효화 DELETE 가 커밋되지 않고 롤백된다(P1 프로덕션 결함)" 로 보고했으나 **사실이 아니다.** `EmbeddingService.invalidate_cache`(`embeddings/service.py:307-308`)가 `delete_caches` 뒤에 이미 commit 한다. 설계 에이전트는 `delete_caches`(flush만)와 호출부만 읽고 그 사이 한 줄짜리 함수를 열지 않았으며, "실측" 은 실제 코드 경로가 아니라 **가설한 패턴을 합성 재현**한 것이었다. 회귀 테스트를 쓰고 결함 상태로 mutation 했을 때 테스트가 죽지 않아 발견했다. 남는 것은 위의 scope 갭뿐이다.
+- [ ] **BL-EXT-CACHE-2** (P2) **정밀 캐시 무효화.** 캐시 `sources`가 참조하는 chunk id를 기준으로 대상 캐시행만 삭제하는 방식은 아직 구현하지 않았다. 읽기 시점 fail-closed로 노출은 닫혔고, 남은 목적은 캐시 효율을 높이는 성능 과제다.
+- [ ] **BL-NOTES-CACHE-2** (P2) **노트 캐시 무효화의 scope 갭.** `embed_note_async`는 `invalidate_cache(workspace_id, note.project_id)`로 project scope만 무효화한다. 전역 질의로 만들어진 `project_id IS NULL` 캐시행은 그 노트의 청크를 참조해도 살아남는다. 읽기 시점 fail-closed로 노출은 닫혔고, 남은 것은 cache miss와 재검색에 따른 캐시 효율이다.
+  - ⚠ **정정 기록**: 2026-08-01 설계 라운드가 이 항목을 "무효화 DELETE 가 커밋되지 않고 롤백된다(P1 프로덕션 결함)" 로 보고했으나 **사실이 아니다.** `EmbeddingService.invalidate_cache`(`embeddings/service.py:329-336`, 2026-08-01 기준)가 `delete_caches` 뒤에 이미 commit 한다. 설계 에이전트는 `delete_caches`(flush만)와 호출부만 읽고 그 사이 한 줄짜리 함수를 열지 않았으며, "실측" 은 실제 코드 경로가 아니라 **가설한 패턴을 합성 재현**한 것이었다. 회귀 테스트를 쓰고 결함 상태로 mutation 했을 때 테스트가 죽지 않아 발견했다. 남는 것은 위의 scope 갭뿐이다.
 
 - [ ] **BL-EXT-REASON-1** (P2) `ExternalDocument` 에 문서별 실패 **사유** 컬럼이 없다. ADR-026 D4 "문서별 `failed` 상태와 사유를 남긴다" 의 사유 절반이 미충족. 현재는 sync run `error_summary` 한 줄뿐. 마이그레이션 필요.
 - [ ] **BL-EXT-SYNC-3** (P2) 최초 import 의 export 5xx/timeout 은 여전히 문서 행을 남기지 않는다. BL-EXT-SYNC-1 과 같은 UX 결함 클래스이나 트리거가 다르다 (이번엔 미지원 MIME 만 좁게 수정).
 - [ ] **BL-EMBED-2** (P2) `embed_note` 도 노트 전문을 L1 임베딩 입력으로 보내고 단일 `generate_embeddings` 호출을 쓴다 — BL-EXT-EMBED-1 과 동일한 구조적 결함. `embed_meeting` 은 요청당 입력 배열 한도 쪽 노출이 더 크다.
 - [ ] **BL-EMBED-3** (P3) external_document 의 L1 `embedding` 컬럼은 **소비처가 없다** (검색은 `chunk_level = 2` 만, enrich 는 `chunk_text` 만). 생성 비용 + halfvec(1536) 저장이 낭비다. L1 행 자체는 부모 컨텍스트 본문 때문에 필요하다.
+
+> **2026-08-01 BL-EXT-CACHE-1/3 브라우저 QA 부수 발견 — 캐시 변경과 무관한 기존 FE 결함.**
+> 실 2계정 팀 워크스페이스 + 일회용 컨테이너 DB 에서 관측했다. 같은 라운드가 보고한 다른 2건
+> (프로젝트 목록 visibility 배지 미렌더 · `CORS_ORIGINS` 로컬 포트 부재)은 **코드 대조 결과 거짓**이라
+> 등재하지 않았다 — 전자는 `project-card.tsx` 의 배지가 `<button>` 이 아니라 조건 없이 렌더되는 `<span>` 이고
+> (QA 셀렉터 오류), 후자는 `core/config.py` 기본값과 `.env.example` 이 모두 `http://localhost:3000` 이라
+> repo 는 정상이고 관측 대상이 로컬 `.env` 였다.
+
+- [ ] **BL-FE-NOTE-DELETE-1** (P2) **노트를 UI 로 삭제할 수 없다.** `deleteNote`(`frontend/src/features/notes/api.ts`)와 `useDeleteNote`(`frontend/src/features/notes/hooks.ts`)는 구현돼 있으나 **호출자가 없다** (2026-08-01 grep 기준). 노트 목록 카드에도 노트 상세(편집 / 팀으로 올리기 / 내보내기)에도 삭제 어포던스가 없다. BE `DELETE` 엔드포인트는 정상 동작한다(QA 가 실 JWT 로 204 확인). → dormant hook 을 화면에 연결하거나 hook 을 제거해 의도를 명확히 할 것.
+- [ ] **BL-FE-PROJECT-NOTES-1** (P2) **프로젝트 상세가 그 프로젝트에 속한 노트를 보여주지 않는다.** 노트가 실재(`notes` · `embedding_chunks` 확인)하는데도 "프로젝트를 시작하세요" 빈 상태를 렌더한다. 앵커 = `frontend/src/features/projects/components/project-detail.tsx` 본문. 노트 목록 화면에서는 해당 노트에 프로젝트가 표시된다 → 조회 조건 또는 탭 필터 쪽 의심.
+- [ ] **BL-FE-RAG-STALE-BANNER-1** (P3) **캐시 답변에 잘못된 "오래된 소스" 배너.** 소스 노트가 당일 생성인데도 `⚠️ 오래된 소스입니다 (2026-08-01 기준)` 배너가 뜬다. freshness 판정이 틀렸거나 문구가 오해를 부른다. 앵커 = FE RAG 답변 렌더의 freshness 배너.
+- [ ] **BL-FE-VISIBILITY-DIALOG-1** (P2) `[확인 필요]` **프로젝트 상세의 Visibility 배지 클릭이 조용히 실패한다** (관측: 클릭 후 6초 폴링에도 `[role=dialog]` 0개, console error 0건). 단 **배선은 완전하다** — `project-detail.tsx` 가 `VisibilityBadge` 에 `interactive={canManage}` + `onClick` 으로 `setVisibilityDialogOpen(true)` 를 넘기고 `VisibilityChangeDialog` 를 `onOpenChange` 와 함께 렌더한다 (2026-08-01 코드 기준). 배지 자체도 활성 상태였다(`disabled=false`, `title='클릭하여 변경'`). 따라서 확정 결함이 아니라 **재현 과제**다. 의심 지점 = 클릭 시점의 `canManage` 평가(BUG-H02 가드) 또는 클릭 이벤트가 핸들러에 도달하지 않는 경우. visibility 는 권한 통제 수단이므로 우선 재현할 것.
 
 > **2026-06-17 멀티 에이전트 팀 QA 후속** (`git history`)
 - [ ] **(선택) 풍부한 음성 샘플 1개 확보** — 알려진 트랜스크립트 + 명명된 사실 2개 이상. 현재 픽스처는 무음 10초 webm + test.m4a 뿐 → 회의 오디오 파이프라인의 **콘텐츠** 검증(transcription/화자분리/요약 품질) 갭. 텍스트 캡처로 RAG 경로는 검증 완료(오디오는 기계동작만).

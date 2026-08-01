@@ -231,28 +231,39 @@ class RagService:
             }
             return
 
-        # [9] Cache Store — BL-042: max_visibility 동시 저장 (fast path 인덱스)
+        # [9] Cache Store — max_visibility 동시 저장 (BL-042. 2026-08-01 BL-EXT-CACHE-3
+        # 이후 읽기 fast path 근거는 아니고 저장 시점 라벨이다) + source chunk 존재 fence
         try:
             source_chunk_ids = [
                 s["id"] for s in sources_for_client
                 if isinstance(s, dict) and "id" in s
             ]
             max_vis = await self.embedding_repo.compute_max_visibility(source_chunk_ids)
-            cache = SemanticCache(
-                workspace_id=workspace_id,
-                project_id=project_id,
-                question=question,
-                question_embedding=question_embedding,
-                answer=full_answer,
-                sources=sources_for_client,
-                max_visibility=max_vis,
-                expires_at=datetime.utcnow() + timedelta(days=7),
-            )
             # Codex F-2 fix: time_range filter 적용된 answer 는 cache 저장 skip
             # (다른 filter / no-filter 사용자에게 누수 방지)
             if not is_time_filtered:
-                await self.embedding_repo.save_cache(cache)
-                await self.embedding_repo.commit()
+                if not await self.embedding_repo.all_chunks_exist(source_chunk_ids):
+                    existing_count = await self.embedding_repo.count_existing_chunks(
+                        source_chunk_ids
+                    )
+                    logger.info(
+                        "캐시 저장 skip: source chunk %d개 중 %d개가 사라짐",
+                        len(source_chunk_ids),
+                        len(source_chunk_ids) - existing_count,
+                    )
+                else:
+                    cache = SemanticCache(
+                        workspace_id=workspace_id,
+                        project_id=project_id,
+                        question=question,
+                        question_embedding=question_embedding,
+                        answer=full_answer,
+                        sources=sources_for_client,
+                        max_visibility=max_vis,
+                        expires_at=datetime.utcnow() + timedelta(days=7),
+                    )
+                    await self.embedding_repo.save_cache(cache)
+                    await self.embedding_repo.commit()
         except Exception as cache_err:
             logger.warning("캐시 저장 실패 (비치명적): %s", cache_err)
 

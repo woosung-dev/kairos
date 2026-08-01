@@ -6,6 +6,8 @@ tests/fixtures/visibility/*.sql 스냅샷과 비교한다.
   이동해도 이 테스트가 그린이면 생성 SQL(=쿼리 플랜 입력)이 불변임을 CI 가 증명한다.
 - 스냅샷 갱신: 의미 등가가 IDOR 매트릭스로 검증된 경우에만
   `UPDATE_VISIBILITY_SNAPSHOTS=1 uv run pytest tests/architecture/test_visibility_characterization.py`
+- 2026-08-01 BL-EXT-CACHE-1 로 `embeddings_all_chunks_visible_sql` 스냅샷을
+  의도적으로 갱신한다 (fail-closed 전환).
 """
 import os
 import pathlib

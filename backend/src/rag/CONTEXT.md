@@ -77,7 +77,7 @@
 | R-2 | **워크스페이스 격리**: `workspace_id` 필터 + (선택) `project_id` 범위 |
 | R-3 | **SemanticCache TTL 7일** — `expires_at` 자동 무효화 (embeddings 도메인 책임) |
 | R-4 | **유사도 임계값 0.93** — 미만은 cache miss로 간주 |
-| R-5 | **콘텐츠 변경 시 캐시 무효화** — `embedding_service.invalidate_cache()` 일부 구현됨 (`meetings/pipeline_service.py:200`). 정책 보강은 Phase B |
+| R-5 | **콘텐츠 변경 시 캐시 무효화와 안전한 재사용** — 콘텐츠 변경 경로의 무효화는 project scope로 남아 있다 (`notes/pipeline_service.py:75-77,149`, 2026-08-01 코드 기준; BL-NOTES-CACHE-2). 이 문서는 캐시 hit에서 삭제된 출처를 서빙하지 않아야 한다는 정책을 먼저 올바르게 적었지만, 2026-08-01 이전 구현은 그 정책을 따라가지 못했다. 현재 읽기·쓰기 보장은 R-15를 따른다. |
 | R-6 | **Gemini 응답에는 항상 출처(sources) 인용 포함** — 인용 없는 답변 금지 |
 | R-7 | **답변은 한국어 우선** — 사용자 질문 언어에 맞춤 |
 | R-8 | **SSE 스트리밍**: `EventSourceResponse` (`sse_starlette.sse`) — 내부적으로 `text/event-stream`. `StreamingResponse` 직접 사용 금지 — 헌법 B-14 |
@@ -87,6 +87,11 @@
 | R-12 | **질문 입력 검증** — `RagAskRequest.question` 은 strip 후 2자 이상 + 500자 이하 (Sprint 14 BUG-C01). prompt-injection 류 거대 입력 차단 + Pydantic 422로 5xx 회피. |
 | R-13 | **Layer 1/3 진입 시 HNSW 세션 변수 강제** (Sprint 16 ADR-020 + CONTEXT-MAP I-21). `embeddings/repository.py`의 `_apply_hnsw_session_params(session)` 헬퍼가 `vector_search` / `find_similar_cache` 진입 직전 `SET LOCAL hnsw.ef_search=40` + `iterative_scan=relaxed_order` + `max_scan_tuples=20000` 적용. RAG 서비스가 별도 호출하지 않음 (embeddings 도메인 캡슐화). 결과: RBAC/visibility 포스트필터 적용 시 결과 부족 자동 해소. |
 | R-14 | **외부 원본 source type** — `source_type` 허용값 SSOT는 `backend/src/embeddings/repository.py`의 `_ALLOWED_SOURCE_TYPES`다. `save_chunk` insert 경로는 이 화이트리스트를 assert하고 `save_chunks`는 이를 우회하므로, `external_document`는 검증된 `save_chunk` 경로로 저장해 RAG 검색을 허용한다. 새 source type은 화이트리스트와 FE의 `(A)` 타입 union, `(B)` 좁은 캐스트/const 목록, `(C)` 라벨·아이콘·분기 구분을 함께 갱신한다. 상세 결정은 `docs/adr/026-external-source-ingest-rail.md` D6을 따른다. 검색 대상은 R-1에 따라 `chunk_level = 2`만이다. |
+| R-15 | **SemanticCache 출처 무결성** (2026-08-01) — **읽기**: 비-admin 요청자에게는 `sources` 청크의 실제 가시성을 매번 재검사한다. 행이 없는 청크는 위반으로 본다. `max_visibility` 라벨은 더 이상 검증을 건너뛰는 근거가 아니다. **쓰기**: source 청크가 하나라도 사라진 상태에서는 캐시행을 만들지 않는다. admin/owner 우회는 검색 경로와 같은 정책으로 유지한다. |
+
+> `max_visibility`는 BL-042의 fast path 인덱스에서 저장 시점 라벨로 강등됐다. 브라우저 QA의 scenario_b는 소스 청크가 살아 있는 상태에서 프로젝트 visibility가 `public`에서 `private`로 바뀌어 라벨이 stale해졌고, 변경 전에는 누출됐으나 현재 비-admin 요청에서는 차단됨을 관측했다 (`.claude/spike-gdrive/artifacts/QA.qa.json`, 2026-08-01).
+>
+> 남는 한계: 무효화 scope는 BL-NOTES-CACHE-2의 project 단위로 남아 있으며, admin에게는 삭제된 콘텐츠가 TTL 만료까지 서빙될 수 있다. 이는 권한 확대가 아니라 캐시 데이터 수명 문제다.
 
 ---
 
@@ -103,7 +108,7 @@ POST /ask    질문 → 답변 + 출처 (SSE 스트리밍, EventSourceResponse)
 ## 8. 엣지 케이스
 
 - 검색 결과 0건 → "관련 콘텐츠를 찾을 수 없습니다" + 가이드
-- 캐시 hit이지만 출처 콘텐츠 삭제됨 → 즉시 무효화 + 재검색
+- 비-admin 캐시 hit이지만 출처 청크가 삭제됐거나 현재 가시성을 통과하지 못함 → 캐시행을 서빙하지 않고 cache miss로 처리해 재검색. 캐시행 자체를 즉시 삭제하지는 않음; admin/owner 우회에는 TTL 만료 전 삭제된 콘텐츠가 남을 수 있음 (R-15)
 - Gemini API 실패 (SafetyFilter / 빈 candidate / 네트워크) → SSE `error` 이벤트 (한국어 안내 + retryAfter=3초) + `done` 이벤트 종료 + 캐시 저장 skip (R-11)
 - Gemini 빈 답변 (strip 후 빈 문자열) → 캐시 저장 skip + `done` 이벤트 정상 종료
 - 질문 길이 위반: strip 후 < 2자 또는 > 500자 → Pydantic 422 (R-12)
