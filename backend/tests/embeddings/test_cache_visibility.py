@@ -6,7 +6,7 @@
 2. 비-ProjectMember member 가 동일 question 으로 find_similar_cache 호출 → cache miss
 3. ProjectMember 매핑된 member 가 호출 → cache hit
 4. owner 가 호출 → 항상 hit (admin/owner 우회)
-5. max_visibility='public' cache 는 fast path — 모든 사용자 hit
+5. public cache 는 source chunk 가 살아 있고 public 이면 비-admin 도 hit
 """
 import uuid
 
@@ -66,6 +66,79 @@ async def test_compute_max_visibility_picks_most_restrictive(
     # 빈 list
     empty = await repo.compute_max_visibility([])
     assert empty == "public"
+
+
+@pytest.mark.asyncio
+async def test_all_chunks_exist_returns_false_when_no_source_chunks_exist(
+    integration_session, team_ws
+):
+    """F3: 존재하지 않는 source chunk 만 주면 fence 는 False 다."""
+    repo = EmbeddingRepository(integration_session)
+
+    exists = await repo.all_chunks_exist([str(uuid.uuid4())])
+
+    assert exists is False
+
+
+@pytest.mark.asyncio
+async def test_all_chunks_exist_returns_true_when_all_source_chunks_exist(
+    integration_session, team_ws
+):
+    """F4: source chunk 가 전부 있으면 fence 는 True 다."""
+    chunks = [
+        EmbeddingChunk(
+            workspace_id=team_ws.id,
+            source_id=uuid.uuid4(),
+            source_type="note",
+            chunk_text=f"F4 chunk {index}",
+            chunk_index=index,
+            chunk_level=2,
+            embedding=_make_vec(seed=70 + index),
+        )
+        for index in range(2)
+    ]
+    integration_session.add_all(chunks)
+    await integration_session.flush()
+
+    exists = await EmbeddingRepository(integration_session).all_chunks_exist(
+        [str(chunk.id) for chunk in chunks]
+    )
+
+    assert exists is True
+
+
+@pytest.mark.asyncio
+async def test_all_chunks_exist_returns_false_when_some_source_chunks_are_missing(
+    integration_session, team_ws
+):
+    """F5: source chunk 일부가 없으면 fence 는 False 다."""
+    chunk = EmbeddingChunk(
+        workspace_id=team_ws.id,
+        source_id=uuid.uuid4(),
+        source_type="note",
+        chunk_text="F5 existing chunk",
+        chunk_index=0,
+        chunk_level=2,
+        embedding=_make_vec(seed=72),
+    )
+    integration_session.add(chunk)
+    await integration_session.flush()
+
+    exists = await EmbeddingRepository(integration_session).all_chunks_exist(
+        [str(chunk.id), str(uuid.uuid4())]
+    )
+
+    assert exists is False
+
+
+@pytest.mark.asyncio
+async def test_all_chunks_exist_returns_true_for_empty_source_chunks(
+    integration_session,
+):
+    """F6: 빈 source chunk 목록은 예외 없이 True 로 처리한다."""
+    exists = await EmbeddingRepository(integration_session).all_chunks_exist([])
+
+    assert exists is True
 
 
 @pytest.mark.asyncio
@@ -190,10 +263,396 @@ async def test_cache_hit_visibility_member_with_mapping(
 
 
 @pytest.mark.asyncio
-async def test_cache_hit_public_fast_path_skips_check(
+async def test_cache_miss_private_when_all_source_chunks_deleted(
     integration_session, auth_user, team_ws
 ):
-    """max_visibility='public' cache 는 fast path — 모든 사용자 hit."""
+    """N1: 삭제된 source 를 참조하는 private cache 는 비멤버에게 MISS."""
+    p_private = Project(
+        title="N1 private", workspace_id=team_ws.id, visibility="private",
+        created_by_id=auth_user.id,
+    )
+    integration_session.add(p_private)
+    await integration_session.flush()
+
+    chunk = EmbeddingChunk(
+        workspace_id=team_ws.id, project_id=p_private.id,
+        source_id=uuid.uuid4(), source_type="note",
+        chunk_text="deleted private source", chunk_index=0, chunk_level=2,
+        embedding=_make_vec(seed=31),
+    )
+    requester = User(
+        clerk_id="cache_vis_n1_member",
+        display_name="N1 비멤버",
+        email="cache_vis_n1@kairos.test",
+    )
+    integration_session.add_all([chunk, requester])
+    await integration_session.flush()
+    integration_session.add(
+        WorkspaceMember(
+            workspace_id=team_ws.id,
+            user_id=requester.id,
+            role="member",
+        )
+    )
+    integration_session.add(
+        SemanticCache(
+            workspace_id=team_ws.id,
+            question="n1 deleted private?",
+            question_embedding=_make_vec(seed=31),
+            answer="삭제된 비공개 답변",
+            sources=[{"id": str(chunk.id), "text": "deleted private source"}],
+            max_visibility="private",
+        )
+    )
+    await integration_session.commit()
+
+    await integration_session.delete(chunk)
+    await integration_session.commit()
+
+    hit = await EmbeddingRepository(integration_session).find_similar_cache(
+        question_embedding=_make_vec(seed=31),
+        workspace_id=team_ws.id,
+        requester_user_id=requester.id,
+        requester_role="member",
+        threshold=0.90,
+    )
+    assert hit is None
+
+
+@pytest.mark.asyncio
+async def test_cache_miss_public_when_all_source_chunks_deleted(
+    integration_session, auth_user, team_ws
+):
+    """N2: 삭제된 source 를 참조하는 public cache 는 비멤버에게 MISS."""
+    p_public = Project(
+        title="N2 public", workspace_id=team_ws.id, visibility="public",
+        created_by_id=auth_user.id,
+    )
+    integration_session.add(p_public)
+    await integration_session.flush()
+
+    chunk = EmbeddingChunk(
+        workspace_id=team_ws.id, project_id=p_public.id,
+        source_id=uuid.uuid4(), source_type="note",
+        chunk_text="deleted public source", chunk_index=0, chunk_level=2,
+        embedding=_make_vec(seed=32),
+    )
+    requester = User(
+        clerk_id="cache_vis_n2_member",
+        display_name="N2 비멤버",
+        email="cache_vis_n2@kairos.test",
+    )
+    integration_session.add_all([chunk, requester])
+    await integration_session.flush()
+    integration_session.add(
+        WorkspaceMember(
+            workspace_id=team_ws.id,
+            user_id=requester.id,
+            role="member",
+        )
+    )
+    integration_session.add(
+        SemanticCache(
+            workspace_id=team_ws.id,
+            question="n2 deleted public?",
+            question_embedding=_make_vec(seed=32),
+            answer="삭제된 공개 답변",
+            sources=[{"id": str(chunk.id), "text": "deleted public source"}],
+            max_visibility="public",
+        )
+    )
+    await integration_session.commit()
+
+    await integration_session.delete(chunk)
+    await integration_session.commit()
+
+    hit = await EmbeddingRepository(integration_session).find_similar_cache(
+        question_embedding=_make_vec(seed=32),
+        workspace_id=team_ws.id,
+        requester_user_id=requester.id,
+        requester_role="member",
+        threshold=0.90,
+    )
+    assert hit is None
+
+
+@pytest.mark.asyncio
+async def test_cache_miss_private_when_some_source_chunks_deleted(
+    integration_session, auth_user, team_ws
+):
+    """N3: 둘 중 하나만 삭제돼도 private cache 는 비멤버에게 MISS."""
+    p_private = Project(
+        title="N3 private", workspace_id=team_ws.id, visibility="private",
+        created_by_id=auth_user.id,
+    )
+    p_public = Project(
+        title="N3 public", workspace_id=team_ws.id, visibility="public",
+        created_by_id=auth_user.id,
+    )
+    integration_session.add_all([p_private, p_public])
+    await integration_session.flush()
+
+    chunks = [
+        EmbeddingChunk(
+            workspace_id=team_ws.id, project_id=p_private.id,
+            source_id=uuid.uuid4(), source_type="note",
+            chunk_text="partially deleted private source", chunk_index=0,
+            chunk_level=2, embedding=_make_vec(seed=33),
+        ),
+        EmbeddingChunk(
+            workspace_id=team_ws.id, project_id=p_public.id,
+            source_id=uuid.uuid4(), source_type="note",
+            chunk_text="remaining public source", chunk_index=0,
+            chunk_level=2, embedding=_make_vec(seed=33),
+        ),
+    ]
+    requester = User(
+        clerk_id="cache_vis_n3_member",
+        display_name="N3 비멤버",
+        email="cache_vis_n3@kairos.test",
+    )
+    integration_session.add_all([*chunks, requester])
+    await integration_session.flush()
+    integration_session.add(
+        WorkspaceMember(
+            workspace_id=team_ws.id,
+            user_id=requester.id,
+            role="member",
+        )
+    )
+    integration_session.add(
+        SemanticCache(
+            workspace_id=team_ws.id,
+            question="n3 partially deleted private?",
+            question_embedding=_make_vec(seed=33),
+            answer="부분 삭제된 비공개 답변",
+            sources=[{"id": str(chunk.id), "text": chunk.chunk_text} for chunk in chunks],
+            max_visibility="private",
+        )
+    )
+    await integration_session.commit()
+
+    await integration_session.delete(chunks[0])
+    await integration_session.commit()
+
+    hit = await EmbeddingRepository(integration_session).find_similar_cache(
+        question_embedding=_make_vec(seed=33),
+        workspace_id=team_ws.id,
+        requester_user_id=requester.id,
+        requester_role="member",
+        threshold=0.90,
+    )
+    assert hit is None
+
+
+@pytest.mark.asyncio
+async def test_cache_hit_deleted_sources_for_admin(
+    integration_session, auth_user, team_ws
+):
+    """N4: admin 은 삭제된 source cache 도 정책상 HIT."""
+    p_private = Project(
+        title="N4 private", workspace_id=team_ws.id, visibility="private",
+        created_by_id=auth_user.id,
+    )
+    integration_session.add(p_private)
+    await integration_session.flush()
+
+    chunk = EmbeddingChunk(
+        workspace_id=team_ws.id, project_id=p_private.id,
+        source_id=uuid.uuid4(), source_type="note",
+        chunk_text="admin deleted source", chunk_index=0, chunk_level=2,
+        embedding=_make_vec(seed=34),
+    )
+    integration_session.add(chunk)
+    await integration_session.flush()
+    integration_session.add(
+        SemanticCache(
+            workspace_id=team_ws.id,
+            question="n4 admin deleted?",
+            question_embedding=_make_vec(seed=34),
+            answer="admin 삭제 답변",
+            sources=[{"id": str(chunk.id), "text": "admin deleted source"}],
+            max_visibility="private",
+        )
+    )
+    await integration_session.commit()
+
+    await integration_session.delete(chunk)
+    await integration_session.commit()
+
+    hit = await EmbeddingRepository(integration_session).find_similar_cache(
+        question_embedding=_make_vec(seed=34),
+        workspace_id=team_ws.id,
+        requester_user_id=auth_user.id,
+        requester_role="admin",
+        threshold=0.90,
+    )
+    assert hit is not None
+    assert hit["answer"] == "admin 삭제 답변"
+
+
+@pytest.mark.asyncio
+async def test_cache_miss_deleted_sources_for_project_member(
+    integration_session, auth_user, team_ws
+):
+    """N5: ProjectMember 본인도 삭제된 private source cache 는 MISS."""
+    p_private = Project(
+        title="N5 private", workspace_id=team_ws.id, visibility="private",
+        created_by_id=auth_user.id,
+    )
+    integration_session.add(p_private)
+    await integration_session.flush()
+    integration_session.add(
+        ProjectMember(
+            project_id=p_private.id,
+            user_id=auth_user.id,
+            workspace_id=team_ws.id,
+            role="member",
+        )
+    )
+
+    chunk = EmbeddingChunk(
+        workspace_id=team_ws.id, project_id=p_private.id,
+        source_id=uuid.uuid4(), source_type="note",
+        chunk_text="project member deleted source", chunk_index=0, chunk_level=2,
+        embedding=_make_vec(seed=35),
+    )
+    integration_session.add(chunk)
+    await integration_session.flush()
+    integration_session.add(
+        SemanticCache(
+            workspace_id=team_ws.id,
+            question="n5 project member deleted?",
+            question_embedding=_make_vec(seed=35),
+            answer="프로젝트 멤버 삭제 답변",
+            sources=[{"id": str(chunk.id), "text": "project member deleted source"}],
+            max_visibility="private",
+        )
+    )
+    await integration_session.commit()
+
+    await integration_session.delete(chunk)
+    await integration_session.commit()
+
+    hit = await EmbeddingRepository(integration_session).find_similar_cache(
+        question_embedding=_make_vec(seed=35),
+        workspace_id=team_ws.id,
+        requester_user_id=auth_user.id,
+        requester_role="member",
+        threshold=0.90,
+    )
+    assert hit is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "sources",
+    [[], [{"text": "source id 없음"}]],
+    ids=["empty_sources", "source_without_id"],
+)
+async def test_cache_miss_private_without_source_chunk_ids(
+    integration_session, auth_user, team_ws, sources
+):
+    """N6: 비-admin private cache 의 빈·형식 불량 source 는 MISS."""
+    requester = User(
+        clerk_id=f"cache_vis_n6_{len(sources)}",
+        display_name="N6 비멤버",
+        email=f"cache_vis_n6_{len(sources)}@kairos.test",
+    )
+    integration_session.add(requester)
+    await integration_session.flush()
+    integration_session.add(
+        WorkspaceMember(
+            workspace_id=team_ws.id,
+            user_id=requester.id,
+            role="member",
+        )
+    )
+    integration_session.add(
+        SemanticCache(
+            workspace_id=team_ws.id,
+            question=f"n6 missing chunk ids {len(sources)}?",
+            question_embedding=_make_vec(seed=36 + len(sources)),
+            answer="source id 없는 답변",
+            sources=sources,
+            max_visibility="private",
+        )
+    )
+    await integration_session.commit()
+
+    hit = await EmbeddingRepository(integration_session).find_similar_cache(
+        question_embedding=_make_vec(seed=36 + len(sources)),
+        workspace_id=team_ws.id,
+        requester_user_id=requester.id,
+        requester_role="member",
+        threshold=0.90,
+    )
+    assert hit is None
+
+
+@pytest.mark.asyncio
+async def test_cache_miss_stale_public_visibility_after_project_becomes_private(
+    integration_session, auth_user, team_ws
+):
+    """N7: 살아 있는 chunk 의 public→private stale label 은 비멤버에게 MISS."""
+    project = Project(
+        title="N7 public then private", workspace_id=team_ws.id,
+        visibility="public", created_by_id=auth_user.id,
+    )
+    integration_session.add(project)
+    await integration_session.flush()
+
+    chunk = EmbeddingChunk(
+        workspace_id=team_ws.id, project_id=project.id,
+        source_id=uuid.uuid4(), source_type="note",
+        chunk_text="stale public source", chunk_index=0, chunk_level=2,
+        embedding=_make_vec(seed=38),
+    )
+    requester = User(
+        clerk_id="cache_vis_n7_member",
+        display_name="N7 비멤버",
+        email="cache_vis_n7@kairos.test",
+    )
+    integration_session.add_all([chunk, requester])
+    await integration_session.flush()
+    integration_session.add(
+        WorkspaceMember(
+            workspace_id=team_ws.id,
+            user_id=requester.id,
+            role="member",
+        )
+    )
+    integration_session.add(
+        SemanticCache(
+            workspace_id=team_ws.id,
+            question="n7 stale public?",
+            question_embedding=_make_vec(seed=38),
+            answer="stale 공개 라벨 답변",
+            sources=[{"id": str(chunk.id), "text": "stale public source"}],
+            max_visibility="public",
+        )
+    )
+    await integration_session.commit()
+
+    project.visibility = "private"
+    integration_session.add(project)
+    await integration_session.commit()
+
+    hit = await EmbeddingRepository(integration_session).find_similar_cache(
+        question_embedding=_make_vec(seed=38),
+        workspace_id=team_ws.id,
+        requester_user_id=requester.id,
+        requester_role="member",
+        threshold=0.90,
+    )
+    assert hit is None
+
+
+@pytest.mark.asyncio
+async def test_cache_hit_public_when_source_chunks_are_visible(
+    integration_session, auth_user, team_ws
+):
+    """살아 있는 public source cache 는 비-admin 사용자도 HIT."""
     p_public = Project(
         title="PP", workspace_id=team_ws.id, visibility="public",
         created_by_id=auth_user.id,

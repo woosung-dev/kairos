@@ -176,27 +176,32 @@ PROJECT_VISIBILITY_FILTER_SQL = """
         """
 
 # EmbeddingRepository._all_chunks_visible 용 anti-join 쿼리 (admin 우회는 caller).
-# 위반 정의: project_id 있고 코어 규칙 통과 못 하는 chunk 가 1개라도 존재.
+# 2026-08-01 BL-EXT-CACHE-1: 행 부재 = 위반(fail-closed) — 삭제된 source chunk 를
+# 참조하는 캐시행의 비-admin 서빙을 차단한다.
+# 위반 정의: 요청한 chunk 행이 없거나, project_id 있고 코어 규칙 통과 못 하는 chunk 가 1개라도 존재.
 ALL_CHUNKS_VISIBLE_SQL = """
-            SELECT 1 FROM embedding_chunks ec
-            WHERE ec.id = ANY(:chunk_ids)
-              AND ec.project_id IS NOT NULL
-              AND NOT EXISTS (
-                SELECT 1 FROM projects p
-                WHERE p.id = ec.project_id
-                  AND (
-                    p.visibility = 'public'
-                    OR (p.visibility = 'draft' AND p.created_by_id = :req_uid)
-                    OR (p.visibility = 'private' AND EXISTS (
-                      SELECT 1 FROM project_members pm
-                      WHERE pm.project_id = p.id AND pm.user_id = :req_uid
-                        AND EXISTS (
-                          SELECT 1 FROM workspace_members wm
-                          WHERE wm.workspace_id = p.workspace_id
-                            AND wm.user_id = :req_uid
-                        )
-                    ))
-                  )
-              )
+            SELECT 1 FROM unnest(CAST(:chunk_ids AS uuid[])) AS req(id)
+            LEFT JOIN embedding_chunks ec ON ec.id = req.id
+            WHERE ec.id IS NULL
+               OR (
+                 ec.project_id IS NOT NULL
+                 AND NOT EXISTS (
+                   SELECT 1 FROM projects p
+                   WHERE p.id = ec.project_id
+                     AND (
+                       p.visibility = 'public'
+                       OR (p.visibility = 'draft' AND p.created_by_id = :req_uid)
+                       OR (p.visibility = 'private' AND EXISTS (
+                         SELECT 1 FROM project_members pm
+                         WHERE pm.project_id = p.id AND pm.user_id = :req_uid
+                           AND EXISTS (
+                             SELECT 1 FROM workspace_members wm
+                             WHERE wm.workspace_id = p.workspace_id
+                               AND wm.user_id = :req_uid
+                           )
+                       ))
+                     )
+                 )
+               )
             LIMIT 1
         """

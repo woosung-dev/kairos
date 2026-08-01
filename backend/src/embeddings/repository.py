@@ -31,6 +31,14 @@ TIME_RANGE_INTERVAL: dict[str, timedelta | None] = {
 }
 
 
+ALL_CHUNKS_EXIST_SQL = """
+            SELECT 1 FROM unnest(CAST(:chunk_ids AS uuid[])) AS req(id)
+            LEFT JOIN embedding_chunks ec ON ec.id = req.id
+            WHERE ec.id IS NULL
+            LIMIT 1
+        """
+
+
 async def _apply_hnsw_session_params(session: AsyncSession) -> None:
     # Sprint 16 ADR-020 / CONTEXT-MAP I-21: 벡터 검색 트랜잭션 진입 시 세션 변수를
     # 트랜잭션 로컬로 강제. PERF-r2-6: 3 SET LOCAL(=Neon RTT 3회) → 단일
@@ -380,16 +388,14 @@ class EmbeddingRepository:
 
         # BL-041 + BL-042: cache hit 시 sources visibility 검증.
         # - admin/owner : 모든 visibility 통과
-        # - max_visibility = 'public' : fast path (모든 사용자 통과)
-        # - 그 외 : _all_chunks_visible anti-join 으로 chunk 별 검증
+        # - 비-admin : _all_chunks_visible anti-join 으로 chunk 별 검증
         is_admin = requester_role in ("admin", "owner")
-        max_vis = row._mapping.get("max_visibility", "public")
-        if not is_admin and max_vis != "public":
+        if not is_admin:
             sources = row._mapping["sources"] or []
             chunk_ids = [s["id"] for s in sources if isinstance(s, dict) and "id" in s]
-            if chunk_ids and not await self._all_chunks_visible(
-                chunk_ids, requester_user_id
-            ):
+            if not chunk_ids:
+                return None
+            if not await self._all_chunks_visible(chunk_ids, requester_user_id):
                 # 누출 위험 — cache miss 처리. hit_count 증가도 skip.
                 return None
 
@@ -403,8 +409,10 @@ class EmbeddingRepository:
         """BL-042: sources 의 chunk 들이 참조하는 project 들 중 가장 제한적인
         visibility 반환 ('public' < 'draft' < 'private').
 
-        cache 저장 시 호출 — find_similar_cache 의 fast path 인덱스용.
+        cache 저장 시 호출 — 저장 시점 라벨이다. 2026-08-01 BL-EXT-CACHE-3 이후
+        읽기 경로는 이 라벨로 검증을 건너뛰지 않는다 (비-admin 은 항상 재검사).
         chunk.project_id IS NULL 또는 chunk 자체 없으면 'public' (대응 안 함).
+        rag/service.py 의 캐시 저장 fence 가 chunk 자체 없는 상황을 배제한다.
         """
         if not chunk_ids:
             return "public"
@@ -431,6 +439,35 @@ class EmbeddingRepository:
             return "draft"
         return "private"
 
+    async def all_chunks_exist(self, chunk_ids: list[str]) -> bool:
+        """주어진 chunk id 가 모두 존재하는지 확인한다.
+
+        빈 목록은 검사할 chunk 가 없으므로 True 를 반환한다.
+        """
+        if not chunk_ids:
+            return True
+
+        result = await self.session.execute(
+            text(ALL_CHUNKS_EXIST_SQL),
+            {"chunk_ids": [str(chunk_id) for chunk_id in chunk_ids]},
+        )
+        return result.first() is None
+
+    async def count_existing_chunks(self, chunk_ids: list[str]) -> int:
+        """주어진 chunk id 중 현재 존재하는 행 수를 반환한다."""
+        if not chunk_ids:
+            return 0
+
+        result = await self.session.execute(
+            text("""
+                SELECT count(*)
+                FROM unnest(CAST(:chunk_ids AS uuid[])) AS req(id)
+                JOIN embedding_chunks ec ON ec.id = req.id
+            """),
+            {"chunk_ids": [str(chunk_id) for chunk_id in chunk_ids]},
+        )
+        return result.scalar_one()
+
     async def _all_chunks_visible(
         self,
         chunk_ids: list[str],
@@ -439,6 +476,7 @@ class EmbeddingRepository:
         """BL-041: cache sources 의 모든 chunk 가 requester 에게 visibility 통과하는지.
 
         한 chunk 라도 fail → False 반환 → 호출자가 cache miss 처리.
+        행이 없는 chunk id 도 위반으로 처리한다.
         visibility 규칙은 _visibility_filter_sql 와 동일 (ADR-014):
         - chunk.project_id IS NULL → 통과
         - project.visibility = 'public' → 통과
