@@ -5,14 +5,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowUpRight, Check, Pencil } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Check, Pencil, Trash2 } from "lucide-react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useNote, useUpdateNote } from "../hooks";
+import { useDeleteNote, useNote, useUpdateNote } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { ExportButton } from "@/components/shared/ExportButton";
 import { exportNote } from "../api";
 import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const AUTOSAVE_DEBOUNCE_MS = 1000;
 
@@ -27,9 +38,11 @@ export function NoteDetail({ noteId }: NoteDetailProps) {
   const canWrite = hasRole("member");
   const { data: note, isLoading, error } = useNote(wid ?? undefined, noteId);
   const updateNote = useUpdateNote(wid ?? undefined);
+  const deleteNote = useDeleteNote(wid ?? undefined);
 
   const [isEditing, setIsEditing] = useState(false);
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   // Codex F-9 fix (Sprint 24 Wave 2 P2): title/content autosave 별도 timer.
   // 기존: 공유 debounceRef → title 입력 1s 안에 content 입력 시 title save cancel (또는 그 반대).
   // 해결: 별도 ref 로 독립 debounce, 둘 다 안전하게 commit.
@@ -107,6 +120,18 @@ export function NoteDetail({ noteId }: NoteDetailProps) {
     }
     setIsEditing(false);
   }, [editor, noteId, updateNote]);
+
+  const handleDelete = useCallback(() => {
+    deleteNote.mutate(noteId, {
+      onSuccess: () => {
+        toast.success("노트를 삭제했습니다");
+        router.push("/notes");
+      },
+      onError: (err) => {
+        toast.error(err instanceof Error ? err.message : "노트 삭제에 실패했습니다");
+      },
+    });
+  }, [deleteNote, noteId, router]);
 
   if (!wid) {
     return (
@@ -196,6 +221,22 @@ export function NoteDetail({ noteId }: NoteDetailProps) {
               <span>저장</span>
             </button>
           )}
+          {canWrite && (
+            <button
+              type="button"
+              aria-label="삭제"
+              data-testid="note-detail-delete-button"
+              onClick={() => setIsDeleteAlertOpen(true)}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md cursor-pointer border text-xs font-medium transition-colors duration-150 hover:bg-[var(--surface-active)]"
+              style={{
+                borderColor: "var(--error)",
+                color: "var(--error)",
+              }}
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>삭제</span>
+            </button>
+          )}
           <button
             type="button"
             data-testid="note-detail-promote-button"
@@ -274,6 +315,27 @@ export function NoteDetail({ noteId }: NoteDetailProps) {
         open={isPromoteOpen}
         onOpenChange={setIsPromoteOpen}
       />
+
+      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>노트를 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              삭제된 노트는 복원할 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+              disabled={deleteNote.isPending}
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
