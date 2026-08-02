@@ -4,7 +4,7 @@ import { Search, LogOut, Settings } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "@/store/ui";
 import { useMembers } from "@/features/members/hooks";
-import { useWorkspaces } from "@/features/workspaces/hooks";
+import { useIsValidWorkspaceId } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { WorkspaceSwitcher } from "@/features/workspaces/components/WorkspaceSwitcher";
 import { useClerk, useUser } from "@clerk/nextjs";
@@ -21,10 +21,8 @@ import {
 export function Header() {
   const { toggleSidebar, toggleRagOverlay } = useUIStore();
   const wid = useWorkspaceStore((s) => s.activeWorkspaceId);
-  const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId);
   // localStorage 의 stale wid 로 인한 404 fetch 차단 (BUG-H01)
-  const { data: workspaces } = useWorkspaces();
-  const isValidWid = !!wid && !!workspaces?.some((w) => w.id === wid);
+  const isValidWid = useIsValidWorkspaceId(wid ?? undefined);
   const { data: members } = useMembers(isValidWid ? wid! : undefined);
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
@@ -159,14 +157,14 @@ export function Header() {
 
             <DropdownMenuSeparator />
 
-            {/* 로그아웃 — 워크스페이스 캐시/Zustand 정리 후 sign-out (BUG-H01).
+            {/* 로그아웃 — query cache 정리 후 sign-out. activeWorkspaceId 초기화는 panel-layout
+                self-heal 과 경합해 즉시 되채워지므로 계정 전환 방어는 ensureOwner 가 담당한다.
                 base-ui Menu.Item 은 onClick 사용 — onSelect (Radix API) 는 미동작. */}
             <DropdownMenuItem
               variant="destructive"
               className="px-3 py-2 cursor-pointer"
               onClick={async () => {
                 queryClient.clear();
-                setActiveWorkspaceId("");
                 await signOut({ redirectUrl: "/" });
               }}
             >

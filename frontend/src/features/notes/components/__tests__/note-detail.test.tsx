@@ -140,11 +140,12 @@ describe("NoteDetail 삭제", () => {
     expect(deleteMutate).toHaveBeenCalledWith(NOTE_ID, expect.any(Object));
   });
 
-  it("canWrite=false이면 삭제 버튼을 렌더하지 않는다", () => {
+  it("canWrite=false이면 편집·삭제 버튼을 렌더하지 않는다", () => {
     useWorkspaceStore.setState({ workspaceRole: "viewer" });
 
     renderNoteDetail();
 
+    expect(screen.queryByLabelText("편집")).not.toBeInTheDocument();
     expect(
       screen.queryByTestId("note-detail-delete-button"),
     ).not.toBeInTheDocument();
@@ -179,13 +180,15 @@ describe("NoteDetail 삭제 권한 (작성자 본인 + admin 이상)", () => {
     expect(screen.getByLabelText("삭제")).toBeInTheDocument();
   });
 
-  it("멤버 정보 로딩 중에는 삭제 버튼을 렌더하지 않는다", () => {
+  it("workspace role이 미확정이면 편집을 보이고 삭제 버튼을 렌더하지 않는다", () => {
+    useWorkspaceStore.setState({ workspaceRole: null });
     mockUseWorkspaceRole.mockReturnValue(
-      roleResult({ isLoading: true, userId: null }),
+      roleResult({ userId: null }),
     );
 
     renderNoteDetail();
 
+    expect(screen.getByLabelText("편집")).toBeInTheDocument();
     expect(screen.queryByLabelText("삭제")).not.toBeInTheDocument();
   });
 });

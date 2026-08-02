@@ -2,6 +2,10 @@
 
 import { inboxKeys } from "@/lib/query-keys";
 import { useApiClient } from "@/lib/use-api-client";
+import {
+  useWorkspaceIdGuard,
+  withWorkspaceGuardLoading,
+} from "@/features/workspaces/hooks";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -16,13 +20,17 @@ import type { FetchInboxParams } from "./api";
  */
 export function useInbox(wid: string | undefined, params?: FetchInboxParams) {
   const api = useApiClient();
+  const { isValidWorkspaceId, isWorkspaceListPending, workspaceListError } =
+    useWorkspaceIdGuard(wid);
 
-  return useQuery({
+  const query = useQuery({
     // Sprint 23 D3 fix: queryKey 에 params 포함 → 각 callsite 의 의도 분리.
     queryKey: inboxKeys.list(wid ?? "", params),
     queryFn: () => fetchInbox(api, wid!, params),
-    enabled: !!wid,
+    enabled: !!wid && isValidWorkspaceId,
   });
+
+  return withWorkspaceGuardLoading(query, isWorkspaceListPending, workspaceListError);
 }
 
 /**

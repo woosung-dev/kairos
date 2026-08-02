@@ -2,6 +2,10 @@
 
 import { memberKeys, inviteKeys, workspaceKeys } from "@/lib/query-keys";
 import { useApiClient } from "@/lib/use-api-client";
+import {
+  useWorkspaceIdGuard,
+  withWorkspaceGuardLoading,
+} from "@/features/workspaces/hooks";
 import { useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -27,10 +31,14 @@ import type {
 
 export function useSyncWorkspaceRole(wid: string | undefined) {
   const { user } = useUser();
-  const { data: members } = useMembers(wid);
+  const { data: members, isLoading: isMembersLoading } = useMembers(wid);
   const setWorkspaceRole = useWorkspaceStore((s) => s.setWorkspaceRole);
 
   useEffect(() => {
+    if (isMembersLoading) {
+      return;
+    }
+
     if (!members || !user) {
       setWorkspaceRole(null);
       return;
@@ -38,21 +46,25 @@ export function useSyncWorkspaceRole(wid: string | undefined) {
     // Clerk user.id로 직접 매칭 (email은 JWT claims에 미포함)
     const me = members.find((m) => m.clerkId === user.id);
     setWorkspaceRole(me?.role ?? null);
-  }, [members, user, setWorkspaceRole]);
+  }, [members, isMembersLoading, user, setWorkspaceRole]);
 }
 
 // --- 멤버 훅 ---
 
 export function useMembers(wid: string | undefined) {
   const api = useApiClient();
+  const { isValidWorkspaceId, isWorkspaceListPending, workspaceListError } =
+    useWorkspaceIdGuard(wid);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: memberKeys.list(wid ?? ""),
     queryFn: () => fetchMembers(api, wid!),
-    enabled: !!wid,
+    enabled: !!wid && isValidWorkspaceId,
     // 권한 표면 — 전역 focus refetch off 에서 예외 (role 변경/제거 반영 지연 방지)
     refetchOnWindowFocus: true,
   });
+
+  return withWorkspaceGuardLoading(query, isWorkspaceListPending, workspaceListError);
 }
 
 export function useWorkspaceRole(workspaceId: string | undefined) {
@@ -130,14 +142,23 @@ export function useInvites(
   options?: { enabled?: boolean },
 ) {
   const api = useApiClient();
+  const { isValidWorkspaceId, isWorkspaceListPending, workspaceListError } =
+    useWorkspaceIdGuard(wid);
+  const isInvitesEnabled = options?.enabled ?? true;
 
-  return useQuery({
+  const query = useQuery({
     queryKey: inviteKeys.list(wid ?? ""),
     queryFn: () => fetchInvites(api, wid!),
-    enabled: !!wid && (options?.enabled ?? true),
+    enabled: !!wid && isValidWorkspaceId && isInvitesEnabled,
     // 권한 표면 — 전역 focus refetch off 에서 예외 (초대 비활성화 반영 지연 방지)
     refetchOnWindowFocus: true,
   });
+
+  return withWorkspaceGuardLoading(
+    query,
+    isWorkspaceListPending && isInvitesEnabled,
+    isInvitesEnabled ? workspaceListError : null,
+  );
 }
 
 export function useCreateInvite(wid: string | undefined) {
