@@ -92,6 +92,7 @@ beforeEach(() => {
   useWorkspaceStore.setState({ activeWorkspaceId: "workspace-1" });
   vi.mocked(useWorkspaceRole).mockReturnValue({
     role: "owner",
+    userId: "user-owner",
     isLoading: false,
     isOwner: true,
     isAdmin: true,

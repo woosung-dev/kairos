@@ -125,8 +125,13 @@ class NotePipelineService:
         check_project_access (admin/owner 우회 / project None / public / draft creator /
         private member) 재사용 — _verify_note_visibility 와 동일 규칙.
         requester_role 미전달(None) = 내부 호출 → 게이트 skip (하위호환).
+
+        BL-NOTE-DELETE-POLICY-1 (2026-08-02 사용자 결정): visibility 통과 후 **작성자 본인 +
+        admin 이상**만 삭제할 수 있다. 삭제는 되돌릴 수 없고 노트는 개인 저작물 성격이 강하다.
+        **게이트 순서가 계약이다** — visibility(404) 가 먼저, 작성자(403) 가 나중. 그래야
+        보이지 않는 노트의 존재가 403 으로 누출되지 않는다.
         """
-        from src.notes.exceptions import NoteNotFoundError
+        from src.notes.exceptions import NoteDeleteForbiddenError, NoteNotFoundError
 
         note = await self.note_repo.find_by_id(note_id, workspace_id)
         if note is None:
@@ -138,6 +143,12 @@ class NotePipelineService:
             if not has_access:
                 # fail-closed 404 — 존재성/소속 누출 방지 (get/list 와 동일 시그널)
                 raise NoteNotFoundError()
+            if (
+                requester_role not in ADMIN_BYPASS_ROLES
+                and note.created_by_id != requester_user_id
+            ):
+                # 읽을 수는 있으나 삭제만 막힌다 → 403 (BL-NOTE-DELETE-POLICY-1)
+                raise NoteDeleteForbiddenError()
         project_id = note.project_id
         # embedding chunk 삭제 (repository 직접 호출 = 헌법 §4.2 OK, read-only가 아니지만
         # embeddings 도메인은 cross-domain shared service로 분류 — ADR-014 §1)

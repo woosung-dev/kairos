@@ -131,13 +131,36 @@
 - [x] **BL-FE-A11Y-DROPDOWN-1** (P3) → **해소.** `dashboard-header.tsx` 의 `DropdownMenuTrigger` 에
   `aria-label="프로젝트 관리 메뉴"` 부여. 테스트는 태그를 가정하지 않고 `getByLabelText` 로만 찾아
   열고 항목 클릭까지 단언한다(같은 배지가 화면에 따라 button/span 으로 갈리는 전례 때문).
-- [ ] **BL-NOTE-DELETE-POLICY-1** (P2) **제품 결정 완료 — 구현 대기.** member 가 남의 노트 상세에서도
-  삭제 버튼을 본다. 게이트가 `canWrite = hasRole("member")` 로 역할 기반이고 작성자 기반이 아니다.
-  - **결정 (2026-08-02 사용자)**: **작성자 본인 + admin 이상만 삭제 가능.** 근거 — 삭제는 되돌릴 수
-    없는 파괴적 액션이고 노트는 개인 저작물 성격이 강하다.
-  - 구현 범위: **FE 게이트 + BE 인가를 같은 PR 에서** 맞춘다(FE 만 고치면 API 로 우회 가능).
-    BE 가 현재 그 DELETE 를 실제 인가하는지는 여전히 미검증 — 임시 노트로 확인할 것
-    (나온스 노트를 파괴하면 다른 관측이 무너진다).
+- [x] **BL-NOTE-DELETE-POLICY-1** (P2) → **해소. 등재 서술이 이번엔 맞았다.**
+  **결정 (2026-08-02 사용자)**: 작성자 본인 + admin 이상만 삭제 가능. 근거 — 삭제는 되돌릴 수 없는
+  파괴적 액션이고 노트는 개인 저작물 성격이 강하다.
+  - **미검증이었던 BE 실측 결과**: `require_member`(역할≥member) + project visibility 게이트뿐이고
+    **작성자 검사가 0건**이었다 → member 가 남의 노트를 실제로 삭제할 수 있었다(등재대로).
+  - **스키마 변경 불필요** — `Note.created_by_id` 가 이미 있었고 응답의 `createdById` 와 FE `Note`
+    타입도 이미 이를 노출한다. 마이그레이션 0건.
+  - **FE 는 신규 엔드포인트 없이 해결** — `Member.userId`(내부 UUID) 가 members 응답에 이미 있어
+    `useWorkspaceRole` 이 본인 내부 id 를 함께 돌려주도록 한 줄 확장했다. `/users/me` 추가 호출 없음.
+  - 구현: `pipeline_service.delete_note_with_cleanup` 에 작성자 게이트(+`NoteDeleteForbiddenError` 403),
+    `note-detail.tsx` 삭제 버튼만 `canDelete` 로 교체(편집은 역할 기반 유지).
+    **게이트 순서가 계약** — visibility 404 가 먼저, 작성자 403 이 나중(존재 누출 방지).
+  - ⚠ 기존 회귀 1건(`test_member_delete_ok`)의 전제가 새 정책과 충돌해 보정했다 —
+    "비-작성자 ProjectMember 삭제 성공" → "ProjectMember **작성자** 삭제 성공"으로 의도 보존.
+  - 회귀: `backend/tests/integration/test_note_delete_authorship.py`(실 라우팅+실 RBAC+실 DB 10건) +
+    `note-detail.test.tsx` 4건.
+
+> **2026-08-02 BL-NOTE-DELETE-POLICY-1 라운드 G4(codex 교차 리뷰) 부수 발견 — 이번 변경과 무관한 선재 이슈.**
+
+- [ ] **BL-BE-RBAC-CACHE-DESTRUCTIVE-1** (P3) **member 게이트 라우트는 캐시된 role 로 admin 우회를 판정한다.**
+  `auth/rbac.py` 의 `bypass_cache = ROLE_LEVEL[min_role] >= admin` 때문에 `require_viewer`/`require_member`
+  라우트는 `_MEMBER_CACHE`(TTL 15s, invalidation 은 in-process 전용)를 쓴다. 그 라우트들이 넘긴
+  `member.role` 이 `ADMIN_BYPASS_ROLES` 비교에 그대로 쓰이므로, 강등 직후 타 인스턴스에서 최대 15초간
+  admin 우회가 성립한다. 같은 파일 주석이 "파괴적 작업은 캐시 bypass" 를 의도로 적고 있어 규약과도 어긋난다.
+  **범위**: notes get/update/export/delete 뿐 아니라 같은 패턴의 다른 도메인 전반 → 교차 이슈라 단일 PR 밖.
+  **[가정]** 실제 악용에는 강등 직후 15초 + 다중 인스턴스 조건이 필요해 심각도는 낮게 본다.
+- [ ] **BL-BE-NOTE-SERVICE-DELETE-DEAD-1** (P4) `NoteService.delete_note`(`notes/service.py:240`) 는
+  요청자 컨텍스트 없이 삭제하며 **호출부가 0건인 dead code** 다(라우터는 pipeline 경유). 지금은 우회가
+  아니지만 향후 누군가 이 메서드를 라우트에 연결하면 BL-NOTE-DELETE-POLICY-1 인가를 즉시 우회한다.
+  제거하거나 pipeline 으로 위임할 것. R3(기존 dead code 미변경)에 따라 이번 PR 에서는 손대지 않았다.
 - [x] **BL-RAG-PROMPT-HYGIENE-1** (P3) → **해소. ⚠ 등재된 원인이 틀렸다.** 앵커를
   "`RAG_SYSTEM_PROMPT` 소스 취급 규칙" 으로 적었으나 **그런 규칙은 없었다** — PR #146 이 규칙 4를
   제거한 뒤 프롬프트에 소스 제외를 지시하는 문장은 0건이고, `rag/service.py` `_format_sources_for_prompt`

@@ -69,6 +69,7 @@
 | N-8 | **promote 검증 — same_workspace/target_personal → 400, target_invalid/not_member → 403** (CannotPromoteToSameWorkspaceError / CannotPromoteToPersonalError / TargetWorkspaceInvalidError) |
 | N-9 | **Sprint 24 BL-064: chunk 0 + plain_text 분기는 BG re-embedding schedule** — 400 거부 대신 `_bg_regenerate_embed_with_audit` wrapper BG task 가 `pipeline.embed_note_async` 호출 + audit `pending → processing → completed/failed` lifecycle 갱신. plain_text 부재 case 만 400 회귀 가드 유지 |
 | N-10 | **Sprint 24 BL-064: PromoteNoteOut snake_case 보존** — `new_note_id` / `audit_id` / `embedding_status` 모두 snake_case (alias 추가 X). FE ItemPromoteModal 의 NEW_ID_KEY snake_case read 호환성 (Codex 2차 P2-3) |
+| N-11 | **BL-NOTE-DELETE-POLICY-1 (2026-08-02): 삭제는 작성자 본인 + admin 이상만** — `delete_note_with_cleanup` 이 visibility 게이트 통과 후 `note.created_by_id == requester_user_id` 또는 `requester_role in ADMIN_BYPASS_ROLES` 를 요구. **게이트 순서가 계약** — visibility 는 404(존재 누출 방지), 작성자는 **403**(이미 GET 으로 읽을 수 있는 노트라 숨길 실익이 없다). viewer 는 라우터 `require_member` 가 앞에서 차단. `requester_role=None` 내부 호출은 종전대로 skip. 회귀 = `tests/integration/test_note_delete_authorship.py` |
 
 ---
 

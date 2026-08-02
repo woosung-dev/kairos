@@ -10,6 +10,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { useDeleteNote, useNote, useUpdateNote } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import { useWorkspaceRole } from "@/features/members/hooks";
 import { ExportButton } from "@/components/shared/ExportButton";
 import { exportNote } from "../api";
 import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
@@ -37,6 +38,16 @@ export function NoteDetail({ noteId }: NoteDetailProps) {
   const hasRole = useWorkspaceStore((s) => s.hasRole);
   const canWrite = hasRole("member");
   const { data: note, isLoading, error } = useNote(wid ?? undefined, noteId);
+  // BL-NOTE-DELETE-POLICY-1: 삭제는 작성자 본인 + admin 이상만. 편집(canWrite)은 역할 기반 유지.
+  // BE 도 같은 규칙을 인가하므로(API 우회 차단) 이 게이트는 UX 층이다.
+  const { userId: myUserId, isAdmin, isLoading: isRoleLoading } =
+    useWorkspaceRole(wid ?? undefined);
+  // canWrite 를 함께 요구하는 이유 — 노트를 작성한 viewer 도 삭제할 수 없다(BE 라우터가
+  // require_member 로 먼저 막는다). 역할 하한 + 작성자/admin 을 모두 만족해야 한다.
+  const canDelete =
+    canWrite &&
+    !isRoleLoading &&
+    (isAdmin || (myUserId !== null && note?.createdById === myUserId));
   const updateNote = useUpdateNote(wid ?? undefined);
   const deleteNote = useDeleteNote(wid ?? undefined);
 
@@ -221,7 +232,7 @@ export function NoteDetail({ noteId }: NoteDetailProps) {
               <span>저장</span>
             </button>
           )}
-          {canWrite && (
+          {canDelete && (
             <button
               type="button"
               aria-label="삭제"

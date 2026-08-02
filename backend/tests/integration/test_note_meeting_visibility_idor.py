@@ -751,11 +751,18 @@ class TestNoteWritePathVisibilityIDOR:
             integration_session
         )
         await _add_project_member(integration_session, project.id, ws, outsider)
+        # BL-NOTE-DELETE-POLICY-1 (2026-08-02): 삭제가 작성자 본인 + admin 이상으로 좁혀졌다.
+        # 이 테스트의 원 의도는 "ProjectMember 는 visibility 게이트를 통과한다" 이므로
+        # 작성자 조건을 만족하는 노트(outsider 본인 작성)로 그 의도를 유지한다.
+        # 비-작성자 ProjectMember 가 403 을 받는 것은 test_note_delete_authorship.py 가 덮는다.
+        own_note = await _create_note(
+            integration_session, ws, project.id, outsider, self.SECRET
+        )
         pipeline = _note_pipeline(integration_session)
 
-        # ProjectMember → 삭제 성공 (예외 없음)
+        # ProjectMember + 작성자 → 삭제 성공 (예외 없음)
         await pipeline.delete_note_with_cleanup(
-            note.id, ws, requester_user_id=outsider, requester_role="member"
+            own_note.id, ws, requester_user_id=outsider, requester_role="member"
         )
 
     @pytest.mark.asyncio
