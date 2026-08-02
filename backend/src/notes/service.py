@@ -237,16 +237,6 @@ class NoteService:
         await self.repo.commit()
         return self._to_dict(note)
 
-    async def delete_note(
-        self, note_id: uuid.UUID, workspace_id: uuid.UUID
-    ) -> None:
-        """노트 삭제 (순수). embedding cleanup은 NotePipelineService 책임."""
-        note = await self.repo.find_by_id(note_id, workspace_id)
-        if note is None:
-            raise NoteNotFoundError()
-        await self.repo.delete(note)
-        await self.repo.commit()
-
     async def export_note(
         self,
         note_id: uuid.UUID,

@@ -2,6 +2,10 @@
 
 import { projectKeys, meetingKeys, onboardingKeys } from "@/lib/query-keys";
 import { useApiClient } from "@/lib/use-api-client";
+import {
+  useWorkspaceIdGuard,
+  withWorkspaceGuardLoading,
+} from "@/features/workspaces/hooks";
 import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -59,12 +63,16 @@ export function useRecentItems(
  */
 export function useProjects(wid: string | undefined, params?: FetchProjectsParams) {
   const api = useApiClient();
+  const { isValidWorkspaceId, isWorkspaceListPending, workspaceListError } =
+    useWorkspaceIdGuard(wid);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: projectKeys.list(wid ?? "", params),
     queryFn: () => fetchProjects(api, wid!, params),
-    enabled: !!wid,
+    enabled: !!wid && isValidWorkspaceId,
   });
+
+  return withWorkspaceGuardLoading(query, isWorkspaceListPending, workspaceListError);
 }
 
 /**
@@ -72,12 +80,16 @@ export function useProjects(wid: string | undefined, params?: FetchProjectsParam
  */
 export function useProject(wid: string | undefined, id: string) {
   const api = useApiClient();
+  const { isValidWorkspaceId, isWorkspaceListPending, workspaceListError } =
+    useWorkspaceIdGuard(wid);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: projectKeys.detail(wid ?? "", id),
     queryFn: () => fetchProject(api, wid!, id),
-    enabled: !!wid,
+    enabled: !!wid && isValidWorkspaceId,
   });
+
+  return withWorkspaceGuardLoading(query, isWorkspaceListPending, workspaceListError);
 }
 
 /**
@@ -205,12 +217,16 @@ export function useRemoveMeetingProject(wid: string | undefined) {
 /** Project 멤버 목록 조회 */
 export function useProjectMembers(wid: string | undefined, projectId: string) {
   const api = useApiClient();
+  const { isValidWorkspaceId, isWorkspaceListPending, workspaceListError } =
+    useWorkspaceIdGuard(wid);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: projectKeys.members(wid ?? "", projectId),
     queryFn: () => fetchProjectMembers(api, wid!, projectId),
-    enabled: !!wid && !!projectId,
+    enabled: !!wid && !!projectId && isValidWorkspaceId,
   });
+
+  return withWorkspaceGuardLoading(query, isWorkspaceListPending, workspaceListError);
 }
 
 /** Project 멤버 추가 (admin 이상) */

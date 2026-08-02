@@ -33,6 +33,26 @@ export function ProjectMembersPanel({
   visibility,
   canManage,
 }: ProjectMembersPanelProps) {
+  if (visibility !== "private") {
+    return null;
+  }
+
+  return (
+    <PrivateProjectMembersPanel
+      workspaceId={workspaceId}
+      projectId={projectId}
+      visibility={visibility}
+      canManage={canManage}
+    />
+  );
+}
+
+function PrivateProjectMembersPanel({
+  workspaceId,
+  projectId,
+  visibility,
+  canManage,
+}: ProjectMembersPanelProps) {
   const { data: projectMembers, isLoading } = useProjectMembers(
     workspaceId,
     projectId

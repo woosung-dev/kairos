@@ -7,7 +7,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from fastapi.responses import Response
 
-from src.auth.rbac import require_member, require_viewer
+from src.auth.rbac import require_member, require_member_fresh, require_viewer
 from src.workspaces.models import WorkspaceMember
 from src.notes.dependencies import get_note_pipeline_service, get_note_service
 from src.notes.pipeline_service import NotePipelineService
@@ -114,7 +114,7 @@ async def update_note(
     note_id: uuid.UUID,
     data: UpdateNoteRequest,
     background_tasks: BackgroundTasks,
-    member: WorkspaceMember = Depends(require_member),
+    member: WorkspaceMember = Depends(require_member_fresh),
     service: NoteService = Depends(get_note_service),
     pipeline: NotePipelineService = Depends(get_note_pipeline_service),
 ):
@@ -146,7 +146,7 @@ async def update_note(
 async def delete_note(
     workspace_id: uuid.UUID,
     note_id: uuid.UUID,
-    member: WorkspaceMember = Depends(require_member),
+    member: WorkspaceMember = Depends(require_member_fresh),
     pipeline: NotePipelineService = Depends(get_note_pipeline_service),
 ):
     # embedding cleanup 포함 orchestrator 경유 (ADR-014 옵션 A 정합) — Codex H2/옵션 A: workspace_id 필수
@@ -173,7 +173,7 @@ async def promote_note(
     note_id: uuid.UUID,
     body: NotePromoteIn,
     background_tasks: BackgroundTasks,
-    member: WorkspaceMember = Depends(require_member),
+    member: WorkspaceMember = Depends(require_member_fresh),
     service: NoteService = Depends(get_note_service),
 ) -> NotePromoteOut:
     """노트 → team workspace 복제 + audit row + 백그라운드 embedding 복제.

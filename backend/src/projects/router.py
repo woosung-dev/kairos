@@ -9,7 +9,12 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from src.auth.rbac import require_admin, require_member, require_viewer
+from src.auth.rbac import (
+    require_admin,
+    require_member,
+    require_member_fresh,
+    require_viewer,
+)
 from src.workspaces.models import WorkspaceMember
 from src.projects.dependencies import get_project_service
 from src.projects.schemas import (
@@ -102,7 +107,7 @@ async def update_project(
     workspace_id: uuid.UUID,
     project_id: uuid.UUID,
     data: UpdateProjectRequest,
-    member: WorkspaceMember = Depends(require_member),
+    member: WorkspaceMember = Depends(require_member_fresh),
     service: ProjectService = Depends(get_project_service),
 ):
     # BE-T15: visibility 변경은 admin 이상 강제 (L-7)

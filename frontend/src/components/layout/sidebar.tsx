@@ -168,7 +168,9 @@ function ProjectsList({
     });
   };
 
-  const { data: activeData } = useProjects(workspaceId, { status: "active" });
+  const { data: activeData, isLoading: isActiveProjectsLoading } = useProjects(workspaceId, {
+    status: "active",
+  });
   const { data: archivedData } = useProjects(workspaceId, { status: "archived" });
 
   const projects = activeData?.items ?? [];
@@ -187,7 +189,14 @@ function ProjectsList({
           프로젝트
         </span>
       </div>
-      {projects.length === 0 ? (
+      {isActiveProjectsLoading ? (
+        <p
+          className="text-xs py-4 text-center"
+          style={{ color: "var(--text-muted)" }}
+        >
+          프로젝트 불러오는 중...
+        </p>
+      ) : projects.length === 0 ? (
         <p
           className="text-xs py-4 text-center"
           style={{ color: "var(--text-muted)" }}

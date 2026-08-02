@@ -30,6 +30,11 @@ ROLE_LEVEL: dict[str, int] = {
 #   1) TTL 60s → 15s (cross-instance 읽기 stale 상한 축소)
 #   2) admin/owner 게이트는 캐시 bypass — 강등된 role 이 타 인스턴스에서 파괴적
 #      작업(멤버 관리·삭제·초대)을 통과하지 못하도록 항상 DB fresh 조회 (write-through).
+#   3) BL-BE-RBAC-CACHE-DESTRUCTIVE-1 (2026-08-02): member 게이트 중에서도 **캐시된 role 을
+#      admin 우회 판정에 그대로 소비하는** 파괴적 라우트는 require_member_fresh 로 opt-in 한다.
+#      ⚠ 그 밖의 상태 변경 member 라우트(create/capture/classify/dismiss/upload 등)는 여전히
+#      캐시 게이트다 — 강등된 viewer 가 15s 창에서 member 급 쓰기를 통과할 수 있다
+#      (BL-BE-RBAC-FRESH-REMAINING-1). 전면 적용은 성능 회귀라 별도 판단 대상.
 _MEMBER_CACHE: dict[tuple[uuid.UUID, uuid.UUID], tuple[WorkspaceMember, float]] = {}
 _MEMBER_CACHE_TTL_SEC = 15.0
 _MEMBER_CACHE_MAX_SIZE = 2000
@@ -91,10 +96,11 @@ class RoleChecker:
             ...
     """
 
-    def __init__(self, min_role: str) -> None:
+    def __init__(self, min_role: str, *, bypass_cache: bool = False) -> None:
         if min_role not in ROLE_LEVEL:
             raise ValueError(f"유효하지 않은 역할: {min_role}")
         self.min_role = min_role
+        self.bypass_cache = bypass_cache
 
     async def __call__(
         self,
@@ -104,7 +110,9 @@ class RoleChecker:
     ) -> WorkspaceMember:
         # Sprint 28 BUG-S28-PERF-RT-1 — cache hit 시 SELECT 0.
         # admin/owner 게이트는 bypass — cross-instance stale role 로 파괴적 작업 차단.
-        bypass_cache = ROLE_LEVEL[self.min_role] >= _CACHE_BYPASS_MIN_LEVEL
+        bypass_cache = self.bypass_cache or (
+            ROLE_LEVEL[self.min_role] >= _CACHE_BYPASS_MIN_LEVEL
+        )
         member = (
             None if bypass_cache else _member_cache_get(workspace_id, current_user.id)
         )
@@ -128,5 +136,6 @@ class RoleChecker:
 # 사전 정의 의존성 — 라우터에서 Depends(require_member) 형태로 사용
 require_viewer = RoleChecker("viewer")
 require_member = RoleChecker("member")
+require_member_fresh = RoleChecker("member", bypass_cache=True)
 require_admin = RoleChecker("admin")
 require_owner = RoleChecker("owner")

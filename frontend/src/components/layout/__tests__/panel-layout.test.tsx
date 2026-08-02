@@ -10,19 +10,23 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, waitFor } from "@testing-library/react";
-import { useWorkspaces } from "@/features/workspaces/hooks";
+import { useIsValidWorkspaceId, useWorkspaces } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import type { Workspace } from "@/features/workspaces/types";
 import { PanelLayout } from "../panel-layout";
 
 const CURRENT_USER = "user_A";
+const { toast } = vi.hoisted(() => ({ toast: vi.fn() }));
 
 vi.mock("@clerk/nextjs", () => ({
   useAuth: () => ({ userId: CURRENT_USER }),
 }));
 
+vi.mock("sonner", () => ({ toast }));
+
 vi.mock("@/features/workspaces/hooks", () => ({
   useWorkspaces: vi.fn(),
+  useIsValidWorkspaceId: vi.fn(),
 }));
 
 vi.mock("@/features/members/hooks", () => ({
@@ -59,6 +63,9 @@ function mockWorkspaces(data: Workspace[] | undefined) {
   vi.mocked(useWorkspaces).mockReturnValue({
     data,
   } as unknown as ReturnType<typeof useWorkspaces>);
+  vi.mocked(useIsValidWorkspaceId).mockImplementation(
+    (wid) => !!wid && !!data?.some((workspace) => workspace.id === wid),
+  );
 }
 
 function renderLayout() {
@@ -85,13 +92,24 @@ describe("PanelLayout — activeWorkspaceId self-heal", () => {
     });
   });
 
-  it("접근 불가 wid(목록에 없음)는 목록 첫 워크스페이스로 교정된다", async () => {
+  it("접근 불가 wid(목록에 없음)는 목록 첫 워크스페이스로 교정하고 한 번 알린다", async () => {
     useWorkspaceStore.setState({ activeWorkspaceId: "ws-foreign" });
     mockWorkspaces(WS_LIST);
 
-    renderLayout();
+    const { rerender } = renderLayout();
 
     await waitFor(() => expect(activeWid()).toBe("ws-1"));
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledWith(
+      "접근할 수 없어 “첫 워크스페이스” 워크스페이스로 전환했습니다",
+    );
+
+    rerender(
+      <PanelLayout>
+        <div>본문</div>
+      </PanelLayout>,
+    );
+    expect(toast).toHaveBeenCalledTimes(1);
   });
 
   it("목록에 있는 wid 는 덮어쓰지 않는다", async () => {
@@ -102,6 +120,7 @@ describe("PanelLayout — activeWorkspaceId self-heal", () => {
 
     await waitFor(() => expect(useWorkspaces).toHaveBeenCalled());
     expect(activeWid()).toBe("ws-2");
+    expect(toast).not.toHaveBeenCalled();
   });
 
   it("wid 가 비어있으면 목록 첫 워크스페이스로 채운다", async () => {
@@ -111,6 +130,7 @@ describe("PanelLayout — activeWorkspaceId self-heal", () => {
     renderLayout();
 
     await waitFor(() => expect(activeWid()).toBe("ws-1"));
+    expect(toast).not.toHaveBeenCalled();
   });
 
   it("목록 로딩 중(undefined)에는 접근 불가 wid 라도 건드리지 않는다", async () => {
@@ -121,5 +141,6 @@ describe("PanelLayout — activeWorkspaceId self-heal", () => {
 
     await waitFor(() => expect(useWorkspaces).toHaveBeenCalled());
     expect(activeWid()).toBe("ws-foreign");
+    expect(toast).not.toHaveBeenCalled();
   });
 });

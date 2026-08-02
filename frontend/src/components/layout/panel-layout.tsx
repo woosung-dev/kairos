@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useAuth } from "@clerk/nextjs";
+import { toast } from "sonner";
 import { useUIStore } from "@/store/ui";
 import { useSourceViewerStore } from "@/features/sources/store";
 import { useBreakpoint } from "@/hooks/use-media-query";
@@ -40,7 +41,7 @@ const SourceViewer = dynamic(
   { ssr: false, loading: () => <PanelSkeleton /> },
 );
 import { useSyncWorkspaceRole } from "@/features/members/hooks";
-import { useWorkspaces } from "@/features/workspaces/hooks";
+import { useIsValidWorkspaceId, useWorkspaces } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 
 export function PanelLayout({ children }: { children: React.ReactNode }) {
@@ -50,6 +51,8 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
   const ensureOwner = useWorkspaceStore((s) => s.ensureOwner);
   const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId);
   const { data: workspaces } = useWorkspaces();
+  const isValidWorkspaceId = useIsValidWorkspaceId(activeWorkspaceId ?? undefined);
+  const notifiedInvalidWorkspaceIdRef = useRef<string | undefined>(undefined);
 
   // 계정 소유자 가드 (BL-S27c-12): 다른 user 로 전환되면 이전 user 의
   // activeWorkspaceId 를 즉시 초기화해 cross-tenant 403 을 막는다. user id 만
@@ -71,10 +74,21 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
   // 목록에 있는 wid 는 덮어쓰지 않으므로 생성/전환으로 막 설정된 wid 는 그대로 유지된다.
   useEffect(() => {
     if (!workspaces?.length) return;
-    if (!workspaces.some((w) => w.id === activeWorkspaceId)) {
-      setActiveWorkspaceId(workspaces[0].id);
+    if (isValidWorkspaceId) {
+      notifiedInvalidWorkspaceIdRef.current = undefined;
+      return;
     }
-  }, [workspaces, activeWorkspaceId, setActiveWorkspaceId]);
+
+    const nextWorkspace = workspaces[0];
+    if (
+      activeWorkspaceId &&
+      notifiedInvalidWorkspaceIdRef.current !== activeWorkspaceId
+    ) {
+      toast(`접근할 수 없어 “${nextWorkspace.name}” 워크스페이스로 전환했습니다`);
+      notifiedInvalidWorkspaceIdRef.current = activeWorkspaceId;
+    }
+    setActiveWorkspaceId(nextWorkspace.id);
+  }, [workspaces, activeWorkspaceId, isValidWorkspaceId, setActiveWorkspaceId]);
 
   // 워크스페이스 변경 시 역할 동기화
   useSyncWorkspaceRole(activeWorkspaceId ?? undefined);

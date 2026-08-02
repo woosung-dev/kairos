@@ -24,6 +24,47 @@ export function useWorkspaces() {
   });
 }
 
+export function useWorkspaceIdGuard(wid: string | undefined) {
+  const {
+    data: workspaces,
+    error: workspaceListError,
+    isPending: isWorkspaceListPending,
+  } = useWorkspaces();
+
+  return {
+    isValidWorkspaceId: !!wid && !!workspaces?.some((workspace) => workspace.id === wid),
+    isWorkspaceListPending,
+    // 이미 받은 목록은 wid 가드의 근거로 유효하다. 그 뒤 background refetch 실패는
+    // 의존 쿼리를 막지 않으므로 그 쿼리의 오류로 전파하지 않는다.
+    workspaceListError: workspaces === undefined ? workspaceListError : null,
+  };
+}
+
+export function useIsValidWorkspaceId(wid: string | undefined) {
+  return useWorkspaceIdGuard(wid).isValidWorkspaceId;
+}
+
+export function withWorkspaceGuardLoading<T extends { isLoading: boolean }>(
+  query: T,
+  isWorkspaceListPending: boolean,
+  workspaceListError: Error | null = null,
+): T {
+  if (!isWorkspaceListPending && !workspaceListError) return query;
+
+  return new Proxy(query, {
+    get: (target, key, receiver) => {
+      if (workspaceListError) {
+        if (key === "error") return workspaceListError;
+        if (key === "isError") return true;
+        if (key === "status") return "error";
+        if (key === "isSuccess" || key === "isPending" || key === "isLoading") return false;
+      }
+      if (key === "isLoading" && isWorkspaceListPending) return true;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+}
+
 export function useCreateWorkspace() {
   const api = useApiClient();
   const queryClient = useQueryClient();

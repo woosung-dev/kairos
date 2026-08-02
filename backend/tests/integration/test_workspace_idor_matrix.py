@@ -417,9 +417,10 @@ class TestNotesIDORMatrix:
         from src.notes.dependencies import get_note_service, get_note_pipeline_service
 
         app.dependency_overrides[get_current_user] = lambda: user_a
-        # update_note 는 require_member 통과 — member_a 그대로 활용
-        from src.auth.rbac import require_member
+        # 정책 의존성 교체와 무관하게 router→service 전달만 검증한다.
+        from src.auth.rbac import require_member, require_member_fresh
         app.dependency_overrides[require_member] = lambda: member_a
+        app.dependency_overrides[require_member_fresh] = lambda: member_a
 
         note_id = uuid.uuid4()
         mock_service = AsyncMock()
@@ -451,10 +452,11 @@ class TestNotesIDORMatrix:
         """Codex F-2 Critical: update_note 가 cross-workspace project_id 거부 → 404."""
         from src.notes.dependencies import get_note_service, get_note_pipeline_service
         from src.projects.exceptions import ProjectNotFoundError
-        from src.auth.rbac import require_member
+        from src.auth.rbac import require_member, require_member_fresh
 
         app.dependency_overrides[get_current_user] = lambda: user_a
         app.dependency_overrides[require_member] = lambda: member_a
+        app.dependency_overrides[require_member_fresh] = lambda: member_a
 
         note_id = uuid.uuid4()
         foreign_project_id = uuid.uuid4()
@@ -480,10 +482,11 @@ class TestNotesIDORMatrix:
     ):
         """notes #4: DELETE /notes/{id} — pipeline.delete_note_with_cleanup workspace_id (Codex F-2 옵션 A)."""
         from src.notes.dependencies import get_note_pipeline_service
-        from src.auth.rbac import require_member
+        from src.auth.rbac import require_member, require_member_fresh
 
         app.dependency_overrides[get_current_user] = lambda: user_a
         app.dependency_overrides[require_member] = lambda: member_a
+        app.dependency_overrides[require_member_fresh] = lambda: member_a
 
         note_id = uuid.uuid4()
         mock_pipeline = AsyncMock()
@@ -513,10 +516,11 @@ class TestNotesIDORMatrix:
         """Codex 2차 Major 1 (C7): cross-tenant note DELETE → 404 (이전 204 success bug)."""
         from src.notes.dependencies import get_note_pipeline_service
         from src.notes.exceptions import NoteNotFoundError
-        from src.auth.rbac import require_member
+        from src.auth.rbac import require_member, require_member_fresh
 
         app.dependency_overrides[get_current_user] = lambda: user_a
         app.dependency_overrides[require_member] = lambda: member_a
+        app.dependency_overrides[require_member_fresh] = lambda: member_a
 
         note_id = uuid.uuid4()
         mock_pipeline = AsyncMock()
@@ -689,10 +693,11 @@ class TestActionsIDORMatrix:
     ):
         """actions #1: PATCH /action-items/{id} — workspace_id 정확 값 (Codex F-3)."""
         from src.actions.dependencies import get_action_service
-        from src.auth.rbac import require_member
+        from src.auth.rbac import require_member, require_member_fresh
 
         app.dependency_overrides[get_current_user] = lambda: user_a
         app.dependency_overrides[require_member] = lambda: member_a
+        app.dependency_overrides[require_member_fresh] = lambda: member_a
 
         action_id = uuid.uuid4()
         mock_service = AsyncMock()
@@ -722,10 +727,11 @@ class TestActionsIDORMatrix:
         """Codex F-2 Critical: update_action_item 의 project_id cross-workspace 거부 → 404."""
         from src.actions.dependencies import get_action_service
         from src.projects.exceptions import ProjectNotFoundError
-        from src.auth.rbac import require_member
+        from src.auth.rbac import require_member, require_member_fresh
 
         app.dependency_overrides[get_current_user] = lambda: user_a
         app.dependency_overrides[require_member] = lambda: member_a
+        app.dependency_overrides[require_member_fresh] = lambda: member_a
 
         action_id = uuid.uuid4()
         foreign_project_id = uuid.uuid4()
@@ -751,10 +757,11 @@ class TestActionsIDORMatrix:
         """
         from src.actions.dependencies import get_action_service
         from src.meetings.exceptions import MeetingNotFoundError
-        from src.auth.rbac import require_member
+        from src.auth.rbac import require_member, require_member_fresh
 
         app.dependency_overrides[get_current_user] = lambda: user_a
         app.dependency_overrides[require_member] = lambda: member_a
+        app.dependency_overrides[require_member_fresh] = lambda: member_a
 
         action_id = uuid.uuid4()
         foreign_meeting_id = uuid.uuid4()
@@ -785,10 +792,11 @@ class TestActionsIDORMatrix:
         """Codex F-2 Critical: update_action_item 의 assignee_id (다른 workspace 멤버) 거부 → 404."""
         from src.actions.dependencies import get_action_service
         from src.common.exceptions import NotFoundError
-        from src.auth.rbac import require_member
+        from src.auth.rbac import require_member, require_member_fresh
 
         app.dependency_overrides[get_current_user] = lambda: user_a
         app.dependency_overrides[require_member] = lambda: member_a
+        app.dependency_overrides[require_member_fresh] = lambda: member_a
 
         action_id = uuid.uuid4()
         foreign_user_id = uuid.uuid4()
@@ -933,10 +941,11 @@ class TestProjectsIDORMatrix:
     ):
         """PATCH /projects/{id} → service.update_project workspace_id 정확 값 (Codex F-3)."""
         from src.projects.dependencies import get_project_service
-        from src.auth.rbac import require_member
+        from src.auth.rbac import require_member, require_member_fresh
 
         app.dependency_overrides[get_current_user] = lambda: user_a
         app.dependency_overrides[require_member] = lambda: member_a
+        app.dependency_overrides[require_member_fresh] = lambda: member_a
 
         project_id = uuid.uuid4()
         mock_service = AsyncMock()

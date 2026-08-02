@@ -62,14 +62,14 @@
 | N-1 | **NoteService 는 embeddings.service 직접 호출 금지** — pipeline orchestrator 경유만 (헌법 §4.2, ADR-014 옵션 A) |
 | N-2 | **delete 는 pipeline.delete_note_with_cleanup 경유** — embedding cleanup + cache invalidation 묶음 (옵션 A, Codex H2) |
 | N-3 | **Note.project_id 변경 시 같은 workspace 내 project 만 허용** (Codex F-2 Critical secondary FK) |
-| N-4 | **헌법 I-9 (Sprint 19 PR #1, Codex F-1)** — service / repository / pipeline 모든 메서드 workspace_id 필수. find_by_id(note_id, workspace_id), get_note(note_id, workspace_id), update_note / delete_note / export_note 동일, pipeline embed_note_async / delete_note_with_cleanup 도 동일 |
+| N-4 | **헌법 I-9 (Sprint 19 PR #1, Codex F-1)** — service / repository / pipeline 모든 메서드 workspace_id 필수. find_by_id(note_id, workspace_id), get_note(note_id, workspace_id), update_note / export_note 동일, pipeline embed_note_async / delete_note_with_cleanup 도 동일 |
 | N-5 | **cross-tenant 시도 응답: 404** (path workspace 안에 없는 note_id = NotFound, Codex F-4 lock-in) |
 | N-6 | **Sprint 23 D4 promote = 복제 + tombstone (헌법 I-18)** — 원본 Note 변경 없음. target ws 에 새 Note + EmbeddingChunk 복제 (BG) + ItemPromotionAudit (item_type='note') |
 | N-7 | **promote 복제본 project_id = None** — source.project_id 는 source ws 의 project 라 cross-workspace 제약 (secondary FK ck). target ws 에서 PATCH 로 별도 연결 |
 | N-8 | **promote 검증 — same_workspace/target_personal → 400, target_invalid/not_member → 403** (CannotPromoteToSameWorkspaceError / CannotPromoteToPersonalError / TargetWorkspaceInvalidError) |
 | N-9 | **Sprint 24 BL-064: chunk 0 + plain_text 분기는 BG re-embedding schedule** — 400 거부 대신 `_bg_regenerate_embed_with_audit` wrapper BG task 가 `pipeline.embed_note_async` 호출 + audit `pending → processing → completed/failed` lifecycle 갱신. plain_text 부재 case 만 400 회귀 가드 유지 |
 | N-10 | **Sprint 24 BL-064: PromoteNoteOut snake_case 보존** — `new_note_id` / `audit_id` / `embedding_status` 모두 snake_case (alias 추가 X). FE ItemPromoteModal 의 NEW_ID_KEY snake_case read 호환성 (Codex 2차 P2-3) |
-| N-11 | **BL-NOTE-DELETE-POLICY-1 (2026-08-02): 삭제는 작성자 본인 + admin 이상만** — `delete_note_with_cleanup` 이 visibility 게이트 통과 후 `note.created_by_id == requester_user_id` 또는 `requester_role in ADMIN_BYPASS_ROLES` 를 요구. **게이트 순서가 계약** — visibility 는 404(존재 누출 방지), 작성자는 **403**(이미 GET 으로 읽을 수 있는 노트라 숨길 실익이 없다). viewer 는 라우터 `require_member` 가 앞에서 차단. `requester_role=None` 내부 호출은 종전대로 skip. 회귀 = `tests/integration/test_note_delete_authorship.py` |
+| N-11 | **BL-NOTE-DELETE-POLICY-1 (2026-08-02): 삭제는 작성자 본인 + admin 이상만** — `delete_note_with_cleanup` 이 visibility 게이트 통과 후 `note.created_by_id == requester_user_id` 또는 `requester_role in ADMIN_BYPASS_ROLES` 를 요구. **게이트 순서가 계약** — visibility 는 404(존재 누출 방지), 작성자는 **403**(이미 GET 으로 읽을 수 있는 노트라 숨길 실익이 없다). viewer 는 라우터 `require_member_fresh` 가 앞에서 차단. `requester_role=None` 내부 호출은 종전대로 skip. 회귀 = `tests/integration/test_note_delete_authorship.py` |
 
 ---
 
@@ -96,12 +96,11 @@ GET    /{id}/embedding-status     Sprint 24 BL-064: embedding 진행 상태 poll
 
 ### Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영)
 
-- 인증/인가: `require_member` (POST/PATCH/DELETE) / `require_viewer` (GET) 통과
+- 인증/인가: `require_member` (POST create) / `require_member_fresh` (PATCH/DELETE/POST promote) / `require_viewer` (GET) 통과
 - service / repository: 모든 호출 시 path `workspace_id` 필수 (헌법 I-9)
   - `service.get_note(note_id, workspace_id, requester_user_id=, requester_role=)`
   - `service.update_note(note_id, workspace_id, title=, content=, project_id=)`
   - `service.export_note(note_id, workspace_id, fmt, requester_user_id=, requester_role=)`
-  - `service.delete_note(note_id, workspace_id)` (현재 router 경로는 pipeline 직접 호출)
   - `repository.find_by_id(note_id, workspace_id)`
 - pipeline (옵션 A, Codex H2 — pipeline 우회 IDOR 차단):
   - `pipeline.embed_note_async(note_id, workspace_id)`
