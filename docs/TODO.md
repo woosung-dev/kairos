@@ -150,17 +150,25 @@
 
 > **2026-08-02 BL-NOTE-DELETE-POLICY-1 라운드 G4(codex 교차 리뷰) 부수 발견 — 이번 변경과 무관한 선재 이슈.**
 
-- [ ] **BL-BE-RBAC-CACHE-DESTRUCTIVE-1** (P3) **member 게이트 라우트는 캐시된 role 로 admin 우회를 판정한다.**
-  `auth/rbac.py` 의 `bypass_cache = ROLE_LEVEL[min_role] >= admin` 때문에 `require_viewer`/`require_member`
-  라우트는 `_MEMBER_CACHE`(TTL 15s, invalidation 은 in-process 전용)를 쓴다. 그 라우트들이 넘긴
-  `member.role` 이 `ADMIN_BYPASS_ROLES` 비교에 그대로 쓰이므로, 강등 직후 타 인스턴스에서 최대 15초간
-  admin 우회가 성립한다. 같은 파일 주석이 "파괴적 작업은 캐시 bypass" 를 의도로 적고 있어 규약과도 어긋난다.
-  **범위**: notes get/update/export/delete 뿐 아니라 같은 패턴의 다른 도메인 전반 → 교차 이슈라 단일 PR 밖.
-  **[가정]** 실제 악용에는 강등 직후 15초 + 다중 인스턴스 조건이 필요해 심각도는 낮게 본다.
-- [ ] **BL-BE-NOTE-SERVICE-DELETE-DEAD-1** (P4) `NoteService.delete_note`(`notes/service.py:240`) 는
-  요청자 컨텍스트 없이 삭제하며 **호출부가 0건인 dead code** 다(라우터는 pipeline 경유). 지금은 우회가
-  아니지만 향후 누군가 이 메서드를 라우트에 연결하면 BL-NOTE-DELETE-POLICY-1 인가를 즉시 우회한다.
-  제거하거나 pipeline 으로 위임할 것. R3(기존 dead code 미변경)에 따라 이번 PR 에서는 손대지 않았다.
+- [x] **BL-BE-RBAC-CACHE-DESTRUCTIVE-1** (P3) → **해소(범위 한정).** `RoleChecker` 에 키워드 전용
+  `bypass_cache` 옵션과 `require_member_fresh` 싱글턴을 추가하고, **캐시된 role 을 admin 우회 판정에
+  소비하는 파괴적 라우트만** fresh 게이트로 교체했다 (2026-08-02 기준: notes PATCH·DELETE·promote /
+  meetings promote / actions PATCH / projects PATCH). 가장 날카로운 건 `projects/router.py` PATCH —
+  visibility 변경 **권한 자체**를 캐시된 role 로 판정하고 있었다.
+  **읽기(GET) 경로는 그대로 뒀다** — `auth/CONTEXT.md` 가 2026-07-05 에 의도적으로 수용한 리스크다.
+  ⚠ **등재가 "교차 이슈라 단일 PR 밖" 이라고 본 것은 과대평가였다** — 실제 대상이 소수라 단일 PR 에 들어왔다.
+  **결정적 증거**: 실 Clerk JWT + 실 HTTP + 일회용 컨테이너 DB 직접 UPDATE(invalidation 우회)로 강등 창을
+  재현 → 치환본(`require_member`) **200(우회 성립)** ↔ 수정본(`require_member_fresh`) **403(차단)**.
+  회귀: `tests/integration/test_note_delete_authorship.py` (강등 창 403 · 정상 admin 통과 · GET 기존 거동 유지).
+- [ ] **BL-BE-RBAC-FRESH-REMAINING-1** (P3) `[신규 · 2026-08-02 G4 교차 리뷰]` 남은 **상태 변경** 라우트는
+  여전히 캐시 게이트(`require_member`)다 — inbox dismiss/classify · memory · upload · meetings capture ·
+  notes create · projects create/delete 등. 이들은 `member.role` 을 admin 우회 판정에 쓰지 않으므로
+  위 항목의 스코프 밖이었으나, **viewer 로 강등된 사용자가 15초 창에서 member 급 쓰기를 통과**할 수 있다.
+  BL-BE-RBAC-CACHE-DESTRUCTIVE-1 과 같은 방식(`require_member_fresh`)으로 확대할지 판단 필요.
+  ⚠ 확대 시 **성능 회귀 주의** — 캐시를 넣은 이유가 Stage 2 #6 이다.
+- [x] **BL-BE-NOTE-SERVICE-DELETE-DEAD-1** (P4) → **해소.** `NoteService.delete_note` 제거 +
+  `notes/CONTEXT.md` 갱신. 삭제 전 `rg -n "\.delete_note\(" backend/src backend/tests` 로 호출부 0건을
+  재확인했다(`delete_note_with_cleanup` 부분 문자열 히트 제외). 전체 스위트 통과 수 감소 0 으로 증명.
 - [x] **BL-RAG-PROMPT-HYGIENE-1** (P3) → **해소. ⚠ 등재된 원인이 틀렸다.** 앵커를
   "`RAG_SYSTEM_PROMPT` 소스 취급 규칙" 으로 적었으나 **그런 규칙은 없었다** — PR #146 이 규칙 4를
   제거한 뒤 프롬프트에 소스 제외를 지시하는 문장은 0건이고, `rag/service.py` `_format_sources_for_prompt`
@@ -173,42 +181,75 @@
 
 > **2026-08-02 WS-STALE 라운드 브라우저 QA 부수 발견 — 이번 변경과 무관한 기존 결함.**
 
-- [ ] **BL-FE-LOGOUT-RESET-DEAD-1** (P3) **로그아웃 핸들러의 `setActiveWorkspaceId("")` 가 실효 없다.**
-  실측(경로 A run1·run3): 로그아웃 직후 localStorage 의 `activeWorkspaceId` 가 `""` 가 아니라 owner
-  개인 ws 였다 — 값을 비운 직후 아직 언마운트되지 않은 self-heal 이 즉시 되채운다(run2 는 팀 ws 가
-  그대로 남아, 어느 값이 남는지도 캐시 상태에 따라 갈린다). 계정 전환 안전을 실제로 지탱하는 것은
-  `ensureOwner` 하나뿐이고 이 정리 코드는 이름값을 못 한다 = 단일 실패점.
-  앵커 = `header.tsx:169` + `panel-layout.tsx` self-heal.
-- [ ] **BL-FE-DASHBOARD-RAW-ANCHOR-1** (P3) 대시보드 "빠른 접근" 타일 4개가 `next/link` 가 아니라
-  원시 `<a href>` 라 클릭마다 풀 페이지 리로드가 일어난다(실측: `window.__qaMark` 소실). 같은 앱의
-  사이드바·하단 내비는 `next/link` 를 쓴다. SPA 내비게이션 상실 + 캐시·상태 폐기.
-  앵커 = `dashboard/page.tsx` 의 "빠른 접근" 타일 map.
-- [ ] **BL-FE-403-DOUBLE-FETCH-1** (P3) `[가정]` 접근 불가 워크스페이스 상태에서 같은 API 경로로 403 이
-  2회씩 중복 발사된다(`/projects` 진입 시 4종 각 2건). 앞 라운드 QA 도 같은 배수를 관측했다. 정상
-  상태에서는 드러나지 않으나 실패 시 오류 노이즈와 서버 부하가 2배다. **중복 원인은 코드로 특정하지
-  않았다** — Header/Sidebar 가 같은 wid-scoped 쿼리를 각자 구독하는 것으로 추정만 했다.
-- [ ] **BL-FE-WS-FALLBACK-LABEL-1** (P3) 접근 불가 ws 고착 시 사용자에게 원인 단서가 없다. 헤더가
-  `active?.name ?? "Kairos"` 폴백 라벨을 표시하고 사이드바는 "프로젝트 없음", 본문은 경고 한 줄뿐이다.
-  전환 UI 로 다른 ws 를 고르면 즉시 복구되는데 그 안내가 화면 어디에도 없다.
-  BL-FE-WS-HEAL-SCOPE-1 자동 교정으로 대부분 사라지지만 폴백 라벨 자체는 남는다.
-  앵커 = `WorkspaceSwitcher.tsx:91`.
-- [ ] **BL-DX-CONSOLE-ERROR-COUNT-1** (P3) **프로세스** — "console.error 0건" 합격 조건이 집계 방식에
-  따라 뒤집힌다. 앱 코드가 던진 `console.error`/`pageerror` 는 0건이어도 브라우저 generic
-  `Failed to load resource ... 403` raw 라인은 수십 건이 기록된다. `e2e/team-helpers.ts`
-  `collectConsoleErrors` 는 그 문자열을 노이즈로 거르면서 별도 response 리스너로 4xx 를 에러로 집계한다.
-  향후 라운드의 브라우저 신호는 **어느 집계인지까지** 못박아야 한다.
-- [ ] **BL-FE-WID-GUARD-PREFETCH-1** (P3) 접근 불가 wid 교정 **전 첫 렌더**에서 라우트당 403 이 4~5건
-  나간다(교정과 함께 멈추므로 기능 영향은 없다). `header.tsx:27` 은 이미 `isValidWid` 가드로 members
-  조회를 보류하는 선례가 있는데 projects/inbox 데이터 훅에는 같은 가드가 없다. 워크스페이스 목록이
-  도착하기 전 wid-scoped 요청을 보류하면 잔여 403 을 더 줄일 수 있다.
-- [ ] **BL-RAG-EMPTY-CITATION-1** (P3) RAG 가 `"제공된 소스에서 관련 정보를 찾지 못했습니다."` 라고
-  답하면서 인용 번호 `[1], [2]` 를 함께 붙인다(실측 1회). 정보를 못 찾았으면 인용할 소스도 없어야
-  하는데 번호가 남아, 사용자가 클릭 가능한 인용을 보고 근거가 있다고 오인할 수 있다.
-  `RAG_SYSTEM_PROMPT` 의 "정보 없음" 지시와 "사용한 소스를 번호로 인용" 지시가 충돌하는 것으로 보인다.
-- [ ] **BL-FE-MEMBERS-PANEL-NOOP-1** (P3) `[가정]` public 프로젝트 상세에도 "Project Members 0 /
-  명시적 멤버 없음" 섹션이 뜨고, 같은 화면에 "visibility=Private 시에만 명시 멤버 매핑 의미 있음"
-  이라는 안내가 함께 표시된다 — 아무 효과가 없다고 스스로 밝히는 섹션을 노출한다(owner 는 멤버 추가
-  입력창까지 본다). public/draft 에서는 숨기는 편이 자연스럽다. **정확한 앵커 파일은 미특정.**
+- [x] **BL-FE-LOGOUT-RESET-DEAD-1** (P3) → **해소.** `header.tsx` 의 죽은 `setActiveWorkspaceId("")` 를
+  제거하고 `ensureOwner` 가 계정 전환의 실제 방어임을 코드 주석에 명시했다. **effect 를 추가하지 않았다**
+  (원인이 effect 경합인데 effect 를 더 넣으면 병을 키운다). 브라우저 3회 반복 관측에서 로그아웃 직후
+  값이 남더라도 재로그인 시 이전 계정 ws 가 노출되지 않음을 확인 — 제거해도 안전이 달라지지 않는다는
+  것이 곧 "이 코드가 실효 없었다" 의 증거다.
+- [x] **BL-FE-DASHBOARD-RAW-ANCHOR-1** (P3) → **해소(projects 도메인까지 확대, 사용자 결정).**
+  `dashboard/page.tsx` 빠른 접근 타일 + `project-card.tsx` + `onboarding-view.tsx` 를 `next/link` 로
+  치환(태그만, 스타일·href 불변). 브라우저 실측: 타일·카드 클릭 후 `window.__qaMark` **생존**,
+  최상위 document 요청 **0건**. ⚠ 등재 앵커는 `href={item.href}` **변수형**이라
+  `rg '<a href="/'` 로는 잡히지 않는다 — 다음 라운드에 같은 grep 을 쓰지 마라.
+- [ ] **BL-FE-RAW-ANCHOR-REMAINING-1** (P4) `[신규 · 2026-08-02]` 같은 원시 `<a>` 패턴이
+  `features/meetings/components/meeting-detail.tsx` · `app/(app)/{meetings,projects}/[id]/error.tsx` ·
+  `components/empty-state.tsx` 에 남아 있다. error boundary 는 **풀 리로드가 의도일 수 있어** 판단 필요.
+- [x] **BL-FE-403-DOUBLE-FETCH-1** (P3) → **해소. ⚠ 등재된 원인이 틀렸다.**
+  "Header/Sidebar 중복 구독" 이 아니었다 — 같은 query key 는 React Query 가 dedup 하고(실측),
+  StrictMode 는 in-flight dedup 으로 요청을 늘리지 않으며, prefetch/hydration 경로는 저장소에 **0건**이다.
+  **진짜 원인은 `lib/query-client.tsx` 의 전역 `retry: 1` 이 status 분기 없이 4xx 에도 적용되던 것.**
+  `api-client.ts` 에 `ApiError(status)` 를 도입해 status 를 보존하고 4xx 는 재시도하지 않게 했다
+  (5xx·네트워크 오류는 기존대로 1회 재시도 — 과잉 차단이 아님을 테스트가 단언).
+  브라우저 실측: 접근 불가 프로젝트 상세 요청이 **정확히 1회**(이전 2회), `/projects` 진입 403 **0건**.
+  ⚠ sidebar 의 `status=active`/`status=archived` 는 **의도된 별개 쿼리**다 — 경로만 보고 중복으로 세지 마라.
+- [ ] **BL-FE-HOOK-RETRY-OVERRIDE-1** (P4) `[신규 · 2026-08-02]` `features/{integrations,meetings}/hooks.ts`
+  의 개별 `retry: (failureCount) => failureCount < 1` 은 전역 기본값을 덮으므로 4xx 에도 여전히 재시도한다.
+  전역과 같은 status 분기를 적용할지 판단 필요.
+- [x] **BL-FE-WS-FALLBACK-LABEL-1** (P3) → **해소(해법 교체, 사용자 결정).**
+  ⚠ 등재가 전제한 "고착 상태" 는 PR #147 자동 교정(BL-FE-WS-HEAL-SCOPE-1)이 이미 없앴다.
+  폴백 안내 배지를 만들었더니 **접근 가능한 ws 가 0개일 때만 도달 가능**한 사실상 dormant code 였다.
+  → 배지를 제거하고, **self-heal 이 실제로 워크스페이스를 교체할 때 그 사실을 알리는 토스트**로 바꿨다
+  (`접근할 수 없어 "‹ws명›" 워크스페이스로 전환했습니다`). 항상 도달 가능하고 브라우저로 검증된다:
+  접근 불가 wid → 토스트 **정확히 1회(5/5, 목록 지연 조건 3/3)**, **빈 wid 로 시작하면 미발화(0/3)**.
+- [x] **BL-DX-CONSOLE-ERROR-COUNT-1** (P3) → **해소.** 합격 기준을 못박았다
+  (`.claude/spike-gdrive/artifacts/SUCCESS-CRITERIA.md` §0.1, 이후 라운드 표준):
+  **합격 대상 = 앱 집계**(앱 코드 `console.error` + `pageerror` + 앱 BE `/api/v1/*` 4xx/5xx) → **0건**.
+  브라우저 generic `Failed to load resource …` 는 같은 실패의 중복 집계라 합격선에서 제외하되 **함께 보고**.
+  ⚠ `collectConsoleErrors` 는 **두 수치를 나눠 주지 않는다** — 단일 배열이 곧 앱 집계다.
+  generic 이 필요하면 별도 리스너로 세고, 안 셌으면 "미집계" 라고 쓴다(추정치 금지).
+- [x] **BL-FE-WID-GUARD-PREFETCH-1** (P3) → **해소(적용 범위 한정).** `header.tsx` 의 지역 판정식을
+  `useIsValidWorkspaceId` 공유 훅으로 추출하고 **projects·inbox·members 계열 데이터 훅**에 적용했다.
+  `useWorkspaces` 는 이미 같은 key 로 구독 중이라 추가 네트워크 0건. 브라우저 실측 403 **0건**.
+  ⚠ 이 가드는 **거짓 화면 3종을 파생시켰고 전부 후속 iteration 으로 잡았다** — 다음에 같은 종류의
+  가드를 넣을 때 반드시 함께 볼 것: (1) `enabled:false` 면 `isLoading===false` 라 **빈 상태가 조기 노출**
+  (2) 목록 조회 **에러** 경로도 같은 거짓 빈 상태 (3) **권한 표면**(`useMembers`→`useSyncWorkspaceRole`)을
+  가드하면 role 이 `null` 로 덮여 **권한 게이트 UI 가 숨는다**(e2e `t22` 가 잡음).
+  공통 원인은 하나다 — **"아직 모른다" 를 "없다/권한 없음" 으로 렌더**하는 것.
+- [ ] **BL-FE-WID-GUARD-REMAINING-1** (P4) `[신규 · 2026-08-02 G4 교차 리뷰]` `notes`·`meetings`·
+  `actions`·`memory`·`onboarding`·`integrations` 훅은 여전히 `enabled: !!wid` 라 stale wid 로
+  `/notes` 등에 직접 진입하면 self-heal 전에 403 을 발사한다. 확대 적용 시 **위 3종 파생 결함을
+  반드시 함께 처리**할 것.
+- [x] **BL-RAG-EMPTY-CITATION-1** (P3) → **해소. ⚠ 등재된 인과가 틀렸다.**
+  규칙 2·3은 **충돌하지 않는다** — 규칙 3은 "답변에 **사용한** 각 소스" 로 스코프돼 있다.
+  실제 결함은 **"정보 없음일 때 인용 금지" 지시의 부재**(underspecification)다.
+  또 "인용할 소스도 없어야 한다" 도 틀렸다 — `rag/service.py` 의 `fused` 빈 경로는 LLM 을 호출하지 않고
+  `sourceCount=0` 이라 인용을 물리적으로 만들 수 없다. 관측 사례는 **소스가 실재한** LLM 경로였다.
+  → 규칙 2 에만 인용 금지 문장을 추가하고 프롬프트 문자열 단언을 붙였다(결정적 게이트).
+  브라우저 보조 관측: 무관 질문 **6/6** 이 `sourceCount=2` 인 LLM 경로였고 `[N]` **0건**,
+  대조군 2/2 는 인용 정상(인용 기능 자체가 죽지 않았다는 증거).
+- [ ] **BL-RAG-CITATION-CODE-GUARD-1** (P4) `[신규 · 2026-08-02]` 인용 번호는 **100% LLM 산출물**이고
+  코드가 파싱·검증하지 않는다(`rag/service.py` 는 토큰을 그대로 스트리밍). 프롬프트 수정만으로는
+  비결정적 재발을 막지 못한다. **재발이 관측되면** 코드측 결정론 가드를 검토할 것
+  (SSE 스트리밍이라 BE 후처리는 버퍼링을 강요 → FE 렌더층이 현실적 후보. 단 부분 인용 답변 오탐 위험).
+- [x] **BL-FE-MEMBERS-PANEL-NOOP-1** (P3) → **해소. ⚠ 등재의 `[가정]` 이 반만 맞았다.**
+  앵커 = `features/projects/components/project-members-panel.tsx`(렌더 경로 3홉 실재, importer 2).
+  **"분기가 없다" 가 아니라 "분기 방향이 반대" 였다** — `!isPrivate` 일 때 "의미 없음" 안내를 *추가로*
+  띄우고 있었다. `visibility` 는 이미 prop 으로 있어 **추가 fetch 0건**으로 해결했다.
+  private 이 아니면 내부 컴포넌트를 아예 마운트하지 않아 **멤버 쿼리도 발사되지 않는다**(UI 숨김이 아님).
+  ⚠ 기존 `project-dashboard.test.tsx` 가 이 패널을 `() => null` 로 모킹하므로 신규 테스트는 **실물 렌더**로 작성.
+  ⚠ 콘텐츠 0건 프로젝트는 온보딩 뷰가 떠서 패널 자체가 안 보인다 — 재현 시 콘텐츠 1건 이상 필요.
+- [ ] **BL-BE-CACHE-COMMENT-DRIFT-1** (P4) `[신규 · 2026-08-02]` `workspaces/invite_service.py` 의
+  캐시 관련 주석이 "최대 60s" 라고 적혀 있으나 실제 `_MEMBER_CACHE_TTL_SEC` 는 **15s** 다. 주석 드리프트.
 
 
 > **2026-06-17 멀티 에이전트 팀 QA 후속** (`git history`)
