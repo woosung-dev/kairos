@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { Project } from "../types";
 import {
   VISIBILITY_COLOR_VAR,
@@ -25,7 +26,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export function ProjectCard({ project }: ProjectCardProps) {
   return (
-    <a
+    <Link
       href={`/projects/${project.id}`}
       data-testid={`project-card-${project.id}`}
       className="block p-4 rounded border transition-colors"
@@ -104,6 +105,6 @@ export function ProjectCard({ project }: ProjectCardProps) {
           {project.description}
         </p>
       )}
-    </a>
+    </Link>
   );
 }

@@ -2,6 +2,7 @@
 "use client";
 
 import { Mic, Rocket, StickyNote } from "lucide-react";
+import Link from "next/link";
 
 export function OnboardingView() {
   return (
@@ -17,7 +18,7 @@ export function OnboardingView() {
         첫 회의를 녹음하거나 노트를 작성해보세요. AI가 자동으로 요약하고 지식을 구조화합니다.
       </p>
       <div className="flex items-center gap-3">
-        <a
+        <Link
           href="/new"
           className="px-5 py-2.5 rounded text-sm font-medium transition-colors"
           style={{
@@ -33,8 +34,8 @@ export function OnboardingView() {
         >
           <Mic className="w-4 h-4" />
           회의 녹음
-        </a>
-        <a
+        </Link>
+        <Link
           href="/notes"
           className="px-5 py-2.5 rounded text-sm font-medium transition-colors border"
           style={{
@@ -50,7 +51,7 @@ export function OnboardingView() {
         >
           <StickyNote className="w-4 h-4" />
           노트 작성
-        </a>
+        </Link>
       </div>
     </div>
   );

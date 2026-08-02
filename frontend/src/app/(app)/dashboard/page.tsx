@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Building2, Mic, StickyNote, Inbox, Folder } from "lucide-react";
 import { useWorkspaces } from "@/features/workspaces/hooks";
 import { CreateWorkspaceDialog } from "@/features/workspaces/components/create-workspace-dialog";
@@ -119,7 +120,7 @@ export default function DashboardPage() {
             { icon: <Inbox className="w-6 h-6" />, label: "Inbox", href: "/inbox" },
             { icon: <Folder className="w-6 h-6" />, label: "프로젝트", href: "/projects" },
           ].map((item) => (
-            <a
+            <Link
               key={item.label}
               href={item.href}
               className="flex flex-col items-center gap-2 px-4 py-4 rounded border text-sm transition-colors"
@@ -137,7 +138,7 @@ export default function DashboardPage() {
             >
               {item.icon}
               <span>{item.label}</span>
-            </a>
+            </Link>
           ))}
         </div>
       </div>
