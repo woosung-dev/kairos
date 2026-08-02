@@ -7,7 +7,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from fastapi.responses import Response
 
-from src.auth.rbac import require_member, require_viewer
+from src.auth.rbac import require_member, require_member_fresh, require_viewer
 from src.workspaces.models import WorkspaceMember
 from src.meetings.dependencies import get_meeting_service, get_pipeline_service
 from src.meetings.pipeline_service import MeetingPipelineService
@@ -153,7 +153,7 @@ async def promote_meeting(
     meeting_id: uuid.UUID,
     body: MeetingPromoteIn,
     background_tasks: BackgroundTasks,
-    member: WorkspaceMember = Depends(require_member),
+    member: WorkspaceMember = Depends(require_member_fresh),
     service: MeetingService = Depends(get_meeting_service),
 ) -> MeetingPromoteOut:
     """회의 → team workspace 복제 + audit row + 백그라운드 embedding 복제.

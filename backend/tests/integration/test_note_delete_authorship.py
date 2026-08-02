@@ -17,6 +17,7 @@ anti-hollow-green: 라우터 / RBAC(`require_member`) / `NotePipelineService` / 
 """
 from __future__ import annotations
 
+import time
 import uuid
 
 import pytest
@@ -282,3 +283,92 @@ class TestNoteDeleteGateOrdering:
 
         assert res.status_code == 403, res.text
         assert await _note_exists(integration_session, note.id)
+
+
+class TestDestructiveRouteCacheFreshness:
+    @pytest.mark.asyncio
+    async def test_stale_admin_cache_cannot_change_project_visibility(
+        self, integration_session: AsyncSession, as_user
+    ):
+        """강등 직후에도 project PATCH 는 DB의 member role 로 거부한다."""
+        from src.auth import rbac as auth_rbac
+        from src.workspaces.models import WorkspaceMember
+
+        owner = await _new_user(integration_session, "owner")
+        downgraded_user = await _new_user(integration_session, "downgraded")
+        workspace_id = await _create_team_ws(integration_session, owner.id)
+        await _add_ws_member(
+            integration_session, workspace_id, downgraded_user.id, "member"
+        )
+        project = await _create_project(
+            integration_session, workspace_id, owner.id, "public"
+        )
+        cached_admin = WorkspaceMember(
+            workspace_id=workspace_id,
+            user_id=downgraded_user.id,
+            role="admin",
+        )
+        auth_rbac._MEMBER_CACHE[(workspace_id, downgraded_user.id)] = (
+            cached_admin,
+            time.time() + auth_rbac._MEMBER_CACHE_TTL_SEC,
+        )
+
+        response = await as_user(downgraded_user).patch(
+            f"/api/v1/workspaces/{workspace_id}/projects/{project.id}",
+            json={"visibility": "private"},
+        )
+
+        assert response.status_code == 403, response.text
+
+    @pytest.mark.asyncio
+    async def test_fresh_member_gate_allows_db_admin(
+        self, integration_session: AsyncSession, as_user
+    ):
+        """파괴적 경로도 정상 DB admin을 과잉 차단하지 않는다."""
+
+        owner = await _new_user(integration_session, "owner")
+        admin_user = await _new_user(integration_session, "admin")
+        workspace_id = await _create_team_ws(integration_session, owner.id)
+        await _add_ws_member(integration_session, workspace_id, admin_user.id, "admin")
+        project = await _create_project(
+            integration_session, workspace_id, owner.id, "public"
+        )
+        response = await as_user(admin_user).patch(
+            f"/api/v1/workspaces/{workspace_id}/projects/{project.id}",
+            json={"visibility": "private"},
+        )
+
+        assert response.status_code == 200, response.text
+
+    @pytest.mark.asyncio
+    async def test_get_route_keeps_stale_admin_cache_behavior(
+        self, integration_session: AsyncSession, as_user
+    ):
+        """GET은 의도적으로 캐시를 사용하므로 stale admin role 이 private project를 읽는다."""
+        from src.auth import rbac as auth_rbac
+        from src.workspaces.models import WorkspaceMember
+
+        owner = await _new_user(integration_session, "owner")
+        downgraded_user = await _new_user(integration_session, "downgraded")
+        workspace_id = await _create_team_ws(integration_session, owner.id)
+        await _add_ws_member(
+            integration_session, workspace_id, downgraded_user.id, "member"
+        )
+        project = await _create_project(
+            integration_session, workspace_id, owner.id, "private"
+        )
+        cached_admin = WorkspaceMember(
+            workspace_id=workspace_id,
+            user_id=downgraded_user.id,
+            role="admin",
+        )
+        auth_rbac._MEMBER_CACHE[(workspace_id, downgraded_user.id)] = (
+            cached_admin,
+            time.time() + auth_rbac._MEMBER_CACHE_TTL_SEC,
+        )
+
+        response = await as_user(downgraded_user).get(
+            f"/api/v1/workspaces/{workspace_id}/projects/{project.id}"
+        )
+
+        assert response.status_code == 200, response.text

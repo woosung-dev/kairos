@@ -18,6 +18,10 @@ def test_rag_prompt_instructs_numbered_bracket_citation() -> None:
     assert "📎" not in RAG_SYSTEM_PROMPT
 
 
+def test_rag_prompt_forbids_citation_when_information_is_missing() -> None:
+    assert "이 경우 인용 번호를 붙이지 마세요" in RAG_SYSTEM_PROMPT
+
+
 def test_rag_prompt_bracket_digit_pattern_present() -> None:
     # FE 가 실제로 파싱하는 패턴 `[<digit>]` 이 프롬프트 안내에 등장.
     assert re.search(r"\[\d+\]", RAG_SYSTEM_PROMPT) is not None

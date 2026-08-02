@@ -4,7 +4,7 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 
-from src.auth.rbac import require_member, require_viewer
+from src.auth.rbac import require_member, require_member_fresh, require_viewer
 from src.workspaces.models import WorkspaceMember
 from src.actions.dependencies import get_action_service
 from src.actions.schemas import (
@@ -63,7 +63,7 @@ async def update_action_item(
     workspace_id: uuid.UUID,
     action_id: uuid.UUID,
     data: UpdateActionItemRequest,
-    member: WorkspaceMember = Depends(require_member),
+    member: WorkspaceMember = Depends(require_member_fresh),
     service: ActionItemService = Depends(get_action_service),
 ):
     return await service.update_action_item(
