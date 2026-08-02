@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   API_BASE_URL,
+  ApiError,
   AuthRequiredError,
   createApiClient,
 } from "../api-client";
@@ -42,6 +43,19 @@ describe("createApiClient", () => {
     const api = createApiClient(async () => "tok-123");
 
     await expect(api.fetch<void>("/notes/1", { method: "DELETE" })).resolves.toBeUndefined();
+  });
+
+  it("fetch: 403 응답은 detail과 status를 보존한 ApiError를 던진다", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({ detail: "워크스페이스 접근 권한이 없습니다" }, 403),
+    );
+    const api = createApiClient(async () => "tok-123");
+
+    const error = await api.fetch("/workspaces/ws-1/projects").catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(403);
+    expect((error as ApiError).message).toBe("워크스페이스 접근 권한이 없습니다");
   });
 
   it("fetch: 토큰 null 이면 AuthRequiredError (message '인증이 필요합니다')", async () => {

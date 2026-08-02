@@ -1,6 +1,16 @@
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 /**
  * BE API 호출 코어 — createApiClient 전용 내부 경로.
  * token 옵션은 여기서만 처리한다 (외부 노출 금지 — PR-3 c8 복붙 회귀 봉쇄).
@@ -40,7 +50,7 @@ async function coreApiFetch<T = unknown>(
     const error = await res
       .json()
       .catch(() => ({ detail: "요청 실패" }));
-    throw new Error(error.detail || `HTTP ${res.status}`);
+    throw new ApiError(error.detail || `HTTP ${res.status}`, res.status);
   }
 
   // 204 No Content
