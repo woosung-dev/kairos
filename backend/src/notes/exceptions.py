@@ -9,6 +9,20 @@ class NoteNotFoundError(NotFoundError):
         super().__init__("노트")
 
 
+class NoteDeleteForbiddenError(HTTPException):
+    """BL-NOTE-DELETE-POLICY-1: 작성자 본인 또는 admin 이상만 노트를 삭제할 수 있다.
+
+    404 가 아니라 403 인 이유 — 이 요청자는 그 노트를 이미 GET/list 로 읽을 수 있다.
+    존재를 숨길 실익이 없고, GET 200 / DELETE 404 는 모순된 계약이다.
+    보이지 않는 노트(cross-tenant / private·draft 비-멤버)는 기존대로 404 를 유지한다.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=403, detail="작성자 또는 admin 이상만 삭제할 수 있습니다"
+        )
+
+
 # ── Sprint 23 D4 Task 2 Step 2.3: promote 검증 예외 (meetings 패턴 정렬) ──
 
 

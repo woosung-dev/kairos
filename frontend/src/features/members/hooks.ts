@@ -60,13 +60,16 @@ export function useWorkspaceRole(workspaceId: string | undefined) {
   const { data: members, isLoading } = useMembers(workspaceId);
 
   // clerkId 기반 매칭 (email은 JWT claims에 미포함)
-  const role =
-    members?.find((m) => m.clerkId === user?.id)?.role ?? null;
+  const me = members?.find((m) => m.clerkId === user?.id) ?? null;
+  const role = me?.role ?? null;
 
   // workspaceId 가 비어있으면 fetch 자체가 enabled=false → isLoading=false 로 간주.
   // members 미로딩 상태에서는 권한 분기 컴포넌트가 placeholder/spinner 를 띄울 수 있도록 노출.
   return {
     role,
+    // BL-NOTE-DELETE-POLICY-1: 작성자 판정용 **내부** user id (Clerk id 아님).
+    // 리소스의 createdById 와 대조하는 용도 — 별도 API 없이 members 응답에서 얻는다.
+    userId: me?.userId ?? null,
     isLoading: !!workspaceId && isLoading,
     isOwner: role === "owner",
     isAdmin: role === "admin" || role === "owner",

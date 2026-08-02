@@ -108,7 +108,7 @@ FastAPI 표준 `HTTPException`을 사용한다. `ApiResponse<T>` 래퍼를 사�
 | 28 | 3 | `GET` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 목록 |
 | 29 | 3 | `POST` | `/api/v1/workspaces/{wid}/projects/{pid}/notes` | 노트 생성 |
 | 30 | 3 | `PATCH` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 수정 (자동저장) |
-| 31 | 3 | `DELETE` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 삭제 |
+| 31 | 3 | `DELETE` | `/api/v1/workspaces/{wid}/notes/{id}` | 노트 삭제 — require_member + **BL-NOTE-DELETE-POLICY-1 (2026-08-02)**: 작성자 본인 또는 admin/owner 만. 비-작성자 member → **403**, project visibility 불가·cross-tenant → 404 (게이트 순서: visibility 먼저) |
 | 32 | 4 | `PATCH` | `/api/v1/workspaces/{id}/members/{uid}/role` | 역할 변경 |
 | 33 | 4 | `DELETE` | `/api/v1/workspaces/{id}/members/{uid}` | 멤버 제거 |
 | 34 | 4 | `POST` | `/api/v1/workspaces/{id}/invite` | 초대 링크 생성 (Sprint 6: `defaultProjectVisibility` 필드 추가) |
