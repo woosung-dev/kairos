@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "backend/**"
+      - "apps/backend/**"
       - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
@@ -44,7 +44,7 @@ jobs:
 
       # ── 이미지 빌드 + GAR push ─────────────────────────────────────────
       - name: Build and push image to GAR
-        working-directory: backend
+        working-directory: apps/backend
         run: |
           set -euo pipefail
           IMAGE_BASE="${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY }}/${{ env.BACKEND_IMAGE }}"

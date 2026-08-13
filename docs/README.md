@@ -50,7 +50,7 @@
 - [AI 협업 세션 루틴](guides/session-routine.md)
 
 ### adr/
-ADR 19건 — `docs/adr/NNN-<slug>.md` (Nygard 포맷). 예: 011 페르소나 정의, 019 Gemini EOL 마이그레이션, 020 pgvector HNSW halfvec, 022 Clerk webhook SKIP. 전체 목록은 `ls docs/adr/`.
+ADR 24건 — `docs/adr/NNN-<slug>.md` (Nygard 포맷). 예: 011 페르소나 정의, 019 Gemini EOL 마이그레이션, 020 pgvector HNSW halfvec, 022 Clerk webhook SKIP. 전체 목록은 `ls docs/adr/`.
 
 ### plans/active/
 현재 진행 sprint plan. 폴더 README 참조.
@@ -60,4 +60,4 @@ ADR 19건 — `docs/adr/NNN-<slug>.md` (Nygard 포맷). 예: 011 페르소나 �
 본 docs/ 외부에 위치하지만 진입점:
 - [`CONTEXT-MAP.md`](../CONTEXT-MAP.md) — 도메인 경계 + 핵심 불변식 (I-1 ~ I-21) + §9 문서 갱신 원칙
 - [`DESIGN.md`](../DESIGN.md) — 디자인 시스템
-- 도메인별 `backend/src/<domain>/CONTEXT.md` (workspaces, projects, meetings, notes, inbox, rag, embeddings, memory)
+- 도메인별 `apps/backend/src/<domain>/CONTEXT.md` (workspaces, projects, meetings, notes, inbox, rag, embeddings, memory)

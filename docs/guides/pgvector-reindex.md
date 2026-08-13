@@ -3,7 +3,7 @@
 > **목적**: REINDEX CONCURRENTLY로 bloat 정리 + 인덱스 크기/성능 모니터링.
 > **상위 결정**: `docs/adr/020-pgvector-hnsw-halfvec.md` (ADR-020)
 > **헌법**: `CONTEXT-MAP.md` I-20/I-21
-> **스크립트**: `backend/scripts/reindex_vectors.py`
+> **스크립트**: `apps/backend/scripts/reindex_vectors.py`
 
 ---
 
@@ -17,7 +17,7 @@
 ## 2. 측정 (Bloat 비율)
 
 ```bash
-cd backend
+cd apps/backend
 uv run python scripts/reindex_vectors.py --dry-run
 ```
 
@@ -47,20 +47,20 @@ idx_cache_hnsw: size=18 MB, bloat=3.1%
 ### 4-A. 측정 only
 
 ```bash
-uv run python backend/scripts/reindex_vectors.py --dry-run
+uv run python apps/backend/scripts/reindex_vectors.py --dry-run
 ```
 
 ### 4-B. 임계값 기반 자동 reindex
 
 ```bash
-uv run python backend/scripts/reindex_vectors.py
+uv run python apps/backend/scripts/reindex_vectors.py
 # bloat ≥30% 인덱스만 REINDEX
 ```
 
 ### 4-C. 강제 reindex (대량 삭제 직후)
 
 ```bash
-uv run python backend/scripts/reindex_vectors.py --force
+uv run python apps/backend/scripts/reindex_vectors.py --force
 # 모든 INDEXES 대상 REINDEX
 ```
 
@@ -88,7 +88,7 @@ uv run python backend/scripts/reindex_vectors.py --force
 본 sprint는 컬럼 타입을 `vector(1536)` → `halfvec(1536)`로 변경하므로 ivfflat 인덱스(`vector_cosine_ops`)를 동일 마이그레이션 b2c3d4e5f6a7 내에서 drop 강제. `vector_cosine_ops`가 halfvec 컬럼과 호환 불가 → ALTER COLUMN TYPE 시 `DatatypeMismatchError`. backend.md §9 2단계 배포는 **컬럼 타입 유지 expression index 패턴** 전용.
 
 ```sql
--- backend/alembic/versions/b2c3d4e5f6a7_pgvector_hnsw_halfvec.py upgrade() step 2.5
+-- apps/backend/alembic/versions/b2c3d4e5f6a7_pgvector_hnsw_halfvec.py upgrade() step 2.5
 -- (CONCURRENTLY는 autocommit_block 내부 실행)
 DROP INDEX CONCURRENTLY IF EXISTS idx_chunks_vector;
 DROP INDEX CONCURRENTLY IF EXISTS idx_cache_vector;

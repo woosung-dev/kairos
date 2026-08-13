@@ -36,7 +36,7 @@
 - [x] **BL-EXT-OAUTH-1** (P1) OAuth `nonce` 미소비 → **해소** (`6bc5ab8`). `integration_oauth_states` 테이블 + callback 의 `DELETE ... RETURNING` 단문 원자 소비. 소비를 Google 토큰 교환보다 앞에 두어 재사용 요청이 외부 호출에 도달하지 않는다. 브라우저 실측 — callback 3회에 Google 아웃바운드 1회.
 - [x] **BL-EXT-CACHE-3** (P1) **해소 (2026-08-01).** 비-admin `max_visibility='public'` fast path를 제거하고, 캐시 저장 직전에 source chunk 존재 fence를 둬 사라진 source를 참조하는 캐시행을 저장하지 않는다.
 - [x] **BL-EXT-CACHE-1** (P1) **해소 (2026-08-01).** `ALL_CHUNKS_VISIBLE_SQL` anti-join이 source chunk 행 부재를 위반으로 판정하는 fail-closed가 됐다.
-  - (2026-08-01 사용자 결정; `backend/src/embeddings/repository.py:389-400`, `backend/src/rag/service.py:234-265` 기준) 기존 캐시행은 일회성 전량 무효화하지 않고 TTL 7일로 자연 배출한다. admin/owner 우회는 유지하며, 안3 epoch 카운터는 기각했고 fence에 `FOR SHARE`를 도입하지 않는다.
+  - (2026-08-01 사용자 결정; `apps/backend/src/embeddings/repository.py:389-400`, `apps/backend/src/rag/service.py:234-265` 기준) 기존 캐시행은 일회성 전량 무효화하지 않고 TTL 7일로 자연 배출한다. admin/owner 우회는 유지하며, 안3 epoch 카운터는 기각했고 fence에 `FOR SHARE`를 도입하지 않는다.
   - 비-admin source 재검사에 따른 캐시 miss 증가는 노출 차단을 위한 감수한 트레이드오프다.
 - [x] **BL-EXT-REVISION-2** (P1) revision guard 가 경쟁 동기화에서 무력 → **해소** (`87e1963`). `version` 단독 + 본문 갱신 CAS. ⚠ CAS 는 "최신 보존" 이 아니라 **"선착순 보존"** 이며 완료·오류 상태 전이는 CAS 미보호 (`integrations/CONTEXT.md` §6 기록).
 - [x] **BL-EXT-SYNC-1** (P2) 최초 import 의 unsupported MIME 무상태 → **해소** (`5af8261`). metadata 직후 판별 → 빈 행 생성 → raise. ⚠ ADR-026 D4 **부분 충족** — 사유는 문서별로 남지 않는다 (아래 신규 BL 참조).
@@ -77,7 +77,7 @@
   게이트**로, 노트 1건짜리 프로젝트에서 실 콘텐츠가 온보딩 뷰에 덮였다. 게이트를 `=== 0` 으로 좁혔고
   `docs/adr/006-app-redesign-brainstorm.md` §6 에 갱신 이력을 남겼다(ADR 에 문서화된 설계 결정이었으므로).
 - [x] **BL-FE-RAG-STALE-BANNER-1** (P3) → **해소.** ⚠ **FE 결함이 아니었다.** `⚠️ 오래된 소스입니다 (…기준)`
-  문자열은 FE 어디에도 없다. 출처는 `backend/src/common/prompts.py` `RAG_SYSTEM_PROMPT` 규칙 4 —
+  문자열은 FE 어디에도 없다. 출처는 `apps/backend/src/common/prompts.py` `RAG_SYSTEM_PROMPT` 규칙 4 —
   LLM 에게 답변 본문에 그 경고를 넣으라는 지시였고, LLM 이 당일 소스에 잘못 붙였다(QA BEFORE 4라운드 중 2회
   재현 = 실재하나 비결정적). BE 는 이미 `rag/service.py _format_sources` 로 freshness 를 결정론적으로
   계산해 FE 배지로 노출하므로 규칙 4는 중복이자 비결정적 두 번째 판정 경로였다 → 규칙 4 제거.
@@ -120,7 +120,7 @@
   (목록은 `WorkspaceMember` 조인으로 멤버인 것만 반환 — `workspaces/repository.py:39-40`).
   → 보정을 `panel-layout.tsx` 로 끌어올리고 `dashboard/page.tsx` 중복 제거(R4 재사용 우선).
 - [x] **BL-DX-E2E-API-URL-1** (P1) **로컬 e2e 시드가 프로덕션 DB 를 오염시킬 수 있었다** → **코드 가드 완료.**
-  `frontend/.env.local` 의 `E2E_API_URL` 이 프로덕션 Cloud Run 을 가리키는데 `e2e/team-helpers.ts` 가
+  `apps/web/.env.local` 의 `E2E_API_URL` 이 프로덕션 Cloud Run 을 가리키는데 `e2e/team-helpers.ts` 가
   그 값을 그대로 쓴다 → override 없이 team-setup 을 돌리면 프로덕션에 팀 워크스페이스·초대·프로젝트·
   나온스 노트가 생성된다. 같은 파일의 `NEXT_PUBLIC_API_URL` 은 localhost 라 두 값이 다른 환경을 가리켰다.
   `assertLocalSeedTarget()` 이 시드 첫 수에서 비-로컬 대상을 거부한다(`E2E_ALLOW_REMOTE_SEED=1` 명시 옵트인).
@@ -145,7 +145,7 @@
     **게이트 순서가 계약** — visibility 404 가 먼저, 작성자 403 이 나중(존재 누출 방지).
   - ⚠ 기존 회귀 1건(`test_member_delete_ok`)의 전제가 새 정책과 충돌해 보정했다 —
     "비-작성자 ProjectMember 삭제 성공" → "ProjectMember **작성자** 삭제 성공"으로 의도 보존.
-  - 회귀: `backend/tests/integration/test_note_delete_authorship.py`(실 라우팅+실 RBAC+실 DB 10건) +
+  - 회귀: `apps/backend/tests/integration/test_note_delete_authorship.py`(실 라우팅+실 RBAC+실 DB 10건) +
     `note-detail.test.tsx` 4건.
 
 > **2026-08-02 BL-NOTE-DELETE-POLICY-1 라운드 G4(codex 교차 리뷰) 부수 발견 — 이번 변경과 무관한 선재 이슈.**
@@ -167,7 +167,7 @@
   BL-BE-RBAC-CACHE-DESTRUCTIVE-1 과 같은 방식(`require_member_fresh`)으로 확대할지 판단 필요.
   ⚠ 확대 시 **성능 회귀 주의** — 캐시를 넣은 이유가 Stage 2 #6 이다.
 - [x] **BL-BE-NOTE-SERVICE-DELETE-DEAD-1** (P4) → **해소.** `NoteService.delete_note` 제거 +
-  `notes/CONTEXT.md` 갱신. 삭제 전 `rg -n "\.delete_note\(" backend/src backend/tests` 로 호출부 0건을
+  `notes/CONTEXT.md` 갱신. 삭제 전 `rg -n "\.delete_note\(" apps/backend/src apps/backend/tests` 로 호출부 0건을
   재확인했다(`delete_note_with_cleanup` 부분 문자열 히트 제외). 전체 스위트 통과 수 감소 0 으로 증명.
 - [x] **BL-RAG-PROMPT-HYGIENE-1** (P3) → **해소. ⚠ 등재된 원인이 틀렸다.** 앵커를
   "`RAG_SYSTEM_PROMPT` 소스 취급 규칙" 으로 적었으나 **그런 규칙은 없었다** — PR #146 이 규칙 4를
@@ -254,12 +254,12 @@
 
 > **2026-06-17 멀티 에이전트 팀 QA 후속** (`git history`)
 - [ ] **(선택) 풍부한 음성 샘플 1개 확보** — 알려진 트랜스크립트 + 명명된 사실 2개 이상. 현재 픽스처는 무음 10초 webm + test.m4a 뿐 → 회의 오디오 파이프라인의 **콘텐츠** 검증(transcription/화자분리/요약 품질) 갭. 텍스트 캡처로 RAG 경로는 검증 완료(오디오는 기계동작만).
-- [ ] **(선택) 전용 admin/viewer Clerk dev 계정 발급** — 현재 2계정(owner d@e.com + member a@e.com)으로 role 변경하며 4 role 전수했으나, 동시 다중 role 라이브 시나리오엔 전용 계정이 편함. `frontend/.env.local` QA_LOCAL_ADMIN_*/QA_LOCAL_VIEWER_* 추가.
+- [ ] **(선택) 전용 admin/viewer Clerk dev 계정 발급** — 현재 2계정(owner d@e.com + member a@e.com)으로 role 변경하며 4 role 전수했으나, 동시 다중 role 라이브 시나리오엔 전용 계정이 편함. `apps/web/.env.local` QA_LOCAL_ADMIN_*/QA_LOCAL_VIEWER_* 추가.
 
 > Sprint 25 moonlit-sutton 완료 — PR draft 진입 (2026-05-21). 다음 Sprint 진입 계획은 Recently Completed 섹션 참조.
 
 ### 📋 사용자 작업 대기
-- [ ] **T-SEC-CLERK-ROTATE** (운영자) Clerk dev `CLERK_SECRET_KEY` **rotation** — 노출 키(`sk_test_mvhptL…`) 무효화. 파일 redaction 은 PR #115(d5463cc) 완료됐으나 라이브 키 무효화가 진짜 fix. Clerk 대시보드 → API Keys → Secret key regenerate 후 `.env.local`/`backend/.env`·Cloud Run/Vercel env 갱신. **시급 아님**(dev 키 + repo private, 2026-05-29 사용자 판단). git 히스토리 1 commit 잔존(SEC-CLERK-SECRET-COMMITTED).
+- [ ] **T-SEC-CLERK-ROTATE** (운영자) Clerk dev `CLERK_SECRET_KEY` **rotation** — 노출 키(`sk_test_mvhptL…`) 무효화. 파일 redaction 은 PR #115(d5463cc) 완료됐으나 라이브 키 무효화가 진짜 fix. Clerk 대시보드 → API Keys → Secret key regenerate 후 `.env.local`/`apps/backend/.env`·Cloud Run/Vercel env 갱신. **시급 아님**(dev 키 + repo private, 2026-05-29 사용자 판단). git 히스토리 1 commit 잔존(SEC-CLERK-SECRET-COMMITTED).
 - [ ] **T-CLEANUP-1** production DB Neon SQL editor에서 `DELETE FROM users WHERE clerk_id='user_QA20260521_sentinel_test_doNotUse'` (Sprint 25 PoC 잔존 정리)
 - [ ] **PR #102 (Sprint 25 moonlit-sutton) ready review + squash merge** — 사용자 승인 후 main 머지
 - [ ] **post-merge 배포 verify** — Cloud Run rollout 후 `POST /api/v1/users/sync` 404 응답 + `/health` 200 + `/dashboard` 회귀 0건
@@ -497,7 +497,7 @@
 
 ## Recently Completed — Sprint 17 Workspace Switcher UI (BL-014/015/018, 2026-05-15)
 
-- [x] **BL-014** Workspace switcher dropdown — `frontend/src/features/workspaces/components/WorkspaceSwitcher.tsx` 신설. header.tsx topbar 좌측에 wire. trigger = `{name} + WorkspaceTypeBadge + (team only) memberCount + ChevronDown`. options에 type badge inline + 활성 워크스페이스 Check 마크 + 새 워크스페이스 inline create.
+- [x] **BL-014** Workspace switcher dropdown — `apps/web/src/features/workspaces/components/WorkspaceSwitcher.tsx` 신설. header.tsx topbar 좌측에 wire. trigger = `{name} + WorkspaceTypeBadge + (team only) memberCount + ChevronDown`. options에 type badge inline + 활성 워크스페이스 Check 마크 + 새 워크스페이스 inline create.
 - [x] **BL-015 (부분)** `WorkspaceTypeBadge` shared 컴포넌트 — `Lock`(Personal) / `Users`(Team) + 11px Geist Mono. Switcher trigger + options 2곳 적용. F-17 Recall card는 topbar context redundancy 회피로 wontfix. F-40 PromoteModal은 기존 Users icon + Team only filter 유지.
 - [x] **BL-018** DESIGN.md atomic update — §Recall UI `capture row` + `tabs` 제거 (search-first FAB 실제 구현 반영). Bottom Nav 5th [검색] → [메모]. Workspace Switcher Dropdown Spec 인라인 lock-in. Decisions Log 2026-05-15 entry 추가.
 - [x] **BE 수정** `WorkspaceResponse` schema + `create_workspace` / `get_workspace` service dict에 `type` 필드 노출 (legacy row default 'team'). list_workspaces는 기존 노출 유지.
@@ -585,7 +585,7 @@
 
 - [ ] **T-3 Sprint 14 Clerk Production 인스턴스 발급** [확인 필요]
   - 위치: Clerk Dashboard → New Application → Production
-  - 발급 후: `frontend/.env.local` + Vercel env 의 `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` 를 `pk_live_*` / `sk_live_*` 로 교체
+  - 발급 후: `apps/web/.env.local` + Vercel env 의 `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` 를 `pk_live_*` / `sk_live_*` 로 교체
   - 효과: 사인인 화면 "Development mode" 배지 제거 (Curious 핵심 망설임 #1)
   - 코드 측 (커밋 완료): `@clerk/localizations` koKR + SignIn/SignUp `forceRedirectUrl="/dashboard"`
 
@@ -602,7 +602,7 @@
 
 - [x] **BL-003 구현** — `EmbeddingRepository.find_chunks_by_ids()` 추가 + `_enrich_context` N+1 → 배치 1회. 테스트 3개 추가.
 - [x] **BL-004 구현** — `MeetingSummaryResult` / `MeetingActionsResult` Pydantic 모델 추가 + `ai_processing.py` 경계 검증. 테스트 4개 추가.
-- [x] **pyrightconfig.json** — backend/ + 루트 추가. IDE Pyright venv 경로 설정.
+- [x] **pyrightconfig.json** — apps/backend/ + 루트 추가. IDE Pyright venv 경로 설정.
 - 테스트: 신규 7개 추가 (BL-003: 3, BL-004: 4) / 전체 87 passed
 
 ### Sprint 14 — 가입 첫 5분 신뢰 회복 + RAG 안정화 (2026-05-14 완료, PR 대기)

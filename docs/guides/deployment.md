@@ -88,7 +88,7 @@ gcloud auth configure-docker asia-northeast3-docker.pkg.dev
 ### 2.2 빌드 + 배포
 
 ```bash
-cd backend
+cd apps/backend
 
 # Docker 빌드
 docker build -t asia-northeast3-docker.pkg.dev/$GCP_PROJECT_ID/kairos/api:latest .
@@ -142,7 +142,7 @@ curl https://kairos-api-xxx-du.a.run.app/docs
 
 ## 2.5 자동 배포 (권장) — GitHub Actions + Workload Identity Federation
 
-`main` 브랜치의 `backend/**` 변경분을 자동 감지해 빌드·배포하도록 `.github/workflows/deploy.yml` 가 구성되어 있다.
+`main` 브랜치의 `apps/backend/**` 변경분을 자동 감지해 빌드·배포하도록 `.github/workflows/deploy.yml` 가 구성되어 있다.
 수동 `docker push + gcloud run deploy` 는 **초기 인프라 구축 시에만** 사용한다 — 자주 반복되는 배포는 반드시 자동화를 거친다.
 
 ### 2.5.1 사전 1회 설정 (GCP 콘솔 작업 필요)
@@ -262,7 +262,7 @@ E2E 테스트까지 활성화하려면 추가로:
 
 ### 2.5.2 배포 실행
 
-- **자동:** `main` 브랜치에 `backend/**` 변경이 포함된 커밋이 푸시되면 `.github/workflows/deploy.yml` 이 트리거.
+- **자동:** `main` 브랜치에 `apps/backend/**` 변경이 포함된 커밋이 푸시되면 `.github/workflows/deploy.yml` 이 트리거.
 - **수동:** GitHub repo → Actions → `Deploy Backend (Cloud Run)` → `Run workflow`.
 
 ### 2.5.3 롤백
@@ -288,8 +288,15 @@ gcloud run services update-traffic kairos-api \
 1. [vercel.com](https://vercel.com) → **New Project**
 2. GitHub repo 연결
 3. Framework Preset: **Next.js** (자동 감지)
-4. Root Directory: **`frontend/`**
+4. Root Directory: **`apps/web/`**
 5. Production Branch: **`main`** (`prod` 브랜치 미사용 — `main` push 시 Vercel 자동 배포)
+
+> **2026-08-13 apps/ 재구성 (ADR-027)**: 기존 Root Directory `frontend/` → `apps/web/` 로 대시보드에서
+> 수동 변경 필요. 절차 — ① 재구성 PR 머지 (머지 커밋의 Vercel 빌드는 "Root Directory does not exist" 로
+> 실패하는 것이 정상, prod 는 마지막 READY 배포가 계속 서빙되므로 다운타임 0) → ② Settings →
+> Build and Deployment → Root Directory 를 `apps/web` 으로 저장 (env vars 는 프로젝트 스코프라 유지,
+> 빌드 캐시만 1회 cold) → ③ 실패한 머지 커밋 배포를 Redeploy → ④ READY 확인 + 콘솔 error 0.
+> "Ignored Build Step" 에 `frontend/` 경로 참조가 있으면 함께 수정.
 
 ### 3.2 환경변수 설정
 
@@ -306,7 +313,7 @@ Vercel → Settings → Environment Variables:
 `main` 브랜치에 push 하면 Vercel 자동 배포 (`prod` 브랜치 미사용):
 
 ```bash
-git push origin main   # → Vercel 자동 배포(FE) + Cloud Run 자동 배포(BE, backend/** 변경 시)
+git push origin main   # → Vercel 자동 배포(FE) + Cloud Run 자동 배포(BE, apps/backend/** 변경 시)
 ```
 
 ### 3.4 CORS 업데이트
@@ -340,7 +347,7 @@ git merge main
 git push origin prod    # → Vercel 자동 배포
 
 # 2. Cloud Run 수동 배포
-cd backend
+cd apps/backend
 docker build -t asia-northeast3-docker.pkg.dev/$GCP_PROJECT_ID/kairos/api:latest .
 docker push asia-northeast3-docker.pkg.dev/$GCP_PROJECT_ID/kairos/api:latest
 gcloud run deploy kairos-api \

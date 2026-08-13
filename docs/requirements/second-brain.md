@@ -127,9 +127,9 @@ Layer 2: 팀 지식 베이스 (프로젝트)
 | **Draft** | 작업 중 표시 (AD-24) | 작성자(creator) + admin/owner |
 | **Private** | 프로젝트 멤버만 접근 (Sprint 6 L-6 ProjectMember 신설) | 명시 매핑된 ProjectMember + admin/owner |
 
-> **권한 분기 위치**: `backend/src/projects/repository.py:_apply_visibility_filter` (BE-T8). admin/owner는 모든 visibility 우회. RAG 검색에서도 동일 분기 적용 — Private 프로젝트는 비멤버 응답에서 자동 제외 (ADR-014 옵션 A, RagPipelineService).
+> **권한 분기 위치**: `apps/backend/src/projects/repository.py:_apply_visibility_filter` (BE-T8). admin/owner는 모든 visibility 우회. RAG 검색에서도 동일 분기 적용 — Private 프로젝트는 비멤버 응답에서 자동 제외 (ADR-014 옵션 A, RagPipelineService).
 >
-> **시각화**: `frontend/src/features/projects/components/visibility-badge.tsx` — lucide Globe(Public 청록 #3ECFB4) / FileEdit(Draft warning #FBBF24) / Lock(Private muted #6B6B73). 변경은 admin 이상만 (BE-T15).
+> **시각화**: `apps/web/src/features/projects/components/visibility-badge.tsx` — lucide Globe(Public 청록 #3ECFB4) / FileEdit(Draft warning #FBBF24) / Lock(Private muted #6B6B73). 변경은 admin 이상만 (BE-T15).
 
 ### Archive 시 자동 공개 + 인사이트 추출
 
