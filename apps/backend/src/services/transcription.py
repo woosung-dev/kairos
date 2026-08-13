@@ -1,4 +1,4 @@
-# backend/src/services/transcription.py
+# apps/backend/src/services/transcription.py
 """Whisper API 트랜스크립션 서비스. 화자 분리 없음 (Sprint 1 MVP)."""
 import asyncio
 import io

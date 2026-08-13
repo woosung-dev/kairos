@@ -1,4 +1,4 @@
-# backend/src/workspaces/invite_router.py
+# apps/backend/src/workspaces/invite_router.py
 """초대 링크 엔드포인트."""
 import uuid
 

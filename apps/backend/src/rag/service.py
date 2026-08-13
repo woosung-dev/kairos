@@ -1,4 +1,4 @@
-# backend/src/rag/service.py
+# apps/backend/src/rag/service.py
 """RAG 서비스 — 캐시 확인 → Hybrid Search → RRF → Gemini SSE."""
 import json
 import logging

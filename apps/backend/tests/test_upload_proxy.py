@@ -1,4 +1,4 @@
-# backend/tests/test_upload_proxy.py
+# apps/backend/tests/test_upload_proxy.py
 """업로드 프록시 엔드포인트 테스트 — R2 CORS 우회.
 
 Regression: ISSUE-R2-CORS-001 — 브라우저 직접 R2 PUT이 CORS로 차단됨.

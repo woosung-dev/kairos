@@ -6,9 +6,9 @@
 이상적이나 환경 의존이라 본 스크립트로 옵션 B (합성) 폴백 제공.
 
 사용:
-    cd backend
+    cd apps/backend
     uv run python tests/embeddings/fixtures/generate_recall_corpus.py
-    # 출력: backend/tests/embeddings/fixtures/recall_corpus.json
+    # 출력: apps/backend/tests/embeddings/fixtures/recall_corpus.json
 
 옵션:
     --chunks N    (default 200)

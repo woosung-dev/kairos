@@ -1,4 +1,4 @@
-# backend/tests/notes/test_notes_api.py
+# apps/backend/tests/notes/test_notes_api.py
 """노트 API 통합 테스트."""
 import uuid
 

@@ -1,4 +1,4 @@
-# backend/tests/meetings/test_export.py
+# apps/backend/tests/meetings/test_export.py
 """회의 내보내기 API 테스트."""
 import uuid
 from unittest.mock import AsyncMock, MagicMock

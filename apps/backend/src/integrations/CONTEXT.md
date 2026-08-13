@@ -2,7 +2,7 @@
 
 # integrations CONTEXT
 
-> 상위: `/backend/CONTEXT.md` → `/CONTEXT-MAP.md`. 상세 결정: `docs/adr/026-external-source-ingest-rail.md`.
+> 상위: `/apps/backend/CONTEXT.md` → `/CONTEXT-MAP.md`. 상세 결정: `docs/adr/026-external-source-ingest-rail.md`.
 >
 > **현재 상태 (2026-07-31)**: ADR-026의 모델·repository/service·GoogleDriveClient·동기화 pipeline·외부 문서 임베딩 경로와 OAuth authorize/callback 라우터가 구현됐다.
 

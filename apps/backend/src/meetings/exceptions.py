@@ -1,4 +1,4 @@
-# backend/src/meetings/exceptions.py
+# apps/backend/src/meetings/exceptions.py
 """Meeting 도메인 예외."""
 from fastapi import HTTPException
 

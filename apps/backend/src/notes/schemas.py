@@ -1,4 +1,4 @@
-# backend/src/notes/schemas.py
+# apps/backend/src/notes/schemas.py
 """노트 요청/응답 스키마."""
 import uuid
 from typing import Literal

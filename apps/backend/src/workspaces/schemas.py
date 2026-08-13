@@ -1,4 +1,4 @@
-# backend/src/workspaces/schemas.py
+# apps/backend/src/workspaces/schemas.py
 """Workspace 스키마."""
 import uuid
 from datetime import datetime

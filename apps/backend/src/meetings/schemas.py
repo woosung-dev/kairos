@@ -1,4 +1,4 @@
-# backend/src/meetings/schemas.py
+# apps/backend/src/meetings/schemas.py
 """Meeting 스키마."""
 import uuid
 from datetime import datetime

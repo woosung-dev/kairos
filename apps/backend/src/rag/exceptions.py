@@ -1,4 +1,4 @@
-# backend/src/rag/exceptions.py
+# apps/backend/src/rag/exceptions.py
 """RAG 관련 예외."""
 
 

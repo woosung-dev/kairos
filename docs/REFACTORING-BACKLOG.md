@@ -36,7 +36,7 @@
 
 ## BL-S27c-1 — `get_current_user` lazy seed race condition fix ★★★ (P0)
 
-**현 상태**: `backend/src/auth/dependencies.py:160-169` 의 User INSERT 가 race-unsafe. Dashboard 첫 진입 시 FE 가 5+ API 동시 호출 → 각 transaction 이 `find_by_clerk_id`=None → 동시 INSERT → 1개 성공 + 나머지 IntegrityError `duplicate key value violates unique constraint "ix_users_clerk_id"` → 500.
+**현 상태**: `apps/backend/src/auth/dependencies.py:160-169` 의 User INSERT 가 race-unsafe. Dashboard 첫 진입 시 FE 가 5+ API 동시 호출 → 각 transaction 이 `find_by_clerk_id`=None → 동시 INSERT → 1개 성공 + 나머지 IntegrityError `duplicate key value violates unique constraint "ix_users_clerk_id"` → 500.
 
 **증상 verified** (Sprint 27c audit, Account #3 c@e.com localhost 재현): `GET /workspaces` 500 + `/workspaces/{id}/members` 500 + `/workspaces/{id}/projects` 500 + `/workspaces/{id}/inbox` 403 (lazy fallback). production 의 동일 증상도 같은 race condition 추정 (deploy stale 가설 무효).
 
@@ -50,7 +50,7 @@
 
 ## BL-S27c-2 — GEMINI_API_KEY 재발급 ★★★ (P0)
 
-**현 상태**: `backend/.env` 의 `GEMINI_API_KEY` invalid. BE log `google.genai.errors.ClientError: 400 API_KEY_INVALID`. 회의 업로드 → AI pipeline 전체 실패 (status="실패").
+**현 상태**: `apps/backend/.env` 의 `GEMINI_API_KEY` invalid. BE log `google.genai.errors.ClientError: 400 API_KEY_INVALID`. 회의 업로드 → AI pipeline 전체 실패 (status="실패").
 
 **목표**: Google AI Studio (`https://aistudio.google.com`) 에서 새 API key 발급 + local `.env` + Cloud Run secret 동기화.
 
@@ -62,7 +62,7 @@
 
 ## BL-S27c-3 — Landing screenshot 3건 400 fix ★★ (P1)
 
-**현 상태**: `/landing/screenshots/screenshot-dashboard.png` / `meeting-summary.png` / `rag-answer.png` 모두 Next.js Image optimizer 400. 파일 disk 존재 (`frontend/public/landing/screenshots/`). source code bug (localhost + production 동일 400).
+**현 상태**: `/landing/screenshots/screenshot-dashboard.png` / `meeting-summary.png` / `rag-answer.png` 모두 Next.js Image optimizer 400. 파일 disk 존재 (`apps/web/public/landing/screenshots/`). source code bug (localhost + production 동일 400).
 
 **목표**: Next.js Image config / format / dimension issue 원인 진단 + fix. 또는 직접 `<img>` 태그 fallback.
 
@@ -144,7 +144,7 @@
 
 ## BL-S27c-11 — Real IDOR + edge case 회귀 가드 강화 ★ (P2)
 
-**현 상태**: Sprint 27c audit 에서 real cross-tenant IDOR verified (Account #1 → Account #2 workspace, 5 endpoint 403). 단 `backend/tests/integration/` 의 동일 시나리오 회귀 가드 명시 필요. Sprint 19 BUG-C01-EXT 의 후속 안정화.
+**현 상태**: Sprint 27c audit 에서 real cross-tenant IDOR verified (Account #1 → Account #2 workspace, 5 endpoint 403). 단 `apps/backend/tests/integration/` 의 동일 시나리오 회귀 가드 명시 필요. Sprint 19 BUG-C01-EXT 의 후속 안정화.
 
 **근거**: Sprint 27c audit `qa-edgecase.md` real verify 통과 + 헌법 I-9 정합 verified.
 
@@ -314,7 +314,7 @@
 
 - ARCH-1 + ARCH-r2-1 + ARCH-5 + BUG-S28-ARCH-2 — OnboardingService DI 통일 + Demeter helper
 - ARCH-2 + ARCH-r2-3 — services DTO 일관
-- ARCH-3 + BUG-S28-ARCH-1 — `backend/src/audit/` 도메인 신설 → BE 17 모듈 (현재 16)
+- ARCH-3 + BUG-S28-ARCH-1 — `apps/backend/src/audit/` 도메인 신설 → BE 17 모듈 (현재 16)
 - ARCH-6 — `common/promote_helpers.py` 확장 + 5 도메인 promote SRP
 - ARCH-r2-2 — auth lazy seed LazySeedService 추출
 - BUG-S28-ARCH-4 — `core ↔ common` cycle 분리
@@ -337,7 +337,7 @@
 
 ## BL-S27e-H — backend dependency upper-bound 정책 (Sprint 27e Round 2 신규) ★ (P3)
 
-**현 상태**: `backend/pyproject.toml` 17 dependencies 중 `pgvector>=0.4.2,<1.0.0` 만 upper-bound 명시. 나머지 (google-genai/openai/sentry-sdk/fastapi 등) 하한만 → `uv sync` 자동 재해결 시 major bump (1.x → 2.x) 자동 적용 가능 → breaking API 변경 risk.
+**현 상태**: `apps/backend/pyproject.toml` 17 dependencies 중 `pgvector>=0.4.2,<1.0.0` 만 upper-bound 명시. 나머지 (google-genai/openai/sentry-sdk/fastapi 등) 하한만 → `uv sync` 자동 재해결 시 major bump (1.x → 2.x) 자동 적용 가능 → breaking API 변경 risk.
 
 **Fix 후보**:
 - (a) `uv.lock` pin 만 신뢰: CI 와 production Dockerfile 에서 `uv sync --frozen` 강제 (단순)
@@ -454,8 +454,8 @@ async def _report_progress(meeting_id, step, **meta): ...
 ```
 
 **영향 파일:**
-- `backend/src/meetings/models.py` — MeetingProgress 모델 추가
-- `backend/src/meetings/pipeline_service.py` — commit 횟수 감소
+- `apps/backend/src/meetings/models.py` — MeetingProgress 모델 추가
+- `apps/backend/src/meetings/pipeline_service.py` — commit 횟수 감소
 - `alembic/versions/` — 마이그레이션 추가
 
 **예상 LOC delta:** +50 (모델) / -30 (pipeline_service 단순화)
@@ -501,7 +501,7 @@ class MeetingPipelineService:
 ```
 
 **영향 파일:**
-- `backend/src/meetings/pipeline_service.py` (360 LOC → ~250 LOC 예상)
+- `apps/backend/src/meetings/pipeline_service.py` (360 LOC → ~250 LOC 예상)
 
 **예상 LOC delta:** -100 ~ -110
 
@@ -550,8 +550,8 @@ enriched = [
 ```
 
 **영향 파일:**
-- `backend/src/embeddings/repository.py` — `find_chunks_by_ids` 메서드 추가
-- `backend/src/rag/service.py` — `_enrich_context` 배치 호출로 변경
+- `apps/backend/src/embeddings/repository.py` — `find_chunks_by_ids` 메서드 추가
+- `apps/backend/src/rag/service.py` — `_enrich_context` 배치 호출로 변경
 
 **예상 LOC delta:** +12 (repository) / -8 (service)
 
@@ -605,8 +605,8 @@ async def extract_actions_and_link(self, ...) -> dict:
 ```
 
 **영향 파일:**
-- `backend/src/common/prompts.py` — Pydantic 모델 2개 추가 (또는 `common/llm_schemas.py` 신설)
-- `backend/src/services/ai_processing.py` — 검증 2줄 추가 (summarize, extract_actions_and_link)
+- `apps/backend/src/common/prompts.py` — Pydantic 모델 2개 추가 (또는 `common/llm_schemas.py` 신설)
+- `apps/backend/src/services/ai_processing.py` — 검증 2줄 추가 (summarize, extract_actions_and_link)
 
 **예상 LOC delta:** +30 (스키마 모델) / +4 (검증 줄)
 
@@ -625,8 +625,8 @@ async def extract_actions_and_link(self, ...) -> dict:
 ## BL-005 — memory.service.promote() Service Session 직접 접근 제거 ✅ **완료 (Sprint 19 PR #1 C10, 2026-05-18)**
 
 **해소** (Sprint 27e Round 2 BUG-S27e-ARCH-7 verified):
-- `backend/src/memory/service.py:405-505` `MemoryService.promote()` 가 `self.workspace_repo.find_by_id(target_workspace_id)` + `self.workspace_repo.find_member(...)` 사용 — WorkspaceRepository 경유.
-- `grep "self.repo.session.execute" backend/src/memory/service.py` = **0 hit** verified.
+- `apps/backend/src/memory/service.py:405-505` `MemoryService.promote()` 가 `self.workspace_repo.find_by_id(target_workspace_id)` + `self.workspace_repo.find_member(...)` 사용 — WorkspaceRepository 경유.
+- `grep "self.repo.session.execute" apps/backend/src/memory/service.py` = **0 hit** verified.
 - `MemoryService.__init__` workspace_repo 주입 강제 (line 424 fail-closed RuntimeError).
 
 **근거**: Sprint 19 PR #1 C10 (Codex F-4), memory `project_sprint19_pr1_kickoff.md`. Sprint 27e Round 2 architecture-findings-r2.md §1 ARCH-7 verify.
@@ -636,7 +636,7 @@ async def extract_actions_and_link(self, ...) -> dict:
 (이하 historical record — closed 마크 위 본 BL 의 원 기록 보존)
 
 **현 상태 (해소 전):**
-`backend/src/memory/service.py:420, 431` — `MemoryService.promote`가 `self.repo.session.execute(target_q)` / `self.repo.session.execute(member_q)` 직접 호출. Backend Rules §3 (AsyncSession은 Repository만 보유) 위반. Workspace + WorkspaceMember 조회를 repo 위임 없이 inline.
+`apps/backend/src/memory/service.py:420, 431` — `MemoryService.promote`가 `self.repo.session.execute(target_q)` / `self.repo.session.execute(member_q)` 직접 호출. Backend Rules §3 (AsyncSession은 Repository만 보유) 위반. Workspace + WorkspaceMember 조회를 repo 위임 없이 inline.
 
 **목표 인터페이스:**
 ```python
@@ -650,9 +650,9 @@ member = await self.workspace_repo.get_member(target_workspace_id, promoted_by_u
 ```
 
 **영향 파일:**
-- `backend/src/workspaces/repository.py` — 메서드 2개 추가 (이미 있을 가능성 있음, 확인 후 재사용)
-- `backend/src/memory/service.py` — promote() session 호출 제거
-- `backend/src/memory/dependencies.py` — WorkspaceRepository 주입
+- `apps/backend/src/workspaces/repository.py` — 메서드 2개 추가 (이미 있을 가능성 있음, 확인 후 재사용)
+- `apps/backend/src/memory/service.py` — promote() session 호출 제거
+- `apps/backend/src/memory/dependencies.py` — WorkspaceRepository 주입
 
 **예상 LOC delta:** +20 (repository) / -10 (service)
 
@@ -671,16 +671,16 @@ member = await self.workspace_repo.get_member(target_workspace_id, promoted_by_u
 ## BL-006 — memory → embeddings.create_chunk 직접 호출 → pipeline_service.py 분리 (ADR-014 위반) ✅ **완료 (Sprint 24 Wave 2 Phase 7, 2026-05-20)**
 
 **현 상태 (해소 전):**
-`backend/src/memory/service.py:550, :780` — `_bg_distill_and_embed` + module-level `_bg_promote_embed` 가 `from src.embeddings.repository import EmbeddingRepository` 를 lazy import 후 직접 `save_chunk` 호출. CONTEXT-MAP §4.2 + ADR-014 위반.
+`apps/backend/src/memory/service.py:550, :780` — `_bg_distill_and_embed` + module-level `_bg_promote_embed` 가 `from src.embeddings.repository import EmbeddingRepository` 를 lazy import 후 직접 `save_chunk` 호출. CONTEXT-MAP §4.2 + ADR-014 위반.
 
 **해소 (2026-05-20):**
-- 신설: `backend/src/memory/pipeline_service.py` — `MemoryPipelineService.save_memory_chunk(session, ...)` 가 `EmbeddingRepository.save_chunk` 호출 캡슐화. `source_type='memory'` 고정.
-- 갱신: `backend/src/memory/service.py` — lazy import 2 hit 제거, `_bg_distill_and_embed` 와 `_bg_promote_embed` 가 pipeline 위임. `MemoryService.__init__` `pipeline: MemoryPipelineService | None = None` 추가, `_bg_*` 진입 전 fail-closed (`RuntimeError`).
-- 갱신: `backend/src/memory/dependencies.py` — `MemoryPipelineService` 동반 주입.
-- 회귀 방지: `backend/tests/architecture/test_no_memory_to_embeddings_lazy_import.py` 2 케이스 (lazy import 0 hit assertion + E-9 1 hit 유지 assertion).
+- 신설: `apps/backend/src/memory/pipeline_service.py` — `MemoryPipelineService.save_memory_chunk(session, ...)` 가 `EmbeddingRepository.save_chunk` 호출 캡슐화. `source_type='memory'` 고정.
+- 갱신: `apps/backend/src/memory/service.py` — lazy import 2 hit 제거, `_bg_distill_and_embed` 와 `_bg_promote_embed` 가 pipeline 위임. `MemoryService.__init__` `pipeline: MemoryPipelineService | None = None` 추가, `_bg_*` 진입 전 fail-closed (`RuntimeError`).
+- 갱신: `apps/backend/src/memory/dependencies.py` — `MemoryPipelineService` 동반 주입.
+- 회귀 방지: `apps/backend/tests/architecture/test_no_memory_to_embeddings_lazy_import.py` 2 케이스 (lazy import 0 hit assertion + E-9 1 hit 유지 assertion).
 
 **미해소 (E-9 예외 유지)**:
-- `backend/src/memory/repository.py:33` 의 `from src.embeddings.repository import _apply_hnsw_session_params` 1 hit 는 vector_search HNSW SET LOCAL 위해 유지 (embeddings/CONTEXT.md E-9 — capsule 우회 최소 비용 약속, Sprint 16). vector_search 자체 흡수는 LOC vs 가치 비대칭으로 후속 sprint carry-over.
+- `apps/backend/src/memory/repository.py:33` 의 `from src.embeddings.repository import _apply_hnsw_session_params` 1 hit 는 vector_search HNSW SET LOCAL 위해 유지 (embeddings/CONTEXT.md E-9 — capsule 우회 최소 비용 약속, Sprint 16). vector_search 자체 흡수는 LOC vs 가치 비대칭으로 후속 sprint carry-over.
 
 **테스트 결과**: pytest 406 → 408 + 1 skipped (architecture gate +2). 기존 memory 27 테스트 회귀 0.
 
@@ -691,7 +691,7 @@ member = await self.workspace_repo.get_member(target_workspace_id, promoted_by_u
 ## BL-007 — memory AI 호출 helper (`_call_distill` / `_call_embedding` / `_call_transcribe`) → services/memory_ai_calls.py 통합
 
 **현 상태:**
-`backend/src/memory/service.py:637~709` — module-level helper 3개에서 Gemini / OpenAI / Whisper client 직접 생성. 주석 "테스트 monkeypatch 진입점"이지만 BG task session_factory 컨텍스트와 AI 호출 시간 블로킹 분리 X. session orphan 위험.
+`apps/backend/src/memory/service.py:637~709` — module-level helper 3개에서 Gemini / OpenAI / Whisper client 직접 생성. 주석 "테스트 monkeypatch 진입점"이지만 BG task session_factory 컨텍스트와 AI 호출 시간 블로킹 분리 X. session orphan 위험.
 
 **목표 인터페이스:**
 ```python
@@ -703,8 +703,8 @@ class MemoryAiCallsService:
 ```
 
 **영향 파일:**
-- `backend/src/services/memory_ai_calls.py` — 신설 (또는 ai_processing.py 확장)
-- `backend/src/memory/service.py` — helper 제거
+- `apps/backend/src/services/memory_ai_calls.py` — 신설 (또는 ai_processing.py 확장)
+- `apps/backend/src/memory/service.py` — helper 제거
 
 **예상 LOC delta:** +120 (services) / -75 (memory/service)
 
@@ -723,7 +723,7 @@ class MemoryAiCallsService:
 ## BL-008 — memory R2 boto3 client 재생성 → R2Service 메서드로 상향
 
 **현 상태:**
-`backend/src/memory/service.py:602, 620` — `_upload_audio_to_r2` / `_download_audio_from_r2`가 R2Service 주입받지만 `self.r2_service._session.client(...)` non-public API 우회. Backend Rules §5 권장 (`aioboto3` async session 패턴) 위반.
+`apps/backend/src/memory/service.py:602, 620` — `_upload_audio_to_r2` / `_download_audio_from_r2`가 R2Service 주입받지만 `self.r2_service._session.client(...)` non-public API 우회. Backend Rules §5 권장 (`aioboto3` async session 패턴) 위반.
 
 **목표 인터페이스:**
 ```python
@@ -735,8 +735,8 @@ class R2Service:
 ```
 
 **영향 파일:**
-- `backend/src/common/r2.py` — 메서드 3개 추가
-- `backend/src/memory/service.py` — helper 2개 → R2Service 메서드 호출
+- `apps/backend/src/common/r2.py` — 메서드 3개 추가
+- `apps/backend/src/memory/service.py` — helper 2개 → R2Service 메서드 호출
 
 **예상 LOC delta:** +60 (r2.py) / -30 (memory/service)
 
@@ -755,7 +755,7 @@ class R2Service:
 ## BL-009 — memory MemoryItem status state machine 분리 (3 BG task 중복 제거)
 
 **현 상태:**
-`backend/src/memory/service.py:515~549, 568~588, 755~787` — `processing → embedding_pending → active` (또는 embedding_failed) 전이 로직이 3개 BG task에 유사 중복. status 열거형은 `models.py:48~49`에 있지만 transition 검증 X. status 추가/변경 시 grep 3곳 수정 필요 (locality 낮음).
+`apps/backend/src/memory/service.py:515~549, 568~588, 755~787` — `processing → embedding_pending → active` (또는 embedding_failed) 전이 로직이 3개 BG task에 유사 중복. status 열거형은 `models.py:48~49`에 있지만 transition 검증 X. status 추가/변경 시 grep 3곳 수정 필요 (locality 낮음).
 
 **목표 인터페이스:**
 ```python
@@ -768,8 +768,8 @@ class MemoryStatusFlow:
 ```
 
 **영향 파일:**
-- `backend/src/memory/status_flow.py` — 신설
-- `backend/src/memory/service.py` — 3개 BG task에서 사용
+- `apps/backend/src/memory/status_flow.py` — 신설
+- `apps/backend/src/memory/service.py` — 3개 BG task에서 사용
 
 **예상 LOC delta:** +60 (status_flow) / -40 (service)
 
@@ -788,7 +788,7 @@ class MemoryStatusFlow:
 ## BL-010 — memory MemoryQueryEmbeddingCache race condition 정책 결정
 
 **현 상태:**
-`backend/src/memory/service.py:335~355` — `_get_query_embedding` cache lookup 후 저장 (line 354). 동시 호출 시 UNIQUE 충돌 무시 (`repository.py:269` "race condition은 무시"). 두 workspace가 동일 normalized_query 입력 시 cache 공유 여부 deterministic X.
+`apps/backend/src/memory/service.py:335~355` — `_get_query_embedding` cache lookup 후 저장 (line 354). 동시 호출 시 UNIQUE 충돌 무시 (`repository.py:269` "race condition은 무시"). 두 workspace가 동일 normalized_query 입력 시 cache 공유 여부 deterministic X.
 
 **목표 인터페이스:**
 정책 결정 필요:
@@ -959,7 +959,7 @@ BUT 실제 렌더 상태:
 원인: BL-014 (switcher 없음) + Personal workspace에 가 본 적이 없어 Lock 분기 미검증.
 
 **목표 인터페이스:**
-- `<WorkspaceTypeBadge type="personal" | "team" />` shared component (`frontend/src/features/workspaces/components/`)
+- `<WorkspaceTypeBadge type="personal" | "team" />` shared component (`apps/web/src/features/workspaces/components/`)
 - 사용 위치: switcher dropdown / topbar / recall card top-right / promote modal option
 
 **예상 LOC delta:** +60 (신규 컴포넌트 + 4 호출처)
@@ -1096,7 +1096,7 @@ Stage 5-4 design-review 잡다한 polish 3건:
 
 ## BL-021 — e2e auth.setup Clerk koKR label selector mismatch ✅ **완료 (commit 2bf3df8)**
 
-**해결:** `frontend/e2e/auth.setup.ts:42` selector 를 `getByLabel(/email/i)` → `input[name="identifier"]` 로 정정. Clerk SDK standard input name 사용으로 locale-independent.
+**해결:** `apps/web/e2e/auth.setup.ts:42` selector 를 `getByLabel(/email/i)` → `input[name="identifier"]` 로 정정. Clerk SDK standard input name 사용으로 locale-independent.
 
 **현 상태:**
 PR #29 CI e2e job fail (5m timeout). main에서 이미 같은 fail inherit (run 25825914554, 2026-05-13 push sha 8311620 이후). 본 PR 책임 아님 — auth.setup.ts 본 PR diff 0 (Sprint 14에서 마지막 수정).
@@ -1305,7 +1305,7 @@ Cloud Run + Neon Postgres 환경에서 BE 인스턴스 cold start 시:
 - 추정 Cloud Run URL curl: `404 Page not found` HTML — e2e 응답과 패턴 매칭
 
 **fix:**
-- `frontend/e2e/auth.setup.ts` GET/POST 응답 `.ok()` 가드 + 명시 error 메시지 (status + apiUrl + body[0..200])
+- `apps/web/e2e/auth.setup.ts` GET/POST 응답 `.ok()` 가드 + 명시 error 메시지 (status + apiUrl + body[0..200])
 - 기존 `.json().catch(() => [])` silent fallback 제거 (503 시 wsList=[] 분기로 빠져 POST에서 다시 SyntaxError 발생하는 도미노 차단)
 - 후속 = 사용자 GCP 콘솔에서 E2E_API_URL secret 갱신 (또는 Cloud Run service 재배포)
 
@@ -1331,8 +1331,8 @@ Cloud Run + Neon Postgres 환경에서 BE 인스턴스 cold start 시:
 - Foreground (capture_text/capture_voice/recall) + background (distill/embed/transcribe) 책임 단일 클래스 누적.
 
 **해결:**
-- `backend/src/memory/_helpers.py` 신설 — `_call_*` 헬퍼 3개 이동.
-- `backend/src/memory/background.py` 신설 — `BackgroundMemoryService` 클래스 (3 백그라운드 task).
+- `apps/backend/src/memory/_helpers.py` 신설 — `_call_*` 헬퍼 3개 이동.
+- `apps/backend/src/memory/background.py` 신설 — `BackgroundMemoryService` 클래스 (3 백그라운드 task).
 - `MemoryService.__init__` 에 BackgroundMemoryService 주입. router 변경 없음.
 
 **예상 LOC delta:** service.py −300 / background.py +250 / _helpers.py +100. net +50, monolith 해소.
@@ -1467,7 +1467,7 @@ Cloud Run + Neon Postgres 환경에서 BE 인스턴스 cold start 시:
 - pool recycle 시간 미설정
 
 **해결 방향**:
-- `backend/src/core/db.py` 또는 engine config 에 `pool_pre_ping=True`, `pool_recycle=300` 추가
+- `apps/backend/src/core/db.py` 또는 engine config 에 `pool_pre_ping=True`, `pool_recycle=300` 추가
 - 또는 asyncpg 의 `connection_class` 에서 `before_first_query` health-check
 
 **우선순위**: ★★★☆☆ (P1 deferred — intermittent, 사용자 noticeable 하지만 retry 로 우회)
@@ -1620,7 +1620,7 @@ Cloud Run + Neon Postgres 환경에서 BE 인스턴스 cold start 시:
 **해결 (PR #69)**: `.github/workflows/nightly-e2e.yml` cron 으로 heavy spec 분리.
 
 **해결 (Sprint 18, qa-fix-r2-cleanup-script)**: R2 nightly cleanup script + workflow.
-- `backend/scripts/r2_cleanup.py` — aioboto3 비동기, uploads/ prefix 의 N 일 이상 객체 dry run/--delete
+- `apps/backend/scripts/r2_cleanup.py` — aioboto3 비동기, uploads/ prefix 의 N 일 이상 객체 dry run/--delete
 - `.github/workflows/r2-cleanup.yml` — workflow_dispatch 수동 트리거 전용 (cron 은 사용자 검증 후)
 - 안전 기본값: DRY RUN, max-keys 10000, prefix uploads/
 
@@ -1750,7 +1750,7 @@ PR #1 audit 4 case (action_items.project_id / notes.project_id / mpl / project_m
 
 ### 회귀 안전망 (Sprint 24 Wave 2 T-N+2, 2026-05-20)
 
-`backend/tests/fixtures/composite_fk.py` + `backend/tests/integration/test_composite_fk_scn_matrix.py` —
+`apps/backend/tests/fixtures/composite_fk.py` + `apps/backend/tests/integration/test_composite_fk_scn_matrix.py` —
 SCN-FK-01~12 매트릭스 (4 entity × 3 op = 12 case) 자동화. 회귀 시 SCN ID 로 즉시 식별.
 기존 `test_workspace_fk_cross_tenant_block.py` (7 case) 와 상호 보완.
 
@@ -1872,7 +1872,7 @@ E1    2482456 refactor(bl-053): E1 entry — AsyncSession SM 양분 import + cla
 ### BL-054 carry-over (PR #93)
 
 - 모든 repository 의 `session.execute(stmt).scalars().all()` / `.scalar_one_or_none()` / `.scalar_one()` 패턴을 SQLModel typed `session.exec(stmt).all()` / `.one_or_none()` / `.one()` 으로 migration
-- 헌법 patch 동반 (CONTEXT-MAP I-14 + backend/CONTEXT.md B-10 + .ai/stacks/fastapi/backend.md)
+- 헌법 patch 동반 (CONTEXT-MAP I-14 + apps/backend/CONTEXT.md B-10 + .ai/stacks/fastapi/backend.md)
 - execute allowlist manifest (G1~G5) 작성 후 진행
 
 **근거**: Sprint 19 PR #2 D9 + BL-052 cleanup PR (#91) Plan agent verdict + Codex 1차/2차 review.
@@ -1911,7 +1911,7 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 ### 헌법 patch (Codex 1차 MAJOR-1 수락)
 
 - `CONTEXT-MAP.md` I-14: `session.exec() 금지` → manifest 기반 allowlist 명시
-- `backend/CONTEXT.md` B-10: 동일 정정 + N+1 방지 selectinload 동일
+- `apps/backend/CONTEXT.md` B-10: 동일 정정 + N+1 방지 selectinload 동일
 
 ### 검증
 
@@ -2202,7 +2202,7 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 - `meetings/pipeline_service.py:process_meeting` 호출처 교체 (`transcribe` → `transcribe_with_chunking`).
 - `tests/services/test_whisper_chunked_4hr.py` — 3 신규 test (short single / 4hr 4 chunk offset / overlap dedupe). mock 기반 (ffmpeg/Whisper 실제 호출 회피).
 
-**Atomic Update**: `backend/CONTEXT.md` §10 STT 파이프라인 + `docs/architecture/ai-pipeline.md` §"STT (Speech-to-Text)" + 본 BL closed mark.
+**Atomic Update**: `apps/backend/CONTEXT.md` §10 STT 파이프라인 + `docs/architecture/ai-pipeline.md` §"STT (Speech-to-Text)" + 본 BL closed mark.
 
 **제약·후속**:
 - 4hr 라이브 audio 실측은 별도 dogfood 과제 (테스트는 mock 검증). 사용자 audio sample 확보 시점에 production 1회 verify 권장.
@@ -2214,7 +2214,7 @@ F0 c23c9dc docs(bl-054): F0 execute manifest 신설 (G1~G5 카테고리)
 
 **현 상태:** 미시작 (carry-over from Sprint 24 Wave 2 T-RAG-MOCK-REMOVE / BUG-POW-005).
 
-Sprint 24 Wave 2 T-RAG-MOCK-REMOVE 에서 `frontend/src/features/rag/components/search-scope.tsx` 의 MOCK_SELECTABLE_SOURCES 5건 제거 후 "선택한 소스" 탭을 "소스 선택 기능 준비 중 — 현재는 전체 워크스페이스에서 검색합니다" empty state 로 변경. 장기적으로 source-level (회의/노트 단위) RAG 검색 범위 선택이 실제로 필요한가는 Power persona 데이터 수집 후 결정.
+Sprint 24 Wave 2 T-RAG-MOCK-REMOVE 에서 `apps/web/src/features/rag/components/search-scope.tsx` 의 MOCK_SELECTABLE_SOURCES 5건 제거 후 "선택한 소스" 탭을 "소스 선택 기능 준비 중 — 현재는 전체 워크스페이스에서 검색합니다" empty state 로 변경. 장기적으로 source-level (회의/노트 단위) RAG 검색 범위 선택이 실제로 필요한가는 Power persona 데이터 수집 후 결정.
 
 **목표:**
 
@@ -2244,8 +2244,8 @@ Phase 2 T-AI-DATE 완료 후 n=20 으로 확장 재측정해 P/R 회복 confirma
 
 **목표:**
 
-1. `backend/tests/llm/fixtures/sample_transcripts.py` 의 DELTA_3 ground-truth sample 을 5 → 20 으로 확장 (다양한 회의 시나리오 — 1:1, 4+명 회의, 마감일 명시/미명시 mix, assignee 명시/미명시 mix).
-2. `backend/scripts/sprint24_wave2_delta.py` (또는 후속 sprint 의 동등 스크립트) 로 post-Phase-2 모델 (gemini-3.1-flash-lite + T-AI-DATE prompt) 재측정.
+1. `apps/backend/tests/llm/fixtures/sample_transcripts.py` 의 DELTA_3 ground-truth sample 을 5 → 20 으로 확장 (다양한 회의 시나리오 — 1:1, 4+명 회의, 마감일 명시/미명시 mix, assignee 명시/미명시 mix).
+2. `apps/backend/scripts/sprint24_wave2_delta.py` (또는 후속 sprint 의 동등 스크립트) 로 post-Phase-2 모델 (gemini-3.1-flash-lite + T-AI-DATE prompt) 재측정.
 3. 결과 비교: baseline `P=1.000 R=1.000` (n=5) vs post-Phase-2 (n=20) — gate 임계 P/R ≥ 0.9.
 4. fail 시: prompt 추가 강화 (예: assignee 명시 의무 위반 사례 Few-shot 추가) 또는 hybrid (chain-of-thought 또는 2-step extraction) 도입 검토.
 
@@ -2328,7 +2328,7 @@ dashboard 4 API (workspaces / members / meetings / inbox) 가 직렬 호출. wor
 **예상 시간**: 1h
 
 ### 배경
-Sprint 24 Wave 2 Phase 6 T-BE-PERF Top 1 fix 에서 `backend/src/auth/dependencies.py` 의 `_JWT_CLAIMS_CACHE` 를 자체 dict + 수동 maxsize 청소로 구현. Gemini 2차 review 가 `cachetools.TTLCache` 권고 (의존성 추가, 검증된 라이브러리).
+Sprint 24 Wave 2 Phase 6 T-BE-PERF Top 1 fix 에서 `apps/backend/src/auth/dependencies.py` 의 `_JWT_CLAIMS_CACHE` 를 자체 dict + 수동 maxsize 청소로 구현. Gemini 2차 review 가 `cachetools.TTLCache` 권고 (의존성 추가, 검증된 라이브러리).
 
 ### 작업
 1. `cachetools` 의존성 추가 (pyproject.toml)
@@ -2344,7 +2344,7 @@ Sprint 24 Wave 2 Phase 6 T-BE-PERF Top 1 fix 에서 `backend/src/auth/dependenci
 **우선순위**: P4 — 현재 작동 OK, 가독성 권고
 
 ### 배경
-`backend/src/rag/service.py` 의 `is_time_filtered = time_range is not None and time_range != "all"`. None 이 default 라 None 도 cache 적용 (의도된 작동). 그러나 가독성 위해 명시적 처리 권고.
+`apps/backend/src/rag/service.py` 의 `is_time_filtered = time_range is not None and time_range != "all"`. None 이 default 라 None 도 cache 적용 (의도된 작동). 그러나 가독성 위해 명시적 처리 권고.
 
 ### 작업
 - `is_time_filtered` 를 helper 함수로 추출 + docstring 으로 None/"all" 동치 명시
@@ -2371,7 +2371,7 @@ T-BE-PERF spike 결론 = production 3-4s 의 main bottleneck = Cloud Run cold st
 **우선순위**: P2 (DoS 완화는 됐으나 streaming 이 진정한 fix)
 
 ### 배경
-agy adversarial review (2026-05-21, Sprint 25 polish) F2 — `backend/src/upload/router.py:upload_file_proxy` 가 `await file.read()` 로 전체 파일을 RAM 적재 후 검증. 500MB × 4 concurrent = 2GB → Cloud Run 2GB instance OOM 위험.
+agy adversarial review (2026-05-21, Sprint 25 polish) F2 — `apps/backend/src/upload/router.py:upload_file_proxy` 가 `await file.read()` 로 전체 파일을 RAM 적재 후 검증. 500MB × 4 concurrent = 2GB → Cloud Run 2GB instance OOM 위험.
 
 Sprint 25 polish 부분 fix (commit `947b778`): `file.size` (multipart 메타) pre-read 차단 — 정상 client 의 oversize 페이로드는 RAM 적재 전 413. 그러나:
 - `file.size = None` 인 client 는 여전히 fallback `await file.read()` → 전체 메모리 적재
@@ -2469,13 +2469,13 @@ v2 (audio/mp4 collapse) 였을 때는 text/plain 과 mismatch → 거부였으�
 ### 배경
 agy F9 sub-3 — `/api/v1/users/sync` endpoint 재도입 시 Svix 서명 검증 누락 위험. 현재 lock-in:
 - ADR-022 §"회수 옵션 5단계" 에 Svix 검증 의무 명시
-- `backend/tests/auth/test_auth_sync_disabled.py` 가 "404 응답" verify (재도입 시 fail → 작성자가 의식)
+- `apps/backend/tests/auth/test_auth_sync_disabled.py` 가 "404 응답" verify (재도입 시 fail → 작성자가 의식)
 
 리스크: 재도입 commit 에서 회귀 테스트도 같이 제거 + Svix 추가 누락 → IDOR 회귀.
 
 ### 작업
 - pre-commit hook 또는 CI lint:
-  - `backend/src/auth/router.py` 에 `@router.post("/sync"` 또는 `@router.post("/users/sync")` 패턴 등장 시
+  - `apps/backend/src/auth/router.py` 에 `@router.post("/sync"` 또는 `@router.post("/users/sync")` 패턴 등장 시
   - 동일 파일에 `svix` 또는 `webhook_signature` 또는 `Webhook(` 임포트 부재면 block
 - 또는 ADR-022 §"회수 옵션" 5단계 를 git commit message template 으로 강제 (작성자 의식 유도)
 
@@ -2490,7 +2490,7 @@ agy F9 sub-3 — `/api/v1/users/sync` endpoint 재도입 시 Svix 서명 검증 
 **우선순위**: P4
 
 ### 배경
-`backend/src/services/ai_processing.py` 의 `_validate_action_dates` 후처리 helper 가 past year due_date drop 시 meeting_id + due_date + title 로그. ActionItem 의 다른 식별 정보 (assignee 등) 도 일부 남기면 prompt regression 추적성 향상.
+`apps/backend/src/services/ai_processing.py` 의 `_validate_action_dates` 후처리 helper 가 past year due_date drop 시 meeting_id + due_date + title 로그. ActionItem 의 다른 식별 정보 (assignee 등) 도 일부 남기면 prompt regression 추적성 향상.
 
 ### 작업
 - log warn extra dict 에 `assignee` 등 추가
@@ -2526,7 +2526,7 @@ agy F9 sub-3 — `/api/v1/users/sync` endpoint 재도입 시 Svix 서명 검증 
 > docs + AGENTS.md 기반 아키텍처/기능 검증 (3-agent recon + deep-module Ousterhout deletion-test 렌즈). Scope B = 문서 정합 + arch test gate + 안전 FE 리팩토링. 검증 결론 = 코드는 헌법 21불변식을 대체로 준수 (I-1/I-4/I-9/I-13 clean; embeddings E-9·onboarding I-1 은 문서화된 예외).
 
 ### ✅ 본 PR 에서 해소 (RESOLVED)
-- **문서 drift 봉합**. 모듈/feature 개수 정합 (BE 16 = 13 도메인 + common/core/services, FE 15 — feedback 등재) → `AGENTS.md` / `docs/architecture/directory-map.md` / `CONTEXT-MAP.md §4.3`. `backend/CONTEXT.md §4` 표 정정 (auth/notes/upload CONTEXT.md 존재 반영, feedback 행 추가). `backend/src/workspaces/CONTEXT.md` 신설 (유일 도메인 CONTEXT.md gap 해소).
+- **문서 drift 봉합**. 모듈/feature 개수 정합 (BE 16 = 13 도메인 + common/core/services, FE 15 — feedback 등재) → `AGENTS.md` / `docs/architecture/directory-map.md` / `CONTEXT-MAP.md §4.3`. `apps/backend/CONTEXT.md §4` 표 정정 (auth/notes/upload CONTEXT.md 존재 반영, feedback 행 추가). `apps/backend/src/workspaces/CONTEXT.md` 신설 (유일 도메인 CONTEXT.md gap 해소).
 - **arch test gate 강제화** (BUG-S28-ARCH-5 부분 해소). I-1 (service 가 AsyncSession 인스턴스 미보유, onboarding allowlist) / I-4 (프롬프트 `common/prompts.py` 중앙화) / core→common import allowlist (cycle 악화 회귀 가드) 3종 추가. 기존 memory→embeddings 가드 포함 arch test 4 게이트로 확대.
 - **FE shallow/FSD 위반 제거**. notes·meetings `export-button.tsx` ~95% 중복 → `components/shared/ExportButton.tsx` 1개로 추출 (동작 보존, wrapper 2파일 삭제). FSD 격리 위반 2건 해소 — `getCitationColor` → `lib/citation-colors.ts`, visibility 공유 어휘(`ProjectVisibility` 타입 + 라벨/설명/색상) → `lib/visibility.ts` (members → projects 컴포넌트 내부 import 제거).
 

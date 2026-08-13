@@ -1,4 +1,4 @@
-# backend/tests/embeddings/test_external_document_l1_limit.py
+# apps/backend/tests/embeddings/test_external_document_l1_limit.py
 """BL-EXT-EMBED-1 — 외부 문서 L1 임베딩 입력 상한 + 배치 분할 회귀 테스트.
 
 핵심 불변식: 절단은 **임베딩 입력에만** 적용되고 저장되는 chunk_text 는 전문이다.

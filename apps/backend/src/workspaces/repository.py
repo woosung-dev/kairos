@@ -1,4 +1,4 @@
-# backend/src/workspaces/repository.py
+# apps/backend/src/workspaces/repository.py
 """Workspace Repository — AsyncSession 유일 보유자.
 
 Sprint 19 PR #1 C12 (Codex F-1/F-5): 헌법 I-9 강제.

@@ -1,4 +1,4 @@
-# backend/src/common/prompts.py
+# apps/backend/src/common/prompts.py
 """AI 프롬프트 상수. 인라인 프롬프트 작성 금지 — 모든 프롬프트는 여기서 관리."""
 import json
 import re

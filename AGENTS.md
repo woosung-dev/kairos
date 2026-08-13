@@ -27,7 +27,7 @@
 1. `CONTEXT-MAP.md` (헌법 — 도메인 경계 + 불변식)
 2. `AGENTS.md` (본 문서)
 3. `DESIGN.md` (디자인 시스템)
-4. 작업 도메인의 `backend/src/<domain>/CONTEXT.md`
+4. 작업 도메인의 `apps/backend/src/<domain>/CONTEXT.md`
 5. `docs/TODO.md`
 6. 디렉토리 구조 필요 시: `docs/architecture/directory-map.md` (2026-07-31 기준 BE 17 모듈 = 14 도메인 + common/core/services, FE 16 features. `integrations`는 ADR-026 PR #143 로 구현 완료)
 
@@ -87,7 +87,7 @@ docs: 문서 / chore: 빌드·설정 / test: 테스트
 
 **도메인 / 엔티티 / visibility / 파이프라인**: `CONTEXT-MAP.md` (헌법). 상세 architecture: `docs/architecture/{ai,rag,cross-domain}-pipeline.md`.
 
-**AI 제약**: 모델 고정 (ADR-019) · 프롬프트 중앙 `backend/src/common/prompts.py` (인라인 금지) · cross-domain = `pipeline_service.py` orchestrator 만 · 장기 작업 = BackgroundTasks + 202 + polling.
+**AI 제약**: 모델 고정 (ADR-019) · 프롬프트 중앙 `apps/backend/src/common/prompts.py` (인라인 금지) · cross-domain = `pipeline_service.py` orchestrator 만 · 장기 작업 = BackgroundTasks + 202 + polling.
 
 **Design System**: `DESIGN.md` 가 시각·UI source. 사용자 승인 없이 일탈 금지.
 

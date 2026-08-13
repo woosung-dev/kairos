@@ -25,7 +25,7 @@
 ## 3. 디렉토리 (FSD)
 
 ```
-frontend/src/
+apps/web/src/
 ├── app/           라우트 진입점 — Thin Component (RSC 우선)
 │   ├── (auth)/    Clerk 인증
 │   ├── (landing)/ 랜딩 페이지
@@ -93,7 +93,7 @@ frontend/src/
 ## 6. 시안 → 컴포넌트 흐름 (Stage 3 산출 시)
 
 1. `/design-shotgun` 또는 Figma 시안 승인
-2. `frontend/src/features/<domain>/components/` 안에 컴포넌트 생성
+2. `apps/web/src/features/<domain>/components/` 안에 컴포넌트 생성
 3. shadcn 토큰만 사용 (DESIGN.md 참조)
 4. RSC 기본, 클라이언트 인터랙션은 child만 `'use client'`
 5. 라우트로 시각 확인 → `/design-review`

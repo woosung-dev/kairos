@@ -1,4 +1,4 @@
-# backend/src/notes/exceptions.py
+# apps/backend/src/notes/exceptions.py
 from fastapi import HTTPException
 
 from src.common.exceptions import NotFoundError

@@ -1,4 +1,4 @@
-# frontend/src/features/projects — CONTEXT
+# apps/web/src/features/projects — CONTEXT
 
 ProjectDashboard가 정식 라우트 컴포넌트 (Sprint 7 BE-T14, AD-46).
 온보딩 게이트는 회의·노트 콘텐츠가 없고 로딩이 아닐 때만 OnboardingView를 렌더한다.

@@ -18,8 +18,8 @@
 #    워크트리는 `.claude/worktrees/` 안(= gitignore)이므로 커밋 경로에 노출되지 않지만,
 #    워크트리 디렉터리를 레포 밖으로 옮기지 마라.
 #
-# 의존성(frontend/node_modules · backend/.venv)은 복사하지 않는다 — 워크트리에서 직접 설치한다.
-#   (cd frontend && pnpm install) && (cd backend && uv sync)      # pnpm store 하드링크라 ~10초
+# 의존성(apps/web/node_modules · apps/backend/.venv)은 복사하지 않는다 — 워크트리에서 직접 설치한다.
+#   (cd apps/web && pnpm install) && (cd apps/backend && uv sync)      # pnpm store 하드링크라 ~10초
 
 # AI 규칙 SSOT — AGENTS.md 가 .ai/common/global.md 를 7회, .ai/templates/workflow.md 를 4회 참조한다.
 # 없으면 워크트리 세션이 Plan→Code→Test 규율과 Atomic Update 라우팅을 통째로 못 읽는다.
@@ -37,7 +37,7 @@
 # 백엔드 시크릿 — DATABASE_URL(Neon dev)·Clerk·R2·Gemini·OpenAI.
 # ⚠️ 메인과 같은 Neon dev DB 를 가리킨다. 워크트리에서 alembic upgrade/downgrade 를 돌리면
 #    메인과 다른 워크트리에 그대로 영향이 간다 (2026-07-30 dev DB 전삭제 사고 참조).
-backend/.env
+apps/backend/.env
 
 # 프론트 Clerk 키 + E2E/QA 계정. 없으면 dev 서버가 부팅 단계에서 죽고 e2e 가 전멸한다.
-frontend/.env.local
+apps/web/.env.local

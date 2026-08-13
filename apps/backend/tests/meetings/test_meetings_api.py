@@ -1,4 +1,4 @@
-# backend/tests/meetings/test_meetings_api.py
+# apps/backend/tests/meetings/test_meetings_api.py
 """Meetings API 통합 테스트."""
 import uuid
 from unittest.mock import AsyncMock, MagicMock

@@ -1,4 +1,4 @@
-# backend/tests/projects/test_members.py
+# apps/backend/tests/projects/test_members.py
 """ProjectMember 추가 API 시나리오 매트릭스 테스트."""
 import uuid
 from unittest.mock import AsyncMock, MagicMock

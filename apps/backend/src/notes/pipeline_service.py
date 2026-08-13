@@ -1,4 +1,4 @@
-# backend/src/notes/pipeline_service.py
+# apps/backend/src/notes/pipeline_service.py
 """노트 오케스트레이터 — embeddings.service 호출 + 권한 검증 일원화.
 
 ADR-014 옵션 A: D-2 (notes → embeddings.service) 부채 해소.

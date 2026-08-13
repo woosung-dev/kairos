@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: apps/backend
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: frontend
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
@@ -52,7 +52,7 @@ jobs:
         with:
           node-version: 20
           cache: "pnpm"
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          cache-dependency-path: apps/web/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -160,12 +160,12 @@ jobs:
           version: "latest"
 
       - name: Install backend deps
-        working-directory: backend
+        working-directory: apps/backend
         # Sprint 28 BUG-S28-SEC-1 — `--frozen` 강제 (lock drift 차단)
         run: uv sync --frozen
 
       - name: Run alembic upgrade head
-        working-directory: backend
+        working-directory: apps/backend
         # alembic env.py 가 src.core.config.get_settings 호출 → pydantic Settings 의
         # 모든 SecretStr 필드 (Clerk/AI/R2) 필요. DATABASE_URL 만으론 ValidationError.
         env:
@@ -182,7 +182,7 @@ jobs:
         run: uv run alembic upgrade head
 
       - name: Start backend (uvicorn background)
-        working-directory: backend
+        working-directory: apps/backend
         env:
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
           APP_ENV: test
@@ -225,18 +225,18 @@ jobs:
         with:
           node-version: 20
           cache: "pnpm"
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          cache-dependency-path: apps/web/pnpm-lock.yaml
 
       - name: Install frontend deps
-        working-directory: frontend
+        working-directory: apps/web
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        working-directory: frontend
+        working-directory: apps/web
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Build Next.js app
-        working-directory: frontend
+        working-directory: apps/web
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_API_URL: ${{ env.LOCAL_API_URL }}
@@ -244,7 +244,7 @@ jobs:
         run: pnpm build
 
       - name: Start Next.js app
-        working-directory: frontend
+        working-directory: apps/web
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_API_URL: ${{ env.LOCAL_API_URL }}
@@ -256,7 +256,7 @@ jobs:
 
       # ── Playwright 실행 (local BE 사용) ────────────────────────────────
       - name: Run Playwright tests
-        working-directory: frontend
+        working-directory: apps/web
         env:
           CI: "true"
           E2E_PORT: "3003"
@@ -277,5 +277,5 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: playwright-trace
-          path: frontend/playwright-report/
+          path: apps/web/playwright-report/
           retention-days: 7

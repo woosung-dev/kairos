@@ -46,7 +46,7 @@ NEXT_PUBLIC_API_MOCK=true
 ## 3. 개발 서버 실행
 
 ```bash
-cd frontend
+cd apps/web
 pnpm dev
 ```
 

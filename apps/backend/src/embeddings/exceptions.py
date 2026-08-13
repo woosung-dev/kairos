@@ -1,4 +1,4 @@
-# backend/src/embeddings/exceptions.py
+# apps/backend/src/embeddings/exceptions.py
 """임베딩 관련 예외."""
 
 

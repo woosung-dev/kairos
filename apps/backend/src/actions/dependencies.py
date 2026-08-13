@@ -1,4 +1,4 @@
-# backend/src/actions/dependencies.py
+# apps/backend/src/actions/dependencies.py
 """ActionItem 의존성 — Depends() 조립의 유일한 위치.
 
 Codex F-2 Critical: secondary FK (project / meeting / assignee) cross-tenant 검증을 위해

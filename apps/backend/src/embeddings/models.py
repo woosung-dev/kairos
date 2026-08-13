@@ -1,4 +1,4 @@
-# backend/src/embeddings/models.py
+# apps/backend/src/embeddings/models.py
 """임베딩 청크 + 시맨틱 캐시 모델."""
 import uuid
 from datetime import datetime, timedelta

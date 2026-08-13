@@ -1,4 +1,4 @@
-# backend/src/notes/models.py
+# apps/backend/src/notes/models.py
 """노트 모델. project_id nullable — CODE 철학(마찰 최소화)."""
 import uuid
 from datetime import datetime

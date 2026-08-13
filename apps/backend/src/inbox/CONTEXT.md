@@ -2,7 +2,7 @@
 
 # inbox CONTEXT
 
-> 상위: `/backend/CONTEXT.md` → `/CONTEXT-MAP.md`.
+> 상위: `/apps/backend/CONTEXT.md` → `/CONTEXT-MAP.md`.
 
 ---
 
@@ -111,7 +111,7 @@ POST   /{id}/promote        Sprint 23 D4 — Inbox → team workspace 복제 (I-
 - cross-tenant 응답:
   - path workspace 안에 없는 `inbox_id` → 404 (`InboxItemNotFoundError`)
   - cross-workspace `project_id` → 404 (`ProjectNotFoundError`)
-- 회귀 가드: `backend/tests/integration/test_workspace_idor_matrix.py::TestInboxIDORMatrix` 4 케이스 + `tests/inbox/test_inbox_service.py` 13 케이스
+- 회귀 가드: `apps/backend/tests/integration/test_workspace_idor_matrix.py::TestInboxIDORMatrix` 4 케이스 + `tests/inbox/test_inbox_service.py` 13 케이스
 
 ---
 

@@ -1,4 +1,4 @@
-# backend/src/rag/schemas.py
+# apps/backend/src/rag/schemas.py
 """RAG 요청/응답 스키마."""
 from pydantic import BaseModel, Field, field_validator
 

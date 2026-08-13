@@ -1,4 +1,4 @@
-# backend/src/notes/dependencies.py
+# apps/backend/src/notes/dependencies.py
 """노트 서비스 의존성 주입 — ADR-014 옵션 A 정합 (D-2 부채 해소).
 
 NoteService = 순수 CRUD. NotePipelineService = embedding orchestrator + 권한 검증.

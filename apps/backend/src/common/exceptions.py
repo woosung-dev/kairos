@@ -1,4 +1,4 @@
-# backend/src/common/exceptions.py
+# apps/backend/src/common/exceptions.py
 """공통 예외 및 FastAPI 예외 핸들러."""
 from fastapi import HTTPException
 

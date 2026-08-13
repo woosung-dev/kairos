@@ -11,13 +11,13 @@
 - 모델별 비교 (latency_delta_ms / cost_delta_usd / output_equivalence)
 
 실행:
-  cd backend
+  cd apps/backend
   uv run python scripts/sprint15_day0_spike.py
   # 또는
   python scripts/sprint15_day0_spike.py
 
 전제:
-- backend/.env에 OPENAI_API_KEY + GEMINI_API_KEY 설정
+- apps/backend/.env에 OPENAI_API_KEY + GEMINI_API_KEY 설정
 - samples/ 디렉토리에 audio 7개 (manual 녹음 필요):
     samples/chrome_10s.webm
     samples/chrome_60s.webm
@@ -43,7 +43,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-# sys.path에 backend/src 추가 — Settings 재사용
+# sys.path에 apps/backend/src 추가 — Settings 재사용
 SCRIPT_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = SCRIPT_DIR.parent
 sys.path.insert(0, str(BACKEND_DIR))

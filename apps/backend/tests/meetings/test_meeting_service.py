@@ -1,4 +1,4 @@
-# backend/tests/meetings/test_meeting_service.py
+# apps/backend/tests/meetings/test_meeting_service.py
 """MeetingService 단위 테스트 — Sprint 14 T-8 (BUG-H04) projects 동기화 + 회귀 차단."""
 import uuid
 from unittest.mock import AsyncMock, MagicMock

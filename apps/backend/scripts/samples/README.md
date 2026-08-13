@@ -2,7 +2,7 @@
 
 > **목적**: `sprint15_day0_spike.py`가 측정할 audio sample 7개. founder ~30분 녹음.
 >
-> **파일은 git ignore** (개인 음성 데이터). `.gitignore`에 `backend/scripts/samples/*.webm` `*.mp4` 등록되어 있음.
+> **파일은 git ignore** (개인 음성 데이터). `.gitignore`에 `apps/backend/scripts/samples/*.webm` `*.mp4` 등록되어 있음.
 
 ---
 
@@ -24,13 +24,13 @@
 
 ### 옵션 0: 자동화 cli (가장 빠름, macOS only)
 
-`backend/scripts/record_samples.sh` — ffmpeg + avfoundation 인터랙티브 녹음. 7 sample 일괄 ~15분.
+`apps/backend/scripts/record_samples.sh` — ffmpeg + avfoundation 인터랙티브 녹음. 7 sample 일괄 ~15분.
 
 ```bash
-chmod +x backend/scripts/record_samples.sh
-bash backend/scripts/record_samples.sh           # 일반 (5min 포함)
-bash backend/scripts/record_samples.sh --skip-long  # 5min skip (~10분)
-bash backend/scripts/record_samples.sh --silent-only  # 무음 1개만 (smoke)
+chmod +x apps/backend/scripts/record_samples.sh
+bash apps/backend/scripts/record_samples.sh           # 일반 (5min 포함)
+bash apps/backend/scripts/record_samples.sh --skip-long  # 5min skip (~10분)
+bash apps/backend/scripts/record_samples.sh --silent-only  # 무음 1개만 (smoke)
 ```
 
 장점: 카운트다운 + 파일명 자동 + 코덱 자동 (webm libopus / mp4 aac). 단점: iOS sample도 macOS mic로 녹음됨 → 진짜 iOS MIME 검증 필요 시 옵션 A 병행.
@@ -82,10 +82,10 @@ ffmpeg -i input.wav -t 10 -c:a aac ios_10s.mp4
 ## 검증
 
 ```bash
-ls -lh backend/scripts/samples/
+ls -lh apps/backend/scripts/samples/
 # 7개 파일 확인 (10s ~ 5min, webm/mp4 혼합)
 
-cd backend
+cd apps/backend
 uv run python scripts/sprint15_day0_spike.py
 # 출력: per-sample latency/cost + aggregate + threshold violations
 # 결과 paste → git history
@@ -97,4 +97,4 @@ uv run python scripts/sprint15_day0_spike.py
 
 ## .gitignore 확인
 
-`backend/scripts/samples/*.webm` `*.mp4` `*.wav` 패턴 ignore — 본 README + `.gitkeep`만 commit.
+`apps/backend/scripts/samples/*.webm` `*.mp4` `*.wav` 패턴 ignore — 본 README + `.gitkeep`만 commit.

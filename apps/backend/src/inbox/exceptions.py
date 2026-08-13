@@ -1,4 +1,4 @@
-# backend/src/inbox/exceptions.py
+# apps/backend/src/inbox/exceptions.py
 """Inbox 도메인 예외."""
 from fastapi import HTTPException
 

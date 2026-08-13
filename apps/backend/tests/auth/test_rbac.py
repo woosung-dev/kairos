@@ -1,4 +1,4 @@
-# backend/tests/auth/test_rbac.py
+# apps/backend/tests/auth/test_rbac.py
 """RoleChecker 단위 테스트."""
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch

@@ -1,4 +1,4 @@
-# backend/src/embeddings/dependencies.py
+# apps/backend/src/embeddings/dependencies.py
 """임베딩 서비스 의존성 주입."""
 from fastapi import Depends
 from sqlmodel.ext.asyncio.session import AsyncSession

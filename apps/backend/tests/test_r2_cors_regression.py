@@ -1,4 +1,4 @@
-# backend/tests/test_r2_cors.regression.py
+# apps/backend/tests/test_r2_cors.regression.py
 """R2 버킷 CORS 정책 검증 — 브라우저 직접 PUT 허용 여부.
 
 Regression: ISSUE-R2-CORS-001 — 프로덕션 R2 버킷에 CORS 정책 미설정으로

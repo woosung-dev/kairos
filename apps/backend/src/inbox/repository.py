@@ -1,4 +1,4 @@
-# backend/src/inbox/repository.py
+# apps/backend/src/inbox/repository.py
 """Inbox Repository — AsyncSession 유일 보유자."""
 import uuid
 

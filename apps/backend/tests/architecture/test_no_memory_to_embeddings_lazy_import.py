@@ -10,7 +10,7 @@ E-9 (embeddings/CONTEXT.md): `_apply_hnsw_session_params` 외부 사용처는 �
 import re
 from pathlib import Path
 
-# backend/tests/architecture/* → backend/ 까지 3-up
+# apps/backend/tests/architecture/* → apps/backend/ 까지 3-up
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 

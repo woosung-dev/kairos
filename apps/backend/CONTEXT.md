@@ -2,7 +2,7 @@
 
 # Backend CONTEXT (전역)
 
-> 루트 헌법: `/CONTEXT-MAP.md` 우선. 도메인별 상세는 `backend/src/<domain>/CONTEXT.md`.
+> 루트 헌법: `/CONTEXT-MAP.md` 우선. 도메인별 상세는 `apps/backend/src/<domain>/CONTEXT.md`.
 
 ---
 
@@ -117,7 +117,7 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 
 ---
 
-## 9. 스크립트 (backend/scripts/)
+## 9. 스크립트 (apps/backend/scripts/)
 
 운영 전용 단독 실행 스크립트. router/service/repository 아닌 독립 entry point.
 

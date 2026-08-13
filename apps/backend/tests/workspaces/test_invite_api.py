@@ -1,4 +1,4 @@
-# backend/tests/workspaces/test_invite_api.py
+# apps/backend/tests/workspaces/test_invite_api.py
 """초대/멤버 API 통합 테스트."""
 import uuid
 from unittest.mock import AsyncMock, MagicMock

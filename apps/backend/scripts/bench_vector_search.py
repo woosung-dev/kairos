@@ -5,7 +5,7 @@
 당근(Karrot) DB 밋업 §4-A 측정 + BL-026 (nDCG / precision / 빌드 시간 / EXPLAIN).
 
 사용 예:
-    cd backend
+    cd apps/backend
     uv run python scripts/bench_vector_search.py --mode latency --iter 1000
     uv run python scripts/bench_vector_search.py --mode recall          # recall + nDCG + precision
     uv run python scripts/bench_vector_search.py --mode build-time      # HNSW CREATE INDEX 측정
@@ -21,7 +21,7 @@ BL-026 추가 합격선:
     nDCG@10 >= 0.95
     precision@10 >= 0.90
 
-fixture: backend/tests/embeddings/fixtures/recall_corpus.json
+fixture: apps/backend/tests/embeddings/fixtures/recall_corpus.json
          (없으면 `python tests/embeddings/fixtures/generate_recall_corpus.py` 먼저 실행)
 """
 from __future__ import annotations
@@ -36,7 +36,7 @@ import uuid
 from pathlib import Path
 from statistics import median
 
-# 스크립트 실행 시 backend/src 모듈 import 가능하도록 sys.path 보정
+# 스크립트 실행 시 apps/backend/src 모듈 import 가능하도록 sys.path 보정
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))

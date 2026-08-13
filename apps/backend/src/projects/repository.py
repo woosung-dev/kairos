@@ -1,4 +1,4 @@
-# backend/src/projects/repository.py
+# apps/backend/src/projects/repository.py
 """Project Repository — AsyncSession 유일 보유자.
 
 Sprint 19 PR #1 C9 (Codex F-1/F-3): 헌법 I-9 강제.

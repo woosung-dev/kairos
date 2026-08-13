@@ -9,7 +9,7 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
  * 팀 시드는 워크스페이스·초대·프로젝트·노트를 **실제로 생성**한다. `E2E_API_URL` 이 로컬이 아니면
  * 그 대상 DB 가 오염되므로 기본적으로 거부한다 (BL-DX-E2E-API-URL-1).
  *
- * 배경: `frontend/.env.local` 의 `E2E_API_URL` 이 프로덕션 Cloud Run 을 가리키는 동안
+ * 배경: `apps/web/.env.local` 의 `E2E_API_URL` 이 프로덕션 Cloud Run 을 가리키는 동안
  * `NEXT_PUBLIC_API_URL` 은 localhost 였다. override 없이 team-setup 을 돌리면 프로덕션에
  * 시드가 들어간다. CI 는 `LOCAL_API_URL`(localhost)을 주입하므로 이 가드에 걸리지 않는다.
  *

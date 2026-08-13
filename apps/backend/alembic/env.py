@@ -1,4 +1,4 @@
-# backend/alembic/env.py
+# apps/backend/alembic/env.py
 """Alembic 비동기 마이그레이션 환경 설정."""
 import asyncio
 from logging.config import fileConfig

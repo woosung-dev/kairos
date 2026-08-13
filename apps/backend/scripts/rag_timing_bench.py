@@ -7,7 +7,7 @@ HTTP/SSE/auth 층은 생략 — 측정 대상(embed/vector/text/llm)이 전부 s
 캐시 오염 0 (Codex F-2: time_range 필터 시 cache 미사용).
 
 사용 예:
-    cd backend
+    cd apps/backend
     uv run python scripts/rag_timing_bench.py                       # team-fixtures 기본값
     uv run python scripts/rag_timing_bench.py --runs-per-question 4 \
         --workspace-id <uuid> --user-id <uuid> --json-out out.json
@@ -28,7 +28,7 @@ import sys
 import uuid
 from pathlib import Path
 
-# 스크립트 실행 시 backend/src 모듈 import 가능하도록 sys.path 보정
+# 스크립트 실행 시 apps/backend/src 모듈 import 가능하도록 sys.path 보정
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))

@@ -1,4 +1,4 @@
-# backend/tests/auth/test_auth_api.py
+# apps/backend/tests/auth/test_auth_api.py
 """Auth API 통합 테스트."""
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch

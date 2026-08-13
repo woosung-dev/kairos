@@ -36,7 +36,7 @@ import src.memory.models  # noqa: F401
 
 pytestmark = pytest.mark.integration
 
-# 워크트리 root 기준 alembic.ini 절대 경로 (Config 'backend/alembic.ini' 상대 경로 문제 회피)
+# 워크트리 root 기준 alembic.ini 절대 경로 (Config 'apps/backend/alembic.ini' 상대 경로 문제 회피)
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ALEMBIC_INI = REPO_ROOT / "backend" / "alembic.ini"
 

@@ -1,4 +1,4 @@
-# backend/src/actions/schemas.py
+# apps/backend/src/actions/schemas.py
 """ActionItem 스키마 — Pydantic V2, camelCase alias."""
 import uuid
 from datetime import date

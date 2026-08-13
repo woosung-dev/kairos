@@ -1,4 +1,4 @@
-# backend/src/actions/exceptions.py
+# apps/backend/src/actions/exceptions.py
 """ActionItem 도메인 예외."""
 from fastapi import HTTPException
 

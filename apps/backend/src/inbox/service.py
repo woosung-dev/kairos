@@ -1,4 +1,4 @@
-# backend/src/inbox/service.py
+# apps/backend/src/inbox/service.py
 """Inbox 서비스 — 크로스 레포지토리 (InboxRepo + ProjectRepo + MeetingRepo).
 
 Sprint 19 PR #1 C13a (Codex 2차 F-1): classify 의 source_type='meeting' 시

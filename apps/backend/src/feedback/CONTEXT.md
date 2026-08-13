@@ -2,7 +2,7 @@
 
 # feedback CONTEXT
 
-> 상위: `/backend/CONTEXT.md` → `/CONTEXT-MAP.md`.
+> 상위: `/apps/backend/CONTEXT.md` → `/CONTEXT-MAP.md`.
 
 ---
 

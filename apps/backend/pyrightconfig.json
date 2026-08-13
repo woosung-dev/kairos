@@ -1,8 +1,8 @@
 {
-  "venvPath": "/Users/woosung/project/agy-project/kairos/backend",
+  "venvPath": "/Users/woosung/project/agy-project/kairos/apps/backend",
   "venv": ".venv",
   "pythonVersion": "3.12",
-  "pythonPath": "/Users/woosung/project/agy-project/kairos/backend/.venv/bin/python",
+  "pythonPath": "/Users/woosung/project/agy-project/kairos/apps/backend/.venv/bin/python",
   "extraPaths": ["./"],
   "include": ["src", "tests", "scripts", "alembic"],
   "executionEnvironments": [

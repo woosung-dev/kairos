@@ -1,4 +1,4 @@
-# backend/tests/actions/test_actions_service.py
+# apps/backend/tests/actions/test_actions_service.py
 """ActionItemService 단위 테스트 — create / list / update / _to_dict.
 
 기존 actions 도메인 0 coverage (7 src, 359 LOC). 단일 도메인 CRUD 회귀 가드.

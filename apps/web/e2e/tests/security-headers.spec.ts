@@ -5,7 +5,7 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * frontend/next.config.ts:5-15 의 4종 보안 헤더가 모든 응답에 항상 포함되는지 검증.
+ * apps/web/next.config.ts:5-15 의 4종 보안 헤더가 모든 응답에 항상 포함되는지 검증.
  * 누군가 next.config.ts 의 headers() 를 정리하면 CI 가 즉시 감지.
  *
  * 검증 헤더:

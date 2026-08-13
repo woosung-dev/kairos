@@ -28,8 +28,8 @@
 ### 1. 환경변수 설정
 
 ```bash
-cp backend/.env.example backend/.env        # FastAPI: .env 표준
-cp frontend/.env.example frontend/.env.local  # Next.js: .env.local 표준
+cp apps/backend/.env.example apps/backend/.env        # FastAPI: .env 표준
+cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 ```
 
 각 파일을 열어 실제 값을 입력합니다.
@@ -38,7 +38,7 @@ cp frontend/.env.example frontend/.env.local  # Next.js: .env.local 표준
 ### 2. 백엔드 실행
 
 ```bash
-cd backend
+cd apps/backend
 uv sync
 uv run alembic upgrade head   # DB 마이그레이션
 uv run uvicorn src.main:app --reload --port 8000
@@ -47,7 +47,7 @@ uv run uvicorn src.main:app --reload --port 8000
 ### 3. 프론트엔드 실행
 
 ```bash
-cd frontend
+cd apps/web
 pnpm install
 pnpm dev -p 3000
 ```
@@ -60,13 +60,13 @@ pnpm dev -p 3000
 
 ```bash
 # 백엔드 단위 테스트
-cd backend && uv run pytest -v
+cd apps/backend && uv run pytest -v
 
 # 프론트엔드 빌드 체크 (타입 검사 포함)
-cd frontend && pnpm build
+cd apps/web && pnpm build
 
 # E2E (Playwright) — 로컬 .env.local에 E2E_USER_EMAIL, E2E_USER_PASSWORD 필요
-cd frontend && pnpm e2e
+cd apps/web && pnpm e2e
 ```
 
 ---
@@ -74,7 +74,7 @@ cd frontend && pnpm e2e
 ## 배포
 
 - **FE:** `main` 브랜치 → Vercel 자동 배포
-- **BE:** `main` 브랜치에 `backend/**` 변경 → GitHub Actions 자동 빌드 + Cloud Run 배포
+- **BE:** `main` 브랜치에 `apps/backend/**` 변경 → GitHub Actions 자동 빌드 + Cloud Run 배포
 
 배포 상세 절차 → [`docs/guides/deployment.md`](docs/guides/deployment.md)
 

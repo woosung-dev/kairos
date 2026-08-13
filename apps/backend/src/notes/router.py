@@ -1,4 +1,4 @@
-# backend/src/notes/router.py
+# apps/backend/src/notes/router.py
 """노트 CRUD 엔드포인트."""
 import uuid
 

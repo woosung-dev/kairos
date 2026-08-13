@@ -11,7 +11,7 @@
 # 프로젝트 초기화
 cd kairos/
 uv init backend --no-readme
-cd backend/
+cd apps/backend/
 
 # 핵심 의존성
 uv add fastapi "uvicorn[standard]" sqlmodel asyncpg alembic pydantic-settings
@@ -28,7 +28,7 @@ uv add --dev pytest pytest-asyncio httpx
 ## 2. 디렉토리 구조
 
 ```
-backend/
+apps/backend/
 ├── pyproject.toml
 ├── alembic.ini
 ├── alembic/
@@ -273,7 +273,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 ### 초기화
 
 ```bash
-cd backend/
+cd apps/backend/
 alembic init alembic
 ```
 
@@ -350,7 +350,7 @@ alembic downgrade -1
 
 ```bash
 # 개발 서버 실행
-cd backend/
+cd apps/backend/
 uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
 # 또는 축약

@@ -6,7 +6,7 @@ User.onboarding_step (0~4) lifecycle 관리. 다른 도메인이 핵심 이벤�
 
 ## 2. 엔티티
 
-User 테이블 (`backend/src/auth/models.py`) 의 다음 컬럼 사용:
+User 테이블 (`apps/backend/src/auth/models.py`) 의 다음 컬럼 사용:
 - `onboarding_step: int` (0~4, default 0)
 - `onboarded_at: datetime | None` (step 4 도달 시 자동 set)
 

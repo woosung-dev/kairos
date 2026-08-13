@@ -1,4 +1,4 @@
-# backend/src/meetings/models.py
+# apps/backend/src/meetings/models.py
 """Meeting 관련 모델."""
 import uuid
 from datetime import datetime

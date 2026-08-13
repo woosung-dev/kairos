@@ -1,4 +1,4 @@
-# backend/tests/notes/test_export.py
+# apps/backend/tests/notes/test_export.py
 """노트 내보내기 API 테스트."""
 import uuid
 from unittest.mock import AsyncMock, MagicMock

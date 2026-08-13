@@ -9,8 +9,8 @@
 
 ```bash
 # 1. 템플릿 복사
-cp backend/.env.example backend/.env        # FastAPI: .env 표준
-cp frontend/.env.example frontend/.env.local  # Next.js: .env.local 표준
+cp apps/backend/.env.example apps/backend/.env        # FastAPI: .env 표준
+cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 
 # 2. 각 파일을 열어 실제 값 입력 (아래 발급처 참고)
 ```
@@ -29,7 +29,7 @@ cp frontend/.env.example frontend/.env.local  # Next.js: .env.local 표준
 
 ---
 
-### 백엔드 (`backend/.env`)
+### 백엔드 (`apps/backend/.env`)
 
 | 변수명 | 로컬 | CI (test) | 프로덕션 | 발급처 |
 |---|:---:|:---:|:---:|---|
@@ -49,7 +49,7 @@ cp frontend/.env.example frontend/.env.local  # Next.js: .env.local 표준
 
 ---
 
-### 프론트엔드 (`frontend/.env.local`)
+### 프론트엔드 (`apps/web/.env.local`)
 
 | 변수명 | 로컬 | CI (build) | 프로덕션 | 발급처 |
 |---|:---:|:---:|:---:|---|
@@ -62,7 +62,7 @@ cp frontend/.env.example frontend/.env.local  # Next.js: .env.local 표준
 ### CI 전용 — GitHub Secrets (배포 자동화 + 앱 시크릿)
 
 > GitHub repo → Settings → Secrets and variables → Actions → **Secrets** 탭
-> 값은 `backend/.env`에서 복사
+> 값은 `apps/backend/.env`에서 복사
 
 **배포 인증 (WIF)**
 
@@ -77,15 +77,15 @@ cp frontend/.env.example frontend/.env.local  # Next.js: .env.local 표준
 
 | Secret 이름 | 값 위치 |
 |---|---|
-| `DATABASE_URL` 🔒 | `backend/.env` |
-| `CLERK_SECRET_KEY` 🔒 | `backend/.env` |
-| `CLERK_WEBHOOK_SECRET` 🔒 | `backend/.env` |
-| `R2_ACCOUNT_ID` 🔒 | `backend/.env` |
-| `R2_ACCESS_KEY_ID` 🔒 | `backend/.env` |
-| `R2_SECRET_ACCESS_KEY` 🔒 | `backend/.env` |
-| `R2_BUCKET_NAME` | `backend/.env` |
-| `GEMINI_API_KEY` 🔒 | `backend/.env` |
-| `OPENAI_API_KEY` 🔒 | `backend/.env` |
+| `DATABASE_URL` 🔒 | `apps/backend/.env` |
+| `CLERK_SECRET_KEY` 🔒 | `apps/backend/.env` |
+| `CLERK_WEBHOOK_SECRET` 🔒 | `apps/backend/.env` |
+| `R2_ACCOUNT_ID` 🔒 | `apps/backend/.env` |
+| `R2_ACCESS_KEY_ID` 🔒 | `apps/backend/.env` |
+| `R2_SECRET_ACCESS_KEY` 🔒 | `apps/backend/.env` |
+| `R2_BUCKET_NAME` | `apps/backend/.env` |
+| `GEMINI_API_KEY` 🔒 | `apps/backend/.env` |
+| `OPENAI_API_KEY` 🔒 | `apps/backend/.env` |
 
 > **이미지 (GAR)**: `kairos-deployer` SA의 `roles/artifactregistry.writer` 권한으로 push. 별도 시크릿 불필요.
 > **AWS 이동 시**: `GCP_WIF_PROVIDER` + `GCP_DEPLOYER_SA` → `AWS_ROLE_ARN`으로만 교체. 앱 시크릿 9개는 변경 없음.

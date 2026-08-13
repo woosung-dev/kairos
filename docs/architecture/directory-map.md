@@ -9,11 +9,30 @@
 > 2026-07-30: ADR-026의 `integrations` 구현 예정 도메인을 CONTEXT-MAP §4.1 및 AGENTS.md와 정합해 BE 17 모듈 = 14 도메인 + common/core/services로 갱신했다.
 >
 > 2026-07-31: `integrations` 도메인 구현 완료(ADR-026 Wave 3). FE 에 `features/integrations/`(외부 문서 상세 조회 API·hooks)를 추가했다.
+>
+> 2026-08-13: ADR-027 App-first 재구성 — `backend/` → `apps/backend/`, `frontend/` → `apps/web/`.
+> 배포 단위(앱)를 최상위 경계로 삼는다. `contracts/`(OpenAPI 계약)는 ADR-027 D2 후속 PR 에서 신설.
+
+## 최상위 레이아웃 (2026-08-13, ADR-027)
+
+```
+kairos/
+├── apps/
+│   ├── backend/                       # FastAPI (Cloud Run 배포 단위)
+│   └── web/                           # Next.js (Vercel 배포 단위)
+├── contracts/                         # OpenAPI 계약 (ADR-027 D2 후속 PR 신설 예정)
+├── docs/                              # canonical docs (ADR, guides, architecture)
+├── scripts/                           # 레포 공통 스크립트 (verify-prod.sh)
+└── .github/workflows/                 # CI/CD (test, deploy, nightly-e2e, r2-cleanup)
+```
+
+규칙: 독립 실행·배포되면 `apps/`, 언어를 넘는 계약이면 `contracts/`, 라이브러리 공유 패키지(`packages/`)는
+동일 언어 소비자 2개가 생길 때만 신설 (ADR-027 D5).
 
 ## 프론트엔드 (FSD 기반, FE features — 2026-07-31 기준 16)
 
 ```
-frontend/
+apps/web/
 ├── proxy.ts                           # Clerk 인증 미들웨어 (Next.js 16)
 └── src/
     ├── app/                           # 라우트 진입점 (Thin Component)
@@ -70,7 +89,7 @@ frontend/
 ## 백엔드 (도메인 모듈러 구조, BE 17 모듈 = 14 도메인 + common/core/services — 2026-07-31 기준)
 
 ```
-backend/
+apps/backend/
 └── src/
     ├── auth/                          # Clerk JWT 검증 + lazy seed + RBAC + User/Member cache (Sprint 28)
     ├── inbox/                         # Inbox 적재 + 분류
@@ -119,7 +138,7 @@ backend/
 
 **common 의 audit / promote 도메인 분리 권고**: `common/audit_*.py` + `common/promote_*.py`
 5 파일은 사실상 audit 도메인 — Sprint 27e BUG-S27e-ARCH-3 + Sprint 28 BUG-S28-ARCH-1 carry.
-BL-S27e-F (architecture deepening sprint) 진입 시 `backend/src/audit/` 신설 권고 (2026-07-30 문서 기준 BE 17 — `audit` 추가 시 18).
+BL-S27e-F (architecture deepening sprint) 진입 시 `apps/backend/src/audit/` 신설 권고 (2026-07-30 문서 기준 BE 17 — `audit` 추가 시 18).
 
 **의존성 cycle**: Sprint 28 BUG-S28-ARCH-4 측정 — 11 쌍 양방향 (`core ↔ common` layered
 최하위 cycle 포함). runtime 은 lazy import + model-only 회피로 ImportError 0 (Round B verify),

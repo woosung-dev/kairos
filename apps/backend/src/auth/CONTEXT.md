@@ -2,7 +2,7 @@
 
 # auth CONTEXT
 
-> 상위: `/backend/CONTEXT.md` → `/CONTEXT-MAP.md`.
+> 상위: `/apps/backend/CONTEXT.md` → `/CONTEXT-MAP.md`.
 
 ---
 
@@ -18,7 +18,7 @@
 
 - 도메인 권한 정책 자체 (각 도메인 router/service)
 - 워크스페이스 invitation / role 관리 (`workspaces`)
-- 클라이언트 sync hook (`frontend/src/features/auth`)
+- 클라이언트 sync hook (`apps/web/src/features/auth`)
 
 ---
 

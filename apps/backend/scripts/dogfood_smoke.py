@@ -11,13 +11,13 @@
 
 실행:
   # 1. backend uvicorn 띄운 후
-  cd backend && uv run uvicorn src.main:app --reload &
+  cd apps/backend && uv run uvicorn src.main:app --reload &
 
   # 2. Clerk JWT 토큰 추출 (브라우저 devtools / Clerk dashboard)
   export CLERK_JWT=eyJ...
 
   # 3. smoke 실행
-  cd backend && uv run python scripts/dogfood_smoke.py --token $CLERK_JWT
+  cd apps/backend && uv run python scripts/dogfood_smoke.py --token $CLERK_JWT
 
 옵션:
   --base-url   http://localhost:8000 (default)

@@ -1,4 +1,4 @@
-# backend/src/workspaces/models.py
+# apps/backend/src/workspaces/models.py
 """Workspace 모델."""
 import uuid
 from datetime import datetime

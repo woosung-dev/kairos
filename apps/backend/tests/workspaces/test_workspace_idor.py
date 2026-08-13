@@ -4,7 +4,7 @@
 Sentinel P0 (Sprint 18 → 19) 가 발견:
 - Sentinel A 토큰 → GET /workspaces/{ws_b} → 200 + body 전체 leak (name/owner/memberCount/threshold)
 - Codex 정적 분석 의심 → 실 검증 확정
-- Fix: backend/src/workspaces/router.py:35 require_viewer 추가
+- Fix: apps/backend/src/workspaces/router.py:35 require_viewer 추가
 
 본 테스트는 require_viewer 가 endpoint 에 연결돼 있는지 검증.
 require_viewer 가 dependency_overrides 에서 fail (비멤버 시뮬) 시 endpoint 가 403 반환해야 함.

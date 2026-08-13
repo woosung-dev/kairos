@@ -1,4 +1,4 @@
-# backend/tests/test_cors.py
+# apps/backend/tests/test_cors.py
 """CORS 헤더 핸들러 시나리오 테스트."""
 import uuid
 from unittest.mock import AsyncMock, MagicMock

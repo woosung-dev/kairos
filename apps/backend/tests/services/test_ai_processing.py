@@ -1,4 +1,4 @@
-# backend/tests/services/test_ai_processing.py
+# apps/backend/tests/services/test_ai_processing.py
 """Gemini AI 요약 서비스 테스트."""
 import json
 

@@ -1,4 +1,4 @@
-# backend/src/inbox/dependencies.py
+# apps/backend/src/inbox/dependencies.py
 """Inbox 의존성 — 크로스 레포지토리 패턴 (동일 session 공유).
 
 Sprint 19 PR #1 C13a (Codex 2차 F-1): MeetingRepository 동반 주입 — classify 의

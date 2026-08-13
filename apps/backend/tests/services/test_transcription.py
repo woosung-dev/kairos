@@ -1,4 +1,4 @@
-# backend/tests/services/test_transcription.py
+# apps/backend/tests/services/test_transcription.py
 """Whisper 트랜스크립션 서비스 테스트."""
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch

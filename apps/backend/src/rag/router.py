@@ -1,4 +1,4 @@
-# backend/src/rag/router.py
+# apps/backend/src/rag/router.py
 """RAG 엔드포인트 — SSE 스트리밍."""
 import uuid
 

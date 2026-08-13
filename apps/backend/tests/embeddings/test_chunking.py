@@ -1,4 +1,4 @@
-# backend/tests/embeddings/test_chunking.py
+# apps/backend/tests/embeddings/test_chunking.py
 """청킹 로직 단위 테스트."""
 from src.embeddings.service import EmbeddingService
 

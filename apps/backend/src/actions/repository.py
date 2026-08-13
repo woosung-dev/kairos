@@ -1,4 +1,4 @@
-# backend/src/actions/repository.py
+# apps/backend/src/actions/repository.py
 """ActionItem Repository — AsyncSession 유일 보유자."""
 import uuid
 

@@ -1,4 +1,4 @@
-# backend/tests/meetings/test_pipeline.py
+# apps/backend/tests/meetings/test_pipeline.py
 """Meeting 파이프라인 오케스트레이터 테스트."""
 import uuid
 from contextlib import asynccontextmanager

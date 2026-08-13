@@ -1,4 +1,4 @@
-# backend/src/projects/dependencies.py
+# apps/backend/src/projects/dependencies.py
 """Project 의존성 — Depends() 조립의 유일한 위치.
 
 Sprint 19 PR #1 C9 (Codex F-2): MeetingRepository 동반 주입 (동일 session).

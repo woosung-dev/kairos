@@ -1,4 +1,4 @@
-# backend/src/projects/exceptions.py
+# apps/backend/src/projects/exceptions.py
 """Project 도메인 예외."""
 from fastapi import HTTPException
 

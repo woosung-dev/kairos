@@ -1,4 +1,4 @@
-# backend/src/projects/service.py
+# apps/backend/src/projects/service.py
 """Project 서비스 — AsyncSession import 금지. 단일 도메인 CRUD + cross-workspace 가드.
 
 Sprint 19 PR #1 C9 (Codex F-1/F-2/F-3/F-4/F-6):

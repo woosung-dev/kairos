@@ -1,4 +1,4 @@
-# backend/src/projects/schemas.py
+# apps/backend/src/projects/schemas.py
 """Project 스키마 — Pydantic V2, camelCase alias."""
 from typing import Literal
 
