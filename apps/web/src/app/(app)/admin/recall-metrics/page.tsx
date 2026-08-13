@@ -5,16 +5,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
 import { useApiClient } from "@/lib/use-api-client";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import type { components } from "@/types/api.gen";
 
 const FOUNDER_CLERK_ID = process.env.NEXT_PUBLIC_FOUNDER_CLERK_ID;
 
-interface MemoryMetrics {
-  capture_count: number;
-  recall_count: number;
-  promote_count: number;
-  recall_p50_ms: number | null;
-  recall_p95_ms: number | null;
-}
+// ADR-027 D2 — wire 타입은 계약 생성물에서 import (수기 정의 금지)
+type MemoryMetrics = components["schemas"]["MemoryMetricsOut"];
 
 export default function RecallMetricsPage() {
   const { user, isLoaded } = useUser();

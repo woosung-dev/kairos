@@ -92,6 +92,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 | I-17 | cross-workspace ProjectMember 추가 차단 = ProjectService. add_member 시 WorkspaceRepository.find_member 검증, None → `CrossWorkspaceMemberError(403)`. I-9(read)와 분리된 write 검증 | `projects/service.py:add_member` |
 | I-18 | Promotion = 복제 + tombstone (ADR-016 + Sprint 23 D4). 5 도메인 (memory/meeting/note/inbox/action) source 보존 + target 복제 + audit row. memory = `PromoteAudit`, 4 도메인 = `ItemPromotionAudit`. 공통 헬퍼 `common/promote_helpers.py` | `memory/service.py:promote` + helpers |
 | I-19 | Personal workspace = 1인 격리. `Workspace.type='personal'` → 1 owner, `WorkspaceInvite` 발급 금지, ProjectMember 1명 (R5) | `workspaces/service.py` + `projects/service.py` |
+| I-20 | FE wire 타입 SSOT = 계약 생성물 `apps/web/src/types/api.gen.ts` (openapi-typescript ← `contracts/openapi/v1/openapi.json`). 수기 wire interface 신규 작성 금지, 재생성 = `just contracts` (ADR-027 D2) | CI `contract-check` (`.github/workflows/test.yml`) |
 | I-20 | 벡터 컬럼 `halfvec(1536)` 고정 (ADR-020). `EmbeddingChunk.embedding` + `SemanticCache.question_embedding`. `Vector(1536)` 금지. 인덱스 = HNSW (m=16, ef_construction=64), ivfflat 금지. cosine `<=>` 유지 | `embeddings/models.py` + alembic |
 | I-21 | 벡터 검색 세션 변수 강제 (ADR-020): `hnsw.ef_search=40 + iterative_scan='relaxed_order' + max_scan_tuples=20000` 을 트랜잭션 로컬로(단일 왕복) 강제 — `_apply_hnsw_session_params(session)` 헬퍼. pgvector ≥0.8 서버 + Python ≥0.4.2 | `embeddings/repository.py:_apply_hnsw_session_params` |
 

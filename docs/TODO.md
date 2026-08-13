@@ -29,6 +29,12 @@
 
 ## Next Actions
 
+> **2026-08-13 ADR-027 D5 — 보류 항목 (재검토 트리거 명시)**
+
+- [ ] **BL-ADR027-OASDIFF** (P3) OpenAPI breaking-change 게이트(oasdiff). 트리거: 외부/모바일 API 소비자 첫 등장. 현재는 FE·BE 가 같은 PR 원자 변경 → `api.gen.ts` diff + FE typecheck 이 그 역할 대행 (ADR-027 D5).
+- [ ] **BL-ADR027-NX** (P4) Nx/Turborepo 도입. 트리거: 지속적 CI 병목(>15분) 또는 영향도 계산 수동 유지 불가. test.yml change-detection(2026-08-13 도입)을 먼저 소진 (ADR-027 D5).
+- [ ] **BL-ADR027-PACKAGES** (P4) `packages/` 공유 패키지 신설. 트리거: 동일 언어 소비자 2개 + 변경 주기 동일 증명 (ADR-027 D5).
+
 > **2026-07-31 Drive Spike codex 리뷰 (PR #143) — 미해소 발견** (`.claude/spike-gdrive/artifacts/CARRY.md` 상세)
 > CDX-1(프로젝트 미선택 문서 RAG 노출)은 같은 날 수정됨.
 > **2026-08-01 브랜치 `fix/bl-ext-backlog` 에서 코드 6건 해소** — 아래 체크 표시 참조.

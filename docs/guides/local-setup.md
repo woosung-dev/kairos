@@ -6,14 +6,16 @@
 |------|----------|------------|
 | Node.js | 20+ | `node -v` |
 | pnpm | 9+ | `pnpm -v` |
+| uv | latest | `uv --version` |
+| just | latest | `just --version` (`brew install just`, ADR-027) |
 | Git | 2.30+ | `git --version` |
 
 ## 1. 저장소 클론 및 의존성 설치
 
 ```bash
 git clone <repository-url> kairos
-cd kairos/frontend
-pnpm install
+cd kairos
+just install   # = apps/backend uv sync --frozen + apps/web pnpm install --frozen-lockfile
 ```
 
 ## 2. 환경 변수 설정

@@ -6,9 +6,49 @@ on:
   pull_request:
     branches: [main, qa-fix]
 
+# ADR-027 D4 — PR 은 superseded run 취소, push(main/prod)는 절대 취소 금지 (배포 인접 증거 보존).
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # ── 변경 감지 (ADR-027 D4) ─────────────────────────────────────────────
+  # PR 이벤트에서만 paths-filter 실행 (PR files API 사용 — checkout 불필요).
+  # push(main/prod)는 전체 강제 실행 — dorny push-base 엣지케이스 자체를 회피.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ github.event_name == 'push' && 'true' || steps.filter.outputs.backend }}
+      web: ${{ github.event_name == 'push' && 'true' || steps.filter.outputs.web }}
+      contracts: ${{ github.event_name == 'push' && 'true' || steps.filter.outputs.contracts }}
+    steps:
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad  # v3.0.4
+        if: github.event_name == 'pull_request'
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'apps/backend/**'
+              - '.github/workflows/test.yml'
+            web:
+              - 'apps/web/**'
+              - '.github/workflows/test.yml'
+            contracts:
+              - 'apps/backend/**'
+              - 'apps/web/src/types/api.gen.ts'
+              - 'apps/web/package.json'
+              - 'apps/web/pnpm-lock.yaml'
+              - 'contracts/**'
+              - 'justfile'
+              - '.github/workflows/test.yml'
+
   backend-test:
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     defaults:
       run:
         working-directory: apps/backend
@@ -38,6 +78,8 @@ jobs:
 
   frontend-build:
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     defaults:
       run:
         working-directory: apps/web
@@ -110,6 +152,53 @@ jobs:
         if: failure()
         run: cat /tmp/next.log || true
 
+  # ── API 계약 drift 게이트 (ADR-027 D2) ─────────────────────────────────
+  # export_openapi.py 가 src.main import → backend-test 와 동일한 fake env 필요.
+  # `just contracts-check` = 로컬과 문자 그대로 같은 게이트 (justfile 참조).
+  contract-check:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.contracts == 'true'
+    env:
+      DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
+      CLERK_SECRET_KEY: "sk_test_fake"
+      CLERK_WEBHOOK_SECRET: "whsec_fake"
+      R2_ACCOUNT_ID: "fake"
+      R2_ACCESS_KEY_ID: "fake"
+      R2_SECRET_ACCESS_KEY: "fake"
+      R2_BUCKET_NAME: "fake"
+      GEMINI_API_KEY: "fake"
+      OPENAI_API_KEY: "fake"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f  # v4
+        with:
+          version: "latest"
+
+      - name: Install backend deps
+        working-directory: apps/backend
+        run: uv sync --frozen
+
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa  # v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      - name: Install frontend deps
+        working-directory: apps/web
+        run: pnpm install --frozen-lockfile
+
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3  # v4.0.0
+
+      - name: Contract drift gate (regenerate + diff)
+        run: just contracts-check
+
   # ── E2E 잡 활성화 방법 ────────────────────────────────────────────────────────
   # 1. Repository Settings → Secrets and variables → Variables 탭
   #    E2E_ENABLED = 'true' 추가
@@ -119,9 +208,12 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   e2e:
     runs-on: ubuntu-latest
+    # !failure()/!cancelled() — frontend-build 가 skipped 여도 실행 가능하되 failed 면 차단.
     # Clerk testing credentials 설정된 환경에서만 실행 (secrets 등록 이후 활성화).
-    if: ${{ vars.E2E_ENABLED == 'true' }}
-    needs: frontend-build
+    needs: [changes, frontend-build]
+    if: >-
+      ${{ !failure() && !cancelled() && vars.E2E_ENABLED == 'true' &&
+      (needs.changes.outputs.backend == 'true' || needs.changes.outputs.web == 'true') }}
 
     # Postgres + pgvector + halfvec (pg16) service container — local BE 백킹.
     # prod Cloud Run BE 의존 제거 (cold start 503 회귀 차단).
@@ -279,3 +371,23 @@ jobs:
           name: playwright-trace
           path: apps/web/playwright-report/
           retention-days: 7
+
+  # ── Aggregate gate (ADR-027 D4) ─────────────────────────────────────────
+  # branch protection 도입 시 이 job 하나만 required check 로 등록한다.
+  # skipped 는 허용 (docs-only PR green), failure/cancelled 는 차단.
+  ci-required:
+    name: CI Required
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [changes, backend-test, frontend-build, contract-check, e2e]
+    steps:
+      - name: Aggregate gate — fail on failure/cancelled, tolerate skipped
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS"
+          if echo "$RESULTS" | grep -Eq '"result": "(failure|cancelled)"'; then
+            echo "❌ required job failed or was cancelled"
+            exit 1
+          fi
+          echo "✅ all needed jobs succeeded or were skipped"
