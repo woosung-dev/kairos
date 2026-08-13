@@ -11,7 +11,8 @@
 > 2026-07-31: `integrations` 도메인 구현 완료(ADR-026 Wave 3). FE 에 `features/integrations/`(외부 문서 상세 조회 API·hooks)를 추가했다.
 >
 > 2026-08-13: ADR-027 App-first 재구성 — `backend/` → `apps/backend/`, `frontend/` → `apps/web/`.
-> 배포 단위(앱)를 최상위 경계로 삼는다. `contracts/`(OpenAPI 계약)는 ADR-027 D2 후속 PR 에서 신설.
+> 배포 단위(앱)를 최상위 경계로 삼는다. 같은 날 후속 PR 로 `contracts/`(OpenAPI 계약) +
+> 루트 `justfile` + CI change-detection(`test.yml`) 신설 (ADR-027 D2~D4).
 
 ## 최상위 레이아웃 (2026-08-13, ADR-027)
 
@@ -20,7 +21,7 @@ kairos/
 ├── apps/
 │   ├── backend/                       # FastAPI (Cloud Run 배포 단위)
 │   └── web/                           # Next.js (Vercel 배포 단위)
-├── contracts/                         # OpenAPI 계약 (ADR-027 D2 후속 PR 신설 예정)
+├── contracts/                         # OpenAPI 계약 생성물 (ADR-027 D2) — `just contracts` 재생성, 수정 금지
 ├── docs/                              # canonical docs (ADR, guides, architecture)
 ├── scripts/                           # 레포 공통 스크립트 (verify-prod.sh)
 └── .github/workflows/                 # CI/CD (test, deploy, nightly-e2e, r2-cleanup)

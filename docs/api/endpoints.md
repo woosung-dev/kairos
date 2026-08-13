@@ -1,5 +1,9 @@
 # Kairos REST API 명세
 
+> ⚠️ **2026-08-13 동결 (ADR-027)** — 이 수기 명세는 `contracts/openapi/v1/openapi.json`
+> (코드 생성물, CI `contract-check` drift 게이트)로 대체되었다. **갱신 금지**, 참조용으로만 유지.
+> 최신 계약 = `just contracts` 재생성 또는 dev 서버 `/api/v1/docs`.
+
 > **버전:** v1 (0.1.0)
 > **Base URL:** `https://<host>/api/v1`
 > **인증:** Clerk JWT Bearer Token

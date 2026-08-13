@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // openapi-typescript 생성물 (ADR-027 D2) — lint 가 generator 출력과 싸우지 않게 제외.
+    "src/types/api.gen.ts",
   ]),
   {
     // PR-3 c9: feature 경계 가드 — feature 내부에서 다른 feature 의 컴포넌트를

@@ -58,16 +58,17 @@ pnpm dev -p 3000
 
 ## 테스트
 
+루트 `justfile` 이 단일 진입점 (`brew install just`, ADR-027):
+
 ```bash
-# 백엔드 단위 테스트
-cd apps/backend && uv run pytest -v
-
-# 프론트엔드 빌드 체크 (타입 검사 포함)
-cd apps/web && pnpm build
-
-# E2E (Playwright) — 로컬 .env.local에 E2E_USER_EMAIL, E2E_USER_PASSWORD 필요
-cd apps/web && pnpm e2e
+just install          # BE uv sync --frozen + FE pnpm install
+just be-test          # 백엔드 pytest — CI 와 동일 호출 (transcription/r2-cors 2개 제외)
+just fe-build         # 프론트엔드 빌드 (타입 검사 포함)
+just e2e              # Playwright — 로컬 .env.local에 E2E_USER_EMAIL/PASSWORD 필요
+just contracts-check  # OpenAPI 계약 drift 게이트 (재생성 + git diff)
 ```
+
+전체 recipe 는 `just --list`. `just` 없이는 각 recipe 안의 원 명령을 직접 실행해도 된다.
 
 ---
 
