@@ -3,7 +3,7 @@
 > *καιρός — 흘러가는 시간(Chronos) 속 결정적 순간.*
 > 회의, 노트, 자료를 넣으면 AI가 정리하고, 질문하면 인사이트가 나온다.
 
-**프로덕션:** [kairos-zeta-ebon.vercel.app](https://kairos-zeta-ebon.vercel.app) · BE: [Cloud Run](https://kairos-api-imrsiyibaa-du.a.run.app/api/v1/docs)
+**프로덕션:** [kairos.woosung.dev](https://kairos.woosung.dev) · BE: `https://kairos-api.woosung.dev` (오라클 셀프호스팅, ADR-028)
 
 **현재 상태:** Sprint 26 (glittery-tulip, 2026-05-23) — docs 거버넌스 경량화 진행. ~Sprint 25 (moonlit-sutton) 까지 Multi-Agent QA P0~P2 + 보안 3-layer + 회귀 가드 완료. 상세: `git log` + `docs/REFACTORING-BACKLOG.md` "다음 Sprint 진입점".
 
@@ -15,11 +15,11 @@
 |---|---|
 | Frontend | Next.js 16 + React 19 + Tailwind v4 + shadcn/ui |
 | Backend | FastAPI + SQLModel + asyncpg |
-| Database | PostgreSQL (Neon) + pgvector |
+| Database | PostgreSQL 17 + pgvector 0.8 (오라클 셀프호스팅) |
 | Auth | Clerk |
 | Storage | Cloudflare R2 |
 | AI | Gemini `gemini-3.1-flash-lite` + Whisper STT |
-| Deploy | Vercel (FE) + GCP Cloud Run (BE) |
+| Deploy | Oracle Cloud A1 단일 VM + Cloudflare Tunnel (ADR-028) |
 
 ---
 
@@ -74,12 +74,18 @@ just contracts-check  # OpenAPI 계약 drift 게이트 (재생성 + git diff)
 
 ## 배포
 
-- **FE:** `main` 브랜치 → Vercel 자동 배포
-- **BE:** `main` 브랜치에 `apps/backend/**` 변경 → GitHub Actions 자동 빌드 + Cloud Run 배포
+자동 배포는 없다. 맥에서 arm64 네이티브로 빌드해 SSH 파이프로 서버에 넘긴다.
+
+```bash
+TAG=$(git rev-parse --short HEAD)
+just deploy-preflight     # 진행 중 작업 0 확인 + .env 인코딩 게이트
+just deploy-build $TAG
+just deploy-ship $TAG
+just deploy-status
+```
 
 배포 상세 절차 → [`docs/guides/deployment.md`](docs/guides/deployment.md)
-
-CI 자동 배포 활성화 전 필요한 GCP 설정 → `deployment.md §2.5.1`
+서버 운영 런북 → [`deploy/oci/README.md`](deploy/oci/README.md)
 
 ---
 
@@ -89,7 +95,8 @@ CI 자동 배포 활성화 전 필요한 GCP 설정 → `deployment.md §2.5.1`
 |---|---|
 | [`docs/requirements/prd.md`](docs/requirements/prd.md) | PRD + Phase 로드맵 |
 | [`docs/guides/secrets.md`](docs/guides/secrets.md) | **환경변수 전체 매트릭스** (로컬/CI/프로덕션) |
-| [`docs/guides/deployment.md`](docs/guides/deployment.md) | 배포 절차 (GCP WIF, Vercel) |
+| [`docs/guides/deployment.md`](docs/guides/deployment.md) | 배포 절차 (오라클 셀프호스팅) |
+| [`deploy/oci/README.md`](deploy/oci/README.md) | 서버 운영 런북 (배포·롤백·함정) |
 | [`docs/architecture/ai-pipeline.md`](docs/architecture/ai-pipeline.md) | AI 파이프라인 설계 |
 | [`docs/architecture/rag-pipeline.md`](docs/architecture/rag-pipeline.md) | RAG 6-Layer 설계 |
 | [`CONTEXT-MAP.md`](CONTEXT-MAP.md) | 도메인 헌법 (엔티티 + 불변식) |

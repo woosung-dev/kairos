@@ -1,6 +1,8 @@
 # 환경변수 & 시크릿 관리 가이드
 
-> **한 줄 원칙:** 로컬은 파일로 관리(BE: `.env` / FE: `.env.local`), CI/프로덕션 모두 **GitHub Secrets**를 단일 진실 원천(SoT)으로 사용. 이미지는 GCP **Artifact Registry(GAR)**에 푸시. AWS 이전 시 `deploy.yml` 마지막 부분 + GH Secret 2개(`GCP_*` → `AWS_ROLE_ARN`)만 교체.
+> **한 줄 원칙 (2026-08-14 ADR-028 갱신):** 로컬은 파일로 관리(BE: `.env` / FE: `.env.local`),
+> **프로덕션 SoT 는 오라클 서버의 `~/kairos/.env` (0600)**, GitHub Secrets 는 **CI 전용**이다.
+> 이미지는 레지스트리를 거치지 않고 `docker save | ssh | docker load` 로 전달한다.
 > 코드에 값을 하드코딩하거나 env 파일을 커밋하는 것은 절대 금지.
 
 ---
@@ -59,36 +61,29 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 
 ---
 
-### CI 전용 — GitHub Secrets (배포 자동화 + 앱 시크릿)
+### 프로덕션 — 오라클 서버 `~/kairos/.env` (SoT)
 
-> GitHub repo → Settings → Secrets and variables → Actions → **Secrets** 탭
-> 값은 `apps/backend/.env`에서 복사
+> 템플릿: `deploy/oci/.env.example` · 권한 `chmod 600` 필수
+> 배포 자동화가 없으므로 GitHub Secrets 에 프로덕션 값을 둘 이유가 없다.
 
-**배포 인증 (WIF)**
-
-| Secret 이름 | 값 |
+| 분류 | 키 |
 |---|---|
-| `GCP_WIF_PROVIDER` | `deployment.md §2.5.1-B` 출력값 |
-| `GCP_DEPLOYER_SA` | `kairos-deployer@woosung-dev.iam.gserviceaccount.com` |
-| `CORS_ORIGINS` | `https://kairos-zeta-ebon.vercel.app` |
-| `FRONTEND_URL` | `https://kairos-zeta-ebon.vercel.app` |
+| 배포 단위 | `KAIROS_API_TAG`, `KAIROS_WEB_TAG` (git short SHA — 롤백은 이 둘을 되돌린다) |
+| Tunnel | `KAIROS_TUNNEL_TOKEN` 🔒 (Cloudflare Zero Trust → Tunnels) |
+| DB (컨테이너) | `POSTGRES_USER`, `POSTGRES_PASSWORD` 🔒, `POSTGRES_DB`, `DATABASE_URL` 🔒 |
+| 앱 | `APP_ENV`, `ENVIRONMENT`, `LOG_LEVEL`, `CLERK_PROD_HARDENING`, `FRONTEND_URL`, `CORS_ORIGINS`, `MAX_UPLOAD_BYTES` |
+| Clerk | `CLERK_SECRET_KEY` 🔒, `CLERK_WEBHOOK_SECRET` 🔒, `CLERK_JWT_ISSUER` |
+| R2 | `R2_ACCOUNT_ID` 🔒, `R2_ACCESS_KEY_ID` 🔒, `R2_SECRET_ACCESS_KEY` 🔒, `R2_BUCKET_NAME` |
+| AI | `GEMINI_API_KEY` 🔒, `OPENAI_API_KEY` 🔒 |
+| 운영 | `CRON_SECRET_TOKEN` 🔒 (`openssl rand -hex 32`), `SENTRY_DSN` |
 
-**앱 시크릿 (클라우드 무관 — AWS 이동 시 그대로 재사용)**
+**FE 빌드 인자**는 별도 파일 `deploy/oci/build.env` (gitignore, 템플릿 `build.env.example`).
+전부 `NEXT_PUBLIC_*` 이라 브라우저 번들에 인라인되므로 시크릿이 아니지만,
+**도메인이 바뀌면 반드시 고치고 재빌드**해야 한다.
 
-| Secret 이름 | 값 위치 |
-|---|---|
-| `DATABASE_URL` 🔒 | `apps/backend/.env` |
-| `CLERK_SECRET_KEY` 🔒 | `apps/backend/.env` |
-| `CLERK_WEBHOOK_SECRET` 🔒 | `apps/backend/.env` |
-| `R2_ACCOUNT_ID` 🔒 | `apps/backend/.env` |
-| `R2_ACCESS_KEY_ID` 🔒 | `apps/backend/.env` |
-| `R2_SECRET_ACCESS_KEY` 🔒 | `apps/backend/.env` |
-| `R2_BUCKET_NAME` | `apps/backend/.env` |
-| `GEMINI_API_KEY` 🔒 | `apps/backend/.env` |
-| `OPENAI_API_KEY` 🔒 | `apps/backend/.env` |
-
-> **이미지 (GAR)**: `kairos-deployer` SA의 `roles/artifactregistry.writer` 권한으로 push. 별도 시크릿 불필요.
-> **AWS 이동 시**: `GCP_WIF_PROVIDER` + `GCP_DEPLOYER_SA` → `AWS_ROLE_ARN`으로만 교체. 앱 시크릿 9개는 변경 없음.
+> ⚠️ **인라인 주석 금지.** `KEY=value  # 설명` 에서 주석이 값에 섞이면 Clerk SDK 가 헤더 ascii
+> 인코딩에서 터져 500 이 나고, `CORS_ORIGINS` 오염은 조용한 CORS 전면 차단이 된다.
+> 게이트: `LC_ALL=C grep -n '[^[:print:][:space:]]' ~/kairos/.env` → 출력 0줄
 
 ---
 
@@ -100,7 +95,7 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 |---|---|---|
 | `E2E_CLERK_PUBLISHABLE_KEY` | Secrets | Clerk dev 공개 키 (`pk_test_...`) |
 | `E2E_CLERK_SECRET_KEY` | Secrets | Clerk dev 비밀 키 (`sk_test_...`) |
-| `E2E_API_URL` | Secrets | `https://kairos-api-imrsiyibaa-du.a.run.app` |
+| `E2E_API_URL` | Secrets | `https://kairos-api.woosung.dev` |
 | `E2E_USER_EMAIL` | Secrets | 테스트 계정 이메일 |
 | `E2E_USER_PASSWORD` | Secrets | 테스트 계정 비밀번호 |
 | `E2E_ENABLED` | **Variables** | `true` |
@@ -113,5 +108,6 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 |---|---|---|
 | `.env.local`을 git add | 시크릿 유출 | `.gitignore`에 `.env.local` 확인 |
 | 프로덕션 키를 로컬에서 사용 | 실수로 프로덕 DB 조작 | 로컬은 항상 dev/test 키 사용 |
-| `--clear-secrets` 없이 env_vars만 적용 | 기존 Secret Manager reference와 타입 충돌로 배포 실패 (PR #23 사고) | `deploy.yml`에서 `--clear-secrets` 사전 호출 |
+| `.env`에 인라인 주석(`KEY=값  # 설명`) | 값에 섞인 한글이 Clerk 헤더 인코딩을 깨서 500 / CORS 전면 차단 | 설명은 별도 줄 주석으로만. 배포 전 비ASCII 게이트 |
+| 도메인 변경 후 FE 재빌드 누락 | `NEXT_PUBLIC_*`은 빌드타임 인라인이라 런타임 env로 안 바뀜 | `build.env` 수정 → `just deploy-build` |
 | R2 Secret Access Key 재발급 없이 분실 | 재발급 필요 | 발급 직후 즉시 GitHub Secret에 저장 |

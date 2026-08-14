@@ -1,9 +1,11 @@
 # ADR-008: DevEx 이니셔티브 — E2E 테스트 + BE 배포 자동화
 
 > **날짜:** 2026-04-23
-> **상태:** Accepted
+> **상태:** Accepted — **배포 자동화 부분은 2026-08-14 ADR-028 로 대체됨**
+> (Cloud Run + WIF + Artifact Registry 철거, 오라클 셀프호스팅 + 수동 배포로 전환).
+> E2E 테스트 부분은 유효하다.
 > **작성자:** Claude Opus 4.7 (1M context)
-> **관련:** ADR-002(실행 전략), ADR-006(UI/UX 개편), Sprint 4(배포 인프라)
+> **관련:** ADR-002(실행 전략), ADR-006(UI/UX 개편), Sprint 4(배포 인프라), ADR-028(셀프호스팅)
 
 ---
 

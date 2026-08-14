@@ -163,13 +163,27 @@ D+7 무사고 후 삭제.
 - `CORS_ORIGINS` 다중 오리진 가능(Cloud Run 액션의 쉼표 파싱 제약 소멸).
 - 배포 정의가 레포 안으로 들어온다(`deploy/oci/`). Vercel 대시보드에만 있던 설정이 사라진다.
 
-### 롤백
-prod FE 가 `kairos-zeta-ebon.vercel.app`(Vercel 소유 호스트명)이라 컷오버는 DNS 전환이 아니다.
-컷오버 = "새 URL 을 쓰기 시작", 롤백 = "이전 URL 로 복귀". Vercel + Cloud Run 을 건드리지 않으므로
-전파 지연 0 으로 즉시 되돌아간다.
+### 컷오버 결과 — 병행 기간 없이 당일 철거 (2026-08-14)
 
-단 **컷오버 이후 오라클 DB 에 쌓인 데이터는 Neon 에 없다.** 실사용 데이터가 쌓이기 전이 롤백
-마지노선이다.
+원안은 14일 병행이었다. 그러나 컷오버 직후 확인해 보니 **롤백 대상이 이미 죽어 있었다.**
+
+| 대상 | 실제 상태 | 원인 |
+|---|---|---|
+| Vercel prod FE | 구 배포만 200, **새 배포는 실패 중** | Root Directory 가 `frontend` 로 남아 있었다. ADR-027 의 `apps/web` 이동 후 대시보드 미갱신 |
+| Cloud Run BE | **403** (서비스는 `Ready=True`) | IAM 정책 바인딩 **0개** — `allUsers` invoker 없음 |
+| `deploy.yml` | 실행 안 됨 | GitHub Actions 결제 실패 (`recent account payments have failed`) |
+
+즉 Vercel FE 가 호출할 API 가 403 이라 **롤백해도 앱이 동작하지 않는 상태**였다. 죽은 경로를
+되살리는 비용보다 오라클 환경 안정화가 낫다고 판단해 **같은 날 Cloud Run 서비스와 Vercel
+프로젝트를 삭제**했다.
+
+안전망은 **Neon 원본 DB** 가 대신한다 — 오라클 DB 는 그 복사본이므로 최악의 경우 Neon 데이터로
+다시 세울 수 있다. Neon 프로젝트는 당분간 지우지 않는다.
+
+**철거 후 검증**: Cloud Run 404 · Vercel 404 · 오라클 WEB/API 200 · `/ready` `{"db":"ok"}`.
+
+미정리로 남긴 것: GCP 프로젝트 `gcp-project-504004`(cookmark·nexus-core 와 공유하므로 유지),
+Artifact Registry 이미지, WIF pool, deployer SA, GitHub Secrets 의 `GCP_*`.
 
 ### 후속 (BL 등재)
 - **BL-OCI-1** DB 백업 자동화 — 운영 전환 시
