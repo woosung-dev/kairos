@@ -65,7 +65,11 @@ oci_compose := "docker compose -f docker-compose.prod.yml"
 # 컨테이너를 교체하면 그 회의는 transcribing 상태로 영구 정지한다.
 deploy-preflight:
     @echo "── 진행 중인 회의 처리 (0 이어야 배포 가능) ──"
-    ssh {{oci_host}} 'bash -lc "docker exec kairos-db psql -U kairos -d kairos -tAc \"SELECT count(*) FROM meetings WHERE status IN (\$\$transcribing\$\$, \$\$analyzing\$\$)\""'
+    # SQL 은 stdin 으로 넘긴다. 인라인 -c 는 just/shell/ssh 3중 이스케이프를 타면서
+    # 작은따옴표가 깨지고 `$$` 는 shell PID 로 치환된다 (2026-08-14 실측).
+    # 최근 2시간 내 갱신된 것만 센다. 최장 작업이 ~15분이므로 그보다 오래된 것은
+    # 이미 죽은 좀비이고(2026-05 에 멈춘 6건 실재), 그걸로 배포를 막으면 게이트가 무의미해진다.
+    printf "SELECT count(*) FROM meetings WHERE status IN ('transcribing','analyzing') AND updated_at > now() - interval '2 hours';" | ssh {{oci_host}} 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -tA"'
     @echo "── .env 인코딩 게이트 (출력 0줄이어야 정상) ──"
     ssh {{oci_host}} 'bash -lc "LC_ALL=C grep -n \"[^[:print:][:space:]]\" {{oci_dir}}/.env || true"'
 
