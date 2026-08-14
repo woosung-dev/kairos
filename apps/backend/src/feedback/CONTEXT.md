@@ -54,7 +54,7 @@
 - user_id 는 `get_current_user` 로 서버에서 강제 — 요청 body 의 user 정보 신뢰 안 함.
 - workspace_id 는 인가 경계가 아니라 메타 컨텍스트 — 멤버십 미검증(저위험: 본인 피드백).
 - Slack 전송 실패는 삼킴(best-effort) — 피드백 저장(DB)이 source of truth.
-- 환경변수 `SLACK_FEEDBACK_WEBHOOK_URL` 미설정 시 알림 no-op (Sentry SKIP 정책 정합).
+- 환경변수 `SLACK_FEEDBACK_WEBHOOK_URL` 미설정 시 알림 no-op (피드백은 DB 에 항상 저장).
 
 ---
 

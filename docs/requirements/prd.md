@@ -581,7 +581,7 @@ ADR-010 AD-8(thesis PASS) / ADR-011 §4-b(페르소나 FAIL) / 본 S5(thesis PAS
 - **Sprint 5-6:** RBAC + 초대 시스템 + Visibility 권한 분기 + ProjectMember 신설 ✅
 - **Sprint 7-10:** 도그푸딩 8 자동 케이스 + E2E 검증 + R2 CORS 수정 ✅
 - **Sprint 11:** E2E 자동화 + 마이크 녹음 + (선택) BL-002 리팩토링 (진행 중, 2026-05-12~)
-- **프로덕션 URL:** BE `https://kairos-api-imrsiyibaa-du.a.run.app` / FE `https://kairos-zeta-ebon.vercel.app`
+- **프로덕션 URL:** FE `https://kairos.woosung.dev` / BE `https://kairos-api.woosung.dev` (2026-08-14 ADR-028 오라클 셀프호스팅 전환)
 - **다음 작업:** Sprint 11 (E2E + 마이크 녹음)
 
 ### Phase/Sprint/Stage 용어 매핑

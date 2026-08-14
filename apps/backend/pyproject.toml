@@ -19,7 +19,6 @@ dependencies = [
     "pgvector>=0.4.2,<1.0.0",  # Sprint 16 ADR-020 — sqlalchemy.HALFVEC import 보장 (0.4.2+). 서버 확장은 0.8+ 별도 요구 (iterative_scan).
     "sse-starlette>=2.0.0",
     "python-multipart>=0.0.28",
-    "sentry-sdk[fastapi]>=2.60.0",
 ]
 
 [dependency-groups]

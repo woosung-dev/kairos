@@ -67,3 +67,6 @@ skills-lock.json
 
 # Python coverage artifact
 apps/backend/.coverage
+
+# OCI 배포 빌드 인자 (ADR-028) — 값이 채워진 실제 파일
+deploy/oci/build.env

@@ -1,387 +1,156 @@
 # Kairos 배포 가이드
 
-> ## 🔴 배포 전 필수 확인 (2026-07-30 등록 — 해소되면 이 블록 삭제)
->
-> **dev DB 의 `alembic_version` 이 `a48095872e14` 로 stamp 되어 있다.**
-> 이 리비전은 미머지 브랜치 `spike/gdrive-integrations` 에만 존재한다.
->
-> Dockerfile `CMD` 가 시작 시 `alembic upgrade head` 를 실행하므로,
-> `main` 이미지가 이 DB 에 붙으면 **`Can't locate revision 'a48095872e14'` 로 crash-loop 한다.**
->
-> **배포 전 정리 (integrations 3 테이블만 되돌린다):**
-> ```bash
-> cd /Users/woosung/project/agy-project/kairos-gdrive/backend   # spike worktree
-> DATABASE_URL='<dev DB 연결 문자열>' uv run alembic downgrade -1
-> ```
-> 대상은 `external_documents` · `integration_sync_runs` · `integration_connections` **3개뿐**이며
-> 2026-07-30 기준 **전부 0 rows** 로 확인됐다.
->
-> ⚠️ **`alembic downgrade base` 를 쓰지 마라.** 2026-07-30 에 그 명령으로 dev DB 전체가 비워졌다
-> (PITR 로 복구 완료). 백업 브랜치 `restore-20260730` / `production-wiped-20260730` 보존 중.
->
-> 관련: `kairos-gdrive/.claude/spike-gdrive/HANDOFF.md` §5
+> 2026-08-14 ADR-028 로 **오라클 클라우드 셀프호스팅** 전환 완료.
+> Vercel · GCP Cloud Run 은 같은 날 철거됐다. 이 문서는 그 이후의 절차만 담는다.
+
+**운영 상세(명령어·트러블슈팅)는 [`deploy/oci/README.md`](../../deploy/oci/README.md) 가 정본이다.**
+여기서는 전체 그림과 진입점만 다룬다.
 
 ---
 
-## 사전 준비
+## 아키텍처
 
-### 필요한 계정/도구
-
-- GCP 계정 + 프로젝트 (Cloud Run, Artifact Registry)
-- Vercel 계정
-- Neon 계정 (PostgreSQL)
-- `gcloud` CLI ([설치 가이드](https://cloud.google.com/sdk/docs/install))
-- Docker Desktop
-
-### 환경변수 목록
-
-| 변수 | 설명 | 어디서 얻는지 |
-|------|------|-------------|
-| `DATABASE_URL` | Neon PostgreSQL 연결 문자열 | Neon 대시보드 → Connection Details |
-| `CLERK_SECRET_KEY` | Clerk 비밀 키 | Clerk 대시보드 → API Keys |
-| `CLERK_WEBHOOK_SECRET` | Clerk 웹훅 시크릿 | Clerk 대시보드 → Webhooks |
-| `R2_ACCOUNT_ID` | Cloudflare 계정 ID | Cloudflare 대시보드 |
-| `R2_ACCESS_KEY_ID` | R2 접근 키 | Cloudflare R2 → API Tokens |
-| `R2_SECRET_ACCESS_KEY` | R2 시크릿 키 | 위와 동일 |
-| `R2_BUCKET_NAME` | R2 버킷 이름 | Cloudflare R2 |
-| `GEMINI_API_KEY` | Google Gemini API 키 | Google AI Studio |
-| `OPENAI_API_KEY` | OpenAI API 키 | OpenAI Platform |
-| `CORS_ORIGINS` | 허용 오리진 (쉼표 구분) | Vercel 배포 URL |
-| `LOG_LEVEL` | 로그 레벨 | `WARNING` (프로덕션) |
-| `APP_ENV` | 환경 구분 | `production` |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk 공개 키 (FE) | Clerk 대시보드 |
-| `NEXT_PUBLIC_API_URL` | 백엔드 API URL (FE) | Cloud Run 배포 URL |
-
----
-
-## 1. Neon DB prod 브랜치
-
-1. [Neon 대시보드](https://console.neon.tech) → 프로젝트 선택
-2. **Branches** → **Create Branch**
-3. Name: `prod`, Parent: `main`
-4. Connection string 복사 (다음 단계에서 사용)
-
----
-
-## 2. 백엔드 배포 (GCP Cloud Run)
-
-### 2.1 초기 설정 (최초 1회)
-
-```bash
-# GCP 프로젝트 설정
-export GCP_PROJECT_ID="your-project-id"
-gcloud config set project $GCP_PROJECT_ID
-
-# API 활성화
-gcloud services enable artifactregistry.googleapis.com run.googleapis.com
-
-# Artifact Registry 저장소 생성
-gcloud artifacts repositories create kairos \
-  --repository-format=docker \
-  --location=asia-northeast3 \
-  --description="Kairos API Docker images"
-
-# Docker 인증 설정
-gcloud auth configure-docker asia-northeast3-docker.pkg.dev
+```
+브라우저
+  └─ Cloudflare (엣지 TLS)
+       └─ Cloudflare Tunnel  ── 인바운드 포트 0개
+            └─ 오라클 A1 (truewords-oracle, aarch64, 도쿄)
+                 ├─ kairos-web   127.0.0.1:3100   Next.js standalone
+                 ├─ kairos-api   127.0.0.1:8200   FastAPI
+                 └─ kairos-db    127.0.0.1:5434   PostgreSQL 17 + pgvector 0.8
 ```
 
-### 2.2 빌드 + 배포
-
-```bash
-cd apps/backend
-
-# Docker 빌드
-docker build -t asia-northeast3-docker.pkg.dev/$GCP_PROJECT_ID/kairos/api:latest .
-
-# Push
-docker push asia-northeast3-docker.pkg.dev/$GCP_PROJECT_ID/kairos/api:latest
-
-# Cloud Run 배포
-gcloud run deploy kairos-api \
-  --image asia-northeast3-docker.pkg.dev/$GCP_PROJECT_ID/kairos/api:latest \
-  --region asia-northeast3 \
-  --allow-unauthenticated \
-  --port 8000 \
-  --memory 1Gi \
-  --min-instances 0 \
-  --max-instances 3
-```
-
-배포 완료 시 URL 출력: `https://kairos-api-xxx-du.a.run.app`
-
-### 2.3 환경변수 설정
-
-```bash
-gcloud run services update kairos-api \
-  --region asia-northeast3 \
-  --set-env-vars "\
-APP_ENV=production,\
-LOG_LEVEL=WARNING,\
-DATABASE_URL=<neon-prod-connection-string>,\
-CORS_ORIGINS=https://kairos-xxx.vercel.app,\
-CLERK_SECRET_KEY=<value>,\
-CLERK_WEBHOOK_SECRET=<value>,\
-R2_ACCOUNT_ID=<value>,\
-R2_ACCESS_KEY_ID=<value>,\
-R2_SECRET_ACCESS_KEY=<value>,\
-R2_BUCKET_NAME=<value>,\
-GEMINI_API_KEY=<value>,\
-OPENAI_API_KEY=<value>"
-```
-
-또는 Cloud Run 콘솔 → kairos-api → 수정 → 환경변수 탭에서 GUI로 설정.
-
-### 2.4 검증
-
-```bash
-curl https://kairos-api-xxx-du.a.run.app/docs
-# HTTP 200 (Swagger UI HTML)
-```
-
----
-
-## 2.5 자동 배포 (권장) — GitHub Actions + Workload Identity Federation
-
-`main` 브랜치의 `apps/backend/**` 변경분을 자동 감지해 빌드·배포하도록 `.github/workflows/deploy.yml` 가 구성되어 있다.
-수동 `docker push + gcloud run deploy` 는 **초기 인프라 구축 시에만** 사용한다 — 자주 반복되는 배포는 반드시 자동화를 거친다.
-
-### 2.5.1 사전 1회 설정 (GCP 콘솔 작업 필요)
-
-#### A. Secret Manager에 9개 시크릿 등록
-
-```bash
-# 신규 생성이 필요한 시크릿 (이미 있는 건 스킵)
-SECRETS=(
-  "clerk-secret-key"
-  "clerk-webhook-secret"
-  "r2-account-id"
-  "r2-access-key-id"
-  "r2-secret-access-key"
-  "r2-bucket-name"
-  "openai-api-key"
-  # 기존 재사용: database-url, gemini-api-key
-)
-
-for name in "${SECRETS[@]}"; do
-  read -rs -p "Enter value for $name: " value && echo
-  echo -n "$value" | gcloud secrets create "$name" --data-file=- --replication-policy=automatic
-done
-```
-
-기존 시크릿 값을 갱신할 때:
-```bash
-echo -n "new-value" | gcloud secrets versions add database-url --data-file=-
-```
-
-#### B. Workload Identity Federation 풀 + 프로바이더 생성
-
-```bash
-PROJECT_ID=gcp-project-504004   # 2026-07-30 이전. 이전 jetaime-dev 는 DELETE_REQUESTED 상태
-PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
-REPO=woosung-dev/kairos
-
-# IAM / WIF API 활성화
-gcloud services enable iamcredentials.googleapis.com sts.googleapis.com
-
-# 1) Pool
-gcloud iam workload-identity-pools create "github-actions" \
-  --project="$PROJECT_ID" \
-  --location="global" \
-  --display-name="GitHub Actions Pool"
-
-# 2) Provider (GitHub OIDC)
-gcloud iam workload-identity-pools providers create-oidc "github" \
-  --project="$PROJECT_ID" \
-  --location="global" \
-  --workload-identity-pool="github-actions" \
-  --display-name="GitHub OIDC" \
-  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref" \
-  --attribute-condition="assertion.repository=='${REPO}'" \
-  --issuer-uri="https://token.actions.githubusercontent.com"
-
-# 3) Deployer Service Account
-gcloud iam service-accounts create kairos-deployer \
-  --display-name="Kairos GitHub Actions deployer"
-
-SA_EMAIL="kairos-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
-
-# 4) 역할 부여 (Cloud Run + Artifact Registry + Secret Manager read)
-for role in \
-  roles/run.admin \
-  roles/artifactregistry.writer \
-  roles/iam.serviceAccountUser \
-  roles/secretmanager.secretAccessor
-do
-  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-    --member="serviceAccount:${SA_EMAIL}" \
-    --role="$role"
-done
-
-# 5) WIF → SA 바인딩 (GitHub Actions가 이 SA를 impersonate 가능하게)
-gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
-  --project="$PROJECT_ID" \
-  --role="roles/iam.workloadIdentityUser" \
-  --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-actions/attribute.repository/${REPO}"
-
-# 6) Provider resource name 출력 — 다음 단계에서 GitHub Secret에 등록
-echo "GCP_WIF_PROVIDER=projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-actions/providers/github"
-echo "GCP_DEPLOYER_SA=${SA_EMAIL}"
-```
-
-#### C. 런타임 SA 가 시크릿을 읽을 수 있도록 권한 부여
-
-Cloud Run 서비스가 사용하는 기본 SA (`${PROJECT_NUMBER}-compute@developer.gserviceaccount.com`) 에게 `roles/secretmanager.secretAccessor` 를 부여:
-
-```bash
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor"
-```
-
-#### D. GitHub repo Secrets 등록
-
-Repo → Settings → Secrets and variables → Actions:
-
-| Secret 이름 | 값 |
+| 항목 | 값 |
 |---|---|
-| `GCP_WIF_PROVIDER` | 위 스크립트가 출력한 provider resource name |
-| `GCP_DEPLOYER_SA` | `kairos-deployer@gcp-project-504004.iam.gserviceaccount.com` (2026-07-30 이전 — kairos 전용 SA, WIF provider `kairos` 가 `woosung-dev/kairos` 리포로 제한) |
-| `CORS_ORIGINS` | `https://kairos-zeta-ebon.vercel.app,...` |
-| `FRONTEND_URL` | `https://kairos-zeta-ebon.vercel.app` |
+| FE | https://kairos.woosung.dev |
+| API | https://kairos-api.woosung.dev |
+| 서버 | `ssh truewords-oracle` (quantbridge · truewords 와 **공유**) |
+| 배포 디렉토리 | `~/kairos` (compose · `.env` · initdb) |
+| 오브젝트 스토리지 | Cloudflare R2 (유지) |
+| 인증 | Clerk (유지) |
+| AI | Gemini · OpenAI (유지) |
 
-E2E 테스트까지 활성화하려면 추가로:
-
-| Secret · Var | 값 |
-|---|---|
-| `E2E_CLERK_PUBLISHABLE_KEY` | Clerk dev 공개 키 |
-| `E2E_CLERK_SECRET_KEY` | Clerk dev 비밀 키 |
-| `E2E_API_URL` | 최신 성공 배포의 `deploy-cloudrun` 출력 URL. 정적 URL을 복사하지 말고 `/api/v1/health` 200을 확인한 값을 등록한다. |
-| `E2E_USER_EMAIL` | 테스트 계정 이메일 |
-| `E2E_USER_PASSWORD` | 테스트 계정 비밀번호 |
-| (Variable) `E2E_ENABLED` | `true` |
-
-### 2.5.2 배포 실행
-
-- **자동:** `main` 브랜치에 `apps/backend/**` 변경이 포함된 커밋이 푸시되면 `.github/workflows/deploy.yml` 이 트리거.
-- **수동:** GitHub repo → Actions → `Deploy Backend (Cloud Run)` → `Run workflow`.
-
-### 2.5.3 롤백
-
-```bash
-# 이전 revision 목록
-gcloud run revisions list --service=kairos-api --region=asia-northeast3 --limit=5
-
-# 특정 revision으로 트래픽 100% 전환
-gcloud run services update-traffic kairos-api \
-  --region=asia-northeast3 \
-  --to-revisions=kairos-api-00013-2d7=100
-```
-
-실패한 revision은 Cloud Run이 자동으로 트래픽 0%로 격리하므로, **배포 실패가 프로덕 트래픽을 깨뜨리지 않는다.**
+**같은 호스트의 다른 프로젝트가 쓰는 포트**(건드리지 말 것): 3200 quantbridge-frontend ·
+5432 truewords postgres · 5433 quantbridge-db · 6333 qdrant · 6380 quantbridge-redis ·
+8100 quantbridge-api.
 
 ---
 
-## 3. 프론트엔드 배포 (Vercel)
-
-### 3.1 프로젝트 설정
-
-1. [vercel.com](https://vercel.com) → **New Project**
-2. GitHub repo 연결
-3. Framework Preset: **Next.js** (자동 감지)
-4. Root Directory: **`apps/web/`**
-5. Production Branch: **`main`** (`prod` 브랜치 미사용 — `main` push 시 Vercel 자동 배포)
-
-> **2026-08-13 apps/ 재구성 (ADR-027)**: 기존 Root Directory `frontend/` → `apps/web/` 로 대시보드에서
-> 수동 변경 필요. 절차 — ① 재구성 PR 머지 (머지 커밋의 Vercel 빌드는 "Root Directory does not exist" 로
-> 실패하는 것이 정상, prod 는 마지막 READY 배포가 계속 서빙되므로 다운타임 0) → ② Settings →
-> Build and Deployment → Root Directory 를 `apps/web` 으로 저장 (env vars 는 프로젝트 스코프라 유지,
-> 빌드 캐시만 1회 cold) → ③ 실패한 머지 커밋 배포를 Redeploy → ④ READY 확인 + 콘솔 error 0.
-> "Ignored Build Step" 에 `frontend/` 경로 참조가 있으면 함께 수정.
-
-### 3.2 환경변수 설정
-
-Vercel → Settings → Environment Variables:
-
-| Key | Value |
-|-----|-------|
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk 프로덕션 공개 키 |
-| `CLERK_SECRET_KEY` | Clerk 프로덕션 비밀 키 |
-| `NEXT_PUBLIC_API_URL` | `https://kairos-api-xxx-du.a.run.app` |
-
-### 3.3 배포
-
-`main` 브랜치에 push 하면 Vercel 자동 배포 (`prod` 브랜치 미사용):
+## 배포
 
 ```bash
-git push origin main   # → Vercel 자동 배포(FE) + Cloud Run 자동 배포(BE, apps/backend/** 변경 시)
+TAG=$(git rev-parse --short HEAD)
+
+just deploy-preflight      # 진행 중인 회의 처리가 0 인지 + .env 인코딩 게이트
+just deploy-build $TAG     # 맥에서 arm64 네이티브 빌드 (BE + FE)
+just deploy-ship $TAG      # docker save | ssh | docker load → 태그 교체 → up -d
+just deploy-status         # 컨테이너 상태 + /ready + 서버 자원
 ```
 
-### 3.4 CORS 업데이트
+레지스트리를 쓰지 않는다. 맥(darwin/arm64)과 서버(aarch64)가 같은 아키텍처라
+`--platform linux/arm64` 가 에뮬레이션 없이 돈다.
 
-Vercel 배포 URL 확인 후 Cloud Run 환경변수 업데이트:
+**FE 빌드 인자**는 `deploy/oci/build.env` (gitignore) 에서 읽는다. `NEXT_PUBLIC_*` 은
+빌드타임에 번들로 인라인되므로 **도메인이 바뀌면 반드시 재빌드**해야 한다.
 
-```bash
-gcloud run services update kairos-api \
-  --region asia-northeast3 \
-  --update-env-vars "CORS_ORIGINS=https://kairos-xxx.vercel.app,http://localhost:3000"
-```
+### 배포 전 반드시 확인
+
+`BackgroundTasks` 는 재시도가 없다. 처리 중인 회의가 있는 상태로 컨테이너를 교체하면
+그 회의는 `transcribing` 으로 영구 정지한다. `just deploy-preflight` 가 이걸 검사한다.
 
 ---
 
-## 4. Git 브랜치 전략
+## 롤백
 
-```
-main (개발) → 기능 완성 + 테스트 통과
-  ↓ merge (수동)
-prod (프로덕션)
-  → Vercel: 자동 배포
-  → Cloud Run: 수동 (docker build + push + deploy)
-```
-
-### 재배포 (코드 변경 시)
+`~/kairos/.env` 의 태그 두 줄을 이전 값으로 되돌리고 `up -d`.
 
 ```bash
-# 1. main에서 개발 완료
-git checkout prod
-git merge main
-git push origin prod    # → Vercel 자동 배포
-
-# 2. Cloud Run 수동 배포
-cd apps/backend
-docker build -t asia-northeast3-docker.pkg.dev/$GCP_PROJECT_ID/kairos/api:latest .
-docker push asia-northeast3-docker.pkg.dev/$GCP_PROJECT_ID/kairos/api:latest
-gcloud run deploy kairos-api \
-  --image asia-northeast3-docker.pkg.dev/$GCP_PROJECT_ID/kairos/api:latest \
-  --region asia-northeast3
+just deploy-rollback <이전TAG>
 ```
+
+서버에 직전 2개 태그를 남겨 둔다. **마이그레이션은 자동 롤백되지 않으므로** 스키마 변경은
+expand-then-contract 로만 한다.
 
 ---
 
-## 5. 트러블슈팅
+## 환경변수
 
-### CORS 에러
+서버 `~/kairos/.env` (0600) 가 **프로덕션 SoT** 다. 템플릿은 `deploy/oci/.env.example`.
+발급처와 전체 매트릭스는 [`secrets.md`](secrets.md) 참조.
 
-- Cloud Run `CORS_ORIGINS`에 Vercel URL 포함 확인
-- `http://` vs `https://` 확인
-- trailing slash 없어야 함 (`https://kairos.vercel.app` ✅, `https://kairos.vercel.app/` ❌)
+> ⚠️ **`.env` 에 인라인 주석을 절대 붙이지 마라.** docker compose 의 env_file 파서는
+> `KEY=value  # 설명` 에서 주석을 값의 일부로 읽는다. 한글이 값에 섞이면 Clerk SDK 가 헤더
+> ascii 인코딩에서 터져 401 이 아니라 **500** 이 나고, `CORS_ORIGINS` 오염은 조용한 CORS
+> 전면 차단으로 나타난다.
+>
+> 게이트: `LC_ALL=C grep -n '[^[:print:][:space:]]' ~/kairos/.env` → 출력 0줄
 
-### DB 연결 실패
+---
 
-- Neon connection string에 `?sslmode=require` 포함 확인
-- Cloud Run은 기본적으로 외부 연결 허용
+## 데이터베이스
 
-### Clerk 인증 실패
+`pgvector/pgvector:0.8.0-pg17` 컨테이너. 확장(`vector`, `pg_trgm`)은 `deploy/oci/initdb/`
+스크립트가 볼륨 최초 생성 시 자동으로 만든다.
 
-- **프로덕션 키** 사용 확인 (development 키 아님)
-- Vercel `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`와 Cloud Run `CLERK_SECRET_KEY`가 같은 Clerk 인스턴스인지 확인
-- Clerk 대시보드에서 프로덕션 URL을 Allowed Origins에 추가
+마이그레이션은 compose 의 **one-shot `migrate` 서비스**가 담당하고, `api` 는
+`service_completed_successfully` 로 게이트된다. 앱 기동에 묶지 않는 이유는
+`restart: unless-stopped` 와 결합하면 마이그레이션 실패가 무한 재시작 루프가 되기 때문이다
+(2026-06-23~30 prod 전면 다운이 그 형태였다).
 
-### Cold Start 느림 (첫 요청 5-10초)
+**백업은 아직 없다.** 개발 단계라 의도적으로 제외했고 운영 전환 시 착수한다(BL-OCI-1).
+그때까지 **`docker compose down -v` 는 절대 금지** — `-v` 가 `db-data` 볼륨을 지운다.
 
-- `--min-instances 1`로 변경 (비용 증가, ~$20/월)
-- MVP에서는 cold start 허용 권장
+이전 원본인 Neon(`neondb`)은 당분간 남겨 두어 사실상의 백업 역할을 한다.
 
-### 마이그레이션 실패
+---
 
-- Cloud Run 로그 확인: `gcloud run services logs read kairos-api --region asia-northeast3 --limit 20`
-- `DATABASE_URL`이 올바른지 확인
+## 검증
+
+```bash
+# 로컬 게이트 (CI 와 동일 invocation)
+just be-test && just fe-test && just fe-typecheck && just contracts-check
+
+# 배포 후
+just deploy-status
+./scripts/verify-prod.sh https://kairos-api.woosung.dev
+```
+
+> **`/health` 200 은 배포 검증이 아니다.** 플레이스홀더 Clerk 키로도 200 이 난다.
+> 검증은 반드시 **브라우저 로그인 후 데이터 화면까지** 확인한다.
+
+---
+
+## 알려진 함정
+
+- **Cloudflare 413 은 CORS 오류처럼 보인다.** Free/Pro 는 요청 바디를 100MB 에서 자르는데
+  엣지가 반환하는 413 에는 CORS 헤더가 없다. 업로드 실패 시 파일 크기부터 확인할 것
+  (`MAX_UPLOAD_BYTES` 90MB, FE 에도 동일 가드).
+- **hostname 등록 전에 도메인을 조회하면 로컬 DNS 에 NXDOMAIN 이 캐시된다.** `dig` 는 되는데
+  curl/브라우저만 실패하면 `sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder`.
+- **원격 명령은 `ssh host 'bash -lc "..."'`** — 비로그인 셸의 PATH 에 docker compose 가 없다.
+- **API 호스트명에 Cloudflare Access 를 걸지 마라.** XHR·SSR 이 Access 리다이렉트를 따라가지
+  못한다. API 의 문은 Clerk JWT 다.
+
+---
+
+## 부록 — 이전 배포 스택 (2026-08-14 철거)
+
+| 레이어 | 위치 | 철거 사유 |
+|---|---|---|
+| FE | Vercel (Git 연동, `vercel.json` 없음) | 운영 단일화. 철거 시점에 Root Directory 가 `frontend` 로 남아 **배포가 이미 실패 중**이었다(ADR-027 이동 후 미갱신) |
+| BE | GCP Cloud Run `kairos-api` @ asia-northeast3 | 동일. 철거 시점에 IAM 바인딩이 0개라 **외부에서 403** 이었다 |
+| 자동배포 | `.github/workflows/deploy.yml` (WIF + Artifact Registry) | 파일 삭제. GitHub Actions 결제 실패로 실행되지 않던 상태였다 |
+
+Artifact Registry `kairos-docker` · WIF provider `kairos` · SA `kairos-deployer` · 미사용
+GitHub Secrets 7건은 2026-08-14 에 함께 삭제했다.
+
+GCP 프로젝트 `gcp-project-504004` 와 WIF pool `github` 는 cookmark · nexus-core 가 공유하므로
+남겨 둔다.
+
+**남은 GitHub Secrets 15건은 전부 `test.yml` · `nightly-e2e.yml` · `r2-cleanup.yml` 이 실제로
+참조하는 것들이다.** 정리 판단은 워크플로 grep 과 대조해서 한다:
+
+```bash
+comm -23 <(gh secret list --repo woosung-dev/kairos --json name --jq '.[].name' | sort) \
+         <(grep -rhoE "secrets\.[A-Z_0-9]+" .github/workflows/ | sed 's/secrets\.//' | sort -u)
+```

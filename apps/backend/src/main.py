@@ -2,13 +2,11 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-import sentry_sdk
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import text
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -49,126 +47,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def _scrub_pii_hook(event, hint):
-    """Sentry before_send PII 스크럽 — transcript / email / password / audio_url 제거."""
-    if not isinstance(event, dict):
-        return event
-
-    sensitive_name_parts = (
-        "token",
-        # 키 유출 위험이 진단 편의보다 커 일반적인 key 변수명도 과다 마스킹을 수용한다.
-        "key",
-        # 이 이름의 값은 대부분 사용자 원문이므로 진단 편의보다 본문 보호를 우선한다.
-        "text",
-        "paragraph",
-        "transcript",
-        "plain",
-        "export",
-        "document",
-        # 이름 기반 denylist는 구조적으로 완전할 수 없으며, 값 기반 스크럽·local vars 선택 비활성은 백로그다.
-        "body",
-        "content",
-        "answer",
-        "secret",
-        "password",
-        "passwd",
-        "plaintext",
-        "ciphertext",
-        "credential",
-        "api_key",
-        "apikey",
-        "private_key",
-        "authorization",
-        "code_verifier",
-        "nonce",
-    )
-    max_depth = 4
-    max_items = 100
-
-    def is_sensitive_name(name):
-        return isinstance(name, str) and any(
-            part in name.lower() for part in sensitive_name_parts
-        )
-
-    def scrub_value(value, depth=0):
-        if depth >= max_depth:
-            return "[truncated]" if isinstance(value, (dict, list, tuple)) else value
-        if isinstance(value, dict):
-            scrubbed = {}
-            for index, (name, nested_value) in enumerate(value.items()):
-                if index >= max_items:
-                    scrubbed["[truncated]"] = "[truncated]"
-                    break
-                scrubbed[name] = (
-                    "[redacted]"
-                    if is_sensitive_name(name)
-                    else scrub_value(nested_value, depth + 1)
-                )
-            return scrubbed
-        if isinstance(value, (list, tuple)):
-            scrubbed = [
-                scrub_value(item, depth + 1) for item in value[:max_items]
-            ]
-            if len(value) > max_items:
-                scrubbed.append("[truncated]")
-            return scrubbed
-        return value
-
-    def scrub_stacktrace(stacktrace):
-        if not isinstance(stacktrace, dict):
-            return
-        frames = stacktrace.get("frames")
-        if not isinstance(frames, list):
-            return
-        for frame in frames:
-            if isinstance(frame, dict) and isinstance(frame.get("vars"), dict):
-                frame["vars"] = scrub_value(frame["vars"])
-
-    exception = event.get("exception")
-    exception_values = (
-        exception.get("values") if isinstance(exception, dict) else exception
-    )
-    if isinstance(exception_values, list):
-        for exception_value in exception_values:
-            if isinstance(exception_value, dict):
-                scrub_stacktrace(exception_value.get("stacktrace"))
-
-    threads = event.get("threads")
-    thread_values = threads.get("values") if isinstance(threads, dict) else threads
-    if isinstance(thread_values, list):
-        for thread in thread_values:
-            if isinstance(thread, dict):
-                scrub_stacktrace(thread.get("stacktrace"))
-
-    request = event.get("request")
-    if isinstance(request, dict) and isinstance(request.get("data"), dict):
-        for field in ("transcript", "email", "password", "audio_url"):
-            request["data"].pop(field, None)
-    user = event.get("user")
-    if isinstance(user, dict):
-        user.pop("email", None)
-        user.pop("ip_address", None)
-    return event
-
-
-# Sentry 초기화 (DSN 설정 시에만 활성. dev 환경 기본 비활성)
-if settings.sentry_dsn:
-    sentry_sdk.init(
-        dsn=settings.sentry_dsn.get_secret_value(),
-        integrations=[FastApiIntegration()],
-        send_default_pii=False,
-        before_send=_scrub_pii_hook,
-        traces_sample_rate=settings.sentry_traces_sample_rate,
-        environment=settings.environment,
-    )
-
 # 허용 Origin 목록 (쉼표 구분 문자열에서 파싱)
 ALLOWED_ORIGINS = [o.strip() for o in settings.cors_origins.split(",")]
 
 # T-SEC-5 (Sprint 25, BL-SNT-CANDIDATE-B): production 환경에서 docs/openapi 노출 차단.
 # 공격면 축소 — 스키마 introspection 으로 endpoint enumeration / payload 추론 방지.
 # F7 fix (Sprint 25 polish, agy review): app_env 와 environment 두 env var 가
-# 공존 (전자=앱 자체, 후자=Sentry). 배포 파이프라인이 ENVIRONMENT=production 만
+# 공존 (전자=앱 자체, 후자=배포 환경 라벨). 배포 파이프라인이 ENVIRONMENT=production 만
 # 설정해도 docs 차단되도록 OR 분기 + 대소문자 무관.
 _is_production = (
     settings.app_env.lower() == "production"
@@ -244,9 +129,9 @@ def _attach_cors(request: Request, response: JSONResponse) -> JSONResponse:
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """BE-T4: 5xx 오류 시 CORS 헤더 강제 (exception_handler 레이어).
 
-    Sprint 27e Round 2 BUG-S27e-ARCH-r2-4 — Sentry SKIP path 의 forensic 보장.
-    Sentry DSN 미설정 환경 (dev/staging 또는 cron job) 에서도 stack trace 가
-    Cloud Run stdout log 에 영구 보존되어야 incident response 가능.
+    Sprint 27e Round 2 BUG-S27e-ARCH-r2-4 — forensic 보장.
+    ADR-028 로 Sentry 를 걷어낸 뒤 유일한 관측 수단이 stdout 로그다.
+    stack trace 가 `docker logs` 에 남아야 incident response 가 가능하다.
     """
     logger.exception("global_unhandled_5xx", exc_info=exc, extra={"path": str(request.url.path)})
     response = JSONResponse(

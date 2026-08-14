@@ -1,7 +1,16 @@
 # ADR-021: Sentry Observability (FE + BE) 도입
 
 > **날짜:** 2026-05-19
-> **상태:** Accepted (2026-05-19 Sprint 22 Task 7 구현 완료 — commit `60e8266` BE + `10fdaf2` FE)
+> **상태:** ~~Accepted~~ → **Superseded by ADR-028 (2026-08-14)**
+>
+> 구현은 완료됐으나(`60e8266` BE + `10fdaf2` FE) **DSN 이 단 한 번도 설정된 적이 없어
+> BE·FE 모두 비활성 상태로만 존재**했다. 워크플로·Cloud Run env·로컬 어디에도 DSN 이 없었고,
+> 그 결과 `if settings.sentry_dsn:` 은 항상 false, `capture_exception` 2곳은 no-op 이었다.
+> 의존성(`sentry-sdk`, `@sentry/nextjs`)과 FE 번들 용량만 지불하고 효용은 0 이었으므로
+> 2026-08-14 오라클 셀프호스팅 전환(ADR-028) 시 코드·의존성을 전부 제거했다.
+>
+> 현재 관측 수단은 `docker logs` (json-file, 10MB×3 회전) 뿐이다. 아래 PII 스크럽 설계는
+> 재도입 시 참고 자료로만 유효하다. FE 재도입 지점은 `apps/web/src/lib/track-error.ts` seam.
 > **작성자:** Claude Opus 4.7 (1M context) + 사용자
 > **관련:** Sprint 22 spec `git history` §4.3/§5.8/§7.2 · plan `git history` Task 7 · ADR-014 Service Boundary · ADR-019 Gemini Phase B · `backend/src/main.py` Sentry init · `frontend/instrumentation.ts` Next.js 16 hook
 > **워크플로우:** `.ai/templates/workflow.md` Stage 4 (코드) — Stage 1 ADR 산출은 본 ADR 자체

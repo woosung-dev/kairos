@@ -1,8 +1,7 @@
 # Sprint 28 BUG-S28-SEC-3 회귀 가드 — JWT 검증 실패 forensic logging.
-"""ADR-022 Sentry SKIP 정책 하에 JWT 실패는 Cloud Run stdout 만 남음.
+"""JWT 실패는 stdout 로그에만 남는다 (ADR-028 로 Sentry 제거 — docker logs 가 유일한 관측 경로).
 
-4 except 분기 모두 logger.warning + error_type extra 검증 — Sentry 활성 시점에
-Sentry breadcrumb 으로 그대로 전파됨.
+4 except 분기 모두 logger.warning + error_type extra 를 검증한다.
 """
 import logging
 from unittest.mock import patch

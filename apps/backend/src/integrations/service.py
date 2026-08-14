@@ -1,8 +1,7 @@
 """Integrations 단일 도메인 서비스 — Router와 pipeline의 중간 경계."""
+import logging
 import uuid
 from datetime import datetime
-
-import sentry_sdk
 
 from src.common.crypto import decrypt_string, encrypt_string
 from src.common.exceptions import EncryptionError
@@ -17,6 +16,8 @@ from src.integrations.models import (
     IntegrationSyncRun,
 )
 from src.integrations.repository import IntegrationRepository
+
+logger = logging.getLogger(__name__)
 
 
 class IntegrationService:
@@ -51,7 +52,8 @@ class IntegrationService:
         try:
             encrypted_refresh_token = encrypt_string(refresh_token)
         except EncryptionError as exc:
-            sentry_sdk.capture_exception(exc)
+            # ADR-028: Sentry 제거 후 stdout 로그가 유일한 관측 경로다.
+            logger.exception("integration_encryption_failed", exc_info=exc)
             raise IntegrationEncryptionError() from exc
 
         connection = await self.repo.upsert_connection(
@@ -94,7 +96,8 @@ class IntegrationService:
         try:
             return decrypt_string(connection.encrypted_refresh_token)
         except EncryptionError as exc:
-            sentry_sdk.capture_exception(exc)
+            # ADR-028: Sentry 제거 후 stdout 로그가 유일한 관측 경로다.
+            logger.exception("integration_encryption_failed", exc_info=exc)
             raise IntegrationEncryptionError() from exc
 
     async def get_document(

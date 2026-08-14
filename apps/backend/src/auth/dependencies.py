@@ -12,7 +12,7 @@ from src.auth.repository import UserRepository
 from src.auth.service import AuthService
 from src.common.database import get_async_session
 
-# Sprint 28 BUG-S28-SEC-3 — JWT 검증 실패 forensic logging (Sentry SKIP path).
+# Sprint 28 BUG-S28-SEC-3 — JWT 검증 실패 forensic logging (stdout 이 유일한 관측 경로).
 _auth_logger = logging.getLogger("src.auth.jwt_failure")
 
 # Clerk JWKS 캐시
