@@ -141,5 +141,16 @@ just deploy-status
 | BE | GCP Cloud Run `kairos-api` @ asia-northeast3 | 동일. 철거 시점에 IAM 바인딩이 0개라 **외부에서 403** 이었다 |
 | 자동배포 | `.github/workflows/deploy.yml` (WIF + Artifact Registry) | 파일 삭제. GitHub Actions 결제 실패로 실행되지 않던 상태였다 |
 
-GCP 프로젝트 `gcp-project-504004` 자체는 cookmark · nexus-core 와 공유하므로 남겨 둔다.
-Artifact Registry 이미지 · WIF pool · deployer SA · GitHub Secrets 의 `GCP_*` 는 미정리 상태다.
+Artifact Registry `kairos-docker` · WIF provider `kairos` · SA `kairos-deployer` · 미사용
+GitHub Secrets 7건은 2026-08-14 에 함께 삭제했다.
+
+GCP 프로젝트 `gcp-project-504004` 와 WIF pool `github` 는 cookmark · nexus-core 가 공유하므로
+남겨 둔다.
+
+**남은 GitHub Secrets 15건은 전부 `test.yml` · `nightly-e2e.yml` · `r2-cleanup.yml` 이 실제로
+참조하는 것들이다.** 정리 판단은 워크플로 grep 과 대조해서 한다:
+
+```bash
+comm -23 <(gh secret list --repo woosung-dev/kairos --json name --jq '.[].name' | sort) \
+         <(grep -rhoE "secrets\.[A-Z_0-9]+" .github/workflows/ | sed 's/secrets\.//' | sort -u)
+```

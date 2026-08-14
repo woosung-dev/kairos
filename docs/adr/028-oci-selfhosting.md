@@ -182,8 +182,17 @@ D+7 무사고 후 삭제.
 
 **철거 후 검증**: Cloud Run 404 · Vercel 404 · 오라클 WEB/API 200 · `/ready` `{"db":"ok"}`.
 
-미정리로 남긴 것: GCP 프로젝트 `gcp-project-504004`(cookmark·nexus-core 와 공유하므로 유지),
-Artifact Registry 이미지, WIF pool, deployer SA, GitHub Secrets 의 `GCP_*`.
+**GCP 잔재도 같은 날 정리했다** — Artifact Registry `kairos-docker`(1.72GB), WIF provider `kairos`,
+SA `kairos-deployer`, 그리고 워크플로가 더 이상 참조하지 않는 GitHub Secrets 7건
+(`GCP_DEPLOYER_SA`, `GCP_WIF_PROVIDER`, `CLERK_SECRET_KEY`, `CORS_ORIGINS`, `DATABASE_URL`,
+`FRONTEND_URL`, `E2E_API_URL`).
+
+유지: GCP 프로젝트 `gcp-project-504004`(cookmark·nexus-core 와 공유), WIF pool `github`(동일),
+`cookmark`·`nexus-repo` 저장소, 타 프로젝트 SA.
+
+> ⚠️ 이때 `gh secret delete` 를 다른 레포 디렉토리에서 실행해 **quant-bridge 의 `CLERK_SECRET_KEY`
+> 가 지워지는 사고**가 있었다(CI 3곳에서 사용 중). 서버 `~/quantbridge/.env` 사본으로 복구했다.
+> `gcloud` 는 `--project` 가 명령에 박혀 있어 무사했다 — **cwd 에 의존하는 명령을 건네지 말 것.**
 
 ### 후속 (BL 등재)
 - **BL-OCI-1** DB 백업 자동화 — 운영 전환 시
