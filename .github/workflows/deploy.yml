@@ -1,11 +1,12 @@
 name: Deploy Backend (Cloud Run)
 
+# ADR-028: 2026-08-14 오라클 셀프호스팅 컷오버로 push 트리거 제거.
+#
+# 병행 기간(Cloud Run 을 롤백 대상으로 살려두는 동안) 에 apps/backend/** 머지가 Cloud Run 을
+# 조용히 재배포하면, 그 컨테이너가 부팅하며 Neon 에 `alembic upgrade head` 를 돌린다.
+# 오라클은 자체 DB 를 쓰므로 두 스키마가 갈라진다.
+# 수동 탈출구(workflow_dispatch)는 롤백 경로로 남긴다. D+7 무사고 후 이 파일 전체 삭제.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/backend/**"
-      - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
 concurrency:
