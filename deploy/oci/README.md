@@ -61,7 +61,6 @@ docker buildx build --platform linux/arm64 -t kairos-web:$TAG --load \
   --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_... \
   --build-arg NEXT_PUBLIC_RECALL_ENABLED=true \
   --build-arg NEXT_PUBLIC_APP_ENV=production \
-  --build-arg NEXT_PUBLIC_SENTRY_DSN=... \
   --build-arg NEXT_PUBLIC_FOUNDER_CLERK_ID=user_... \
   apps/web
 

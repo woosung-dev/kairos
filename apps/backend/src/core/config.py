@@ -69,13 +69,11 @@ class Settings(BaseSettings):
     # default 는 dev/test 편의 — validator 가 production 환경에서만 raise.
     cron_secret_token: SecretStr = SecretStr(_CRON_TOKEN_DEV_FALLBACK)
 
-    # Sentry (Sprint 22 Task 7 — Observability)
-    sentry_dsn: SecretStr | None = None
-    sentry_traces_sample_rate: float = 0.1
-    # environment 는 위로 이동 (r2-4 validator 가 참조)
+    # Sentry 는 ADR-028 로 제거됐다 (DSN 이 한 번도 설정된 적 없어 비활성 상태로만 존재).
+    # environment 는 유지 — docs 차단 판정(_is_production)과 r2-4 validator 가 참조한다.
 
     # Slack (Sprint 28 Wave 1 — dogfooding 피드백 알림)
-    # 미설정 시 send_slack_message 는 no-op (피드백은 DB 에 항상 저장). Sentry SKIP 정책과 정합.
+    # 미설정 시 send_slack_message 는 no-op (피드백은 DB 에 항상 저장).
     slack_feedback_webhook_url: str | None = None
 
     # Integrations (ADR-026 D10 — Google Drive v0, 미구현 상태에서는 모두 선택값)
