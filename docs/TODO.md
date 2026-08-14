@@ -22,12 +22,22 @@
 > 차단(Blocked) 항목은 이유 + 필요한 조치를 함께 기록. AI가 사용자에게 빈번하게 질문하는 대신 본 섹션에 누적 후 자연스러운 타이밍에 일괄 전달.
 
 - ~~Clerk Production key 발급~~ — **2026-05-21 사용자 의도적 SKIP 결정** (memory `project_gcp_migration_jetaime_dev_done.md`). GA launch 시점 별도 sprint. Sprint 25 의존 0.
-- [ ] **Sentry DSN 발급** — Sprint 22 conditional init 활성화. 발급 + Vercel/Cloud Run env 등록 + 알람 verify. Sprint 24 Wave 2 BL-NEW-BE-PERF-COLD-START 진단 선행 조건.
+- [ ] 🔴 **GitHub Actions 결제 복구** — `recent account payments have failed` 로 워크플로가 **시작조차 안 된다**(`changes` job 4초 실패 → 나머지 전부 skip). PR #152 머지 게이트가 막혀 있고, 앞으로 모든 PR 에서 pytest·vitest·contract-check·nightly E2E 가 안 돈다. **최우선.**
+- ~~Sentry DSN 발급~~ — **2026-08-14 ADR-028 로 Sentry 자체를 제거**했다. DSN 이 한 번도 설정된 적 없어 BE·FE 모두 비활성 상태였고, 의존성·번들 비용만 지불 중이었다. 재도입 지점은 `apps/web/src/lib/track-error.ts` seam. 현재 관측은 `docker logs`.
 - [ ] **외부 user 1명 실제 dogfooding** — Sprint 22 spec `git history` 12분 walkthrough.
 
 ---
 
 ## Next Actions
+
+> **2026-08-14 ADR-028 셀프호스팅 후속 (PR #152)**
+
+- [ ] **BL-OCI-1** (P1) **DB 백업 자동화.** 오라클 셀프호스팅 DB 에 백업이 없다. 개발 단계라 의도적으로 제외했고, 운영 전환 시 착수한다(일 1회 `pg_dump` → R2). 그때까지 **`docker compose down -v` 금지** — `-v` 가 `db-data` 볼륨을 지운다. 현재 안전망은 Neon 원본(오라클 DB 가 그 복사본)뿐이므로 **Neon 프로젝트를 지우지 말 것.**
+- [ ] **BL-OCI-2** (P3) **presigned URL 업로드 전환.** Cloudflare Free/Pro 는 요청 바디를 100MB 에서 자른다. 운영 실측 최대 파일이 5MB 라 지금은 무해하고, `MAX_UPLOAD_BYTES=90MB` + FE 사전 가드로 막아 뒀다. 100MB 초과 파일이 실제로 필요해지면 착수(약 5시간). BL-070(500MB RAM 적재)도 함께 해소된다. 2026-05 기각 사유는 "R2 버킷 CORS 미설정"이었고 여전히 미설정이다.
+- [ ] **BL-OCI-3** (P3) **GitHub Actions 자동 배포.** 진입 조건 = 수동 배포 3회 연속 성공 + 컷오버 후 7일 무사고 + 장시간 오디오 1건 end-to-end 완주. GH 러너가 amd64 라 arm64 빌드에 QEMU 가 붙는 문제를 먼저 풀어야 한다.
+- [ ] **BL-OCI-4** (P2) **stuck 상태 복구 경로.** `BackgroundTasks` 는 재시도가 없어 프로세스 재시작 시 진행 중이던 회의가 `transcribing`/`analyzing` 으로 영구 정지한다. 2026-08-14 에 그렇게 좌초한 8건(E2E 6 + uploading 2)을 수동 삭제했다. `just deploy-preflight` 가 최근 2시간만 검사하도록 우회했을 뿐 근본 해결이 아니다.
+- [ ] **BL-OCI-5** (P3) **R2 고아 파일 정리.** 삭제된 회의의 원본이 버킷에 남는다. `r2-cleanup.yml` 은 `workflow_dispatch` 전용(cron 미설정)이라 수동 실행이 필요하다. 현재 잔여량은 수십 KB 수준이라 급하지 않다. GH Actions 결제 복구 후 dry-run 먼저.
+- [ ] **BL-OCI-6** (P2) **dev 와 prod 가 같은 Neon DB(`neondb`) 를 쓰고 있었다.** 로컬 개발이 운영 데이터를 직접 건드리는 구조. 오라클 이전으로 prod 는 분리됐지만 로컬 개발 DB 분리는 미해결.
 
 > **2026-08-13 ADR-027 D5 — 보류 항목 (재검토 트리거 명시)**
 
