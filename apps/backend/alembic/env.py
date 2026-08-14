@@ -49,6 +49,9 @@ if config.config_file_name is not None:
 
 target_metadata = SQLModel.metadata
 
+# 마이그레이션 advisory lock 키 — 'kai0' 의 ASCII 값. 이 프로젝트 전용 상수.
+MIGRATION_LOCK_KEY = 0x6B616930
+
 # env.py에서 동적으로 DB URL 설정.
 # Sprint 19 PR #2 D7.5a (Codex v2 F-3): 외부에서 주입한 sqlalchemy.url 가 있으면 우선 (테스트 환경).
 # 없으면 settings 사용 (운영 / 로컬 alembic 명령 = 기존 동작 유지).
@@ -83,8 +86,24 @@ async def run_async_migrations() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
+    # ADR-028: 동시 실행 직렬화. 배포 중 compose 의 migrate one-shot 과 다른 경로
+    # (로컬 alembic, 병행 운영 중인 Cloud Run 콜드스타트)가 같은 DB 에 겹칠 수 있다.
+    #
+    # 락은 반드시 (1) 별도 커넥션에서 (2) AUTOCOMMIT 으로 잡는다. 2026-08-14 실측한 실패 2종:
+    #   - 마이그레이션 커넥션에서 잡으면 exec_driver_sql 이 연 트랜잭션이 alembic 의
+    #     autocommit_block(CONCURRENTLY DDL 용)과 충돌해 `assert self._transaction is not None`.
+    #   - 별도 커넥션이어도 트랜잭션을 열어두면(idle in transaction) 그 다음 마이그레이션의
+    #     CREATE INDEX CONCURRENTLY 가 virtualxid 락을 기다리며 영구 대기한다.
+    # pg_advisory_lock 은 세션 레벨이라 트랜잭션 없이도 커넥션이 살아 있는 동안 유지된다.
+    lock_conn = await connectable.connect()
+    await lock_conn.execution_options(isolation_level="AUTOCOMMIT")
+    await lock_conn.exec_driver_sql(f"SELECT pg_advisory_lock({MIGRATION_LOCK_KEY})")
+    try:
+        async with connectable.connect() as connection:
+            await connection.run_sync(do_run_migrations)
+    finally:
+        await lock_conn.exec_driver_sql(f"SELECT pg_advisory_unlock({MIGRATION_LOCK_KEY})")
+        await lock_conn.close()
     await connectable.dispose()
 
 

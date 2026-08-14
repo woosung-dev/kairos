@@ -5,14 +5,14 @@
 # 사용:
 #   ./scripts/verify-prod.sh [base-url]
 #
-# 기본 base-url: https://kairos-api-rfzkx2dyra-du.a.run.app
+# 기본 base-url: https://kairos-api-gnd4iunquq-du.a.run.app
 # 환경변수 (optional):
 #   CLERK_JWT   — 인증 필요 endpoint 검증용 토큰. 미설정 시 health 만.
 #   WORKSPACE_ID — workspace endpoints 검증용 UUID (CLERK_JWT 와 같이).
 
 set -euo pipefail
 
-BASE_URL="${1:-https://kairos-api-rfzkx2dyra-du.a.run.app}"
+BASE_URL="${1:-https://kairos-api-gnd4iunquq-du.a.run.app}"
 JWT="${CLERK_JWT:-}"
 WS_ID="${WORKSPACE_ID:-}"
 
