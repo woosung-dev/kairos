@@ -35,7 +35,7 @@
 코드 전 "어떤 doc 을 참고했고 어떤 방향으로 수정할지" 1-2줄 브리핑.
 
 ### Atomic Update
-코드 변경 시 관련 canonical doc 1개를 같은 PR 에 포함 (Sprint 26 정책, 옛 2단 매트릭스 폐지). 라우팅 표는 `.ai/common/global.md` §2.
+코드 변경 시 관련 canonical doc 1개를 같은 PR 에 포함 (Sprint 26 정책, 옛 2단 매트릭스 폐지). 라우팅 표는 아래 §5.
 
 ### Think Edge Cases
 네트워크 실패 / 타입 불일치 / 빈 응답 / 권한 오류 기본 고려.
@@ -55,7 +55,7 @@
 
 ## 4. 개발 워크플로우
 
-`.ai/templates/workflow.md` — **Plan → Code → Test** 3단계. 위험도 기반 분류 (Lite / Standard / Heavy) + MUST/MUST NOT 거기 참조.
+**Plan → Code → Test** 3단계. Sprint 종료 시 회고는 git log + `docs/REFACTORING-BACKLOG.md` 로 갈음 — 별도 retrospective 파일 작성 금지.
 
 **검증 증거 표준** (Test 단계 완료 주장 시 PR/commit body 에 포함):
 - FE: 스크린샷 1장 + `console.error` 0건 로그
@@ -64,9 +64,44 @@
 
 ## 5. 문서화 + 코딩 스타일
 
-- 문서: `.ai/common/global.md` §2 — canonical doc 라우팅, ID 체계, TODO.md 운영
-- 스택 코딩: `.ai/stacks/nextjs/frontend.md` + `.ai/stacks/fastapi/backend.md` + `.ai/common/typescript.md`
-- 핵심: TS Strict + `any` 금지 / FastAPI 100% async + Pydantic V2 + Router·Service·Repository 분리
+> **"문서가 없으면 기능도 없다."**
+
+**스택 코딩 규칙** — 그 디렉터리 파일을 열면 `CLAUDE.md` 경유로 자동 로드된다 (ADR-029).
+
+- `apps/backend/AGENTS.md` — FastAPI 스켈레톤 + 스택 함정. **불변식은 `apps/backend/CONTEXT.md` §5 (B-NN)**
+- `apps/web/AGENTS.md` — Next.js 16 / Zod v4 / shadcn v4 / 반응형 / e2e. **불변식은 `apps/web/CONTEXT.md` §4 (F-NN)**
+- ★규칙을 추가할 때는 `AGENTS.md` 가 아니라 해당 `CONTEXT.md` 의 `B-NN`/`F-NN` 에 넣는다 — 두 곳에 쓰면 드리프트가 재발한다
+
+**Atomic Update 라우팅** (변경 유형별 canonical doc 1개):
+
+| 변경 유형 | canonical doc |
+|---|---|
+| 엔티티/모델 (`models.py`) | `docs/architecture/erd.md` |
+| API endpoint (`router.py`) | `docs/api/endpoints.md` |
+| 도메인 경계·불변식 | `CONTEXT-MAP.md` |
+| 파이프라인·아키텍처 | `docs/architecture/*.md` |
+| 의사결정 (대형) | `docs/adr/NNN-*.md` |
+| 부채·후속 작업 | `docs/REFACTORING-BACKLOG.md` |
+| 개발 원칙 | `AGENTS.md` (본 문서) |
+
+Heavy 변경 (DB 스키마/인증/결제/외부 API) 은 계획 단계에서 대상 문서를 자율 지정 + alembic env.py / ADR cross-link 같은 부수 작업도 명시. 코드와 doc 변경은 동일 PR 안에 둔다. PR description 에 변경 canonical doc 목록 1줄 명시.
+
+**Lite 예외**: 단일 typo fix / 3 파일 이하 단순 버그 fix / 리팩토링이면서 외부 시그니처·도메인 용어 비변경인 경우 doc 갱신 면제 가능. commit body 또는 PR description 에 "no doc impact" 1줄 명시.
+
+**ID 체계** — 부여된 ID 는 변경·재사용 금지.
+
+| 대상 | 접두사 | 예시 |
+|---|---|---|
+| 화면 | `SCR-` | `SCR-001` |
+| API | `API-` | `API-012` |
+| 엔티티 | `ENT-` | `ENT-003` |
+| 기능 명세 | `REQ-` | `REQ-007` |
+| 페르소나 | `PERSONA-` | `PERSONA-001` (정의: `docs/adr/011-persona-definition.md`) |
+| 백로그 | `BL-` | `docs/REFACTORING-BACKLOG.md` |
+
+**TODO.md 운영** — `docs/TODO.md` 4 섹션 (Completed / Blocked / Questions / Next Actions). 사용자에게 빈번한 질문 대신 기록 후 일괄 전달.
+
+**코딩 핵심**: TS Strict + `any` 금지 / FastAPI 100% async + Pydantic V2 + Router·Service·Repository 분리
 - FE API wire 타입: `apps/web/src/types/api.gen.ts` 생성물에서 import — 수기 wire interface 신규 작성 금지, 재생성 `just contracts` (ADR-027, I-20)
 - 상태: Server = React Query, Client global = Zustand, local = useState
 - Boolean prefix `is`/`has`/`should`, 이벤트 `handle`/`on`, 상수 UPPER_SNAKE_CASE

@@ -8,7 +8,7 @@
 | `architecture/`  | 시스템 설계, ERD, 디렉토리 맵, 파이프라인  |
 | `api/`           | API 명세서, 프론트-백엔드 통신 규약        |
 | `guides/`        | 로컬 셋업, 배포, secrets, prompt, 세션 루틴 |
-| `adr/`           | Architecture Decision Records (Nygard 포맷, 19건) |
+| `adr/`           | Architecture Decision Records (Nygard 포맷) |
 | `plans/active/`  | 현재 활성 계획과 작업 추적 문서 |
 | `TODO.md`        | 작업 현황 (Completed / Blocked / Questions / Next Actions) |
 | `REFACTORING-BACKLOG.md` | BL-NNN 리팩토링 백로그 + "다음 Sprint 진입점" anchor |
@@ -46,11 +46,12 @@
 - [Secrets 관리](guides/secrets.md)
 - [Prompt 환경 변수 문서](guides/prompt-env-docs.md)
 - [R2 cleanup cron 가이드](guides/r2-cleanup-cron.md)
-- [개발 방법론](guides/development-methodology.md)
+- ~~개발 방법론 (`development-methodology.md`)~~ — 옛 8-Stage 프레임워크. Sprint 26 (2026-05-23) 폐지,
+  2026-08-15 삭제 ([ADR-029](adr/029-ai-rules-relocation.md)). 현행 워크플로우는 `AGENTS.md` §4. 원문 = git history @ `e419acd`
 - [AI 협업 세션 루틴](guides/session-routine.md)
 
 ### adr/
-ADR 24건 — `docs/adr/NNN-<slug>.md` (Nygard 포맷). 예: 011 페르소나 정의, 019 Gemini EOL 마이그레이션, 020 pgvector HNSW halfvec, 022 Clerk webhook SKIP. 전체 목록은 `ls docs/adr/`.
+`docs/adr/NNN-<slug>.md` (Nygard 포맷). 예: 011 페르소나 정의, 020 pgvector HNSW halfvec, 027 apps 모노레포 + 계약 거버넌스, 028 OCI 셀프호스팅, 029 `.ai/` 해체 → 디렉터리별 AGENTS.md. 전체 목록은 `ls docs/adr/`.
 
 ### plans/active/
 현재 진행 sprint plan. 폴더 README 참조.

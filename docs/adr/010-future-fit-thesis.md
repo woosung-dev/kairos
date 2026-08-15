@@ -5,6 +5,7 @@
 > **작성자:** Claude Opus 4.7 (1M context) + 사용자 (Phase B Stage 1 retrofit)
 > **관련:** ADR-004(세컨드 브레인 피벗), ADR-007(L4 조직 인사이트, Phase 4), ADR-009(Stage 1 retrofit 총괄), CONTEXT-MAP.md §1·§3·§6 I-6~I-10·§7 D-1
 > **출처:** `~/.gstack/projects/woosung-dev-kairos/woosung-docs-stage1-meta-review-design-20260511.md` (office-hours design doc, Q6)
+> **참고:** 본 ADR 이 인용하는 `.ai/*` 경로는 2026-08-15 [ADR-029](029-ai-rules-relocation.md) 로 이전·삭제됐다. 본문은 당시 기록이라 수정하지 않는다.
 
 ---
 

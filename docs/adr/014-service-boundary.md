@@ -6,6 +6,7 @@
 > **관련:** ADR-009 §"후속" F8 + §"비용/리스크" + §"4. 부채 D-2/D-3 처리 보류 결정 (AD-15)" / ADR-010 §"검증 시그널" M1 / ADR-011 §"외부 인터뷰" PERSONA-002~003 / ADR-020 §"결정"·AD-55 (Sprint 16 — embeddings 도메인 캡슐화로 옵션 A 책임 분리 유지) / CONTEXT-MAP §4.2 + §7 D-2 D-3 / `.ai/stacks/fastapi/backend.md` §3
 > **출처:** Sprint 6 plan vivid-clarke (`/Users/woosung/.claude/plans/sprint-6-vivid-clarke.md`) §3 (옵션 A 채택 + 코드량 측정 ~120-180줄 + AD-19~22 라벨)
 > **워크플로우:** `.ai/templates/workflow.md` Stage 3 Step 4 (writing-plans + Generator-Evaluator + /codex 중위험+) — Sprint 6 plan에서 분기된 정책 ADR
+> **참고:** 본 ADR 이 인용하는 `.ai/*` 경로는 2026-08-15 [ADR-029](029-ai-rules-relocation.md) 로 이전·삭제됐다. 본문은 당시 기록이라 수정하지 않는다.
 
 ---
 

@@ -14,6 +14,7 @@
 > **작성자:** Claude Opus 4.7 (1M context) + 사용자
 > **관련:** Sprint 22 spec `git history` §4.3/§5.8/§7.2 · plan `git history` Task 7 · ADR-014 Service Boundary · ADR-019 Gemini Phase B · `backend/src/main.py` Sentry init · `frontend/instrumentation.ts` Next.js 16 hook
 > **워크플로우:** `.ai/templates/workflow.md` Stage 4 (코드) — Stage 1 ADR 산출은 본 ADR 자체
+> **참고:** 본 ADR 이 인용하는 `.ai/*` 경로는 2026-08-15 [ADR-029](029-ai-rules-relocation.md) 로 이전·삭제됐다. 본문은 당시 기록이라 수정하지 않는다.
 
 ---
 

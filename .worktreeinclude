@@ -21,9 +21,8 @@
 # 의존성(apps/web/node_modules · apps/backend/.venv)은 복사하지 않는다 — 워크트리에서 직접 설치한다.
 #   (cd apps/web && pnpm install) && (cd apps/backend && uv sync)      # pnpm store 하드링크라 ~10초
 
-# AI 규칙 SSOT — AGENTS.md 가 .ai/common/global.md 를 7회, .ai/templates/workflow.md 를 4회 참조한다.
-# 없으면 워크트리 세션이 Plan→Code→Test 규율과 Atomic Update 라우팅을 통째로 못 읽는다.
-.ai
+# (2026-08-15 ADR-029) 구 `.ai` 항목 삭제 — AI 규칙이 apps/*/AGENTS.md 로 이전되어 tracked 가 됐다.
+#   워크트리가 알아서 체크아웃하므로 여기 적을 이유가 없다.
 
 # 프로젝트 스킬 실체 — .claude/skills/* 가 여기를 가리키는 링크다.
 .agents

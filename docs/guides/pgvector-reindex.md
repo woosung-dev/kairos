@@ -85,7 +85,7 @@ uv run python apps/backend/scripts/reindex_vectors.py --force
 
 ## 7. ivfflat 인덱스 (구) drop — **동일 마이그레이션 처리 (AD-56 정정 2026-05-15)**
 
-본 sprint는 컬럼 타입을 `vector(1536)` → `halfvec(1536)`로 변경하므로 ivfflat 인덱스(`vector_cosine_ops`)를 동일 마이그레이션 b2c3d4e5f6a7 내에서 drop 강제. `vector_cosine_ops`가 halfvec 컬럼과 호환 불가 → ALTER COLUMN TYPE 시 `DatatypeMismatchError`. backend.md §9 2단계 배포는 **컬럼 타입 유지 expression index 패턴** 전용.
+본 sprint는 컬럼 타입을 `vector(1536)` → `halfvec(1536)`로 변경하므로 ivfflat 인덱스(`vector_cosine_ops`)를 동일 마이그레이션 b2c3d4e5f6a7 내에서 drop 강제. `vector_cosine_ops`가 halfvec 컬럼과 호환 불가 → ALTER COLUMN TYPE 시 `DatatypeMismatchError`. `apps/backend/AGENTS.md` §9 2단계 배포는 **컬럼 타입 유지 expression index 패턴** 전용.
 
 ```sql
 -- apps/backend/alembic/versions/b2c3d4e5f6a7_pgvector_hnsw_halfvec.py upgrade() step 2.5

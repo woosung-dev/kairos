@@ -2,7 +2,7 @@
 
 > 마지막 업데이트: 2026-05-21 (Sprint 25 moonlit-sutton closeout — Wave 1+2+3 단일 PR. 17 task 완료, backend pytest 452 PASS / FE typecheck 0 / vitest 56 / build 12/12)
 > 이 파일은 리빙 문서입니다. 주요 작업 후 반드시 업데이트하세요.
-> 형식 규칙: `.ai/common/global.md` §2 참조 — Completed / Blocked / Questions / Next Actions 4섹션 운영.
+> 형식 규칙: `AGENTS.md` §5 참조 — Completed / Blocked / Questions / Next Actions 4섹션 운영.
 
 ---
 

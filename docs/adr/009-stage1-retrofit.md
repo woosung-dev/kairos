@@ -6,6 +6,7 @@
 > **관련:** ADR-008(DevEx 이니셔티브), ADR-010(Future-Fit Thesis), ADR-011(Persona Definition), ADR-004(세컨드 브레인 피벗), ADR-007(L4 조직 인사이트, Phase 4), CONTEXT-MAP.md §1·§3·§6·§7
 > **출처:** `~/.gstack/projects/woosung-dev-kairos/woosung-docs-stage1-meta-review-design-20260511.md` (office-hours design doc — Phase B Stage 1)
 > **워크플로우:** `.ai/templates/workflow.md` Stage 1 (기획·아키텍처 메타 재검증)
+> **참고:** 본 ADR 이 인용하는 `.ai/*` 경로는 2026-08-15 [ADR-029](029-ai-rules-relocation.md) 로 이전·삭제됐다. 본문은 당시 기록이라 수정하지 않는다.
 
 ---
 

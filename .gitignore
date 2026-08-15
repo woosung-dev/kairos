@@ -55,7 +55,9 @@ e2e-*.png
 # MCP config
 .mcp.json
 
-# ai/rules
+# AI 에이전트 로컬 설정
+# .ai/ 는 2026-08-15 ADR-029 로 해체됐다 (규칙은 apps/*/AGENTS.md 로 이전).
+# ★재도입 금지 — 규칙을 gitignore 밖에 두면 정본이 다시 git 밖으로 나간다. 이 줄은 재발 방지용으로 남긴다.
 .ai/
 .claude/
 

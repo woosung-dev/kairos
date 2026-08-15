@@ -15,6 +15,26 @@
 
 ---
 
+## BL-S29-1 — `just docs-check` 게이트 신설 (규칙 재중복 방지) ⏳ **미착수**
+
+**배경**: [ADR-029](adr/029-ai-rules-relocation.md) §2.2 가 「`apps/*/AGENTS.md` 는 `B-NN`·`F-NN`·`I-NN` 불변식을
+재진술하지 않는다」를 규약으로 세웠으나, **강제 수단이 grep 뿐이다.** quant-bridge 는 `docs-audit.sh` 로
+집행하지만 kairos `justfile` 에는 docs recipe 가 0개다.
+
+누군가 `AGENTS.md` 에 규칙 문장을 다시 쓰면 CONTEXT 와 두 정본이 되고, ADR-029 이전은
+**드리프트를 옮긴 것에 불과**해진다. 이번 이전에서 실제로 정정한 드리프트가 10건이었다는 점이 근거다.
+
+**할 일**:
+1. `just docs-check` recipe 신설 — 아래 3종 grep 을 묶는다
+   - `git grep -n '\.ai/' -- . ':!docs/adr' ':!docs/dev-log'` 에서 tombstone 외 신규 발생 0건
+   - `apps/*/AGENTS.md` 에 `B-\d+`/`F-\d+` 패턴이 **정의 형태**(표 행)로 등장하지 않을 것 (포인터 인용은 허용)
+   - 옛 규칙 파일명(`backend.md`·`frontend.md`·`global.md`·`workflow.md`·`typescript.md`) 참조 0건
+2. CI job 추가 (`.github/workflows/test.yml`)
+
+**우선순위**: ★★ (ADR-029 의 효과 지속 여부가 여기 달려 있음)
+
+---
+
 ## BL-QA0617-C — notes embedding-status `chunkCount` 오집계 (승격 노트) ✅ **반증 (코드 버그 아님, 2026-06-17 stacked PR)**
 
 **결론**: Implementer 어드버서리얼 조사 + 실파이프라인 재현 결과 **코드 정상**. `_bg_promote_embed_note`(`notes/service.py:433,451`)가 복제 chunk에 `source_id=new_note_id` 설정, `count_note_chunks`(`notes/repository.py:108-116`)도 `source_id == note_id` 필터 → 두 컬럼 일치, 실파이프라인 promote 시 count=2 정상 반환. 라이브에서 본 `chunkCount:0`은 **probe 타이밍 아티팩트**(getEmbeddingStatus는 FE 미사용 — 직접 API 폴링이 BG copy commit 전/소스 id 대상으로 실행). **회귀 가드 테스트만 추가**(`test_promote_note_with_chunks_copy_reports_chunk_count` — 가설된 source_id 회귀를 방지). 코드 변경 없음.
@@ -394,7 +414,7 @@
 
 **현 상태:** 2026-05-26 Sprint 28 Round A 측정 = CONTEXT-MAP.md **8,007 bytes / 106 lines** (Sprint 27e Round 2 7,960 대비 +47 bytes 추가 회귀). 목표 ≤ 3,000 tokens (~167% 초과). 본 sprint 진정한 cut 시도 X — BL-S26-1 목표 자체 재검토 권고 (token vs byte 단위 명시 + tiktoken 도구 표준화 — BUG-S28-ARCH-7).
 
-**대상:** `AGENTS.md` (135줄) + `CONTEXT-MAP.md` (106줄) + `.ai/common/global.md` (71줄) + `.ai/templates/workflow.md` (80줄) = 392줄.
+**대상:** `AGENTS.md` + `CONTEXT-MAP.md`. (2026-08-15 ADR-029 — 구 대상이던 `.ai/common/global.md` 71줄은 `AGENTS.md §5` 로 흡수, `.ai/templates/workflow.md` 80줄은 삭제됐다.)
 
 **후보 cut:** CONTEXT-MAP I-9 멀티테넌시 격리 한 줄 (11항 압축 가능) · I-14 SQLModel typed query allowlist 5 카테고리 → 표 1줄 · §2 핵심 엔티티 21개 → ERD 링크 + 핵심 12개 · §6 불변식 21개 중 일부 ADR 분리. AGENTS.md 신규 검증 증거 표준 5줄 → 워크플로우 참조 1줄.
 
@@ -888,7 +908,7 @@ Stage 5-5 maintainability specialist 18 INFORMATIONAL. dead code / magic constan
 **현 상태:**
 Stage 5-5 data-migration specialist 6 CRITICAL. Sprint 15 migration `a1b2c3d4e5f6_sprint15_memory_workspace_type.py`가:
 1. 모든 FK에 `ondelete` 명시 X (default RESTRICT) — workspace 삭제 시 memory_items가 차단
-2. Schema + backfill 단일 migration — 2단계 배포 위반 (.ai/stacks/fastapi/backend.md §9)
+2. Schema + backfill 단일 migration — 2단계 배포 위반 (`apps/backend/AGENTS.md` §9)
 3. CREATE INDEX without CONCURRENTLY — prod scale에서 workspaces 테이블 ACCESS EXCLUSIVE lock
 4. Downgrade가 데이터 손실 (DROP TABLE) — 사용자 확인 가드 부재
 5. `workspaces.type` server_default='team'이 기존 solo workspace를 잘못 misclassify (founder 시나리오에서는 무영향이나 multi-tenant 시 surprise)
@@ -1168,7 +1188,7 @@ await page.getByLabel(/email|이메일/i).fill(email);
 
 **의존:**
 - ADR-020 Stage 5 측정 통과 후 Accepted 상태 전제
-- alembic 추가 마이그레이션 + 기존 데이터 재배치 (대용량 시 다운타임 가능 — backend.md §9 2단계 배포)
+- alembic 추가 마이그레이션 + 기존 데이터 재배치 (대용량 시 다운타임 가능 — `apps/backend/AGENTS.md` §9 2단계 배포)
 - 신규 ADR 작성 필요 (파티셔닝 키 + 인덱스 전략)
 
 **예상 LOC delta:** +200~500 (alembic + repository.py 파티션 인지 쿼리 + 운영 스크립트)
@@ -1872,7 +1892,7 @@ E1    2482456 refactor(bl-053): E1 entry — AsyncSession SM 양분 import + cla
 ### BL-054 carry-over (PR #93)
 
 - 모든 repository 의 `session.execute(stmt).scalars().all()` / `.scalar_one_or_none()` / `.scalar_one()` 패턴을 SQLModel typed `session.exec(stmt).all()` / `.one_or_none()` / `.one()` 으로 migration
-- 헌법 patch 동반 (CONTEXT-MAP I-14 + apps/backend/CONTEXT.md B-10 + .ai/stacks/fastapi/backend.md)
+- 헌법 patch 동반 (CONTEXT-MAP I-14 + apps/backend/CONTEXT.md B-10 + `apps/backend/AGENTS.md`)
 - execute allowlist manifest (G1~G5) 작성 후 진행
 
 **근거**: Sprint 19 PR #2 D9 + BL-052 cleanup PR (#91) Plan agent verdict + Codex 1차/2차 review.

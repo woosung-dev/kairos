@@ -10,7 +10,7 @@
 
 - REST API (FastAPI, async) + SSE 스트리밍 (RAG)
 - AI 파이프라인 조율 (STT / Gemini / OpenAI 임베딩)
-- DB 영속화 (Neon Postgres + pgvector)
+- DB 영속화 (PostgreSQL 17 + pgvector — 2026-08-14 부터 오라클 셀프호스팅, Neon 은 백업. ADR-028)
 - 외부 스토리지 (Cloudflare R2)
 - Clerk JWT 검증
 
@@ -104,8 +104,8 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 - Python 3.12+, FastAPI, SQLModel, asyncpg, pgvector
 - 패키지 매니저: `uv`
 - 비동기 100% (sync 코드 금지)
-- 외부: Clerk, Gemini, OpenAI, Whisper API, Cloudflare R2, Neon Postgres
-- 상세 규칙: `.ai/stacks/fastapi/backend.md`
+- 외부: Clerk, Gemini, OpenAI, Whisper API, Cloudflare R2 (DB 는 오라클 VM 셀프호스팅 — ADR-028)
+- 상세 규칙: [`AGENTS.md`](AGENTS.md) (같은 디렉터리 — `CLAUDE.md` 가 본 파일과 함께 자동 로드, ADR-029)
 
 ---
 

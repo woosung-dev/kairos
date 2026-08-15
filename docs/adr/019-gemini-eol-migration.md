@@ -5,6 +5,7 @@
 > **작성자:** Claude Opus 4.7 (1M context) + 사용자
 > **관련:** PRD v3.0 §AI Pipeline · ADR-014 Service Boundary · ADR-020 pgvector HNSW/halfvec (Sprint 16 별도 commit — 코드 swap 충돌 회피) · `docs/architecture/ai-pipeline.md` · `git history` · TODO P0 `S17-T-GEMINI-EOL`
 > **워크플로우:** Sprint 15 R8 14일 stagger 진행 중. EOL 2026-06-17 D-33 압박으로 R8 demo 완료 (2026-05-28) 전 swap 결정 (AD-49 정정 = AD-57로 별도 라벨).
+> **참고:** 본 ADR 이 인용하는 `.ai/*` 경로는 2026-08-15 [ADR-029](029-ai-rules-relocation.md) 로 이전·삭제됐다. 본문은 당시 기록이라 수정하지 않는다.
 
 ---
 
