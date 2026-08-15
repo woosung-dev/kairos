@@ -5,6 +5,7 @@
 > **작성자:** Claude Opus 4.7 (1M context) + 사용자 (PRD v3.0 갱신 직후)
 > **관련:** PRD v3.0 §0 + §2 + §3.6 + 부록 A · ADR-006 UI/UX 개편 · ADR-010 Future-Fit Thesis (M5 신설) · ADR-011 Persona · ADR-014 Service-to-Service 경계 · CONTEXT-MAP I-9 (workspace 격리)
 > **워크플로우:** `.ai/templates/workflow.md` Stage 3 Step 4 — PRD v3.0 §3.6 IA 2축 로드맵에서 분기된 v1.5~v2.0 IA 결정 ADR
+> **참고:** 본 ADR 이 인용하는 `.ai/*` 경로는 2026-08-15 [ADR-029](029-ai-rules-relocation.md) 로 이전·삭제됐다. 본문은 당시 기록이라 수정하지 않는다.
 
 ---
 

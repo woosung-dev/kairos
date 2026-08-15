@@ -5,6 +5,7 @@
 > **작성자:** Claude Opus 4.7 (1M context) + 사용자 (정책 결정)
 > **관련:** Sprint 25 plan `git history` · memory `project_gcp_migration_jetaime_dev_done.md` (2026-05-21 GCP 이전 + 사용자 SKIP 결정 lock-in) · `backend/src/auth/router.py` (sync handler 제거) · `backend/src/auth/service.py` (sync_user 메서드 제거) · `backend/src/auth/CONTEXT.md` §5/§6 · 회귀 가드 `backend/tests/auth/test_auth_sync_disabled.py` · ADR-014 Service Boundary
 > **워크플로우:** `.ai/templates/workflow.md` Stage 4 (코드) — Stage 1 ADR 산출은 본 ADR 자체
+> **참고:** 본 ADR 이 인용하는 `.ai/*` 경로는 2026-08-15 [ADR-029](029-ai-rules-relocation.md) 로 이전·삭제됐다. 본문은 당시 기록이라 수정하지 않는다.
 
 ---
 

@@ -6,6 +6,7 @@
 > **관련:** CONTEXT-MAP §6 I-20/I-21 (Sprint 16 Stage 0 lock-in) · ADR-014 Service Boundary · ADR-019 Gemini EOL · `docs/architecture/rag-pipeline.md` §3/§4/§7 · `backend/src/embeddings/CONTEXT.md` E-7/E-8 · `git history` · `git history` (Stage 5) · BL-003 (RAG N+1 해소, Sprint 13 PR #21)
 > **출처:** 당근(Karrot) DB 밋업 1회 (백은빈, 2025-XX) `pgvector 검색 최적화` — youtube `n3_LY7YFCwE`
 > **워크플로우:** `.ai/templates/workflow.md` Stage 1 (ADR + PRD) · plan `~/.claude/plans/karrot-eager-marshmallow.md`
+> **참고:** 본 ADR 이 인용하는 `.ai/*` 경로는 2026-08-15 [ADR-029](029-ai-rules-relocation.md) 로 이전·삭제됐다. 본문은 당시 기록이라 수정하지 않는다.
 
 ---
 
