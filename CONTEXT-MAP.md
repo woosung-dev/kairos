@@ -110,4 +110,4 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 ## 9. 문서 갱신 원칙
 
-코드 변경 시 관련 canonical doc 1개를 같은 PR 에 포함. 상세 라우팅 표: [`.ai/common/global.md` §2](.ai/common/global.md). (Sprint 26, 2026-05-23 — 옛 Atomic Update 2단 매트릭스 폐지)
+코드 변경 시 관련 canonical doc 1개를 같은 PR 에 포함. 상세 라우팅 표: [`AGENTS.md` §5](AGENTS.md). (Sprint 26, 2026-05-23 — 옛 Atomic Update 2단 매트릭스 폐지. 2026-08-15 ADR-029 로 라우팅 표가 `AGENTS.md` 로 이전)

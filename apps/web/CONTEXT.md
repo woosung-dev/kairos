@@ -106,4 +106,4 @@ apps/web/src/
 - pnpm (Yarn/npm 금지)
 - Tailwind v4 + shadcn v4
 - Zod v4 (schema validation)
-- 상세 규칙: `.ai/stacks/nextjs/frontend.md` (Sprint 26 부터 `.ai/rules/` 심링크 폐지)
+- 상세 규칙: [`AGENTS.md`](AGENTS.md) (같은 디렉터리 — `CLAUDE.md` 가 본 파일과 함께 자동 로드, ADR-029)

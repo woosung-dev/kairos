@@ -1,7 +1,7 @@
 # 백엔드 초기 셋업 가이드
 
 > Kairos 백엔드(FastAPI + SQLModel + asyncpg)를 처음부터 구성하는 단계별 가이드.
-> 모든 규칙은 `.ai/stacks/fastapi/backend.md`를 따른다.
+> 모든 규칙은 `apps/backend/AGENTS.md` + `apps/backend/CONTEXT.md` §5 를 따른다.
 
 ---
 
