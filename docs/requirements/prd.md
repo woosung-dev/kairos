@@ -590,7 +590,7 @@ ADR-010 AD-8(thesis PASS) / ADR-011 §4-b(페르소나 FAIL) / 본 S5(thesis PAS
 |------|------|------|
 | **Phase 0~4** | 제품 로드맵 단계 (장기) | 이 문서 §5 |
 | **Sprint 1~5** | 2주 단위 실행 주기 (Phase 내부) | 이 문서 §5 |
-| **8 Stage** | 세션 워크플로우 (설계→구현→마무리) | `guides/development-methodology.md` |
+| **Plan → Code → Test** | 세션 워크플로우 (설계→구현→검증). 옛 8-Stage 는 Sprint 26 폐지 | `AGENTS.md` §4 |
 
 ---
 

@@ -19,7 +19,7 @@
 | 세션 막 시작함            | `"docs/requirements/prd.md 읽고 현재 Sprint 상태 확인해줘. 지금 해야 할 작업이 뭔지 알려줘."`   |
 | 뭘 해야 할지 알고 있음    | `"docs/architecture/erd.md 읽고 [기능명] 구현해줘"`                                             |
 | 구현 끝남                 | `"/qa 실행해줘"` → (통과 후) `"/ship"`                                                          |
-| 뭘 하고 있었는지 모르겠음 | `"docs/guides/development-methodology.md 읽고 지금 Stage 몇인지, 다음에 뭘 해야 하는지 알려줘"` |
+| 뭘 하고 있었는지 모르겠음 | `"docs/TODO.md 와 docs/REFACTORING-BACKLOG.md 상단 '다음 Sprint 진입점' 읽고 지금 뭘 해야 하는지 알려줘"` |
 
 ---
 
@@ -97,14 +97,15 @@
 
 ---
 
-## 4. 방향을 잃었을 때: 방법론 문서 참조
+## 4. 방향을 잃었을 때: 진입점 문서 참조
 
 ```
-"docs/guides/development-methodology.md 읽고
- 지금 Stage 몇인지, 다음에 뭘 해야 하는지 알려줘"
+"docs/TODO.md 와 docs/REFACTORING-BACKLOG.md 상단 '다음 Sprint 진입점' 읽고
+ 지금 뭘 해야 하는지 알려줘"
 ```
 
-5-Stage 개발 방법론(Upload → STT → AI처리 → Inbox → 임베딩)과 Phase별 진행 방식이 정리되어 있어, 큰 그림에서 현재 위치를 파악할 수 있다.
+`TODO.md` 4섹션(Completed / Blocked / Questions / Next Actions)과 백로그의 진입점 anchor 가
+「지금 어디까지 왔고 다음이 무엇인지」의 정본이다.
 
 ---
 
@@ -127,45 +128,43 @@
 
 ---
 
-## 8 Stage 방법론, 내가 알아야 할 것은?
+## Plan → Code → Test, 내가 알아야 할 것은?
 
-> 상세: `docs/guides/development-methodology.md` (8 Stage 프레임워크)
+> 상세: `AGENTS.md` §4. (옛 8-Stage 프레임워크는 Sprint 26 에 폐지, 2026-08-15 삭제 — ADR-029)
 
-### 8 Stage를 다 외울 필요 없다
-
-사용자 입장에서는 **3가지 모드**만 구분하면 된다:
+### 3단계만 구분하면 된다
 
 ```
-1. 설계 모드 (Stage 1~3) — "아직 코드 안 짬. 문서/디자인 만드는 중"
-2. 구현 모드 (Stage 4~5) — "코드 짜는 중"
-3. 마무리 모드 (Stage 6~8) — "다 짰고, 검증/배포/정리"
+1. Plan  — "아직 코드 안 짬. 의도/영향 범위 정하는 중"
+2. Code  — "코드 짜는 중"
+3. Test  — "다 짰고, 검증 증거 모으는 중"
 ```
 
 ### 내가 알아야 하는 것 vs AI에게 맡기는 것
 
 | 내가 판단                                | AI가 처리                                           |
 | ---------------------------------------- | --------------------------------------------------- |
-| 지금 어느 모드인지 (설계? 구현? 마무리?) | 구체적 명령어 (`/qa`, `/ship`, `/design-review` 등) |
+| 지금 어느 단계인지 (Plan? Code? Test?)   | 구체적 명령어 (`/qa`, `/ship`, `/design-review` 등) |
 | Sprint 목표가 뭔지 (뭘 만들고 있는지)    | 파일 경로, 의존성 분석, 코드 작성                   |
-| 결과물이 맞는지 최종 판단                | Stage별 세부 절차와 순서                            |
+| 결과물이 맞는지 최종 판단                | 단계별 세부 절차와 순서                             |
 
-### 왜 모드 감각이 필요한가?
+### 왜 단계 감각이 필요한가?
 
 AI가 "구현하겠습니다"라고 할 때, 아직 설계가 안 끝났으면 "아직 설계 안 끝났는데?"라고 브레이크를 걸 수 있어야 한다. **방향은 내가 잡고, 실행은 AI가 한다.**
 
-### AI가 방법론을 자동으로 아는가?
+### AI가 규칙을 자동으로 아는가?
 
-- `CLAUDE.md` → **매 세션 자동 로드** (워크플로우, 스택, 현재 상태)
-- `development-methodology.md` → **자동 로드 안 됨**, 요청해야 읽음
+- `AGENTS.md` (= `.claude/CLAUDE.md`) → **매 세션 자동 로드** (워크플로우, 스택, 현재 상태)
+- `apps/backend/AGENTS.md` · `apps/web/AGENTS.md` → **그 디렉터리 파일을 여는 순간** 자동 로드 (ADR-029)
+- `CONTEXT-MAP.md` (헌법) → **자동 로드 안 됨**, 요청해야 읽음
 
 그래서 세션 시작 시 이렇게 하면 가장 정확하다:
 
 ```
-"docs/requirements/prd.md 읽고 현재 Sprint 확인해줘.
- docs/guides/development-methodology.md도 참고해서
- 지금 어떤 Stage인지, 다음에 뭘 해야 하는지 알려줘."
+"CONTEXT-MAP.md 와 docs/TODO.md 읽고 현재 상태 확인해줘.
+ 지금 어느 단계이고 다음에 뭘 해야 하는지 알려줘."
 ```
 
-PRD(무엇을) + 방법론(어떻게)을 둘 다 참고해서 안내받을 수 있다.
+헌법(무엇이 불변인지) + TODO(어디까지 왔는지)를 둘 다 참고해서 안내받을 수 있다.
 
 ---
