@@ -42,7 +42,7 @@
 
 - **로컬**: `.env.local`에 직접 입력하는 값. 실제 예시값 또는 `✅` 표시.
 - **CI**: GitHub Actions에서 어떻게 처리되는지. GitHub Secret이면 Secret 이름, 테스트용 fake면 `➖ fake`.
-- **프로덕션**: 값이 어디에 저장되는지. (Vercel 환경변수 / GCP Secret Manager / GitHub Secret 등)
+- **프로덕션**: 값이 어디에 저장되는지. (서버 `.env` / 빌드 인자 / GitHub Secret 등)
 - **발급처**: 어디서 값을 얻는지. 대시보드 링크 또는 설명.
 
 🔒 민감 정보(API 키, DB 패스워드 등)는 변수명 옆에 🔒 표시.
@@ -114,7 +114,7 @@ cp [프론트엔드경로]/.env.example [프론트엔드경로]/.env.local   # �
 
 | 항목 | 기본값 | 변경 필요 시 |
 |---|---|---|
-| 배포 환경 | GCP Cloud Run + Vercel | Railway, Fly.io, AWS 등으로 변경 |
+| 배포 환경 | Oracle Cloud A1 + Cloudflare Tunnel (ADR-028) | Railway, Fly.io, AWS 등으로 변경 |
 | 시크릿 저장소 | GCP Secret Manager | AWS Secrets Manager, Doppler 등으로 변경 |
 | CI 플랫폼 | GitHub Actions | GitLab CI, CircleCI 등으로 변경 |
 | 언어 정책 | 한국어 | 영어 프로젝트면 "언어: 영어"로 변경 |

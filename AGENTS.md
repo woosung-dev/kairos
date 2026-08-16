@@ -102,7 +102,7 @@ Heavy 변경 (DB 스키마/인증/결제/외부 API) 은 계획 단계에서 대
 **TODO.md 운영** — `docs/TODO.md` 4 섹션 (Completed / Blocked / Questions / Next Actions). 사용자에게 빈번한 질문 대신 기록 후 일괄 전달.
 
 **코딩 핵심**: TS Strict + `any` 금지 / FastAPI 100% async + Pydantic V2 + Router·Service·Repository 분리
-- FE API wire 타입: `apps/web/src/types/api.gen.ts` 생성물에서 import — 수기 wire interface 신규 작성 금지, 재생성 `just contracts` (ADR-027, I-20)
+- FE API wire 타입: `apps/web/src/types/api.gen.ts` 생성물에서 import — 수기 wire interface 신규 작성 금지, 재생성 `just contracts` (ADR-027, I-22)
 - 상태: Server = React Query, Client global = Zustand, local = useState
 - Boolean prefix `is`/`has`/`should`, 이벤트 `handle`/`on`, 상수 UPPER_SNAKE_CASE
 

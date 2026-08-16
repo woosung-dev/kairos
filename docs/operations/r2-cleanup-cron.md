@@ -18,11 +18,11 @@
 openssl rand -hex 32
 # 예) 7a1c4f8b2d3e5f6a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a
 
-# Cloud Run 환경변수 / Secret Manager에 저장
+# 서버 `~/kairos/.env` 에 저장 (ADR-028 — Cloud Run/Secret Manager 는 철거됨)
 gcloud secrets create cron-secret-token --replication-policy=automatic
 echo -n "<token>" | gcloud secrets versions add cron-secret-token --data-file=-
 
-# Cloud Run service 업데이트 — CRON_SECRET_TOKEN env 매핑
+# 서버 .env 갱신 후 compose 재기동 — CRON_SECRET_TOKEN env 매핑
 gcloud run services update kairos-backend \
   --update-secrets CRON_SECRET_TOKEN=cron-secret-token:latest \
   --region asia-northeast3

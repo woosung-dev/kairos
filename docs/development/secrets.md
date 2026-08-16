@@ -31,23 +31,28 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 
 ---
 
+> **프로덕션 컬럼 = 오라클 서버 `~/kairos/.env`** (아래 SoT 절). 2026-08-14 ADR-028 이전의
+> "Cloud Run env" / "GitHub Secret" / "Vercel 환경변수" 표기는 2026-08-16 에 정정했다.
+> `NEXT_PUBLIC_*` 는 **빌드타임 인라인**이라 서버 `.env` 가 아니라 `deploy/oci/build.env` 에 있고,
+> 값을 바꾸면 **FE 이미지를 재빌드해야 한다**.
+
 ### 백엔드 (`apps/api/.env`)
 
 | 변수명 | 로컬 | CI (test) | 프로덕션 | 발급처 |
 |---|:---:|:---:|:---:|---|
-| `APP_ENV` | ✅ `development` | ➖ | Cloud Run env | 직접 입력 |
-| `LOG_LEVEL` | ✅ `INFO` | ➖ | Cloud Run env | 직접 입력 |
-| `CORS_ORIGINS` | ✅ `http://localhost:3000` | ➖ | GitHub Secret | Vercel 배포 URL |
-| `FRONTEND_URL` | ✅ `http://localhost:3000` | ➖ | GitHub Secret | Vercel 배포 URL |
-| `DATABASE_URL` 🔒 | ✅ | ➖ fake | GitHub Secret | [Neon 대시보드](https://console.neon.tech) → Connection Details |
-| `CLERK_SECRET_KEY` 🔒 | ✅ | ➖ fake | GitHub Secret | [Clerk 대시보드](https://dashboard.clerk.com) → API Keys |
-| `CLERK_WEBHOOK_SECRET` 🔒 | ✅ | ➖ fake | GitHub Secret | Clerk 대시보드 → Webhooks |
-| `R2_ACCOUNT_ID` 🔒 | ✅ | ➖ fake | GitHub Secret | Cloudflare 대시보드 → 우측 상단 Account ID |
-| `R2_ACCESS_KEY_ID` 🔒 | ✅ | ➖ fake | GitHub Secret | Cloudflare R2 → Manage R2 API tokens |
-| `R2_SECRET_ACCESS_KEY` 🔒 | ✅ | ➖ fake | GitHub Secret | 위와 동일 (토큰 생성 시 1회만 표시) |
-| `R2_BUCKET_NAME` | ✅ | ➖ fake | GitHub Secret | Cloudflare R2 버킷 이름 |
-| `GEMINI_API_KEY` 🔒 | ✅ | ➖ fake | GitHub Secret | [Google AI Studio](https://aistudio.google.com) → Get API key |
-| `OPENAI_API_KEY` 🔒 | ✅ | ➖ fake | GitHub Secret | [OpenAI Platform](https://platform.openai.com/api-keys) |
+| `APP_ENV` | ✅ `development` | ➖ | 서버 `.env` | 직접 입력 |
+| `LOG_LEVEL` | ✅ `INFO` | ➖ | 서버 `.env` | 직접 입력 |
+| `CORS_ORIGINS` | ✅ `http://localhost:3000` | ➖ | 서버 `.env` | `https://kairos.woosung.dev` |
+| `FRONTEND_URL` | ✅ `http://localhost:3000` | ➖ | 서버 `.env` | `https://kairos.woosung.dev` |
+| `DATABASE_URL` 🔒 | ✅ | ➖ fake | 서버 `.env` | 프로덕션은 오라클 VM 의 `kairos-db` 컨테이너 (ADR-028). 로컬/백업은 [Neon](https://console.neon.tech) |
+| `CLERK_SECRET_KEY` 🔒 | ✅ | ➖ fake | 서버 `.env` | [Clerk 대시보드](https://dashboard.clerk.com) → API Keys |
+| `CLERK_WEBHOOK_SECRET` 🔒 | ✅ | ➖ fake | 서버 `.env` | Clerk 대시보드 → Webhooks |
+| `R2_ACCOUNT_ID` 🔒 | ✅ | ➖ fake | 서버 `.env` | Cloudflare 대시보드 → 우측 상단 Account ID |
+| `R2_ACCESS_KEY_ID` 🔒 | ✅ | ➖ fake | 서버 `.env` | Cloudflare R2 → Manage R2 API tokens |
+| `R2_SECRET_ACCESS_KEY` 🔒 | ✅ | ➖ fake | 서버 `.env` | 위와 동일 (토큰 생성 시 1회만 표시) |
+| `R2_BUCKET_NAME` | ✅ | ➖ fake | 서버 `.env` | Cloudflare R2 버킷 이름 |
+| `GEMINI_API_KEY` 🔒 | ✅ | ➖ fake | 서버 `.env` | [Google AI Studio](https://aistudio.google.com) → Get API key |
+| `OPENAI_API_KEY` 🔒 | ✅ | ➖ fake | 서버 `.env` | [OpenAI Platform](https://platform.openai.com/api-keys) |
 
 ---
 
@@ -55,9 +60,9 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 
 | 변수명 | 로컬 | CI (build) | 프로덕션 | 발급처 |
 |---|:---:|:---:|:---:|---|
-| `NEXT_PUBLIC_API_URL` | ✅ `http://localhost:8000` | ➖ fake | Vercel 환경변수 | Cloud Run 배포 URL |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | ✅ | ➖ fake | Vercel 환경변수 | Clerk 대시보드 → API Keys |
-| `CLERK_SECRET_KEY` 🔒 | ✅ | ➖ fake | Vercel 환경변수 | Clerk 대시보드 → API Keys |
+| `NEXT_PUBLIC_API_URL` | ✅ `http://localhost:8000` | ➖ fake | `build.env` | `https://kairos-api.woosung.dev` |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | ✅ | ➖ fake | `build.env` | Clerk 대시보드 → API Keys |
+| `CLERK_SECRET_KEY` 🔒 | ✅ | ➖ fake | 서버 `.env` (web 컨테이너 런타임) | Clerk 대시보드 → API Keys |
 
 ---
 

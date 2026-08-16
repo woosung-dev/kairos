@@ -66,10 +66,10 @@ uv run python apps/api/scripts/reindex_vectors.py --force
 
 ## 5. cron 등록 (선택)
 
-운영 환경(예: Cloud Run Jobs)에서 월 1회 실행:
+운영 환경에서 월 1회 실행 (Cloud Run Jobs 는 ADR-028 로 철거됨 — 현재는 서버에서 수동/cron):
 
 ```bash
-# crontab 또는 Cloud Run Scheduler
+# 오라클 VM crontab
 0 3 1 * *   cd /app/backend && uv run python scripts/reindex_vectors.py
 ```
 
