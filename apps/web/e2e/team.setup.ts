@@ -12,7 +12,7 @@ import {
   PUBLIC_NOTE_TEXT,
   PRIVATE_NOTE_TEXT,
   assertLocalSeedTarget,
-  clerkLogin,
+  login,
   api,
   getMe,
   buildTiptapDoc,
@@ -149,7 +149,7 @@ setup("team seed", async ({ browser }) => {
   // ── 1. owner 로그인 (context A) ──
   const ownerCtx = await browser.newContext();
   const ownerPage = await ownerCtx.newPage();
-  await clerkLogin(ownerPage, ownerEmail, ownerPw);
+  await login(ownerPage, ownerEmail, ownerPw);
   const ownerMe = await getMe(ownerPage);
 
   // ── 2. team ws discover-or-create (personal 절대 사용 금지) ──
@@ -202,7 +202,7 @@ setup("team seed", async ({ browser }) => {
   // ── 4. member 로그인 (context B) ──
   const memberCtx = await browser.newContext();
   const memberPage = await memberCtx.newPage();
-  await clerkLogin(memberPage, memberEmail, memberPw);
+  await login(memberPage, memberEmail, memberPw);
   const memberMe = await getMe(memberPage);
   if (memberMe.id === ownerMe.id) {
     throw new Error("owner/member 가 동일 계정으로 로그인됨 — 컨텍스트 격리 실패");
@@ -249,12 +249,12 @@ setup("team seed", async ({ browser }) => {
     "public",
   );
 
-  // ── 9. localStorage 주입 (양쪽 active ws = team ws + ownerUserId=clerkId) ──
-  if (!ownerMe.clerkId || !memberMe.clerkId) {
-    throw new Error("clerkId 부재 — ensureOwner 가드 우회 불가");
+  // ── 9. localStorage 주입 (양쪽 active ws = team ws + ownerUserId=내부 UUID) ──
+  if (!ownerMe.id || !memberMe.id) {
+    throw new Error("users.id 부재 — ensureOwner 가드 우회 불가");
   }
-  await injectActiveWorkspace(ownerPage, teamWsId, ownerMe.clerkId);
-  await injectActiveWorkspace(memberPage, teamWsId, memberMe.clerkId);
+  await injectActiveWorkspace(ownerPage, teamWsId, ownerMe.id);
+  await injectActiveWorkspace(memberPage, teamWsId, memberMe.id);
 
   // ── 10. storageState 저장 + 픽스처 메타 export ──
   await ownerCtx.storageState({ path: OWNER_FILE });

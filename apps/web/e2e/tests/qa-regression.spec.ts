@@ -29,10 +29,12 @@ test.describe("Sprint 17 QA regression 모음", () => {
       timeout: 15_000,
     });
 
-    // 1. Clerk 토큰 + activeWorkspaceId 확보 (페이지 안에서 fetch)
+    // 1. JWT + activeWorkspaceId 확보 (페이지 안에서 fetch)
     const ctx = await page.evaluate(async () => {
-      // @ts-ignore — Clerk SDK 가 window 에 주입
-      const token = await window.Clerk?.session?.getToken();
+      const tokenRes = await fetch("/api/auth/token", { credentials: "include" });
+      const token = tokenRes.ok
+        ? ((await tokenRes.json()) as { token?: string }).token
+        : undefined;
       const stored = window.localStorage.getItem("kairos-workspace");
       const parsed = stored ? JSON.parse(stored) : null;
       const wid = parsed?.state?.activeWorkspaceId;

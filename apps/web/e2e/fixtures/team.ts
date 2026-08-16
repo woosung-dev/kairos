@@ -114,7 +114,7 @@ export const test = base.extend<TeamFixtures>({
   },
   ownerPage: async ({ ownerContext }, use) => {
     const p = await ownerContext.newPage();
-    await p.goto("/dashboard"); // Clerk SDK hydrate → getToken 가능
+    await p.goto("/dashboard"); // 앱 컨텍스트 확보 (토큰은 /api/auth/token 이 준다)
     await use(p);
   },
   memberPage: async ({ memberContext }, use) => {

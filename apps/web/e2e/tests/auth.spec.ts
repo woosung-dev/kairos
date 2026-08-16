@@ -6,7 +6,7 @@ import { test, expect } from "@playwright/test";
  *
  * 검증 대상:
  * - 미인증 사용자가 /dashboard에 접근하면 /sign-in URL로 리다이렉트된다
- * - /sign-in 페이지에 이메일 입력 필드가 렌더링된다 (Clerk 로그인 폼)
+ * - /sign-in 페이지에 이메일 입력 필드가 렌더링된다 (자체 로그인 폼)
  */
 
 test.describe("인증 플로우", () => {
@@ -22,10 +22,12 @@ test.describe("인증 플로우", () => {
 
   test("로그인 페이지에 이메일 입력 필드가 렌더링된다", async ({ page }) => {
     await page.goto("/sign-in");
-    // BL-021: Clerk koKR localization 후 label "이메일 주소"로 변경됨.
-    // Clerk SDK standard input `name="identifier"` 사용 — locale 변화 무관.
-    await expect(page.locator('input[name="identifier"]')).toBeVisible({
+    // ADR-031: 셀렉터는 우리 폼의 data-testid 계약 (auth-form.tsx).
+    // 예전 `input[name="identifier"]` 는 Clerk SDK 내부 규약이라 locale/버전에 취약했다.
+    await expect(page.getByTestId("auth-email")).toBeVisible({
       timeout: 30_000,
     });
+    await expect(page.getByTestId("auth-password")).toBeVisible();
+    await expect(page.getByTestId("auth-google")).toBeVisible();
   });
 });
