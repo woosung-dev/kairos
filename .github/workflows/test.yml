@@ -131,7 +131,7 @@ jobs:
           # secretKey 필요 (build 시점만 아니라 next start 도). fake 값으로 부팅 OK.
           CLERK_SECRET_KEY: "sk_test_fake"
           NEXT_PUBLIC_API_URL: "http://localhost:8000"
-        run: just fe-security-headers PORT="3000"
+        run: just fe-security-headers 3000
 
       - name: Upload Next.js log on failure
         if: failure()
