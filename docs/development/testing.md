@@ -28,11 +28,25 @@ just ci-local
 | `just be-test` | `backend-test` "Run tests" | pytest. `transcription` / `r2-cors` 2개 제외가 **정본** (외부 API·실 R2 의존) |
 | `just fe-test` | `frontend-build` "Unit tests (vitest)" | 코드 옆 `__tests__/` 단위 테스트 |
 | `just fe-build` | `frontend-build` "Build (includes type check)" | Next 빌드 = TS strict 타입 검사 |
-| `just fe-security-headers` | `frontend-build` "Run security-headers spec only" | 보안 헤더 회귀 (public route, secrets 불요) |
+| `just fe-security-headers` | `frontend-build` "Run security-headers spec only" | 보안 헤더 회귀 (public route, secrets 불요). **빌드 산출물(`pnpm start`)을 검증한다** — ↓ §2.1 |
 | `just contracts-check` | `contract-check` | OpenAPI 재생성 + `git diff --exit-code` drift 차단 (ADR-027 D2) |
 | `just e2e` | `e2e` job (`vars.E2E_ENABLED`, **현재 미활성**) | Playwright |
 
 CI 가 복구되면 이 표가 대조표가 된다 — 로컬만 green 이고 CI 가 red 이면 차이는 이 표의 행에 있다.
+
+### 2.1 ★ 보안 헤더는 dev 서버로 검증하면 안 된다
+
+`playwright.config.ts` 의 `webServer` 는 **비-CI 에서 `pnpm dev` 를 띄운다.** 반면 CI 는
+`pnpm start`(빌드 산출물)를 검증한다. 이 차이를 방치하면 **프로덕션에서만 나는 헤더·기동 회귀가
+로컬 게이트를 통과한다** (2026-08-16 codex 리뷰 P2 지적).
+
+그래서 `just fe-security-headers` 는 직접 `pnpm start -p 3005` 를 띄우고 그 서버를 검증한다
+(`reuseExistingServer: true` 라 playwright 가 dev 서버를 새로 띄우지 않는다).
+
+- 포트 **3005** 고정 — dev(`:3000`) / playwright 기본(`:3003`) 과 겹치지 않게 한다
+- 이미 점유돼 있으면 **중단한다.** 남의 서버를 검증하면 게이트가 거짓 green 이 된다
+- `.next` 가 최신이어야 한다. `ci-local` 이 `fe-build` → `fe-security-headers` 순서를 보장한다
+- 헤더 단언은 포트에 의존하지 않으므로 CI(`:3000`)와 동치다
 
 ## 3. 백엔드 테스트 지형 (`apps/api/tests/`)
 
