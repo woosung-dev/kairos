@@ -42,6 +42,34 @@ export const PRIVATE_NOTE_TEXT = `${TOKEN_PRIVATE} 비공개 프로젝트 기밀
 export type ApiMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
 
+/**
+ * 계정이 존재함을 보장한다 (ADR-031).
+ *
+ * ★Clerk 시절에는 필요 없던 단계다. 계정이 외부 SaaS 에 영속해 있었기 때문에 e2e 는
+ *   "로그인만" 하면 됐다. 이제 계정은 우리 Postgres 에 있고 **CI 는 매 실행 새 DB** 를
+ *   띄운다 — 로그인만 하면 첫 실행부터 실패한다.
+ *
+ * 이미 있으면 Better Auth 가 4xx 를 주므로 그대로 무시한다 (idempotent).
+ */
+export async function ensureAccount(
+  page: Page,
+  email: string,
+  password: string,
+  name: string,
+): Promise<void> {
+  // origin 확보 — page.url() 이 about:blank 면 절대 URL 을 만들 수 없다.
+  if (!page.url().startsWith("http")) await page.goto("/sign-in");
+  await page.request.post(
+    new URL("/api/auth/sign-up/email", page.url()).toString(),
+    {
+      data: { email, password, name },
+      failOnStatusCode: false,
+    },
+  );
+  // 가입은 세션 쿠키까지 세팅한다. 아래 login() 이 폼 경로를 다시 관통하므로
+  // 여기서 얻은 세션에 의존하지 않는다 — 폼 자체가 회귀 대상이기 때문이다.
+}
+
 /** 이메일/비밀번호 로그인 (ADR-031 — 셀렉터는 우리 폼의 data-testid 계약). */
 export async function login(
   page: Page,

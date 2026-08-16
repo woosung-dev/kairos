@@ -12,6 +12,7 @@ import {
   PUBLIC_NOTE_TEXT,
   PRIVATE_NOTE_TEXT,
   assertLocalSeedTarget,
+  ensureAccount,
   login,
   api,
   getMe,
@@ -149,6 +150,8 @@ setup("team seed", async ({ browser }) => {
   // ── 1. owner 로그인 (context A) ──
   const ownerCtx = await browser.newContext();
   const ownerPage = await ownerCtx.newPage();
+  await ownerPage.goto("/sign-in");
+  await ensureAccount(ownerPage, ownerEmail, ownerPw, "E2E Owner");
   await login(ownerPage, ownerEmail, ownerPw);
   const ownerMe = await getMe(ownerPage);
 
@@ -202,6 +205,8 @@ setup("team seed", async ({ browser }) => {
   // ── 4. member 로그인 (context B) ──
   const memberCtx = await browser.newContext();
   const memberPage = await memberCtx.newPage();
+  await memberPage.goto("/sign-in");
+  await ensureAccount(memberPage, memberEmail, memberPw, "E2E Member");
   await login(memberPage, memberEmail, memberPw);
   const memberMe = await getMe(memberPage);
   if (memberMe.id === ownerMe.id) {

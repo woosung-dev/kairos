@@ -1,6 +1,8 @@
 import { test as setup } from "@playwright/test";
 import path from "node:path";
 
+import { ensureAccount, login } from "./team-helpers";
+
 /**
  * 로그인 + 워크스페이스 보장 setup (ADR-031 — Better Auth).
  * 저장된 storageState (cookies + localStorage)를 이후 테스트들이 재사용.
@@ -46,15 +48,12 @@ setup("authenticate", async ({ page }) => {
     );
   }
 
-  // ── 로그인 ──
-  // ADR-031: 폼이 우리 코드가 됐으므로 셀렉터를 data-testid 로 못박는다.
-  // 예전의 `input[name="identifier"]` 는 Clerk SDK 내부 규약이라 벤더와 함께 깨졌다.
-  // (BL-021 의 원래 문제였던 locale 의존은 testid 로 원천 해소된다.)
+  // ── 계정 보장 + 로그인 ──
+  // CI 는 매 실행 새 DB 를 띄우므로 계정 생성이 선행돼야 한다 (ADR-031).
+  // 로그인은 폼 경로를 그대로 관통한다 — data-testid 가 e2e 계약이다.
   await page.goto("/sign-in");
-  await page.getByTestId("auth-email").fill(email);
-  await page.getByTestId("auth-password").fill(password);
-  await page.getByTestId("auth-submit").click();
-  await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
+  await ensureAccount(page, email, password, "E2E 사용자");
+  await login(page, email, password);
 
   // ── 워크스페이스 보장 (API 직접 호출) ──
   // 토큰은 Better Auth jwt 플러그인의 엔드포인트에서 받는다 (window 전역 의존 없음).
