@@ -80,11 +80,21 @@ run = 'docker buildx build -t "kairos-api:$usage_tag" ...'
 
 가변 인자는 `arg "<args>..."` 다. `var=true` 는 KDL 파싱 에러이며 `mise tasks validate` 가 잡아준다.
 
-### D7. CI 도 `jdx/mise-action` 으로 통일한다
+### D7. CI 도 `jdx/mise-action` 으로 통일한다 — **워크플로 3개 전부**
 
 `setup-node` / `pnpm/action-setup` / `setup-uv` / `setup-just` 를 전부 걷어내고 잡마다 `mise-action` 하나로 대체한다. 이로써 **로컬 · CI · 프로덕션이 한 파일(`mise.toml`)에서 나온다** — 이게 이 ADR 의 실익이다.
 
 부수 효과로 CI 가 Node 20 → 22, pnpm 9 → 8.15.9, uv latest → 0.10.4 로 프로덕션에 정렬된다. pnpm 은 락파일이 `lockfileVersion: '6.0'`(pnpm 8 포맷)이므로 이쪽이 원래 맞았다.
+
+**★대상은 `test.yml` 만이 아니다.** 초판은 `test.yml` 만 옮기고 `nightly-e2e.yml` · `r2-cleanup.yml` 을 남겼는데, 그러면 **위 "한 파일에서 나온다" 가 착지하는 순간 거짓이 된다.** 특히 `nightly-e2e.yml` 은 meeting-upload + team spine T1~T21 의 **유일한** 게이트라, 거기만 pnpm 9 / Node 20 으로 남으면 nightly 결과가 PR CI 와 모순될 수 있다. 세 파일 모두 전환한다.
+
+**액션 버전은 `v4.2.5` 로 핀한다.** `v2`(2025-07-27 이후 정지)는 `runs: using: node20` 이라, Node20 deprecated 액션을 걷어낸 PR #173 의 성과를 잡 4개에 되돌린다. `v4.2.5` 는 `node24` 다. 잡별로 `install_args` 를 줘서 필요한 툴만 깐다 (`backend-test: uv`, `frontend-build: node pnpm`, `r2-cleanup: uv`).
+
+### D8. 툴체인 핀은 **주석이 아니라 게이트**로 강제한다
+
+초판은 `[tools]` 값 옆에 `# apps/web/Dockerfile:9` 같은 출처 주석만 달고 "드리프트의 단일 소유자" 라고 선언했다. **그러나 주석은 아무도 검사하지 않는다.** 한쪽만 올리면 주석이 거짓말이 되고 CI ↔ 프로덕션이 다시 갈라진다 — 이 ADR 이 없애려던 바로 그 상태다.
+
+`mise run toolchain-check` 가 `[tools]` 의 세 값을 Dockerfile 의 실제 핀과 대조한다. `contracts-check` 가 API 계약에 하는 일을 툴체인에 그대로 한다. `ci-local` 첫 단계이자 CI `contract-check` 잡의 스텝이다.
 
 ---
 
@@ -113,8 +123,24 @@ ADR-027 D3 의 **"단일 명령 진입점" 원칙과 "CI invocation 과 문자 �
 
 ---
 
+## 초판 이후 리뷰에서 잡은 것 (2026-08-17, `/code-review` + `/codex`)
+
+두 리뷰가 독립적으로 같은 P1 을 지목했다 — **`mise.toml` 이 `contracts` paths-filter 에만 있었다.** `[tools]` 가 런타임 버전을 소유하게 됐으므로 툴체인만 바꾼 PR 이 `backend-test`/`frontend-build` 를 skip 한 채 `ci-required` green 이 된다. 이 ADR 이 막으려던 사고를 이 ADR 이 새로 만든 셈이라 `api`/`web` 필터에 추가했다.
+
+그 외 실측으로 확인해 고친 것:
+
+| | 내용 |
+|---|---|
+| `verify-prod` 회귀 | `arg "<args>..."` 가 **필수** 라 무인자 실행이 죽었다. `scripts/verify-prod.sh:15` 가 `${1:-https://kairos-api.woosung.dev}` 로 무인자를 기본 경로로 삼는다 → `arg "[args]..."` 로 교정. ★`-u` 때문에 `${usage_args:-}` 의 `:-` 가 필수다 (생략 인자는 변수 자체가 없다) |
+| 워크플로 2개 누락 | `nightly-e2e.yml` · `r2-cleanup.yml` (D7 참조) |
+| 액션 런타임 | `mise-action` v2 = node20 → `v4.2.5` = node24 (D7 참조) |
+| 주석뿐인 SSOT | `toolchain-check` 게이트 신설 (D8) |
+| `install` task | 두 `cd` 가 한 셸에서 연쇄돼 두 번째가 첫 번째 착지점에 의존했다 → 각 줄을 서브셸로 |
+| 문서 잔여 | `README.md`(`brew install just`), `export_openapi.py:5`, `build.env.example:3`, `testing.md` 의 CI 스텝명(전환 이전부터 어긋나 있었다), 인계문서의 죽은 라인 인용 |
+
 ## 이번 범위에서 제외한 갭
 
-1. **pnpm store 캐시가 사라졌다.** 구 `setup-node` 의 `cache: "pnpm"` 을 mise-action 이 대체하지 않는다. mise-action 은 툴 설치만 캐시한다. 잡당 수십 초 증가가 예상되며, 실측 후 필요하면 `actions/cache` 를 별도로 붙인다.
-2. **Node 22 로 올린 첫 CI run 이 실질 게이트다.** 20 → 22 는 프로덕션 정렬이지만 e2e/build 가 22 에서 처음 돈다.
-3. `docs-check`(BL-S29-1) 는 여전히 미구현. 이름만 `mise run docs-check` 로 갱신했다.
+1. ~~pnpm store 캐시~~ — **실측으로 해소.** 전환 전후 CI 시간이 사실상 동일했다 (backend-test 3m35s→3m47s, frontend-build 1m33s→1m33s, e2e 2m16s→2m10s, contract-check 28s→28s). `actions/cache` 부착은 불필요.
+2. ~~Node 22 첫 run~~ — **통과 확인.** e2e 포함 6개 잡 전부 green.
+3. **`node = "22"` 는 major 핀이다** (pnpm/uv 는 exact). `apps/web/Dockerfile` 의 `node:22-alpine` 도 같은 방식이라 `toolchain-check` 는 "선언이 서로 같은가" 까지만 보장하고 "해석된 patch 가 같은가" 는 보장하지 않는다. 양쪽을 exact 로 올리려면 Dockerfile 재빌드가 동반되므로 별건.
+4. `docs-check`(BL-S29-1) 는 여전히 미구현. 이름만 `mise run docs-check` 로 갱신했다.

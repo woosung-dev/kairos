@@ -34,11 +34,44 @@ oci_compose = "docker compose -f docker-compose.prod.yml"
 
 # ══ 개발 ══════════════════════════════════════════════════════════════
 
+# ★각 줄을 서브셸로 감싼다. 구 justfile 은 recipe 줄마다 새 셸이라 두 `cd` 가 서로
+#   독립이었는데, mise 는 한 셸에서 본문 전체를 돌린다. `cd apps/api && ... ; cd ../web`
+#   으로 옮기면 두 번째 `cd` 가 첫 번째의 착지점에 의존하게 되고, 줄 순서를 바꾸거나
+#   중간에 한 줄을 끼우는 순간 조용히 레포 밖을 가리킨다.
 [tasks.install]
 description = "BE/FE 의존성 설치 (lockfile 고정)"
 run = '''
-cd apps/api && uv sync --frozen
-cd ../web && pnpm install --frozen-lockfile
+(cd apps/api && uv sync --frozen)
+(cd apps/web && pnpm install --frozen-lockfile)
+'''
+
+# 툴체인 드리프트 게이트 — `[tools]` 와 Dockerfile 의 핀이 갈라지면 실패한다.
+#
+# ★ADR-032 초판은 `[tools]` 옆에 `# apps/web/Dockerfile:9` 같은 주석만 달아두고
+#   "단일 소유자" 라고 선언했는데, **주석은 아무도 검사하지 않는다.** 한쪽만 올리면
+#   CI 와 프로덕션이 다시 갈라지고, 그게 정확히 이 ADR 이 없애려던 상태다.
+#   `contracts-check` 가 계약에 하는 일을 툴체인에 그대로 한다.
+[tasks.toolchain-check]
+description = "mise.toml [tools] ↔ Dockerfile 핀 일치 게이트"
+run = '''
+fail=0
+check() {
+  name="$1"; expected="$2"; file="$3"; pattern="$4"
+  if ! grep -qE "$pattern" "$file"; then
+    echo "DRIFT: $name — mise.toml 은 '$expected' 인데 $file 이 다르다" >&2
+    grep -nE 'FROM node:|corepack prepare pnpm@|astral-sh/uv:' "$file" >&2 || true
+    fail=1
+  else
+    echo "OK: $name = $expected ($file)"
+  fi
+}
+node_v=$(grep -E '^node *=' mise.toml | sed -E 's/.*"([^"]+)".*/\1/')
+pnpm_v=$(grep -E '^pnpm *=' mise.toml | sed -E 's/.*"([^"]+)".*/\1/')
+uv_v=$(grep -E '^uv *=' mise.toml | sed -E 's/.*"([^"]+)".*/\1/')
+check node "$node_v" apps/web/Dockerfile "^FROM node:${node_v}-alpine"
+check pnpm "$pnpm_v" apps/web/Dockerfile "corepack prepare pnpm@${pnpm_v} "
+check uv   "$uv_v"   apps/api/Dockerfile "astral-sh/uv:${uv_v} "
+exit $fail
 '''
 
 [tasks.be-dev]
@@ -158,6 +191,7 @@ E2E_PORT="$usage_port" E2E_BASE_URL="http://localhost:$usage_port" pnpm exec pla
 [tasks.ci-local]
 description = "머지 게이트 — CI 의 backend-test + frontend-build + contract-check 로컬 미러"
 run = '''
+mise run toolchain-check
 mise run be-test
 mise run contracts-check
 mise run fe-test
@@ -165,10 +199,16 @@ mise run fe-build
 mise run fe-security-headers
 '''
 
+# ★인자는 **선택**이다. `scripts/verify-prod.sh:15` 가
+#   `BASE_URL="${1:-https://kairos-api.woosung.dev}"` 로 무인자 기본값을 갖는다.
+#   `<args>...` (필수)로 쓰면 구 `just verify-prod` 의 기본 경로가 통째로 막힌다.
 [tasks.verify-prod]
-description = "프로덕션 스모크 스크립트"
-usage = 'arg "<args>..." help="verify-prod.sh 에 그대로 전달"'
-run = './scripts/verify-prod.sh $usage_args'
+description = "프로덕션 스모크 스크립트 (무인자면 prod 기본 URL)"
+usage = 'arg "[args]..." help="verify-prod.sh 에 그대로 전달 (생략 가능)"'
+# ★`${usage_args:-}` 의 `:-` 가 필수다. 선택 인자를 생략하면 mise 는 변수를 아예
+#   설정하지 않는데, `[task_config] shell` 의 `-u` 가 그걸 unbound 로 잡아 죽인다.
+# ★인용하지 않는 것도 의도다 — 스크립트에 개별 인자로 분리 전달해야 한다.
+run = './scripts/verify-prod.sh ${usage_args:-}'
 
 # ══ OCI 배포 (ADR-028) ════════════════════════════════════════════════
 

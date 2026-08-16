@@ -7,8 +7,14 @@
 
 | 도구 | 버전 | 확인 명령어 |
 |------|------|------------|
-| **mise** | latest | `mise --version` (`brew install mise`, ADR-032) |
+| **mise** | **2026.8.6+** | `mise --version` (`brew install mise`, ADR-032) |
 | Git | 2.30+ | `git --version` |
+
+★**CI 는 mise 를 `2026.8.6` 으로 고정한다** (`.github/workflows/*.yml` 의 `jdx/mise-action` `version:`).
+mise 자체의 task 의미론이 버전에 민감하다 — `[task_config] shell`, `usage` 인자의 env 변수명,
+task 기본 cwd, 그리고 ADR-032 D6 이 기록한 `arg()` 템플릿 제거 예정(2027.5.0)이 전부 런타임 동작이다.
+로컬 mise 가 CI 보다 한참 앞서면 `mise run ci-local` 이 CI 게이트와 다르게 돌 수 있다.
+로컬이 크게 어긋나면 CI 의 `version:` 값에 맞춰라.
 
 ★**Node · pnpm · uv 는 직접 설치하지 않는다.** 루트 `mise.toml` 의 `[tools]` 가 정본이고
 `mise install` 이 그 버전을 그대로 깔아준다. 값은 프로덕션 Dockerfile 에서 가져온 것이라

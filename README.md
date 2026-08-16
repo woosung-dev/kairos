@@ -61,10 +61,10 @@ pnpm dev -p 3000
 
 ## 테스트
 
-루트 `mise.toml` 이 단일 진입점 (`brew install just`, ADR-027):
+루트 `mise.toml` 이 단일 진입점 (`brew install mise`, ADR-032):
 
 ```bash
-mise run ci-local         # ★ 머지 게이트 전체 (be-test + fe-test + fe-build + 보안헤더 + contracts-check)
+mise run ci-local         # ★ 머지 게이트 전체 (toolchain + be-test + contracts + fe-test/build + 보안헤더)
 mise run install          # BE uv sync --frozen + FE pnpm install
 mise run be-test          # 백엔드 pytest — CI 와 동일 호출 (transcription/r2-cors 2개 제외)
 mise run fe-build         # 프론트엔드 빌드 (타입 검사 포함)
@@ -72,7 +72,8 @@ mise run e2e              # Playwright — 로컬 .env.local에 E2E_USER_EMAIL/P
 mise run contracts-check  # OpenAPI 계약 drift 게이트 (재생성 + git diff)
 ```
 
-전체 recipe 는 `mise tasks`. `just` 없이는 각 recipe 안의 원 명령을 직접 실행해도 된다.
+전체 task 는 `mise tasks`. `mise` 없이는 각 task 안의 원 명령을 직접 실행해도 된다.
+`mise install` 이 Node 22 / pnpm 8.15.9 / uv 0.10.4 를 프로덕션과 같은 버전으로 깔아준다.
 
 ---
 
