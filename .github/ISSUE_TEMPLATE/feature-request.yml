@@ -1,0 +1,46 @@
+name: 기능 요청
+description: 새 기능이나 개선을 제안합니다
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 어떤 문제를 겪고 있나요
+      description: 원하는 해법이 아니라 **문제**를 적어 주세요. 해법은 다를 수 있습니다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 사용자 시나리오
+      description: 언제, 누가, 무엇을 하려다 막히는지.
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 원하는 결과
+
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: 제외 범위
+      description: 이번엔 다루지 않아도 되는 것.
+
+  - type: dropdown
+    id: app
+    attributes:
+      label: 영향받는 앱
+      multiple: true
+      options:
+        - web (Next.js 화면)
+        - api (FastAPI)
+        - 모르겠음
+
+  - type: textarea
+    id: refs
+    attributes:
+      label: 참고 자료
+      description: 스크린샷, 다른 제품 사례, 관련 ADR/BL 번호.

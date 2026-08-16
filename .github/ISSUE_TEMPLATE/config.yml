@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 보안 취약점
+    url: https://github.com/woosung-dev/kairos/security/advisories/new
+    about: 공개 Issue 로 열지 말고 private vulnerability reporting 을 사용해 주세요 (.github/SECURITY.md).
+  - name: 작업 백로그
+    url: https://github.com/woosung-dev/kairos/blob/main/docs/REFACTORING-BACKLOG.md
+    about: 내부 리팩토링·부채 항목은 BL-NNN 으로 REFACTORING-BACKLOG.md 에 등재합니다.
