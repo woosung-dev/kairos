@@ -2,13 +2,13 @@
 # Multi-Agent QA fixture seed (Sprint 18 → 19, 2026-05-17). 계정 생성은 사용자 사전 수동.
 """Sprint 18 → 19 Multi-Agent QA fixture seed.
 
-자격증명(Clerk 계정 + JWT)은 본 스크립트가 만들지 않는다.
-사용자가 https://dashboard.clerk.com 에서 5계정 + sign-in token 발급 후
+자격증명(계정 + JWT)은 본 스크립트가 만들지 않는다.
+사용자가 앱의 /sign-up 으로 5계정을 만들고 /api/auth/token 으로 JWT 를 받은 뒤
 `seed-credentials.env` 채워 전달. 본 스크립트는 fixture (User row + Workspace +
 Project + Note + EmbeddingChunk) 만 담당.
 
 사용:
-    # 1. 사용자가 Clerk dev에서 5계정 만들고 JWT 발급
+    # 1. 사용자가 /sign-up 으로 5계정 만들고 /api/auth/token 으로 JWT 발급
     # 2. seed-credentials.env 채움
     # 3. backend 디렉터리에서:
     cd apps/api
@@ -31,7 +31,7 @@ Project + Note + EmbeddingChunk) 만 담당.
     seed-fixtures.json — workspace_id / project_id / note_id / chunk_id 매핑.
     Sentinel sub-agent 가 IDOR + RAG visibility 검증 시 expected source IDs 로 사용.
 
-idempotent: 같은 clerk_id User, 같은 [QA-2026-05-17] prefix Workspace 가 이미 있으면 재사용.
+idempotent: 같은 auth_user_id User, 같은 [QA-2026-05-17] prefix Workspace 가 이미 있으면 재사용.
 """
 from __future__ import annotations
 
@@ -102,7 +102,7 @@ class Credentials:
     """seed-credentials.env 파싱 결과 — 페르소나당 5필드."""
     persona: str  # SENTINEL_A / SENTINEL_B / CASUAL / MOBILE / POWER
     email: str
-    clerk_user_id: str
+    auth_user_id: str
     jwt: str
     jwt_expires_at: str
     display_name: str
@@ -135,16 +135,16 @@ def parse_env_file(env_path: Path) -> dict[str, Credentials]:
     for p in PERSONAS:
         prefix = f"QA_{p}_"
         email = raw.get(f"{prefix}EMAIL", "")
-        clerk_id = raw.get(f"{prefix}CLERK_USER_ID", "")
+        auth_user_id = raw.get(f"{prefix}AUTH_USER_ID", "")
         jwt = raw.get(f"{prefix}JWT", "")
-        if not email or not clerk_id or not jwt:
-            raise ValueError(f"{prefix}EMAIL/CLERK_USER_ID/JWT 누락. seed-credentials.env 채워주세요.")
-        if "xxxxx" in clerk_id or "eyJ..." in jwt[:10] or len(jwt) < 30:
+        if not email or not auth_user_id or not jwt:
+            raise ValueError(f"{prefix}EMAIL/AUTH_USER_ID/JWT 누락. seed-credentials.env 채워주세요.")
+        if "xxxxx" in auth_user_id or "eyJ..." in jwt[:10] or len(jwt) < 30:
             raise ValueError(f"{prefix} 값이 템플릿 그대로 (xxxxx / eyJ...). 실제 값으로 교체 필요.")
         creds[p] = Credentials(
             persona=p,
             email=email,
-            clerk_user_id=clerk_id,
+            auth_user_id=auth_user_id,
             jwt=jwt,
             jwt_expires_at=raw.get(f"{prefix}JWT_EXPIRES_AT", "unknown"),
             display_name=raw.get(f"{prefix}DISPLAY_NAME", p),
@@ -153,15 +153,15 @@ def parse_env_file(env_path: Path) -> dict[str, Credentials]:
 
 
 async def get_or_create_user(session: AsyncSession, cred: Credentials) -> User:
-    """clerk_id로 User 조회, 없으면 생성 (idempotent)."""
+    """auth_user_id 로 User 조회, 없으면 생성 (idempotent)."""
     r = await session.execute(
-        select(User).where(User.clerk_id == cred.clerk_user_id)  # type: ignore[arg-type]
+        select(User).where(User.auth_user_id == cred.auth_user_id)  # type: ignore[arg-type]
     )
     user = r.scalar_one_or_none()
     if user is not None:
         return user
     user = User(
-        clerk_id=cred.clerk_user_id,
+        auth_user_id=cred.auth_user_id,
         email=cred.email,
         display_name=cred.display_name,
     )
@@ -282,7 +282,7 @@ async def seed_all(env_path: Path, out_path: Path, skip_embeddings: bool) -> int
             workspaces[persona] = ws
             result.personas[persona] = {
                 "user_id": str(user.id),
-                "clerk_user_id": cred.clerk_user_id,
+                "auth_user_id": cred.auth_user_id,
                 "email": cred.email,
                 "workspace_id": str(ws.id),
                 "workspace_name": ws.name,
@@ -435,16 +435,16 @@ async def cleanup() -> int:
 
     안전망 (Codex P0-1 + 12항목 #7):
         1. WS_PREFIX 매칭만 (`WS-QA-...`)
-        2. KAIROS_FOUNDER_CLERK_ID 환경변수 설정 시 founder 워크스페이스 매칭 차단
+        2. KAIROS_FOUNDER_USER_ID 환경변수 설정 시 founder 워크스페이스 매칭 차단
     """
     import os
 
-    founder_clerk_id = os.environ.get("KAIROS_FOUNDER_CLERK_ID", "").strip()
+    founder_user_id = os.environ.get("KAIROS_FOUNDER_USER_ID", "").strip()
     settings = get_settings()
     init_engine(settings.database_url)
     async with get_session_factory()() as session:
         r = await session.execute(
-            text("SELECT id, name, owner_clerk_id FROM workspaces WHERE name LIKE :pat"),
+            text("SELECT id, name, owner_id FROM workspaces WHERE name LIKE :pat"),
             {"pat": f"{WS_PREFIX}%"},
         )
         ws_rows = r.all()
@@ -452,11 +452,11 @@ async def cleanup() -> int:
             print(f"[cleanup] 삭제 대상 워크스페이스 0건.")
             return 0
         # Founder guard
-        if founder_clerk_id:
-            overlap = [(wid, name, owner) for wid, name, owner in ws_rows if owner == founder_clerk_id]
+        if founder_user_id:
+            overlap = [(wid, name, owner) for wid, name, owner in ws_rows if str(owner) == founder_user_id]
             if overlap:
                 print(
-                    f"[cleanup] ABORT — founder({founder_clerk_id}) 소유 워크스페이스가 매칭됨:",
+                    f"[cleanup] ABORT — founder({founder_user_id}) 소유 워크스페이스가 매칭됨:",
                     file=sys.stderr,
                 )
                 for wid, name, owner in overlap:
@@ -467,7 +467,7 @@ async def cleanup() -> int:
                 )
                 return 2
         else:
-            print("[cleanup] WARN — KAIROS_FOUNDER_CLERK_ID 미설정. founder guard 미적용.")
+            print("[cleanup] WARN — KAIROS_FOUNDER_USER_ID 미설정. founder guard 미적용.")
         ws_ids = [row[0] for row in ws_rows]
         print(f"[cleanup] {len(ws_ids)} 워크스페이스 + 자식 row 삭제 진행...")
         # 자식부터 삭제 (FK 제약)
@@ -484,7 +484,7 @@ async def cleanup() -> int:
             res = await session.execute(text(stmt), {"wids": ws_ids})
             print(f"  ✅ {label}: {res.rowcount} row 삭제")
         await session.commit()
-        print(f"[cleanup] DONE — User row 는 보존 (Clerk dashboard 에서 직접 삭제 필요)")
+        print("[cleanup] DONE — User row 는 보존 (auth_user 행은 앱에서 직접 삭제 필요)")
         print(f"[cleanup] R2 object 정리는 별도 (meeting 업로드 시 발생한 object 가 있다면 R2 dashboard 수동)")
         return 0
 

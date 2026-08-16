@@ -49,7 +49,7 @@ async def test_lazy_seed_existing_user_advances_step_to_1_if_lower(
 ):
     """기존 user (step=0) → lazy seed path → step=1 backfill."""
     # 기존 user 이지만 onboarding_step=0 인 상태에서 get_current_user 재호출
-    claims = {"sub": auth_user.clerk_id, "email": auth_user.email}
+    claims = {"sub": auth_user.auth_user_id, "email": auth_user.email}
     user = await get_current_user(claims=claims, session=integration_session)
     assert user.id == auth_user.id
 

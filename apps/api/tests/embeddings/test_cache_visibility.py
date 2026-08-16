@@ -163,7 +163,7 @@ async def test_cache_hit_visibility_member_without_mapping(
     await integration_session.flush()
 
     other = User(
-        clerk_id="cache_vis_other_member",
+        auth_user_id="cache_vis_other_member",
         display_name="비매핑 멤버",
         email="cache_vis_other@kairos.test",
     )
@@ -215,7 +215,7 @@ async def test_cache_hit_visibility_member_with_mapping(
     await integration_session.flush()
 
     mapped = User(
-        clerk_id="cache_vis_mapped_member",
+        auth_user_id="cache_vis_mapped_member",
         display_name="매핑 멤버",
         email="cache_vis_mapped@kairos.test",
     )
@@ -281,7 +281,7 @@ async def test_cache_miss_private_when_all_source_chunks_deleted(
         embedding=_make_vec(seed=31),
     )
     requester = User(
-        clerk_id="cache_vis_n1_member",
+        auth_user_id="cache_vis_n1_member",
         display_name="N1 비멤버",
         email="cache_vis_n1@kairos.test",
     )
@@ -338,7 +338,7 @@ async def test_cache_miss_public_when_all_source_chunks_deleted(
         embedding=_make_vec(seed=32),
     )
     requester = User(
-        clerk_id="cache_vis_n2_member",
+        auth_user_id="cache_vis_n2_member",
         display_name="N2 비멤버",
         email="cache_vis_n2@kairos.test",
     )
@@ -407,7 +407,7 @@ async def test_cache_miss_private_when_some_source_chunks_deleted(
         ),
     ]
     requester = User(
-        clerk_id="cache_vis_n3_member",
+        auth_user_id="cache_vis_n3_member",
         display_name="N3 비멤버",
         email="cache_vis_n3@kairos.test",
     )
@@ -555,7 +555,7 @@ async def test_cache_miss_private_without_source_chunk_ids(
 ):
     """N6: 비-admin private cache 의 빈·형식 불량 source 는 MISS."""
     requester = User(
-        clerk_id=f"cache_vis_n6_{len(sources)}",
+        auth_user_id=f"cache_vis_n6_{len(sources)}",
         display_name="N6 비멤버",
         email=f"cache_vis_n6_{len(sources)}@kairos.test",
     )
@@ -609,7 +609,7 @@ async def test_cache_miss_stale_public_visibility_after_project_becomes_private(
         embedding=_make_vec(seed=38),
     )
     requester = User(
-        clerk_id="cache_vis_n7_member",
+        auth_user_id="cache_vis_n7_member",
         display_name="N7 비멤버",
         email="cache_vis_n7@kairos.test",
     )
@@ -681,7 +681,7 @@ async def test_cache_hit_public_when_source_chunks_are_visible(
     await integration_session.commit()
 
     other = User(
-        clerk_id="cache_vis_random_viewer",
+        auth_user_id="cache_vis_random_viewer",
         display_name="랜덤 viewer",
         email="cache_vis_random@kairos.test",
     )

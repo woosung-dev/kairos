@@ -1,8 +1,8 @@
 # Sprint 15 R-CRON — Memory 도메인 admin endpoint (R2 30일 cleanup)
 """Memory admin router — founder/Cloud Scheduler only.
 
-본 라우터는 Clerk JWT 인증 대신 cron secret token 헤더로 보호.
-GCP Cloud Scheduler에서 매일 호출. 30일 이상 경과한 voice 메모의 R2 객체 삭제.
+본 라우터는 Bearer JWT 인증 대신 cron secret token 헤더로 보호.
+스케줄러가 매일 호출. 30일 이상 경과한 voice 메모의 R2 객체 삭제.
 """
 import hmac
 
@@ -16,7 +16,7 @@ admin_router = APIRouter(prefix="/api/v1/admin/memory", tags=["memory-admin"])
 
 
 async def verify_cron_token(x_cron_token: str = Header(default="")) -> None:
-    """Cron secret token 검증 — Clerk JWT 우회 경로. timing-safe compare."""
+    """Cron secret token 검증 — Bearer JWT 우회 경로. timing-safe compare."""
     settings = get_settings()
     expected = settings.cron_secret_token.get_secret_value()
     # hmac.compare_digest로 constant-time 비교 (timing-attack 방지)

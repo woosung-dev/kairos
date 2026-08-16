@@ -154,7 +154,7 @@ async def test_promote_target_not_member_rejected(
 
     # promoter 가 멤버 아닌 별도 team workspace (다른 owner)
     other_owner = User(
-        clerk_id="other_clerk_inbox",
+        auth_user_id="other_ba_inbox",
         display_name="다른 오너 (Inbox)",
         email="other_inbox@kairos.test",
     )

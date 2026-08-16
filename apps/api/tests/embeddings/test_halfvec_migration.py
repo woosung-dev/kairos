@@ -356,8 +356,8 @@ async def _seed_workspace(session):
     await session.execute(
         text(
             """
-            INSERT INTO users (id, clerk_id, email, display_name, created_at, updated_at)
-            SELECT CAST(:uid AS uuid), 'clerk_test_halfvec', 'halfvec@test.kairos',
+            INSERT INTO users (id, auth_user_id, email, display_name, created_at, updated_at)
+            SELECT CAST(:uid AS uuid), 'ba_test_halfvec', 'halfvec@test.kairos',
                    'halfvec tester', now(), now()
             WHERE NOT EXISTS (SELECT 1 FROM users WHERE id = CAST(:uid AS uuid))
             """

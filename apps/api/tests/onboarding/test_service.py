@@ -71,31 +71,31 @@ async def test_get_status_total_steps_is_4(integration_session, auth_user):
 
 @pytest.mark.asyncio
 async def test_increment_step_invalidates_user_cache(integration_session, auth_user):
-    """step 변경 시 User cache(clerk_id, 60s TTL) 무효화 → /me onboardingStep stale 제거.
+    """step 변경 시 User cache(auth_user_id, 60s TTL) 무효화 → /me onboardingStep stale 제거.
 
     이전엔 invalidate_user_cache 호출자가 0건 → 최대 60s stale. 이제 increment_step 이
-    RETURNING clerk_id 로 변경을 감지해 중앙에서 무효화한다.
+    RETURNING auth_user_id 로 변경을 감지해 중앙에서 무효화한다.
     """
     from src.auth import dependencies as auth_deps
 
-    auth_deps._user_cache_set(auth_user.clerk_id, auth_user)
-    assert auth_deps._user_cache_get(auth_user.clerk_id) is not None
+    auth_deps._user_cache_set(auth_user.auth_user_id, auth_user)
+    assert auth_deps._user_cache_get(auth_user.auth_user_id) is not None
 
     service = OnboardingService(integration_session)
     await service.increment_step(auth_user.id, 2)  # 0 → 2 (변경)
 
-    assert auth_deps._user_cache_get(auth_user.clerk_id) is None
+    assert auth_deps._user_cache_get(auth_user.auth_user_id) is None
 
 
 @pytest.mark.asyncio
 async def test_increment_step_noop_keeps_user_cache(integration_session, auth_user):
-    """이미 advance 된 step → no-op(clerk_id=None) → cache 유지(불필요 무효화 방지)."""
+    """이미 advance 된 step → no-op(auth_user_id=None) → cache 유지(불필요 무효화 방지)."""
     from src.auth import dependencies as auth_deps
 
     service = OnboardingService(integration_session)
     await service.increment_step(auth_user.id, 3)  # 0 → 3 (변경)
 
-    auth_deps._user_cache_set(auth_user.clerk_id, auth_user)
+    auth_deps._user_cache_set(auth_user.auth_user_id, auth_user)
     await service.increment_step(auth_user.id, 1)  # 3 ≥ 1 → no-op
 
-    assert auth_deps._user_cache_get(auth_user.clerk_id) is not None
+    assert auth_deps._user_cache_get(auth_user.auth_user_id) is not None

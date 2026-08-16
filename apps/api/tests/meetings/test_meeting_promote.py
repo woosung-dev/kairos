@@ -206,7 +206,7 @@ async def test_promote_target_not_member_rejected(
 
     # promoter 가 멤버 아닌 별도 team workspace (다른 owner)
     other_owner = User(
-        clerk_id="other_clerk",
+        auth_user_id="other_ba",
         display_name="다른 오너",
         email="other@kairos.test",
     )
@@ -408,7 +408,7 @@ async def test_promote_resets_assignee_when_not_target_workspace_member(
     # → external_user 는 어떤 ws 멤버도 아니어도 됨 (assignee_id 필드는 nullable FK
     #   to users.id 라 user 가 존재만 하면 OK; target ws WorkspaceMember 부재가 핵심).
     external_user = User(
-        clerk_id="external_clerk_bl063",
+        auth_user_id="external_ba_bl063",
         display_name="외부 사용자",
         email="external_bl063@kairos.test",
     )

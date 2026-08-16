@@ -24,7 +24,7 @@ async def _create_user(session: AsyncSession) -> uuid.UUID:
     """FK 참조용 users 행 삽입. User 모델을 직접 사용."""
     from src.auth.models import User
     user = User(
-        clerk_id=f"clerk_{uuid.uuid4().hex}",
+        auth_user_id=f"ba_{uuid.uuid4().hex}",
         display_name="테스트 유저",
         email=f"test_{uuid.uuid4().hex}@example.com",
     )

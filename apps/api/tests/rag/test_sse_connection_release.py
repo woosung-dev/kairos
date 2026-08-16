@@ -66,7 +66,7 @@ async def test_connection_released_before_streaming(sse_engine):
     async with AsyncSession(sse_engine, expire_on_commit=False) as seed:
         user = User(
             id=user_id,
-            clerk_id=f"clerk_sse_{user_id}",
+            auth_user_id=f"ba_sse_{user_id}",
             display_name="sse",
             email=f"sse_{user_id}@perf.test",
         )

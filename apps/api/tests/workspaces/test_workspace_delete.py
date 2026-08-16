@@ -49,7 +49,7 @@ def _service(session) -> WorkspaceService:
 
 async def _seed_user(session, tag: str) -> User:
     user = User(
-        clerk_id=f"clerk_{tag}_{uuid.uuid4()}",
+        auth_user_id=f"ba_{tag}_{uuid.uuid4()}",
         display_name=tag,
         email=f"{tag}_{uuid.uuid4()}@del.test",
     )

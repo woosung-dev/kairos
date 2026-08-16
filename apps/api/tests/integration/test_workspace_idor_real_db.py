@@ -27,7 +27,7 @@ pytestmark = pytest.mark.integration
 async def _create_user(session: AsyncSession, email_tag: str = "") -> uuid.UUID:
     from src.auth.models import User
     user = User(
-        clerk_id=f"clerk_{uuid.uuid4().hex}",
+        auth_user_id=f"ba_{uuid.uuid4().hex}",
         display_name=f"테스트 유저 {email_tag}",
         email=f"test_{email_tag}_{uuid.uuid4().hex}@example.com",
     )

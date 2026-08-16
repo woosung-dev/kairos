@@ -53,7 +53,7 @@ async def test_vector_search_excludes_private_for_unmapped_member(
     await integration_session.commit()
 
     other = User(
-        clerk_id="vector_vis_unmapped_member",
+        auth_user_id="vector_vis_unmapped_member",
         display_name="비매핑 멤버",
         email="vector_vis_unmapped@kairos.test",
     )
@@ -95,7 +95,7 @@ async def test_vector_search_includes_private_for_mapped_member(
     await integration_session.flush()
 
     mapped = User(
-        clerk_id="vector_vis_mapped_member",
+        auth_user_id="vector_vis_mapped_member",
         display_name="매핑 멤버",
         email="vector_vis_mapped@kairos.test",
     )
@@ -185,7 +185,7 @@ async def test_vector_search_draft_only_creator_visible(
 ):
     """draft project chunks 는 본인 작성자만 노출 (member 다른 사람 draft 미노출)."""
     other_creator = User(
-        clerk_id="vector_vis_draft_creator",
+        auth_user_id="vector_vis_draft_creator",
         display_name="draft 작성자",
         email="vector_vis_draft_creator@kairos.test",
     )

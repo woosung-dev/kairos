@@ -227,8 +227,10 @@ class InviteService:
         return [
             {
                 "id": str(m.id),
+                # ADR-031: 외부 인증 공급자 ID(`clerkId`)를 응답에서 제거했다.
+                # FE 의 role 판정이 그 값에 문자열 매칭으로 결합돼 있었고, 그게 이번 전환에서
+                # 터진 지점이다. `userId`(내부 UUID)는 인증 공급자가 또 바뀌어도 불변이다.
                 "userId": str(m.user_id),
-                "clerkId": user.clerk_id if user else None,
                 "email": user.email if user else None,
                 "displayName": user.display_name if user else None,
                 "role": m.role,

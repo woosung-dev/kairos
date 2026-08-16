@@ -13,15 +13,15 @@
   # 1. backend uvicorn 띄운 후
   cd apps/api && uv run uvicorn src.main:app --reload &
 
-  # 2. Clerk JWT 토큰 추출 (브라우저 devtools / Clerk dashboard)
-  export CLERK_JWT=eyJ...
+  # 2. JWT 추출 (로그인 후 브라우저에서 GET /api/auth/token)
+  export KAIROS_JWT=eyJ...
 
   # 3. smoke 실행
-  cd apps/api && uv run python scripts/dogfood_smoke.py --token $CLERK_JWT
+  cd apps/api && uv run python scripts/dogfood_smoke.py --token $KAIROS_JWT
 
 옵션:
   --base-url   http://localhost:8000 (default)
-  --token      Clerk JWT (env CLERK_JWT 도 OK, required)
+  --token      Better Auth JWT (env KAIROS_JWT 도 OK, required)
   --keyword    capture 텍스트 + recall 키워드 (default "테스트메모카이로스")
   --personal-id  personal workspace UUID 명시 (생략 시 type=personal 자동)
   --team-id      team workspace UUID 명시 (생략 시 첫 type=team)
@@ -302,7 +302,7 @@ async def run(ctx: SmokeContext) -> int:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Sprint 15 dogfooding smoke test")
     p.add_argument("--base-url", default=os.environ.get("BASE_URL", "http://localhost:8000"))
-    p.add_argument("--token", default=os.environ.get("CLERK_JWT", ""))
+    p.add_argument("--token", default=os.environ.get("KAIROS_JWT", ""))
     p.add_argument("--keyword", default="테스트메모카이로스")
     p.add_argument("--personal-id", default=None)
     p.add_argument("--team-id", default=None)
@@ -314,7 +314,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     if not args.token:
-        print("ERROR: Clerk JWT 필요. --token 또는 CLERK_JWT 환경변수 설정.", file=sys.stderr)
+        print("ERROR: JWT 필요. --token 또는 KAIROS_JWT 환경변수 설정.", file=sys.stderr)
         return 2
     ctx = SmokeContext(
         base_url=args.base_url.rstrip("/"),

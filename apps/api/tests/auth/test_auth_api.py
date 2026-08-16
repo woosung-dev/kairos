@@ -7,7 +7,7 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-from src.auth.dependencies import get_current_user, verify_clerk_token
+from src.auth.dependencies import get_current_user, verify_bearer_token
 from src.auth.models import User
 from src.common.database import get_async_session
 from src.main import app
@@ -29,7 +29,7 @@ async def client():
 def _make_mock_user() -> MagicMock:
     user = MagicMock(spec=User)
     user.id = uuid.uuid4()
-    user.clerk_id = "user_test123"
+    user.auth_user_id = "user_test123"
     user.display_name = "테스트 사용자"
     user.email = "test@example.com"
     user.avatar_url = None
@@ -55,5 +55,5 @@ async def test_get_me_success(client):
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["clerkId"] == "user_test123"
+    assert data["authUserId"] == "user_test123"
     assert data["email"] == "test@example.com"

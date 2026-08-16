@@ -18,12 +18,12 @@ from src.workspaces.repository import WorkspaceRepository
 async def _seed_team_ws(session, *, invite_visibility: str) -> tuple[Workspace, User, str]:
     """team ws + owner + 수락자 user + invite(code) 시드. (ws, acceptor, code) 반환."""
     owner = User(
-        clerk_id=f"clerk_owner_{uuid.uuid4()}",
+        auth_user_id=f"ba_owner_{uuid.uuid4()}",
         display_name="owner",
         email=f"owner_{uuid.uuid4()}@seed.test",
     )
     acceptor = User(
-        clerk_id=f"clerk_acceptor_{uuid.uuid4()}",
+        auth_user_id=f"ba_acceptor_{uuid.uuid4()}",
         display_name="acceptor",
         email=f"acceptor_{uuid.uuid4()}@seed.test",
     )

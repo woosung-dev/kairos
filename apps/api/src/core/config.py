@@ -27,14 +27,21 @@ class Settings(BaseSettings):
     # 보다 앞에 있어야 info.data 에서 보임.)
     environment: str = "development"
 
-    # Sprint 29 — 27e prod 하드닝 validator(issuer/audience/cron) 게이트.
-    # 기본 True = 강제 검증 유지(보안 default). prod 가 ADR-022 에 따라 의도적으로 dev Clerk
-    # 인스턴스를 유지하는 동안, APP_ENV=production 과 dev Clerk 의 모순으로 부팅이 crash-loop
-    # 되어 prod 전체가 다운된 인시던트(2026-06-23~30) 회복용. CLERK_PROD_HARDENING=false 로
-    # 명시 opt-out 시 validator 가 raise → loud warning 으로 전환(조용한 무력화 아님).
-    # ADR-024 Clerk Production 컷오버 완료 시 이 줄을 제거(=True 복귀)해 하드닝 재무장.
-    # 본 field 는 issuer/audience/cron validator 보다 먼저 정의돼야 info.data 에서 보임.
-    clerk_prod_hardening: bool = True
+    # prod 하드닝 validator(issuer/audience/cron) 게이트.
+    #
+    # ADR-031 로 **재무장**했다. 2026-06-23~30 인시던트는 dev Clerk 인스턴스로 prod 를 운영하는
+    # 모순 때문에 부팅이 막힌 것이었고, ADR-024 컷오버가 계속 미뤄지면서 CLERK_PROD_HARDENING=false
+    # 가 prod .env 에 상수로 박혀 있었다. Better Auth 는 우리가 발급자를 소유하므로 그 모순 자체가
+    # 없어졌다 — 더 이상 끌 이유가 없다.
+    #
+    # 그때의 진짜 사고는 "부팅 차단"이 아니라 `api` 의 `restart: unless-stopped` 와 결합한
+    # **무한 재시작 루프**였다. 지금은 `migrate` one-shot 이 alembic/env.py:59 에서 get_settings()
+    # 를 먼저 호출하고 `api` 가 `depends_on: {migrate: service_completed_successfully}` 로
+    # 게이트되므로, config 가 잘못되면 migrate 가 죽고 api 는 아예 재생성되지 않는다.
+    # 부팅 차단형 validator 가 prod 를 다운시키는 경로가 구조적으로 막혀 있다.
+    #
+    # 본 field 는 issuer/audience/cron validator 보다 먼저 정의돼야 info.data 에서 보인다.
+    auth_prod_hardening: bool = True
 
     # CORS (쉼표 구분, 예: "http://localhost:3000,https://kairos.vercel.app")
     cors_origins: str = "http://localhost:3000"
@@ -45,14 +52,22 @@ class Settings(BaseSettings):
     # DB
     database_url: str
 
-    # Clerk
-    clerk_secret_key: SecretStr
-    clerk_webhook_secret: SecretStr
-    # Sprint 27e BUG-S27e-SEC-3 — JWT issuer/audience 명시 검증 (ADR-024 cutover 직격 결함 fix).
-    # default = dev instance — production 은 env 로 override 필수 (validator 가 dev URL 차단).
-    clerk_jwt_issuer: str = "https://creative-boxer-79.clerk.accounts.dev"
-    # Clerk JWT Templates 에 audience 설정 시 사용 — 미설정이면 None 으로 audience 검증 skip.
-    clerk_jwt_audience: str | None = None
+    # 인증 (ADR-031 — Better Auth 가 Next.js 에서 발급, 백엔드는 JWKS 로 서명만 검증)
+    #
+    # ★issuer 와 JWKS URL 을 분리한다. 이전에는 dependencies.py 가
+    #   `issuer + "/.well-known/jwks.json"` 으로 조립해 둘이 하드 결합돼 있었다.
+    #   분리하면 prod 에서 issuer 는 공개 URL(토큰 claim 과 일치해야 함)로 두고 JWKS 는
+    #   compose 내부망(`http://web:3000/api/auth/jwks`)에서 가져올 수 있다 —
+    #   Cloudflare Tunnel 왕복과 외부 egress 가 인증 경로에서 빠진다.
+    #
+    # default 는 로컬 dev 값이고 non-dev 에서는 validator 가 localhost 를 거부한다.
+    auth_jwt_issuer: str = "http://localhost:3000"
+    auth_jwks_url: str = "http://localhost:3000/api/auth/jwks"
+    # Better Auth 기본 audience = baseURL. non-dev 에서는 명시 필수 (validator 가 None 거부).
+    auth_jwt_audience: str | None = None
+    # Better Auth jwt 플러그인 기본 서명 알고리즘은 EdDSA(Ed25519)다.
+    # 쉼표 구분 문자열 — 헤더의 alg 를 절대 신뢰하지 않기 위해 허용 목록을 명시한다.
+    auth_jwt_algorithms: str = "EdDSA"
 
     # Cloudflare R2
     r2_account_id: SecretStr
@@ -112,13 +127,11 @@ class Settings(BaseSettings):
         extra="ignore",         # 선언되지 않은 변수 무시
     )
 
-    # ADR-026 D10 / ADR-024: Fernet 키는 길이 비교 대신 Fernet() 생성으로 검증한다.
-    # `_enforce_or_warn` 은 `clerk_prod_hardening=True`(기본)일 때 `raise` 한다. 현재
-    # `deploy.yml` 이 `CLERK_PROD_HARDENING=false` 로 게이팅해 warning 으로 동작하지만,
-    # Clerk Production 컷오버 시 그 게이트를 제거하면 integrations 키 검증까지 부팅 차단으로
-    # 재무장된다. ADR-024 의 2026-06-30 prod crash-loop 교훈(부팅 차단형 validator 가 prod
-    # 전체를 다운시킴)에 따라 integrations 키는 Clerk 하드닝 플래그와 분리해 항상 warning 으로
-    # 처리한다.
+    # ADR-026 D10: Fernet 키는 길이 비교 대신 Fernet() 생성으로 검증한다.
+    # `_enforce_or_warn` 은 `auth_prod_hardening=True`(기본)일 때 `raise` 하는데,
+    # integrations 키는 그 플래그와 분리해 **항상 warn_only** 로 둔다 — Drive 연동은
+    # 선택 기능이라 키가 없거나 깨졌다고 앱 전체 부팅을 막을 이유가 없다.
+    # (2026-06-30 prod crash-loop 교훈: 부팅 차단형 validator 의 반경을 좁게 유지한다.)
     @field_validator("integrations_encryption_key")
     @classmethod
     def _validate_integrations_encryption_key(cls, v: SecretStr | None) -> SecretStr | None:
@@ -146,17 +159,17 @@ class Settings(BaseSettings):
     # Sprint 29 — 27e prod 하드닝 위반 처리 게이트.
     @classmethod
     def _enforce_or_warn(cls, info, message: str, *, warn_only: bool = False) -> None:
-        """non-dev 보안 위반 처리. clerk_prod_hardening=True(기본)면 raise(27e 강제 검증 유지),
-        False(ADR-022 dev Clerk 유지 명시 opt-out)면 loud warning 으로 전환해 부팅 허용.
+        """non-dev 보안 위반 처리. auth_prod_hardening=True(기본)면 raise,
+        False(명시 opt-out)면 loud warning 으로 전환해 부팅 허용.
         warn_only는 R6상 부팅을 막지 않아야 하는 설정 경고에 사용한다. 조용한 무력화 금지 —
         opt-out·warn_only 모두 위반은 항상 WARNING 로 기록."""
-        if not warn_only and info.data.get("clerk_prod_hardening", True):
+        if not warn_only and info.data.get("auth_prod_hardening", True):
             raise ValueError(message)
         if warn_only:
             logger.warning("[CONFIG GUARD · ADR-026 · startup allowed] %s", message)
             return
         logger.warning(
-            "[CONFIG GUARD · gated by CLERK_PROD_HARDENING=false · ADR-022] %s", message
+            "[CONFIG GUARD · gated by AUTH_PROD_HARDENING=false · ADR-031] %s", message
         )
 
     # Sprint 27e BUG-S27e-SEC-4 + Round 2 r2-3 — non-dev 환경에서 dev fallback + 약한 token 거부.
@@ -182,26 +195,34 @@ class Settings(BaseSettings):
                 )
         return v
 
-    # Sprint 27e BUG-S27e-SEC-3 + Round 2 r2-2 — non-dev 환경에서 dev Clerk issuer 거부.
-    # r2-2: staging 우회 차단 (validator 가 app_env=="production" 단일 비교 였음).
-    # dev issuer hard-code 2 곳 (line 32 default + 본 substring) atomic update 책임 명시.
-    @field_validator("clerk_jwt_issuer")
+    # non-dev 환경에서 로컬 dev 발급자/JWKS 주소 거부 (ADR-031 — 27e SEC-3 가드 승계).
+    # 이전 판정 기준은 Clerk dev 인스턴스 호스트명 substring 이었다. Better Auth 는 발급자가
+    # 곧 우리 FE 의 baseURL 이므로, dev 를 가르는 신호는 loopback 주소다.
+    @staticmethod
+    def _is_loopback_url(v: str) -> bool:
+        lowered = v.lower()
+        return "localhost" in lowered or "127.0.0.1" in lowered or "[::1]" in lowered
+
+    @field_validator("auth_jwt_issuer", "auth_jwks_url")
     @classmethod
-    def _no_dev_issuer_in_non_dev(cls, v: str, info) -> str:
-        if cls._is_non_dev_env(
-            info.data.get("app_env", "development"),
-            info.data.get("environment", "development"),
-        ) and "creative-boxer-79.clerk.accounts.dev" in v:
+    def _no_loopback_auth_url_in_non_dev(cls, v: str, info) -> str:
+        if (
+            cls._is_non_dev_env(
+                info.data.get("app_env", "development"),
+                info.data.get("environment", "development"),
+            )
+            and cls._is_loopback_url(v)
+        ):
             cls._enforce_or_warn(
                 info,
-                "CLERK_JWT_ISSUER must be Clerk Production instance URL in non-dev "
-                "(production/staging). dev issuer 'creative-boxer-79.clerk.accounts.dev' rejected",
+                f"{(info.field_name or 'auth url').upper()} must not point at loopback in "
+                f"non-dev (production/staging). got: {v}",
             )
         return v
 
-    # Sprint 27e Round 2 BUG-S27e-SEC-r2-2 — non-dev 환경에서 audience None default 거부.
-    # SEC-3 fix 의 audience 검증 영구 skip 방지 (None → verify_aud: False fallback 차단).
-    @field_validator("clerk_jwt_audience")
+    # non-dev 환경에서 audience None default 거부 (27e SEC-r2-2 승계).
+    # None 이면 PyJWT 가 audience 검증을 통째로 skip 하므로, 그 상태가 prod 에 굳는 것을 막는다.
+    @field_validator("auth_jwt_audience")
     @classmethod
     def _require_audience_in_non_dev(cls, v: str | None, info) -> str | None:
         if cls._is_non_dev_env(
@@ -210,10 +231,19 @@ class Settings(BaseSettings):
         ) and v is None:
             cls._enforce_or_warn(
                 info,
-                "CLERK_JWT_AUDIENCE must be explicitly set in non-dev "
+                "AUTH_JWT_AUDIENCE must be explicitly set in non-dev "
                 "(production/staging). implicit aud-skip (None) rejected — "
                 "audience 검증 영구 skip 방지",
             )
+        return v
+
+    # 헤더의 alg 를 신뢰하지 않기 위한 허용 목록. 빈 값은 PyJWT 가 모든 알고리즘을 허용하는
+    # alg confusion 진입점이 되므로 비어 있으면 부팅을 막는다 (환경 무관).
+    @field_validator("auth_jwt_algorithms")
+    @classmethod
+    def _require_non_empty_algorithms(cls, v: str) -> str:
+        if not [item.strip() for item in v.split(",") if item.strip()]:
+            raise ValueError("AUTH_JWT_ALGORITHMS must list at least one algorithm")
         return v
 
     @field_validator("google_oauth_redirect_uri")

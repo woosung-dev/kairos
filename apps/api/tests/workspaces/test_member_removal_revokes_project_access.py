@@ -40,7 +40,7 @@ def _make_vec(seed: int, dim: int = 1536) -> list[float]:
 
 async def _create_user(session, tag: str) -> User:
     user = User(
-        clerk_id=f"clerk_{tag}_{uuid.uuid4().hex}",
+        auth_user_id=f"ba_{tag}_{uuid.uuid4().hex}",
         display_name=tag,
         email=f"{tag}_{uuid.uuid4().hex}@example.com",
     )

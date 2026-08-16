@@ -170,7 +170,7 @@ def workspace_b_id() -> uuid.UUID:
 def user_a() -> User:
     user = MagicMock(spec=User)
     user.id = uuid.uuid4()
-    user.clerk_id = "user_a"
+    user.auth_user_id = "user_a"
     user.display_name = "User A"
     user.email = "a@kairos.test"
     user.avatar_url = None

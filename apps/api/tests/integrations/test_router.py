@@ -168,7 +168,7 @@ async def _seed_callback_owner(
 ) -> tuple[User, Workspace, WorkspaceMember]:
     suffix = uuid.uuid4().hex[:8]
     user = User(
-        clerk_id=f"clerk_oauth_{tag}_{suffix}",
+        auth_user_id=f"ba_oauth_{tag}_{suffix}",
         display_name=f"OAuth {tag}",
         email=f"oauth_{tag}_{suffix}@k.test",
     )
@@ -916,7 +916,7 @@ async def test_concurrent_callbacks_upsert_one_connection_without_500(
     oauth_settings: _OAuthSettings,
 ) -> None:
     user = User(
-        clerk_id=f"clerk_callback_concurrent_{uuid.uuid4().hex[:8]}",
+        auth_user_id=f"ba_callback_concurrent_{uuid.uuid4().hex[:8]}",
         display_name="Concurrent Callback Owner",
         email=f"callback_concurrent_{uuid.uuid4().hex[:8]}@k.test",
     )

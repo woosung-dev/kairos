@@ -39,7 +39,7 @@ async def test_delete_project_removes_members_and_meeting_links(integration_sess
     """멤버십 + 미팅 링크가 있는 프로젝트 삭제가 FK 위반 없이 완료 + join 행 0."""
     session = integration_session
     owner = User(
-        clerk_id=f"clerk_pdel_{uuid.uuid4()}",
+        auth_user_id=f"ba_pdel_{uuid.uuid4()}",
         display_name="pdel",
         email=f"pdel_{uuid.uuid4()}@del.test",
     )
@@ -93,7 +93,7 @@ async def test_delete_project_removes_members_and_meeting_links(integration_sess
 async def _seed_base(session, visibility: str = "private"):
     """owner + team ws + owner 멤버 + 프로젝트 시드. 반환 (owner, ws, project)."""
     owner = User(
-        clerk_id=f"clerk_pdel_{uuid.uuid4()}",
+        auth_user_id=f"ba_pdel_{uuid.uuid4()}",
         display_name="pdel",
         email=f"pdel_{uuid.uuid4()}@del.test",
     )
@@ -342,7 +342,7 @@ async def _seed_cache_leak_scenario(session):
         visibility="public",
     )
     non_member = User(
-        clerk_id=f"clerk_pdel_nm_{uuid.uuid4()}",
+        auth_user_id=f"ba_pdel_nm_{uuid.uuid4()}",
         display_name="비-멤버",
         email=f"pdel_nm_{uuid.uuid4()}@del.test",
     )

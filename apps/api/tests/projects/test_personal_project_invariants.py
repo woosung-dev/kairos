@@ -26,7 +26,7 @@ async def test_add_project_member_to_personal_ws_blocked(
 
     # 다른 user 생성
     other = User(
-        clerk_id="other_user_for_invariant_test",
+        auth_user_id="other_user_for_invariant_test",
         display_name="다른 사용자",
         email="other_invariant@kairos.test",
     )
@@ -62,7 +62,7 @@ async def test_add_project_member_to_team_ws_allowed(
 
     # 다른 user + team_ws 멤버로 추가
     other = User(
-        clerk_id="other_team_member_for_invariant_test",
+        auth_user_id="other_team_member_for_invariant_test",
         display_name="팀원",
         email="other_team@kairos.test",
     )

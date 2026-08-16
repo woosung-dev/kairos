@@ -1,4 +1,4 @@
-# Clerk 인증 사용자 정보 조회 라우터 (sync endpoint는 webhook SKIP 결정으로 제거됨)
+# 인증 사용자 정보 조회 라우터 (ADR-031 — Better Auth JWT. webhook/sync endpoint 는 없다)
 """Auth 라우터 — HTTP 전용, 10줄 이하."""
 from fastapi import APIRouter, Depends
 

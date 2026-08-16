@@ -66,12 +66,12 @@ async def _seed_user(engine, user_id: uuid.UUID) -> None:
     async with sm() as session:
         await session.execute(
             text(
-                "INSERT INTO users (id, clerk_id, display_name, email, created_at, updated_at) "
-                "VALUES (:id, :clerk, :name, :email, now(), now())"
+                "INSERT INTO users (id, auth_user_id, display_name, email, created_at, updated_at) "
+                "VALUES (:id, :ba, :name, :email, now(), now())"
             ),
             {
                 "id": str(user_id),
-                "clerk": f"clerk_concurrent_{user_id}",
+                "ba": f"ba_concurrent_{user_id}",
                 "name": "Concurrent Tester",
                 "email": f"{user_id}@concurrent.test",
             },

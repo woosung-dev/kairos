@@ -42,12 +42,24 @@ APP_ROOT = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = APP_ROOT / "alembic.ini"
 
 
+# Better Auth 런타임이 소유하는 테이블 (ADR-031). alembic 이 DDL 을 적용하지만
+# SQLModel 모델은 의도적으로 없다 — FastAPI 는 이 테이블들을 읽지도 쓰지도 않는다.
+# 그래서 compare_metadata 에는 "model 에 없는 테이블" = remove_table 로 보인다.
+# alembic_version 과 정확히 같은 성격의 false positive 다.
+BETTER_AUTH_OWNED_TABLES = frozenset(
+    {"auth_user", "auth_session", "auth_account", "auth_verification", "auth_jwks"}
+)
+
+
 def _include_object(obj, name, type_, reflected, compare_to):
     """compare_metadata 의 false positive 필터.
 
     - alembic_version: alembic 자체 관리 테이블 (model 측에 없음, 정상)
+    - auth_*: Better Auth 소유 테이블 (ADR-031). 위 상수 주석 참조.
     """
-    if type_ == "table" and name == "alembic_version":
+    if type_ == "table" and (
+        name == "alembic_version" or name in BETTER_AUTH_OWNED_TABLES
+    ):
         return False
     return True
 

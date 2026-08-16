@@ -33,7 +33,7 @@ async def _seed_workspace_with_connection(
 ) -> _IntegrationSeed:
     suffix = uuid.uuid4().hex[:8]
     user = User(
-        clerk_id=f"clerk_integrations_{tag}_{suffix}",
+        auth_user_id=f"ba_integrations_{tag}_{suffix}",
         display_name=f"Integrations {tag}",
         email=f"integrations_{tag}_{suffix}@k.test",
     )

@@ -31,7 +31,7 @@ async def _create_user(session: AsyncSession, tag: str) -> uuid.UUID:
     from src.auth.models import User
 
     user = User(
-        clerk_id=f"clerk_{uuid.uuid4().hex}",
+        auth_user_id=f"ba_{uuid.uuid4().hex}",
         display_name=f"유저 {tag}",
         email=f"vis_{tag}_{uuid.uuid4().hex}@example.com",
     )

@@ -38,7 +38,7 @@ async def client():
 def mock_sentinel_a():
     user = MagicMock(spec=User)
     user.id = uuid.uuid4()
-    user.clerk_id = "user_sentinel_a"
+    user.auth_user_id = "user_sentinel_a"
     user.display_name = "Sentinel A"
     user.email = "sentinel-a@kairos.test"
     user.avatar_url = None
