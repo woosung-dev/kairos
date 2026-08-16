@@ -1,11 +1,13 @@
 # 테스트 가이드
 
-## 0. 전제 — CI 가 죽어 있다
+## 0. 판정은 CI, 사전 확인은 로컬
 
-GitHub Actions 가 **결제 실패로 전면 중단** 상태다 (`docs/TODO.md` Blocked 최우선 항목).
-워크플로가 시작조차 못 하고 `changes` job 이 4~8초 만에 실패하며 나머지가 전부 skip 된다.
+머지 판정은 `.github/workflows/test.yml` 의 **`ci-required`** aggregate job 이 한다.
+`just ci-local` 은 같은 게이트를 로컬에서 먼저 돌려 **푸쉬 왕복을 줄이는 용도**다.
 
-> **그래서 로컬 게이트 출력이 유일한 머지 증거다.** PR body 에 붙인다 (`.github/PULL_REQUEST_TEMPLATE.md`).
+> 2026-04~08 사이에는 Actions 가 결제 실패로 전면 중단돼 로컬 게이트가 유일한 증거였다.
+> **2026-08-16 레포 public 전환으로 복구됐다** — 그 시기에 머지된 것들은 CI 검증을 받지 않았다는
+> 뜻이므로, 그 구간을 되짚을 일이 생기면 이 사실을 감안한다.
 
 ## 1. 한 방에
 

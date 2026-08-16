@@ -8,7 +8,7 @@
 **현재 상태 (2026-08-16):** 오라클 셀프호스팅 컷오버 완료 (ADR-028) · AI 규칙을 `apps/*/AGENTS.md` 로 이전 (ADR-029) · `apps/backend` → `apps/api` 개명 + docs 재구성 (ADR-030).
 진행 상세는 `git log` + [`docs/REFACTORING-BACKLOG.md`](docs/REFACTORING-BACKLOG.md) "다음 Sprint 진입점".
 
-> ⚠️ **GitHub Actions 가 결제 실패로 중단 중이다.** 머지 증거는 로컬 게이트 `just ci-local` 뿐이다 ([`docs/development/testing.md`](docs/development/testing.md)).
+> 머지 판정은 CI(`ci-required`)가 한다. `just ci-local` 은 **푸쉬 전 사전 확인**용으로 같은 게이트를 로컬에서 돌린다 ([`docs/development/testing.md`](docs/development/testing.md)).
 
 ---
 

@@ -40,7 +40,7 @@ gh workflow run r2-cleanup.yml --repo woosung-dev/kairos -f days=30 -f delete=tr
 ```
 
 주기 실행이 필요해지면 오라클 VM crontab 에 curl 을 걸거나 `r2-cleanup.yml` 에 `schedule:` 을
-추가한다 (BL-OCI-5). **GitHub Actions 결제가 복구돼야 워크플로가 돈다.**
+추가한다 (BL-OCI-5).
 
 - 매일 03:00 KST (사용자 idle 시간대)
 - 응답 200 OK 외엔 GCP Cloud Logging에 alert (수동 확인 또는 PagerDuty 연동 — Sprint 16+)

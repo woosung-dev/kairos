@@ -80,7 +80,7 @@ fe-security-headers PORT="3005":
     E2E_PORT={{PORT}} E2E_BASE_URL=http://localhost:{{PORT}} pnpm exec playwright test --project=public-only
 
 # ★새 명령을 정의하지 않고 기존 recipe 를 조합만 한다 — "로컬 = CI 문자 동일" 불변 보존.
-# GitHub Actions 가 결제 실패로 중단된 동안 이 출력이 유일한 머지 증거다 (docs/development/testing.md).
+# 푸쉬 전 사전 확인용이다. 최종 판정은 CI 의 `ci-required` 가 한다 (docs/development/testing.md).
 #   - 실패가 환경 문제로 의심되면 `just install` 을 먼저 돌린다.
 #   - ★clean tree 에서 실행한다. contracts-check 는 `git diff --exit-code` 라
 #     작업 트리가 더러우면 계약과 무관한 변경까지 drift 로 잡는다(오탐).
