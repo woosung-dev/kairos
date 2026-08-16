@@ -16,7 +16,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 상세 ERD: `docs/architecture/erd.md`. 본 문서는 코드 사실 우선.
 
-**격리**: Workspace(personal/team) · WorkspaceMember · Project(public/draft/private) · ProjectMember · User(clerk_id, onboarding 0~4). **콘텐츠**: InboxItem · Meeting+TranscriptSegment+MeetingSummary+MeetingProjectLink · ActionItem(nullable parents) · Note(Tiptap) · MemoryItem(text/voice) · FeedbackEntry(dogfooding, user-level·workspace nullable). **audit**: PromoteAudit(memory) · ItemPromotionAudit(4 도메인) · MemoryAiCall · MemoryEvent. **벡터**: EmbeddingChunk(halfvec 1536d L1/L2) · SemanticCache(TTL 7d ≥0.93) · MemoryQueryEmbeddingCache.
+**격리**: Workspace(personal/team) · WorkspaceMember · Project(public/draft/private) · ProjectMember · User(auth_user_id, onboarding 0~4). **콘텐츠**: InboxItem · Meeting+TranscriptSegment+MeetingSummary+MeetingProjectLink · ActionItem(nullable parents) · Note(Tiptap) · MemoryItem(text/voice) · FeedbackEntry(dogfooding, user-level·workspace nullable). **audit**: PromoteAudit(memory) · ItemPromotionAudit(4 도메인) · MemoryAiCall · MemoryEvent. **벡터**: EmbeddingChunk(halfvec 1536d L1/L2) · SemanticCache(TTL 7d ≥0.93) · MemoryQueryEmbeddingCache.
 
 ### 별칭 금지 (도메인 용어 위반 감지)
 

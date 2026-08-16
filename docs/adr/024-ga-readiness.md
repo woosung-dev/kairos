@@ -1,6 +1,10 @@
 # ADR-024 — GA readiness (Clerk Production + Svix + 외부 dogfooding 5명)
 
-**Status**: Accepted (Sprint 27a 결정, Sprint 27b 실행)  
+**Status**: Accepted — **인증 항목만 [ADR-031](031-better-auth-migration.md) 로 대체 (2026-08-16)**  
+> Clerk Production 인스턴스 발급 + Svix webhook 등록 2개 항목은 무효화된다.
+> **GA 종료 기준(외부 5명 중 3명 2주 반복 사용 / 지불 의사 1명)은 유효하게 승계**한다 —
+> 통째로 supersede 하면 살아 있는 GA 기준까지 같이 죽는다.
+
 **Date**: 2026-05-23  
 **Sprint**: 27a (luminous-anchor) 결정 / 27b 실행  
 **Supersedes**: ADR-022 (Clerk webhook SKIP)  

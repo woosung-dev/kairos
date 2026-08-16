@@ -24,7 +24,7 @@ SQLModel metadata 와의 schema diff 가 0 인지 검사한다 — 리비전을 
 
 `alembic/env.py:58-60` 은 `sqlalchemy.url` 이 비어 있을 때 `get_settings()` 를 호출한다.
 `get_settings()` 는 Settings 모델 전체를 검증하므로 **`DATABASE_URL` 만 있어서는 부팅하지 못한다** —
-Clerk / Gemini / OpenAI / R2 키가 전부 필요하다 (CI e2e job 이 fake 값을 전부 주입하는 이유).
+Gemini / OpenAI / R2 키가 전부 필요하다 (CI job 이 fake 값을 전부 주입하는 이유).
 
 URL 을 직접 주입하면 이 경로를 우회할 수 있다:
 

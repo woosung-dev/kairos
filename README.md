@@ -19,7 +19,7 @@
 | Frontend | Next.js 16 + React 19 + Tailwind v4 + shadcn/ui |
 | Backend | FastAPI + SQLModel + asyncpg |
 | Database | PostgreSQL 17 + pgvector 0.8 (오라클 셀프호스팅) |
-| Auth | Clerk |
+| Auth | Better Auth (자체 호스팅, ADR-031) |
 | Storage | Cloudflare R2 |
 | AI | Gemini `gemini-3.1-flash-lite` + Whisper STT |
 | Deploy | Oracle Cloud A1 단일 VM + Cloudflare Tunnel (ADR-028) |

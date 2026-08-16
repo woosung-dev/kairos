@@ -16,7 +16,7 @@
 
 ## 2. 비책임
 
-- 외부 인증 발급 (Clerk SaaS) + User row 매핑 (`auth`)
+- 인증 발급 + User row 매핑 (`auth` 도메인 / Better Auth)
 - Project 멤버십 / visibility (`projects` — ProjectMember 는 별도)
 - 콘텐츠 자체 (회의/노트/액션/메모리 각 도메인)
 

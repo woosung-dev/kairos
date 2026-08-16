@@ -15,7 +15,7 @@
 - **Header**: `X-Cron-Token: <CRON_SECRET_TOKEN>`
 - **Query (optional)**: `?days=30` (기본 30, 1~365 범위)
 - **Response**: `{"deleted_count": N, "ttl_days": 30}`
-- **인증**: Clerk JWT 우회 — `CRON_SECRET_TOKEN` 환경변수와 일치하는 헤더만 통과 (403 외 403)
+- **인증**: Bearer JWT 우회 — `CRON_SECRET_TOKEN` 환경변수와 일치하는 헤더만 통과 (403 외 403)
 
 ## §2. CRON_SECRET_TOKEN 발급
 

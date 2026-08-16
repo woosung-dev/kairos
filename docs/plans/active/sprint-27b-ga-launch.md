@@ -1,5 +1,10 @@
 # Sprint 27b — GA Launch (외부 dogfooding 5명)
 
+> ⚠️ **인증 관련 항목은 [ADR-031](../../adr/031-better-auth-migration.md) 로 무효 (2026-08-16).**
+> "Clerk Production 발급 + Svix webhook" 은 대상 자체가 사라졌다. 외부 5명 dogfooding /
+> GA 종료 기준은 그대로 유효하니, 이 plan 을 다시 픽업할 때 인증 섹션만 걷어내고 쓴다.
+> (본 plan 은 미실행 상태로 남아 있다 — `docs/README.md` 정책상 역사 기록은 소급 수정하지 않는다.)
+
 > 3 도구 (codex + agy + Opus subagent) 2026-05-23 점검 후 합의 = "22 sprint 동안 외부 user 0명, 모든 우선순위 추측 기반. Sprint 27 = GA dogfooding 1순위." 본 plan 은 Sprint 27a (luminous-anchor) D-6 grill + 토큰컷 직후 진입.
 
 ## Context

@@ -6,7 +6,8 @@
 erDiagram
     User {
         uuid id PK
-        string clerk_id UK
+        string auth_user_id UK "Better Auth auth_user.id (ADR-031)"
+        string clerk_id UK "레거시 — 컷오버 +7일 뒤 DROP"
         string display_name
         string email
         string avatar_url

@@ -1,8 +1,13 @@
 # ADR-028: 셀프호스팅 전환 — OCI 단일 VM + Cloudflare Tunnel
 
 **Status**: Accepted
+
 **Date**: 2026-08-14
 **관련**: ADR-001 (기술 스택) · ADR-008 (BE 배포 자동화 — 본 ADR 이 대체) · ADR-020 (pgvector HNSW halfvec) · ADR-021 (Sentry) · ADR-024 (GA readiness / Clerk Production) · ADR-027 (apps 레이아웃) · `deploy/oci/README.md`
+
+> **부분 개정 (2026-08-16, [ADR-031](031-better-auth-migration.md)):** D3 의 "Clerk 유지" 와
+> D5 의 "API 의 문은 Clerk JWT 다" 는 대체됐다. 인증은 Better Auth 로 자체 호스팅되고
+> JWKS 는 compose 내부망에서 가져온다. 본문은 당시 기록이라 수정하지 않는다.
 
 ---
 

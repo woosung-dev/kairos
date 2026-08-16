@@ -12,12 +12,12 @@
 - AI 파이프라인 조율 (STT / Gemini / OpenAI 임베딩)
 - DB 영속화 (PostgreSQL 17 + pgvector — 2026-08-14 부터 오라클 셀프호스팅, Neon 은 백업. ADR-028)
 - 외부 스토리지 (Cloudflare R2)
-- Clerk JWT 검증
+- Bearer JWT 검증 (발급자 = Better Auth, ADR-031)
 
 ## 2. 비책임
 
 - UI / 렌더링 (FE 책임)
-- 외부 인증 발급 (Clerk SaaS)
+- 인증 발급 자체 (Next.js 의 Better Auth 핸들러 — `apps/web/src/lib/auth.ts`)
 
 ---
 
@@ -42,7 +42,7 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 
 | 모듈 | CONTEXT.md | 책임 요약 |
 |---|---|---|
-| auth | `src/auth/CONTEXT.md` | Clerk JWT 검증 + User 매핑. **prefix 예외**: `/api/v1/users` |
+| auth | `src/auth/CONTEXT.md` | Bearer JWT 검증 + User 매핑. **prefix 예외**: `/api/v1/users` |
 | workspaces | `src/workspaces/CONTEXT.md` | Workspace + WorkspaceMember + WorkspaceInvite + `inbox_threshold` |
 | projects | `src/projects/CONTEXT.md` | Project CRUD, MeetingProjectLink, ProjectMember (Sprint 6 L-6), visibility 권한 분기 (Sprint 6 BE-T8), 태그, 인사이트 |
 | inbox | `src/inbox/CONTEXT.md` | Inbox 적재 + AI 분류 추천 |
@@ -93,7 +93,7 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
   - 리소스 이름은 케밥 케이스 (`action-items`, 단일어는 그대로 `inbox`/`meetings`/`notes`)
 - Status code: 생성 201, 비동기 인제스트 202, 삭제 204
 - 페이지네이션: `common/pagination.py` 표준
-- 인증: 모든 엔드포인트는 Clerk JWT 검증 (auth dependency)
+- 인증: 모든 엔드포인트는 Bearer JWT 검증 (auth dependency). 발급자는 Better Auth (ADR-031)
 - **응답 직렬화 (I-16)**: DB snake_case → API camelCase Pydantic alias 변환 (`schemas.py` 책임)
 - 권한: `require_admin` / `require_member` 데코레이터 또는 dependency로 명시 (특히 archive/delete)
 
@@ -104,7 +104,7 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 - Python 3.12+, FastAPI, SQLModel, asyncpg, pgvector
 - 패키지 매니저: `uv`
 - 비동기 100% (sync 코드 금지)
-- 외부: Clerk, Gemini, OpenAI, Whisper API, Cloudflare R2 (DB 는 오라클 VM 셀프호스팅 — ADR-028)
+- 외부: Gemini, OpenAI, Whisper API, Cloudflare R2 (DB·인증은 셀프호스팅 — ADR-028 / ADR-031)
 - 상세 규칙: [`AGENTS.md`](AGENTS.md) (같은 디렉터리 — `CLAUDE.md` 가 본 파일과 함께 자동 로드, ADR-029)
 
 ---
@@ -134,8 +134,8 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 
 **seed_qa_fixtures.py 안전망**:
 - WS_PREFIX 매칭 (`WS-QA-...`) — cleanup 대상 식별
-- `KAIROS_FOUNDER_CLERK_ID` ENV — founder 워크스페이스 매칭 시 ABORT
-- User row 보존 (Clerk dashboard 수동 정리)
+- `KAIROS_FOUNDER_USER_ID` ENV (내부 UUID) — founder 워크스페이스 매칭 시 ABORT
+- User row 보존 (`auth_user` 행은 앱에서 수동 정리)
 - R2 object 별도 정리
 
 ---

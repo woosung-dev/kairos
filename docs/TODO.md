@@ -28,13 +28,9 @@
   `contract-check` success (그 전 5 run 은 전부 4~8초 만에 실패).
 - ~~Sentry DSN 발급~~ — **2026-08-14 ADR-028 로 Sentry 자체를 제거**했다. DSN 이 한 번도 설정된 적 없어 BE·FE 모두 비활성 상태였고, 의존성·번들 비용만 지불 중이었다. 재도입 지점은 `apps/web/src/lib/track-error.ts` seam. 현재 관측은 `docker logs`.
 - [ ] **외부 user 1명 실제 dogfooding** — Sprint 22 spec `git history` 12분 walkthrough.
-- [ ] **T-3 Sprint 14 Clerk Production 인스턴스 발급** [확인 필요]
-  - 위치: Clerk Dashboard → New Application → Production
-  - 발급 후: `apps/web/.env.local` + Vercel env 의 `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` 를 `pk_live_*` / `sk_live_*` 로 교체
-  - 효과: 사인인 화면 "Development mode" 배지 제거 (Curious 핵심 망설임 #1)
-  - 코드 측 (커밋 완료): `@clerk/localizations` koKR + SignIn/SignUp `forceRedirectUrl="/dashboard"`
-- [ ] **T-SEC-CLERK-ROTATE** (운영자) Clerk dev `CLERK_SECRET_KEY` **rotation** — 노출 키(`sk_test_mvhptL…`) 무효화. 파일 redaction 은 PR #115(d5463cc) 완료됐으나 라이브 키 무효화가 진짜 fix. Clerk 대시보드 → API Keys → Secret key regenerate 후 `.env.local`/`apps/api/.env`·Cloud Run/Vercel env 갱신. **시급 아님**(dev 키 + repo private, 2026-05-29 사용자 판단). git 히스토리 1 commit 잔존(SEC-CLERK-SECRET-COMMITTED).
-- [ ] **T-CLEANUP-1** production DB Neon SQL editor에서 `DELETE FROM users WHERE clerk_id='user_QA20260521_sentinel_test_doNotUse'` (Sprint 25 PoC 잔존 정리)
+- [x] ~~**T-3 Sprint 14 Clerk Production 인스턴스 발급**~~ — **ADR-031 로 무효.** Clerk 를 걷어냈으므로 Production 인스턴스 발급 자체가 대상이 아니다.
+- [ ] **T-SEC-CLERK-ROTATE → 인스턴스 삭제로 대체** (운영자) 노출된 dev `CLERK_SECRET_KEY`(`sk_test_mvhptL…`)는 **rotation 이 아니라 Clerk dev 인스턴스 삭제**로 무효화한다 (ADR-031 종료 조건). ⚠️ "시급 아님(dev 키 + repo private)" 이라는 2026-05-29 판단은 **레포가 public 이 된 시점에 무효**다. git 히스토리 675 커밋에 키가 남아 있다. **컷오버 +7일(롤백 창 종료) 시점에 실행**한다 — 그 전에 지우면 구 이미지로 롤백할 수 없다.
+- [ ] **T-CLEANUP-1** production DB 에서 `DELETE FROM users WHERE clerk_id='user_QA20260521_sentinel_test_doNotUse'` (Sprint 25 PoC 잔존 정리). ADR-031 의 `clerk_id` DROP 리비전과 함께 처리하면 자동 소멸.
 - [ ] **PR #102 (Sprint 25 moonlit-sutton) ready review + squash merge** — 사용자 승인 후 main 머지
 - [ ] **post-merge 배포 verify** — Cloud Run rollout 후 `POST /api/v1/users/sync` 404 응답 + `/health` 200 + `/dashboard` 회귀 0건
 
@@ -99,7 +95,7 @@
 - [ ] **BL-BE-CACHE-COMMENT-DRIFT-1** (P4) `[신규 · 2026-08-02]` `workspaces/invite_service.py` 의
   캐시 관련 주석이 "최대 60s" 라고 적혀 있으나 실제 `_MEMBER_CACHE_TTL_SEC` 는 **15s** 다. 주석 드리프트.
 - [ ] **(선택) 풍부한 음성 샘플 1개 확보** — 알려진 트랜스크립트 + 명명된 사실 2개 이상. 현재 픽스처는 무음 10초 webm + test.m4a 뿐 → 회의 오디오 파이프라인의 **콘텐츠** 검증(transcription/화자분리/요약 품질) 갭. 텍스트 캡처로 RAG 경로는 검증 완료(오디오는 기계동작만).
-- [ ] **(선택) 전용 admin/viewer Clerk dev 계정 발급** — 현재 2계정(owner d@e.com + member a@e.com)으로 role 변경하며 4 role 전수했으나, 동시 다중 role 라이브 시나리오엔 전용 계정이 편함. `apps/web/.env.local` QA_LOCAL_ADMIN_*/QA_LOCAL_VIEWER_* 추가.
+- [ ] **(선택) 전용 admin/viewer QA 계정 발급** — 현재 2계정(owner d@e.com + member a@e.com)으로 role 변경하며 4 role 전수했으나, 동시 다중 role 라이브 시나리오엔 전용 계정이 편함. `apps/web/.env.local` QA_LOCAL_ADMIN_*/QA_LOCAL_VIEWER_* 추가.
 
 ### 제품 · UX carry
 - [ ] **T-LAND-01/02** 마케팅 (landing wedge headline + use case)
@@ -109,7 +105,7 @@
 - [ ] **a11y P2** (T-A11Y-SKIP + T-A11Y-CC + T-MOBILE-NAV + T-NAV-BADGE)
 - [ ] **BL-068/069** Sprint 23 D1/D3 Playwright reproduce
 - [ ] **T-UI-1 모바일 햄버거 nav** — 본 sprint 폰트 반응형(17→16) 만 완료, 햄버거 nav 는 모바일 dev 환경 + manual QA 필요로 carry. 현재 LandingNav 가 "로그인" + "시작하기" 는 mobile 노출, "기능" + "요금" 만 sm:block 으로 숨김 (기본 기능 손실 0).
-- [ ] **T-INFRA-1 qa-*.spec.ts CI 게이트 부활** — 5계정 Clerk dev fixture 사용자 작업 의존. Owner/Viewer dual storageState 도 같은 fixture 도입 후 묶음 진행.
+- [ ] **T-INFRA-1 qa-*.spec.ts CI 게이트 부활** — 5계정 QA fixture 사용자 작업 의존 (ADR-031 이후 `/sign-up` 으로 직접 생성 가능 — Clerk 대시보드 수동 발급 의존이 사라졌다). Owner/Viewer dual storageState 도 같은 fixture 도입 후 묶음 진행.
 - [ ] **BL-NEW-DELTA3-REMEASURE** Phase B swap DELTA-3 P/R n=20 재측정 — Cloud Run trace + Sentry + 실 API 비용 필요 (Sprint 24 carry, T-AI-1 contract 가드만 lock-in)
 - [ ] **T-GTM-1 창업자 LinkedIn 링크** — 외부 URL 미수령으로 본 sprint 는 text-only 인프라 transparency 로 대체. URL 수령 시 별도 patch (~30min)
 - [ ] **agy CLI hang BL 등재** — 시스템 외부 도구 이슈, Multi-Agent QA cross-check 자동화 차단
@@ -140,7 +136,7 @@
 - [ ] **S16-T5** Voice note 모델 (Meeting과 별개) + STT + Gemini 요약 + 태그 자동
 - [ ] **S16-T6** Personal workspace에서 음성 메모 첫 진입 시나리오 lock-in
 - [ ] **GCP WIF 초기 설정 + Secret Manager 9개 이관** (사용자 작업) — `docs/operations/deployment.md` §2.5.1 참조
-- [ ] Clerk testing mode 계정 생성 + GitHub `E2E_*` Secrets 등록 (E2E 활성화)
+- [ ] E2E 계정(email/password) 생성 + GitHub `E2E_USER_EMAIL`/`E2E_USER_PASSWORD` 등록 (E2E 활성화)
 - [ ] FE ↔ BE 전체 E2E 시나리오 (신규 계정 → 템플릿 프로젝트 3개 → RAG → `[1]` → Source Viewer 풀콘텐츠 렌더) — ADR-008 후속
 - [ ] **AD-32** BE-T16 Project update 권한 강화 — 현재 require_member 유지 결정. creator-only 또는 admin 강화 필요 시 sprint 7+ 검토 (협업 마찰 우려).
 - [ ] **AD-34** FE RBAC 정밀 분기 — visibility 변경 버튼이 모든 멤버에 활성 + BE-T15 403 위임 (1차). useUser+useMembers 매칭으로 정밀화 = sprint 7+ design-review. dogfooding scope 외, sprint 7+ design-review 보류 **확정**.
@@ -186,6 +182,10 @@
   적어둔 그 지점이다. 등록 전까지는 CI 가 red 여도 머지가 물리적으로 가능하다.
 - [ ] **public 노출 표면 점검** `[신규 · 2026-08-16]` `deploy/oci/README.md` 등 7파일에 SSH 별칭
   (`truewords-oracle`) · 포트 매핑 · 배포 절차가 있다. 시크릿은 아니지만 정찰 정보다.
-- [ ] **Better Auth 전환 시 Clerk dev 인스턴스 삭제** `[신규 · 2026-08-16]` git 히스토리 675 커밋에
+- [ ] **비밀번호 재설정 경로 부재** `[신규 · ADR-031 제외 갭]` 레포에 이메일 발송 인프라가 0건이라
+  이메일/비밀번호 사용자가 비밀번호를 잊으면 복구 경로가 없다. 현재는 사인인 화면에 "Google 로그인을
+  쓰거나 운영자 문의" 안내만 노출한다. 도그푸딩 규모에서는 수동 처리로 버티되, 외부 사용자 확대 전에
+  Resend 등 발송 수단 + `sendResetPassword` 배선이 필요하다. **컷오버와 같은 창에서 하지 않는다.**
+- [ ] **Clerk dev 인스턴스 삭제** `[ADR-031 종료 조건 · 컷오버 +7일]` git 히스토리 675 커밋에
   Clerk dev secret 이 남아 있고 레포가 public 이다. 전환 완료로 키가 무의미해지는 것과, 키가
   **실제로 무효화되는 것**은 다르다 — 인스턴스 삭제까지가 종료 조건이다.

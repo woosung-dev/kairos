@@ -35,29 +35,31 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js 는 .env.local 이 표�
 | 파일 | 키 | 비고 |
 |---|---|---|
 | `apps/api/.env` | `DATABASE_URL` | PostgreSQL 17 + pgvector 0.8 (HNSW/halfvec 필요, ADR-020) |
-| `apps/api/.env` | `CLERK_SECRET_KEY` | Clerk 대시보드 → API Keys |
+| `apps/api/.env` | `AUTH_JWT_ISSUER` · `AUTH_JWKS_URL` | 로컬은 기본값(`http://localhost:3000`)으로 충분 |
 | `apps/api/.env` | `GEMINI_API_KEY` · `OPENAI_API_KEY` | AI 파이프라인·임베딩 |
 | `apps/api/.env` | `R2_*` 4종 | Cloudflare R2 (업로드) |
 | `apps/api/.env` | `CORS_ORIGINS` | 기본 `http://localhost:3000`. Playwright 는 `:3003` 도 필요 |
 | `apps/web/.env.local` | `NEXT_PUBLIC_API_URL` | **`http://localhost:8000`** — 경로(`/api/v1`)를 붙이지 않는다 |
-| `apps/web/.env.local` | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` · `CLERK_SECRET_KEY` | 같은 Clerk 앱 |
+| `apps/web/.env.local` | `BETTER_AUTH_SECRET` · `BETTER_AUTH_DATABASE_URL` · `GOOGLE_CLIENT_*` | 아래 "Google OAuth 클라이언트 발급" 참조 |
 
 > **없으면 부팅이 죽는 키는 9개뿐이다** — `Settings`(`src/core/config.py`)에서 기본값이 없는 필드다:
-> `DATABASE_URL` · `CLERK_SECRET_KEY` · `CLERK_WEBHOOK_SECRET` · `R2_ACCOUNT_ID` ·
+> `DATABASE_URL` · `R2_ACCOUNT_ID` ·
 > `R2_ACCESS_KEY_ID` · `R2_SECRET_ACCESS_KEY` · `R2_BUCKET_NAME` · `GEMINI_API_KEY` · `OPENAI_API_KEY`.
 > 나머지(`APP_ENV` `LOG_LEVEL` `CORS_ORIGINS` `FRONTEND_URL` `GOOGLE_OAUTH_*` 등)는 기본값이 있어
 > 비워도 부팅한다 — Google Drive 키는 `.env.example` 자신이 "비워두면 기존 부팅에 영향 없음" 이라고 적어 뒀다.
 >
 > 반대 방향도 성립하지 않는다. `Settings` 에는 있는데 `.env.example` 에 없는 필드가 8개다
-> (`db_pool_size` `db_max_overflow` `max_upload_bytes` `allowed_upload_mimes` `clerk_jwt_issuer`
-> `clerk_jwt_audience` `clerk_prod_hardening` `slack_feedback_webhook_url`) — 전부 기본값이 있어
+> (`db_pool_size` `db_max_overflow` `max_upload_bytes` `allowed_upload_mimes` `auth_jwt_issuer`
+> `auth_jwks_url` `auth_jwt_audience` `auth_jwt_algorithms` `auth_prod_hardening` `slack_feedback_webhook_url`) — 전부 기본값이 있어
 > 평소엔 안 보이지만, 튜닝하려면 `config.py` 를 봐야 한다. **`.env.example` 은 필수 키 목록이지 전체 목록이 아니다.**
 
-### Clerk 키 발급
+### Google OAuth 클라이언트 발급 (ADR-031)
 
-1. [Clerk 대시보드](https://dashboard.clerk.com/) → "Create application" → Google OAuth 활성화
+1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → "OAuth 클라이언트 ID 만들기" (웹 애플리케이션)
+   ★Drive 연동(ADR-026)의 클라이언트와 **다른 것을 새로 만든다** — 이유는 `docs/development/secrets.md` 참조
 2. "API Keys" 탭에서 `pk_test_...` / `sk_test_...` 복사
-3. Clerk 대시보드 "Allowed origins" 에 `http://localhost:3000` 추가
+3. 승인된 리디렉션 URI 에 `http://localhost:3000/api/auth/callback/google` 추가
+4. `BETTER_AUTH_SECRET` 생성: `openssl rand -base64 32`
 
 ## 3. DB 마이그레이션 + 서버 실행
 
@@ -113,8 +115,11 @@ venv 가 절대 경로를 굽기 때문에 디렉터리를 옮기면 깨진다(A
 rm -rf apps/api/.venv && (cd apps/api && uv sync)
 ```
 
-### Clerk 로그인 실패
-`apps/web/.env.local` 의 키 2개 확인 + Clerk 대시보드 "Allowed origins" 에 `http://localhost:3000`.
+### 로그인 실패
+`apps/web/.env.local` 의 `BETTER_AUTH_SECRET`(32자 이상) · `BETTER_AUTH_DATABASE_URL` 확인.
+Google 로그인이면 리디렉션 URI 등록 여부도 본다.
+백엔드가 401 이면 `curl localhost:3000/api/auth/jwks` 가 키를 돌려주는지, `AUTH_JWT_ISSUER` 가
+`BETTER_AUTH_URL` 과 문자 그대로 같은지 확인 (issuer 불일치는 전 요청 401 로 나타난다).
 
 ### 타입 에러
 `node_modules/next/dist/docs/` 로 Next.js 16 API 변경사항 확인. `params` 는 반드시 `Promise<>` 타입.

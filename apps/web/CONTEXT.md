@@ -9,7 +9,7 @@
 ## 1. 책임
 
 - 모든 UI 렌더링과 상호작용 (회의/노트/Inbox/RAG/프로젝트)
-- Clerk 인증 (`proxy.ts`로 미들웨어)
+- Better Auth 인증 서버 마운트 (`app/api/auth/[...all]`) + 보호 라우트 리다이렉트 (`proxy.ts`) — ADR-031
 - BE API 호출 (React Query)
 - SSE 스트리밍 수신 (RAG 답변)
 - 디자인 시스템(`/DESIGN.md`) 강제
@@ -26,10 +26,10 @@
 
 ```
 apps/web/src/
-├── proxy.ts       Clerk 미들웨어 (Next.js 16 명칭 — middleware.ts 아님)
+├── proxy.ts       세션 쿠키 기반 리다이렉트 (Next.js 16 명칭 — middleware.ts 아님). 인가는 BE 몫
 ├── app/           라우트 진입점 — Thin Component (RSC 우선)
 │   ├── (landing)/ 랜딩 + pricing
-│   ├── (auth)/    Clerk sign-in / sign-up
+│   ├── (auth)/    자체 sign-in / sign-up 폼 (features/auth)
 │   ├── (app)/     인증된 영역 — dashboard · projects · projects/[id] · meetings/[id]
 │   │              · notes · notes/[id] · inbox · memory · search · actions · new
 │   │              · settings · admin/recall-metrics

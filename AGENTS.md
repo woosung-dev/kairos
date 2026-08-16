@@ -119,7 +119,7 @@ docs: 문서 / chore: 빌드·설정 / test: 테스트
 
 **한 줄**: 팀의 세컨드 브레인 — 회의/노트/자료 → AI Distillation → 프로젝트 구조화 → RAG 인사이트. PERSONA-001 1인 풀스택 founder (`docs/adr/011-persona-definition.md`). 상세: `docs/requirements/prd.md`.
 
-**기술 스택**: Next.js 16 + React 19 + Tailwind v4 + shadcn/ui v4 (FE) / FastAPI + SQLModel + asyncpg (BE) / PostgreSQL 17 + pgvector 0.8 HNSW halfvec (ADR-020, 2026-08-14 부터 오라클 셀프호스팅 — Neon 은 백업으로 보존) / Clerk OAuth (webhook SKIP, ADR-022) / R2 / Whisper + pyannote / Gemini `gemini-3.1-flash-lite` 고정 (ADR-019 Phase B) / OpenAI text-embedding-3-small 1536d / **Oracle Cloud A1 단일 VM + Cloudflare Tunnel (ADR-028 — Vercel·Cloud Run 철거 완료)**. 관측 = `docker logs` (Sentry 는 ADR-028 로 제거, ADR-021 Superseded).
+**기술 스택**: Next.js 16 + React 19 + Tailwind v4 + shadcn/ui v4 (FE) / FastAPI + SQLModel + asyncpg (BE) / PostgreSQL 17 + pgvector 0.8 HNSW halfvec (ADR-020, 2026-08-14 부터 오라클 셀프호스팅 — Neon 은 백업으로 보존) / Better Auth 자체 호스팅 인증 — Google OAuth + 이메일/비밀번호, JWKS 로 BE 검증 (ADR-031) / R2 / Whisper + pyannote / Gemini `gemini-3.1-flash-lite` 고정 (ADR-019 Phase B) / OpenAI text-embedding-3-small 1536d / **Oracle Cloud A1 단일 VM + Cloudflare Tunnel (ADR-028 — Vercel·Cloud Run 철거 완료)**. 관측 = `docker logs` (Sentry 는 ADR-028 로 제거, ADR-021 Superseded).
 
 **도메인 / 엔티티 / visibility / 파이프라인**: `CONTEXT-MAP.md` (헌법). 상세 architecture: `docs/architecture/{ai,rag,cross-domain}-pipeline.md`.
 

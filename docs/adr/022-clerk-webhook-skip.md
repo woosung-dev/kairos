@@ -1,7 +1,9 @@
 # ADR-022: Clerk webhook SKIP + `/api/v1/users/sync` endpoint 비활성화 (Pre-GA 운영 정책)
 
 > **날짜:** 2026-05-21
-> **상태:** Superseded by [ADR-024](024-ga-readiness.md) (2026-05-23, Sprint 27a 결정 — GA dogfooding 진입). 원 SKIP 결정은 Sprint 25 T-SEC-1 (Pre-GA 운영 정책) 으로 적용됨.
+> **상태:** Superseded by [ADR-024](024-ga-readiness.md) (2026-05-23) → **최종 [ADR-031](031-better-auth-migration.md) (2026-08-16)**.
+> ADR-031 로 Clerk 자체를 걷어냈다 — Better Auth 에는 webhook 개념이 없어 본 ADR 의 결정 대상이 소멸했다.
+> 파생 산출물(`test_auth_sync_disabled.py`, auth CONTEXT §5 불변식, sync 재도입 가드 BL)도 함께 제거됐다. 원 SKIP 결정은 Sprint 25 T-SEC-1 (Pre-GA 운영 정책) 으로 적용됨.
 > **작성자:** Claude Opus 4.7 (1M context) + 사용자 (정책 결정)
 > **관련:** Sprint 25 plan `git history` · memory `project_gcp_migration_jetaime_dev_done.md` (2026-05-21 GCP 이전 + 사용자 SKIP 결정 lock-in) · `backend/src/auth/router.py` (sync handler 제거) · `backend/src/auth/service.py` (sync_user 메서드 제거) · `backend/src/auth/CONTEXT.md` §5/§6 · 회귀 가드 `backend/tests/auth/test_auth_sync_disabled.py` · ADR-014 Service Boundary
 > **워크플로우:** `.ai/templates/workflow.md` Stage 4 (코드) — Stage 1 ADR 산출은 본 ADR 자체

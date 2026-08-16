@@ -8,7 +8,7 @@
 
 | 도메인 | 한 줄 | BE 정본 | 대응 FE feature |
 |---|---|---|---|
-| auth | Clerk JWT 검증 + User 매핑 + RBAC | [`src/auth/CONTEXT.md`](../../../apps/api/src/auth/CONTEXT.md) | — (`proxy.ts` + Clerk) |
+| auth | Bearer JWT 검증 + User 매핑 + RBAC | [`src/auth/CONTEXT.md`](../../../apps/api/src/auth/CONTEXT.md) | `features/auth` (`proxy.ts` + Better Auth) |
 | workspaces | Workspace + Member + Invite | [`src/workspaces/CONTEXT.md`](../../../apps/api/src/workspaces/CONTEXT.md) | `workspaces/` · `members/` |
 | projects | Project CRUD + ProjectMember + visibility | [`src/projects/CONTEXT.md`](../../../apps/api/src/projects/CONTEXT.md) | `projects/` |
 | inbox | Capture 적재 + AI 분류 | [`src/inbox/CONTEXT.md`](../../../apps/api/src/inbox/CONTEXT.md) | `inbox/` |
