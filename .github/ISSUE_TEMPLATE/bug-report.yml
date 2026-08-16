@@ -1,0 +1,76 @@
+name: 버그 리포트
+description: 동작하지 않는 것을 신고합니다
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        보안 취약점은 여기가 아니라 private vulnerability reporting 으로 신고해 주세요.
+
+  - type: dropdown
+    id: app
+    attributes:
+      label: 영향받는 앱
+      multiple: true
+      options:
+        - web (Next.js 화면)
+        - api (FastAPI)
+        - 모르겠음
+    validations:
+      required: true
+
+  - type: dropdown
+    id: workspace_type
+    attributes:
+      label: 워크스페이스 타입
+      description: 이 제품의 버그는 대부분 격리·권한 경계에서 나옵니다. 재현에 꼭 필요합니다.
+      options:
+        - personal
+        - team
+        - 모르겠음
+    validations:
+      required: true
+
+  - type: dropdown
+    id: role
+    attributes:
+      label: 내 역할
+      options:
+        - owner
+        - admin
+        - member
+        - viewer
+        - 모르겠음
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 재현 절차
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_actual
+    attributes:
+      label: 기대 결과 / 실제 결과
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: 콘솔 에러 / 로그
+      description: 브라우저 DevTools Console 과 Network 탭의 4xx/5xx 응답. 없으면 "없음" 이라고 적어 주세요.
+      render: text
+
+  - type: input
+    id: env
+    attributes:
+      label: 환경
+      placeholder: "브라우저·OS·화면 크기, 또는 로컬/프로덕션"

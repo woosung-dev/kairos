@@ -1,6 +1,6 @@
 # ADR-027: App-first 레포 재구성 + OpenAPI 계약 거버넌스
 
-**Status**: Accepted
+**Status**: Accepted — **D1 은 [ADR-030](030-apps-api-rename.md) 이 부분 대체** (2026-08-16, `apps/backend` → `apps/api`. D2~D5 는 그대로 유효)
 **Date**: 2026-08-13
 **관련**: CONTEXT-MAP.md §9 (Atomic Update) · `docs/architecture/directory-map.md` · ADR-008 (BE 배포 자동화) · ADR-024 (GA readiness) · `apps/web/src/lib/api-client.ts` seam (2026-07-13 리팩토링)
 

@@ -53,7 +53,7 @@ XHR 과 SSR 헤어핀이 그 리다이렉트를 따라가지 못한다. API 의 
 TAG=$(git rev-parse --short HEAD)
 
 # BE
-docker buildx build --platform linux/arm64 -t kairos-api:$TAG --load apps/backend
+docker buildx build --platform linux/arm64 -t kairos-api:$TAG --load apps/api
 
 # FE — NEXT_PUBLIC_* 는 빌드타임 인라인이다. 도메인이 바뀌면 반드시 재빌드.
 docker buildx build --platform linux/arm64 -t kairos-web:$TAG --load \

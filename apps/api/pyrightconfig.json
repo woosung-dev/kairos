@@ -1,0 +1,13 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.12",
+  "extraPaths": ["./"],
+  "include": ["src", "tests", "scripts", "alembic"],
+  "executionEnvironments": [
+    { "root": ".", "extraPaths": ["."] },
+    { "root": "src", "extraPaths": [".."] },
+    { "root": "tests", "extraPaths": [".."] },
+    { "root": "scripts", "extraPaths": [".."] }
+  ]
+}

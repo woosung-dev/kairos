@@ -3,8 +3,11 @@ node_modules/
 .pnpm-store/
 
 # Next.js
-apps/web/.next/
-apps/web/out/
+# ★경로에 앵커하지 않는다. 2026-08-16 에 `apps/web/.next/` 만 있던 탓에
+# 레포 루트의 `frontend/.next/`(ADR-027 이전 경로에 생긴 dev 산출물)가 ignore 를
+# 빠져나가 `git add -A` 로 22파일 7.7MB 가 커밋됐다. 어디서 생기든 잡는다.
+.next/
+out/
 
 # Environment
 .env
@@ -13,7 +16,7 @@ apps/web/out/
 
 # QA 자격증명 (Multi-Agent QA Sprint 18~ — JWT/password 절대 commit 금지)
 **/seed-credentials.env
-apps/backend/scripts/seed-credentials.env
+apps/api/scripts/seed-credentials.env
 docs/dev-log/**/seed-credentials.env
 
 # IDE
@@ -24,11 +27,11 @@ docs/dev-log/**/seed-credentials.env
 .DS_Store
 
 # Sprint 15 Day 0 audio samples (개인 음성 데이터 — README만 commit)
-apps/backend/scripts/samples/*.webm
-apps/backend/scripts/samples/*.mp4
-apps/backend/scripts/samples/*.wav
-apps/backend/scripts/samples/*.aac
-apps/backend/scripts/samples/*.m4a
+apps/api/scripts/samples/*.webm
+apps/api/scripts/samples/*.mp4
+apps/api/scripts/samples/*.wav
+apps/api/scripts/samples/*.aac
+apps/api/scripts/samples/*.m4a
 
 # Build
 dist/
@@ -68,7 +71,7 @@ skills-lock.json
 .context/
 
 # Python coverage artifact
-apps/backend/.coverage
+apps/api/.coverage
 
 # OCI 배포 빌드 인자 (ADR-028) — 값이 채워진 실제 파일
 deploy/oci/build.env

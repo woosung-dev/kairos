@@ -27,7 +27,7 @@
 1. `CONTEXT-MAP.md` (헌법 — 도메인 경계 + 불변식)
 2. `AGENTS.md` (본 문서)
 3. `DESIGN.md` (디자인 시스템)
-4. 작업 도메인의 `apps/backend/src/<domain>/CONTEXT.md`
+4. 작업 도메인의 `apps/api/src/<domain>/CONTEXT.md`
 5. `docs/TODO.md`
 6. 디렉토리 구조 필요 시: `docs/architecture/directory-map.md` (2026-07-31 기준 BE 17 모듈 = 14 도메인 + common/core/services, FE 16 features. `integrations`는 ADR-026 PR #143 로 구현 완료)
 
@@ -68,7 +68,7 @@
 
 **스택 코딩 규칙** — 그 디렉터리 파일을 열면 `CLAUDE.md` 경유로 자동 로드된다 (ADR-029).
 
-- `apps/backend/AGENTS.md` — FastAPI 스켈레톤 + 스택 함정. **불변식은 `apps/backend/CONTEXT.md` §5 (B-NN)**
+- `apps/api/AGENTS.md` — FastAPI 스켈레톤 + 스택 함정. **불변식은 `apps/api/CONTEXT.md` §5 (B-NN)**
 - `apps/web/AGENTS.md` — Next.js 16 / Zod v4 / shadcn v4 / 반응형 / e2e. **불변식은 `apps/web/CONTEXT.md` §4 (F-NN)**
 - ★규칙을 추가할 때는 `AGENTS.md` 가 아니라 해당 `CONTEXT.md` 의 `B-NN`/`F-NN` 에 넣는다 — 두 곳에 쓰면 드리프트가 재발한다
 
@@ -77,7 +77,7 @@
 | 변경 유형 | canonical doc |
 |---|---|
 | 엔티티/모델 (`models.py`) | `docs/architecture/erd.md` |
-| API endpoint (`router.py`) | `docs/api/endpoints.md` |
+| API endpoint (`router.py`) | `contracts/` 재생성 (`just contracts`) + 도메인 `CONTEXT.md` |
 | 도메인 경계·불변식 | `CONTEXT-MAP.md` |
 | 파이프라인·아키텍처 | `docs/architecture/*.md` |
 | 의사결정 (대형) | `docs/adr/NNN-*.md` |
@@ -102,7 +102,7 @@ Heavy 변경 (DB 스키마/인증/결제/외부 API) 은 계획 단계에서 대
 **TODO.md 운영** — `docs/TODO.md` 4 섹션 (Completed / Blocked / Questions / Next Actions). 사용자에게 빈번한 질문 대신 기록 후 일괄 전달.
 
 **코딩 핵심**: TS Strict + `any` 금지 / FastAPI 100% async + Pydantic V2 + Router·Service·Repository 분리
-- FE API wire 타입: `apps/web/src/types/api.gen.ts` 생성물에서 import — 수기 wire interface 신규 작성 금지, 재생성 `just contracts` (ADR-027, I-20)
+- FE API wire 타입: `apps/web/src/types/api.gen.ts` 생성물에서 import — 수기 wire interface 신규 작성 금지, 재생성 `just contracts` (ADR-027, I-22)
 - 상태: Server = React Query, Client global = Zustand, local = useState
 - Boolean prefix `is`/`has`/`should`, 이벤트 `handle`/`on`, 상수 UPPER_SNAKE_CASE
 
@@ -123,7 +123,7 @@ docs: 문서 / chore: 빌드·설정 / test: 테스트
 
 **도메인 / 엔티티 / visibility / 파이프라인**: `CONTEXT-MAP.md` (헌법). 상세 architecture: `docs/architecture/{ai,rag,cross-domain}-pipeline.md`.
 
-**AI 제약**: 모델 고정 (ADR-019) · 프롬프트 중앙 `apps/backend/src/common/prompts.py` (인라인 금지) · cross-domain = `pipeline_service.py` orchestrator 만 · 장기 작업 = BackgroundTasks + 202 + polling.
+**AI 제약**: 모델 고정 (ADR-019) · 프롬프트 중앙 `apps/api/src/common/prompts.py` (인라인 금지) · cross-domain = `pipeline_service.py` orchestrator 만 · 장기 작업 = BackgroundTasks + 202 + polling.
 
 **Design System**: `DESIGN.md` 가 시각·UI source. 사용자 승인 없이 일탈 금지.
 

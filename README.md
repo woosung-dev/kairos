@@ -5,7 +5,10 @@
 
 **프로덕션:** [kairos.woosung.dev](https://kairos.woosung.dev) · BE: `https://kairos-api.woosung.dev` (오라클 셀프호스팅, ADR-028)
 
-**현재 상태:** Sprint 26 (glittery-tulip, 2026-05-23) — docs 거버넌스 경량화 진행. ~Sprint 25 (moonlit-sutton) 까지 Multi-Agent QA P0~P2 + 보안 3-layer + 회귀 가드 완료. 상세: `git log` + `docs/REFACTORING-BACKLOG.md` "다음 Sprint 진입점".
+**현재 상태 (2026-08-16):** 오라클 셀프호스팅 컷오버 완료 (ADR-028) · AI 규칙을 `apps/*/AGENTS.md` 로 이전 (ADR-029) · `apps/backend` → `apps/api` 개명 + docs 재구성 (ADR-030).
+진행 상세는 `git log` + [`docs/REFACTORING-BACKLOG.md`](docs/REFACTORING-BACKLOG.md) "다음 Sprint 진입점".
+
+> ⚠️ **GitHub Actions 가 결제 실패로 중단 중이다.** 머지 증거는 로컬 게이트 `just ci-local` 뿐이다 ([`docs/development/testing.md`](docs/development/testing.md)).
 
 ---
 
@@ -28,17 +31,17 @@
 ### 1. 환경변수 설정
 
 ```bash
-cp apps/backend/.env.example apps/backend/.env        # FastAPI: .env 표준
+cp apps/api/.env.example apps/api/.env        # FastAPI: .env 표준
 cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 ```
 
 각 파일을 열어 실제 값을 입력합니다.
-**발급처 및 CI/프로덕션 설정 방법** → [`docs/guides/secrets.md`](docs/guides/secrets.md)
+**발급처 및 CI/프로덕션 설정 방법** → [`docs/development/secrets.md`](docs/development/secrets.md)
 
 ### 2. 백엔드 실행
 
 ```bash
-cd apps/backend
+cd apps/api
 uv sync
 uv run alembic upgrade head   # DB 마이그레이션
 uv run uvicorn src.main:app --reload --port 8000
@@ -61,6 +64,7 @@ pnpm dev -p 3000
 루트 `justfile` 이 단일 진입점 (`brew install just`, ADR-027):
 
 ```bash
+just ci-local         # ★ 머지 게이트 전체 (be-test + fe-test + fe-build + 보안헤더 + contracts-check)
 just install          # BE uv sync --frozen + FE pnpm install
 just be-test          # 백엔드 pytest — CI 와 동일 호출 (transcription/r2-cors 2개 제외)
 just fe-build         # 프론트엔드 빌드 (타입 검사 포함)
@@ -84,7 +88,7 @@ just deploy-ship $TAG
 just deploy-status
 ```
 
-배포 상세 절차 → [`docs/guides/deployment.md`](docs/guides/deployment.md)
+배포 상세 절차 → [`docs/operations/deployment.md`](docs/operations/deployment.md)
 서버 운영 런북 → [`deploy/oci/README.md`](deploy/oci/README.md)
 
 ---
@@ -94,10 +98,14 @@ just deploy-status
 | 문서 | 내용 |
 |---|---|
 | [`docs/requirements/prd.md`](docs/requirements/prd.md) | PRD + Phase 로드맵 |
-| [`docs/guides/secrets.md`](docs/guides/secrets.md) | **환경변수 전체 매트릭스** (로컬/CI/프로덕션) |
-| [`docs/guides/deployment.md`](docs/guides/deployment.md) | 배포 절차 (오라클 셀프호스팅) |
+| [`docs/development/secrets.md`](docs/development/secrets.md) | **환경변수 전체 매트릭스** (로컬/CI/프로덕션) |
+| [`docs/operations/deployment.md`](docs/operations/deployment.md) | 배포 절차 (오라클 셀프호스팅) |
 | [`deploy/oci/README.md`](deploy/oci/README.md) | 서버 운영 런북 (배포·롤백·함정) |
 | [`docs/architecture/ai-pipeline.md`](docs/architecture/ai-pipeline.md) | AI 파이프라인 설계 |
 | [`docs/architecture/rag-pipeline.md`](docs/architecture/rag-pipeline.md) | RAG 6-Layer 설계 |
 | [`CONTEXT-MAP.md`](CONTEXT-MAP.md) | 도메인 헌법 (엔티티 + 불변식) |
-| [`docs/TODO.md`](docs/TODO.md) | 현재 작업 상태 |
+| [`docs/TODO.md`](docs/TODO.md) | 열린 작업 (Blocked / Questions / Next Actions) |
+| [`docs/README.md`](docs/README.md) | **문서 전체 색인** — active doc 의 유일한 entry point |
+| [`docs/development/testing.md`](docs/development/testing.md) | 테스트 게이트 ↔ CI job 대응표 |
+| [`docs/development/migrations.md`](docs/development/migrations.md) | alembic 규약 + 2단계 배포와 그 예외 |
+| [`docs/product/glossary.md`](docs/product/glossary.md) | 도메인 용어 색인 (정의 SSOT 는 헌법) |

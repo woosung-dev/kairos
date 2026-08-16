@@ -28,7 +28,7 @@
 
 ## 프롬프트 관리 규칙
 
-- 모든 프롬프트는 `apps/backend/src/common/prompts.py`에 **상수**로 정의
+- 모든 프롬프트는 `apps/api/src/common/prompts.py`에 **상수**로 정의
 - 인라인 프롬프트 작성 **절대 금지**
 - Gemini 모델 고정: `gemini-3.1-flash-lite` (임의 변경 금지, ADR-019 Phase B 적용 2026-05-15. 이전: `gemini-2.5-flash` EOL 2026-06-17)
 - 모든 Gemini 호출은 `services/ai_processing.py`에 집중 관리
@@ -132,7 +132,7 @@ RAG_ANSWER_SYSTEM_PROMPT = """
 모든 Gemini 응답은 이 유틸을 통해 파싱한다. 직접 `json.loads()` 호출 금지.
 
 ```python
-# apps/backend/src/common/prompts.py 하단에 포함
+# apps/api/src/common/prompts.py 하단에 포함
 import json, re
 
 def parse_json_response(text: str) -> dict:

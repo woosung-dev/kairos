@@ -13,19 +13,32 @@
 > 2026-08-13: ADR-027 App-first 재구성 — `backend/` → `apps/backend/`, `frontend/` → `apps/web/`.
 > 배포 단위(앱)를 최상위 경계로 삼는다. 같은 날 후속 PR 로 `contracts/`(OpenAPI 계약) +
 > 루트 `justfile` + CI change-detection(`test.yml`) 신설 (ADR-027 D2~D4).
+>
+> 2026-08-16: ADR-030 — `apps/backend/` → `apps/api/`. 같은 라운드에서 `docs/guides/` 를
+> `docs/development/` + `docs/operations/` 로 해체하고 `docs/product/` · `docs/archive/` 를 신설했다.
+> **2026-08-16 이전 문서의 `apps/backend/` 는 `apps/api/` 로 읽는다** (ADR-030 D2).
 
-## 최상위 레이아웃 (2026-08-13, ADR-027)
+## 최상위 레이아웃 (2026-08-16, ADR-030)
 
 ```
 kairos/
 ├── apps/
-│   ├── backend/                       # FastAPI (Cloud Run 배포 단위)
-│   └── web/                           # Next.js (Vercel 배포 단위)
+│   ├── api/                           # FastAPI (OCI 컨테이너 배포 단위, ADR-028/030)
+│   └── web/                           # Next.js (OCI 컨테이너 배포 단위, ADR-028)
 ├── contracts/                         # OpenAPI 계약 생성물 (ADR-027 D2) — `just contracts` 재생성, 수정 금지
-├── docs/                              # canonical docs (ADR, guides, architecture)
+├── deploy/oci/                        # ★ 서버 운영 정본 — compose + build.env + README(런북)
+├── docs/                              # canonical docs (development, operations, architecture, adr, product)
 ├── scripts/                           # 레포 공통 스크립트 (verify-prod.sh)
-└── .github/workflows/                 # CI/CD (test, deploy, nightly-e2e, r2-cleanup)
+├── justfile                           # 단일 명령 진입점 (ADR-027 D3). `just ci-local` = 로컬 머지 게이트
+├── AGENTS.md · CONTEXT-MAP.md · DESIGN.md   # 규칙 / 헌법 / 디자인 (ADR-029)
+└── .github/                           # workflows(test, nightly-e2e, r2-cleanup) + PR·Issue 템플릿 + dependabot
 ```
+
+각 앱은 `AGENTS.md`(스택 함정) + `CONTEXT.md`(불변식 B-NN / F-NN) + `CLAUDE.md`(둘을 `@` import)
+를 갖는다 (ADR-029).
+
+**배포 워크플로는 없다.** 배포는 CI 가 아니라 로컬 `justfile` → SSH(`truewords-oracle`) →
+`docker save | ssh docker load` → compose up 이다 (ADR-028, 레지스트리 미사용).
 
 규칙: 독립 실행·배포되면 `apps/`, 언어를 넘는 계약이면 `contracts/`, 라이브러리 공유 패키지(`packages/`)는
 동일 언어 소비자 2개가 생길 때만 신설 (ADR-027 D5).
@@ -36,23 +49,25 @@ kairos/
 apps/web/
 ├── proxy.ts                           # Clerk 인증 미들웨어 (Next.js 16)
 └── src/
-    ├── app/                           # 라우트 진입점 (Thin Component)
+    ├── app/                           # 라우트 진입점 (Thin Component). route group 3개
+    │   ├── (landing)/                 # 랜딩
+    │   │   ├── page.tsx               #   "/"
+    │   │   └── pricing/
     │   ├── (auth)/                    # Clerk 인증
     │   │   ├── sign-in/[[...sign-in]]/
     │   │   └── sign-up/[[...sign-up]]/
-    │   ├── dashboard/
-    │   ├── inbox/
-    │   ├── weekly-review/
-    │   └── workspace/[workspaceId]/
-    │       └── projects/[projectId]/
-    │           ├── meetings/[meetingId]/
-    │           ├── notes/
-    │           ├── actions/
-    │           └── files/
+    │   ├── (app)/                     # 인증된 앱 영역 (layout/loading/error 보유)
+    │   │   ├── dashboard/  inbox/  notes/  notes/[id]/
+    │   │   ├── projects/   projects/[id]/  meetings/[id]/
+    │   │   ├── memory/  search/  actions/  new/  settings/
+    │   │   └── admin/recall-metrics/  # 유일한 admin 화면 (별도 앱 아님)
+    │   └── invite/[code]/             # 그룹 밖 public 라우트
     │
     ├── components/                    # 도메인 무관 공통 UI
     │   ├── ui/                        # shadcn/ui v4 (수정 금지, I-11)
-    │   ├── layout/                    # Sidebar, Header, PanelLayout, RAGPanel
+    │   ├── layout/                    # Sidebar, Header, PanelLayout, RAGPanel, BottomNav, CmdK
+    │   ├── landing/                   # 랜딩 섹션
+    │   ├── onboarding/                # OnboardingTooltip
     │   └── shared/                    # 도메인 횡단 공통 (Sprint 23 D4)
     │       └── ItemPromoteModal.tsx   # 5 도메인 generic promote modal
     │
@@ -79,18 +94,22 @@ apps/web/
     │   ├── api-client.ts              # ★ ApiClient seam (2026-07-13) — createApiClient(getToken), 토큰 주입 SSOT
     │   ├── use-api-client.ts          # useApiClient() — Clerk getToken 클로저 주입 훅
     │   └── query-keys.ts              # ★ queryKey factory 레지스트리 (2026-07-13) — cross-feature key import 금지 (eslint no-restricted-imports)
-    ├── mocks/                         # Mock data (개발용)
-    │   └── data/
     ├── store/                         # Zustand 전역 상태
     │   └── ui.ts
-    └── types/                         # 공통 유틸 타입 (UUID, Timestamped 등)
-        └── index.ts
+    └── types/
+        ├── api.gen.ts                 # ★ 계약 생성물 (openapi-typescript, I-22) — 수기 수정 금지
+        └── index.ts                   # 공통 유틸 타입 (UUID, Timestamped 등)
 ```
+
+단위 테스트는 코드 옆 `__tests__/`, e2e 는 `apps/web/e2e/` (`chromium` / `public-only` / `team` project).
+**`mocks/` 와 `NEXT_PUBLIC_API_MOCK` 은 존재하지 않는다** — FE 는 항상 실제 BE 를 호출한다
+(2026-08-16 정정: 3개 문서가 없는 디렉터리를 안내하고 있었다).
+**barrel `index.ts` 는 두지 않는다** (현재 0개). `server/` 폴더도 없다 — 100% 클라이언트 TanStack Query.
 
 ## 백엔드 (도메인 모듈러 구조, BE 17 모듈 = 14 도메인 + common/core/services — 2026-07-31 기준)
 
 ```
-apps/backend/
+apps/api/
 └── src/
     ├── auth/                          # Clerk JWT 검증 + lazy seed + RBAC + User/Member cache (Sprint 28)
     ├── inbox/                         # Inbox 적재 + 분류
@@ -125,9 +144,15 @@ apps/backend/
     │   └── promote_models.py          # ItemPromotionAudit ORM 모델
     └── core/
         ├── config.py                  # pydantic-settings (Sprint 27e SEC-3/4 + cutover hardening)
-        ├── database.py                # init_engine / dispose_engine (S28-ARCH-4 후 이동 권고)
-        └── lifespan.py                # FastAPI lifespan (Sentry init conditional)
+        └── lifespan.py                # FastAPI lifespan — common/database.py 의 init/dispose_engine 호출
 ```
+
+> ★ **`core/database.py` 는 존재하지 않는다.** engine 은 `common/database.py` 가 소유한다.
+> 아래 "의존성 cycle" 절의 `core/database.py` 이동 권고는 **미실행 상태**다 (2026-08-16 실측).
+
+> ★ `src/integrations/` 는 **ADR-026 외부 소스 도메인**(Google Drive 연결·ExternalDocument)이다.
+> 일반 모노레포 권고안이 말하는 `integrations/`(외부 SDK 어댑터 레이어)와 이름은 같고 역할이 다르다 —
+> Kairos 에서 SDK 래퍼는 `src/services/` 가 담당한다.
 
 각 도메인 폴더는 다음 파일로 구성:
 `router.py` / `service.py` / `repository.py` / `schemas.py` / `models.py` / `dependencies.py` / `exceptions.py`
@@ -139,7 +164,7 @@ apps/backend/
 
 **common 의 audit / promote 도메인 분리 권고**: `common/audit_*.py` + `common/promote_*.py`
 5 파일은 사실상 audit 도메인 — Sprint 27e BUG-S27e-ARCH-3 + Sprint 28 BUG-S28-ARCH-1 carry.
-BL-S27e-F (architecture deepening sprint) 진입 시 `apps/backend/src/audit/` 신설 권고 (2026-07-30 문서 기준 BE 17 — `audit` 추가 시 18).
+BL-S27e-F (architecture deepening sprint) 진입 시 `apps/api/src/audit/` 신설 권고 (2026-07-30 문서 기준 BE 17 — `audit` 추가 시 18).
 
 **의존성 cycle**: Sprint 28 BUG-S28-ARCH-4 측정 — 11 쌍 양방향 (`core ↔ common` layered
 최하위 cycle 포함). runtime 은 lazy import + model-only 회피로 ImportError 0 (Round B verify),

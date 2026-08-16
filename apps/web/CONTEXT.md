@@ -10,7 +10,7 @@
 
 - 모든 UI 렌더링과 상호작용 (회의/노트/Inbox/RAG/프로젝트)
 - Clerk 인증 (`proxy.ts`로 미들웨어)
-- BE API 호출 (React Query) + Mock 데이터 (개발용)
+- BE API 호출 (React Query)
 - SSE 스트리밍 수신 (RAG 답변)
 - 디자인 시스템(`/DESIGN.md`) 강제
 
@@ -26,28 +26,40 @@
 
 ```
 apps/web/src/
+├── proxy.ts       Clerk 미들웨어 (Next.js 16 명칭 — middleware.ts 아님)
 ├── app/           라우트 진입점 — Thin Component (RSC 우선)
-│   ├── (auth)/    Clerk 인증
-│   ├── (landing)/ 랜딩 페이지
-│   ├── (app)/     인증된 영역 (dashboard, inbox, workspace/[id]/...)
-│   └── invite/    초대 수락
+│   ├── (landing)/ 랜딩 + pricing
+│   ├── (auth)/    Clerk sign-in / sign-up
+│   ├── (app)/     인증된 영역 — dashboard · projects · projects/[id] · meetings/[id]
+│   │              · notes · notes/[id] · inbox · memory · search · actions · new
+│   │              · settings · admin/recall-metrics
+│   └── invite/    초대 수락 (그룹 밖 public 라우트)
 ├── components/
-│   ├── ui/        shadcn v4 — 수정 금지
-│   └── layout/    Sidebar, Header, PanelLayout, RAGPanel
-├── features/      도메인별 비즈니스 레이어 (실제 11개)
-│   ├── inbox/  projects/  meetings/  actions/
-│   ├── notes/  (TiptapEditor 포함: components/note-editor.tsx)
-│   ├── rag/  members/  workspaces/
-│   ├── upload/  sources/  home/
-│   └── 각 feature: components/ + api.ts + hooks.ts + schemas.ts + types.ts
-├── hooks/         공통 유틸 훅
-├── lib/           constants, utils, query-client
-├── mocks/         Mock data (개발용)
+│   ├── ui/        shadcn v4 — 수정 금지 (F-1)
+│   ├── layout/    Sidebar, Header, PanelLayout, RAGPanel, BottomNav, CmdK
+│   ├── landing/   랜딩 섹션
+│   ├── shared/    도메인 횡단 공통 (ItemPromoteModal, ExportButton)
+│   └── onboarding/
+├── features/      도메인별 비즈니스 레이어 (FSD)
+│   ├── actions/  audit/  feedback/  home/  inbox/  integrations/  meetings/
+│   ├── members/  memory/  notes/  onboarding/  projects/  rag/  sources/
+│   ├── upload/  workspaces/
+│   └── 각 feature: api.ts + hooks.ts + types.ts + components/
+│                   (+선택 schemas.ts / store.ts / CONTEXT.md)
+├── hooks/         앱 전역 유틸 훅
+├── lib/           api-client, use-api-client, query-client, query-keys, visibility, utils
 ├── store/         Zustand (전역 UI 상태만)
-└── types/         공통 유틸 타입 (UUID, Timestamped)
+└── types/         api.gen.ts (생성물, I-22) + 공통 유틸 타입
 ```
 
-> `editor/` 별도 feature 폴더 없음. TiptapEditor는 `features/notes/components/note-editor.tsx`.
+> features 개수는 여기에 적지 않는다 — 정본은 `/CONTEXT-MAP.md` §4.3 이다.
+> **barrel `index.ts` 를 두지 않는다** (현재 0개, 예외 없음). Next.js 는 barrel import 를
+> 빌드 비용으로 취급하고, feature 경계는 F-9 + eslint `no-restricted-imports` 가 이미 강제한다.
+> **`server/` 폴더도 없다** — 데이터 페칭은 100% 클라이언트 TanStack Query 다.
+> **`mocks/` 는 존재하지 않는다** (`NEXT_PUBLIC_API_MOCK` 도 없다). FE 는 항상 실제 BE 를 호출한다.
+
+> `editor/` 별도 feature 폴더 없음. TiptapEditor(useEditor/EditorContent)는
+> `features/notes/components/note-detail.tsx` — 옛 `note-editor.tsx` 는 importer 0 dead-code 로 삭제됐다.
 
 ---
 
@@ -74,19 +86,25 @@ apps/web/src/
 
 | Feature | 대응 BE 도메인 | 핵심 컴포넌트 |
 |---|---|---|
-| inbox/ | inbox | inbox-list, inbox-item-card, classify-dialog |
-| projects/ | projects | project-list, project-detail, create-project-dialog |
-| meetings/ | meetings | upload, detail, transcript-viewer |
 | actions/ | actions | action-board |
-| notes/ | notes | note-list, note-detail, **note-editor** (Tiptap) |
-| rag/ | rag | RAGPanel, ask-input, answer-card (SSE) |
-| members/ | workspaces (member + invite) | invite-dialog, member-list |
-| workspaces/ | workspaces (workspace) | workspace-switcher |
-| upload/ | upload | upload-dropzone (presigned URL) |
-| sources/ | (다도메인 조합 — 자료 목록 뷰) | source-list |
-| home/ | (다도메인 조합 — 대시보드 위젯) | home-dashboard |
+| audit/ | (BE `common/audit_router.py`) | audit-list — role 변경 / promote trail |
+| feedback/ | feedback | feedback-button (dogfooding 위젯) |
+| home/ | (다도메인 조합 — 대시보드) | dashboard-suggestions, ActivityFeed |
+| inbox/ | inbox | inbox-list, inbox-item-card, smart-inbox |
+| integrations/ | integrations | 외부 문서 상세 조회 (Google Drive, ADR-026) |
+| meetings/ | meetings | upload, meeting-detail, transcript-viewer |
+| members/ | workspaces (member + invite) | invite-manager, member-list |
+| memory/ | memory | CaptureSheet, RecallResultCard |
+| notes/ | notes | note-list, **note-detail** (Tiptap 에디터), quick-memo |
+| onboarding/ | onboarding | step progression |
+| projects/ | projects | project-list, dashboard/, create-project-dialog, ProjectAdminDialogs |
+| rag/ | rag | RAGPanel, ask-input, answer-card (SSE), markdown-message |
+| sources/ | (다도메인 조합 — 출처 뷰) | source-viewer |
+| upload/ | upload | upload-dropzone (presigned URL), useRecording |
+| workspaces/ | workspaces (workspace) | WorkspaceSwitcher, DangerZone, WorkspaceTypeBadge |
 
-> `sources/`, `home/`은 단일 BE 도메인 매핑이 아닌 **다도메인 조합 뷰**. BE 호출은 여러 feature의 api 통과.
+> `sources/`, `home/`, `audit/` 는 단일 BE 도메인 매핑이 아닌 **다도메인 조합 뷰**.
+> BE ↔ FE 전체 매핑 인덱스: `docs/product/domains/README.md`.
 
 ---
 
