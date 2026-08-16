@@ -167,8 +167,17 @@
   (`apps/web/{package.json,pnpm-lock.yaml}` 만 변경) 에서 필터가 기대대로 판정했다 —
   `api` false → `backend-test` **skip**(올바름), `web`/`contracts` true → `frontend-build`/
   `contract-check` 실행·success. 식별자 `backend`→`api` 개명이 소비 지점과 정합함을 실측으로 확인.
-- [x] ~~**`.github/dependabot.yml` 주기 상향**~~ — 본 PR 에서 `weekly` + limit 5 로 상향.
-  ★`open-pull-requests-limit` 은 **생태계당** 상한이다 — 최초 실행에서 3×3=9개가 한 번에 열렸다.
+- [x] ~~**`.github/dependabot.yml`**~~ — **2026-08-16 파일 삭제.** 버전 업데이트를 끈다.
+  실측: monthly+limit3 에서 9개, weekly+limit5 로 올린 직후 **15개**가 열렸다. 1인 개발(PERSONA-001)이
+  감당할 트리아지 양이 아니고, 그중 실제 신호는 1건이었다(내 CI PORT 버그 — 다음 실 PR 이 30분 뒤
+  똑같이 잡았을 것).
+  ★**Dependabot 보안 업데이트는 이 파일과 별개 기능**이다 (Settings → Code security).
+  파일을 지워도 **CVE PR 은 계속 온다** — 실제 안전 가치는 그쪽이 갖고 있다.
+  **[확인 필요]** Settings 에서 Dependabot alerts / security updates 가 켜져 있는지 한 번 볼 것.
+  **재검토 트리거**: 팀원 2명 이상 **또는** 릴리스 케이던스가 생겨 의존성 최신화가 정기 업무가 될 때.
+- [ ] **액션 SHA 수기 갱신 루틴** `[신규 · 2026-08-16]` dependabot 을 끈 대가로 3rd-party 액션이
+  SHA 로 고정된다. 분기 1회 또는 CI 가 deprecation 경고를 낼 때 갱신한다 —
+  이번이 정확히 그 사례다(`Node.js 20 is deprecated` 경고 → checkout/setup-node/pnpm 3종 갱신).
 - [ ] **`.github/actions/` composite 추출** — uv/pnpm/node setup 이 4곳 중복이다.
   CI 복구로 보류 사유는 사라졌으나, **dependabot #155/#156/#157 이 같은 워크플로 파일을 건드리고 있어**
   그 3건을 먼저 머지한 뒤 착수한다(충돌 회피).

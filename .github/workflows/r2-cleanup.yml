@@ -22,7 +22,7 @@ jobs:
       run:
         working-directory: apps/api
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       # Sprint 28 BUG-S28-SEC-2 — SHA pin (다른 yml 3개 패턴 정합)
       - name: Setup uv
