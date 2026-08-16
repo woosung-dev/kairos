@@ -1,7 +1,8 @@
 // /pricing — 가격 페이지 (T-GTM-2 Pre-GA, "Pricing coming soon" 단일 메시지)
 import Link from "next/link";
-import { auth } from "@clerk/nextjs/server";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
 import { LandingNav } from "@/components/landing/landing-nav";
 import { Footer } from "@/components/landing/footer";
 
@@ -11,8 +12,8 @@ export const metadata = {
 };
 
 export default async function PricingPage() {
-  const { userId } = await auth();
-  if (userId) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (session) {
     redirect("/dashboard");
   }
 

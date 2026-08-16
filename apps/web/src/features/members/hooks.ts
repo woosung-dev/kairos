@@ -7,7 +7,7 @@ import {
   withWorkspaceGuardLoading,
 } from "@/features/workspaces/hooks";
 import { useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useMe } from "@/features/auth/hooks";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import {
@@ -30,7 +30,7 @@ import type {
 // --- 역할 동기화 훅 (앱 초기화 시 호출) ---
 
 export function useSyncWorkspaceRole(wid: string | undefined) {
-  const { user } = useUser();
+  const { data: me } = useMe();
   const { data: members, isLoading: isMembersLoading } = useMembers(wid);
   const setWorkspaceRole = useWorkspaceStore((s) => s.setWorkspaceRole);
 
@@ -39,14 +39,14 @@ export function useSyncWorkspaceRole(wid: string | undefined) {
       return;
     }
 
-    if (!members || !user) {
+    if (!members || !me) {
       setWorkspaceRole(null);
       return;
     }
-    // Clerk user.id로 직접 매칭 (email은 JWT claims에 미포함)
-    const me = members.find((m) => m.clerkId === user.id);
-    setWorkspaceRole(me?.role ?? null);
-  }, [members, isMembersLoading, user, setWorkspaceRole]);
+    // 내부 UUID 로 매칭 (ADR-031 — 외부 인증 ID 의존 제거)
+    const membership = members.find((m) => m.userId === me.id);
+    setWorkspaceRole(membership?.role ?? null);
+  }, [members, isMembersLoading, me, setWorkspaceRole]);
 }
 
 // --- 멤버 훅 ---
@@ -68,20 +68,20 @@ export function useMembers(wid: string | undefined) {
 }
 
 export function useWorkspaceRole(workspaceId: string | undefined) {
-  const { user } = useUser();
+  const { data: me } = useMe();
   const { data: members, isLoading } = useMembers(workspaceId);
 
-  // clerkId 기반 매칭 (email은 JWT claims에 미포함)
-  const me = members?.find((m) => m.clerkId === user?.id) ?? null;
-  const role = me?.role ?? null;
+  // 내부 UUID 로 매칭 (ADR-031 — 외부 인증 ID 의존 제거)
+  const membership = members?.find((m) => m.userId === me?.id) ?? null;
+  const role = membership?.role ?? null;
 
   // workspaceId 가 비어있으면 fetch 자체가 enabled=false → isLoading=false 로 간주.
   // members 미로딩 상태에서는 권한 분기 컴포넌트가 placeholder/spinner 를 띄울 수 있도록 노출.
   return {
     role,
-    // BL-NOTE-DELETE-POLICY-1: 작성자 판정용 **내부** user id (Clerk id 아님).
-    // 리소스의 createdById 와 대조하는 용도 — 별도 API 없이 members 응답에서 얻는다.
-    userId: me?.userId ?? null,
+    // BL-NOTE-DELETE-POLICY-1: 작성자 판정용 내부 user id.
+    // 리소스의 createdById 와 대조하는 용도.
+    userId: membership?.userId ?? null,
     isLoading: !!workspaceId && isLoading,
     isOwner: role === "owner",
     isAdmin: role === "admin" || role === "owner",

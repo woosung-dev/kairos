@@ -14,8 +14,10 @@ const ITEMS: TrustItem[] = [
   {
     icon: ShieldCheck,
     title: "Built on 검증된 인프라",
+    // ADR-028(셀프호스팅) + ADR-031(자체 인증) 이후 사실관계를 반영한 문구.
+    // 이전 카피는 Clerk · Neon · Cloud Run · Vercel 을 열거했는데 전부 철거된 스택이었다.
     description:
-      "Clerk 인증 · Neon PostgreSQL · Cloudflare R2 스토리지 · Google Cloud Run. 직접 운영하지 않는 모든 계층을 신뢰할 수 있는 SaaS로 위임합니다.",
+      "PostgreSQL 17 + pgvector · Cloudflare R2 스토리지 · Cloudflare Tunnel. 인증과 데이터베이스를 직접 운영해 사용자 데이터가 제3자 SaaS를 거치지 않습니다.",
   },
   {
     icon: Database,
@@ -126,8 +128,8 @@ export function TrustSignalsSection() {
           letterSpacing: "0.02em",
         }}
       >
-        Built with Clerk &middot; Neon &middot; Cloudflare R2 &middot; Google
-        Cloud &middot; Vercel
+        Built with PostgreSQL &middot; pgvector &middot; Cloudflare R2 &middot;
+        Cloudflare Tunnel
       </p>
     </section>
   );

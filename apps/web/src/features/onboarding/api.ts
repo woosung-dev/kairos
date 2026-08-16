@@ -1,4 +1,4 @@
-// 온보딩 도메인 API — Clerk JWT + workspace 컨텍스트 헤더로 호출
+// 온보딩 도메인 API — Bearer JWT + workspace 컨텍스트 헤더로 호출
 import type { ApiClient } from "@/lib/api-client";
 
 import { onboardingResponseSchema, type OnboardingResponse } from "./schemas";

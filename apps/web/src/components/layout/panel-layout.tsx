@@ -2,7 +2,6 @@
 
 import { useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
-import { useAuth } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { useUIStore } from "@/store/ui";
 import { useSourceViewerStore } from "@/features/sources/store";
@@ -40,13 +39,14 @@ const SourceViewer = dynamic(
     ),
   { ssr: false, loading: () => <PanelSkeleton /> },
 );
+import { useMe } from "@/features/auth/hooks";
 import { useSyncWorkspaceRole } from "@/features/members/hooks";
 import { useIsValidWorkspaceId, useWorkspaces } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 
 export function PanelLayout({ children }: { children: React.ReactNode }) {
   const { isMobile, isCompact } = useBreakpoint();
-  const { userId } = useAuth();
+  const { data: me } = useMe();
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const ensureOwner = useWorkspaceStore((s) => s.ensureOwner);
   const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId);
@@ -57,9 +57,11 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
   // 계정 소유자 가드 (BL-S27c-12): 다른 user 로 전환되면 이전 user 의
   // activeWorkspaceId 를 즉시 초기화해 cross-tenant 403 을 막는다. user id 만
   // 비교하므로 워크스페이스 목록 로딩/생성 타이밍과 무관(race-free).
+  // ADR-031: 비교 축이 외부 인증 ID 에서 내부 UUID(users.id)로 바뀌었다 —
+  // 인증 공급자가 또 바뀌어도 이 가드는 다시 손댈 필요가 없다.
   useEffect(() => {
-    if (userId) ensureOwner(userId);
-  }, [userId, ensureOwner]);
+    if (me?.id) ensureOwner(me.id);
+  }, [me?.id, ensureOwner]);
 
   // activeWorkspaceId 가 비어있거나(초기/소유자 가드 직후) 현재 사용자가 접근할 수 없는
   // 워크스페이스를 가리키면 첫 워크스페이스로 self-heal (BL-FE-WS-HEAL-SCOPE-1).

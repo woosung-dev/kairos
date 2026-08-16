@@ -2,7 +2,8 @@
 
 import { use } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, SignInButton } from "@clerk/nextjs";
+import Link from "next/link";
+import { authClient } from "@/lib/auth-client";
 import { Users, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,7 +25,8 @@ export default function InvitePage({
 }) {
   const { code } = use(params);
   const router = useRouter();
-  const { isSignedIn } = useAuth();
+  const { data: session } = authClient.useSession();
+  const isSignedIn = !!session;
   const { data: info, isLoading, isError, refetch } = useInviteInfo(code);
   const acceptInvite = useAcceptInvite();
   const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId);
@@ -163,14 +165,20 @@ export default function InvitePage({
                   >
                     참여하려면 먼저 로그인이 필요합니다
                   </p>
-                  <SignInButton
-                    mode="modal"
-                    forceRedirectUrl={`/invite/${code}`}
-                  >
-                    <Button className="w-full cursor-pointer" size="lg">
-                      로그인하고 참여
-                    </Button>
-                  </SignInButton>
+                  {/* ADR-031: Clerk 의 modal 로그인 동등물이 없어 페이지 이동으로 바꿨다.
+                      callbackURL 은 Better Auth 의 trustedOrigins 가 검증하므로
+                      외부 URL 로의 open redirect 는 성립하지 않는다. */}
+                  <Button
+                    className="w-full cursor-pointer"
+                    size="lg"
+                    render={
+                      <Link
+                        href={`/sign-in?callbackURL=${encodeURIComponent(`/invite/${code}`)}`}
+                      >
+                        로그인하고 참여
+                      </Link>
+                    }
+                  />
                 </div>
               )}
 

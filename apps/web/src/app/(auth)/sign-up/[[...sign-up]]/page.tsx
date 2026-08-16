@@ -1,4 +1,6 @@
-import { SignUp } from "@clerk/nextjs";
+import { Suspense } from "react";
+
+import { AuthForm } from "@/features/auth/components/auth-form";
 
 export default function SignUpPage() {
   return (
@@ -7,9 +9,9 @@ export default function SignUpPage() {
       className="flex flex-col items-center justify-center min-h-screen gap-4 px-4 py-12"
       style={{ background: "var(--background)" }}
     >
-      {/* T-GTM-6 (Sprint 25): Pre-GA 베타 안내. dev Clerk 운영 정책 UX 완화 —
-          가입 직전 사용자에게 "베타 멤버 전용 — Pre-GA" 명시로 30대 사용자 피싱
-          의심 신호 완화 (BUG-CASUAL-001 정책 재분류 보완). */}
+      {/* T-GTM-6 (Sprint 25): Pre-GA 베타 안내. 가입 직전 사용자에게
+          "베타 멤버 전용 — Pre-GA" 를 명시해 피싱 의심 신호를 완화한다
+          (BUG-CASUAL-001 정책 재분류 보완). */}
       <div
         className="max-w-md w-full rounded-lg px-4 py-3 text-center"
         style={{
@@ -44,7 +46,10 @@ export default function SignUpPage() {
         </p>
       </div>
 
-      <SignUp forceRedirectUrl="/dashboard" signInForceRedirectUrl="/dashboard" />
+      {/* useSearchParams(callbackURL 읽기) 는 Suspense 경계를 요구한다. */}
+      <Suspense fallback={null}>
+        <AuthForm mode="signUp" />
+      </Suspense>
     </main>
   );
 }

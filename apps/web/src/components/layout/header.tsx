@@ -7,7 +7,9 @@ import { useMembers } from "@/features/members/hooks";
 import { useIsValidWorkspaceId } from "@/features/workspaces/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { WorkspaceSwitcher } from "@/features/workspaces/components/WorkspaceSwitcher";
-import { useClerk, useUser } from "@clerk/nextjs";
+import { authClient } from "@/lib/auth-client";
+import { clearAuthTokenCache } from "@/lib/use-api-client";
+import { useMe } from "@/features/auth/hooks";
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
 import {
@@ -25,13 +27,14 @@ export function Header() {
   const isValidWid = useIsValidWorkspaceId(wid ?? undefined);
   const { data: members } = useMembers(isValidWid ? wid! : undefined);
   const queryClient = useQueryClient();
-  const { signOut } = useClerk();
-  const { user } = useUser();
+  const { data: me } = useMe();
   const router = useRouter();
 
-  const displayName = user?.fullName ?? user?.firstName ?? "User";
-  const email = user?.primaryEmailAddress?.emailAddress ?? "";
-  const avatarInitial = (user?.firstName?.[0] ?? "U").toUpperCase();
+  // ADR-031: Better Auth 는 fullName/firstName 을 나누지 않는다 — 단일 name 이다.
+  // 표시 이름의 정본은 백엔드 `users.display_name`(= /users/me 의 displayName)이다.
+  const displayName = me?.displayName ?? "User";
+  const email = me?.email ?? "";
+  const avatarInitial = (displayName[0] ?? "U").toUpperCase();
 
   return (
     <header
@@ -165,7 +168,12 @@ export function Header() {
               className="px-3 py-2 cursor-pointer"
               onClick={async () => {
                 queryClient.clear();
-                await signOut({ redirectUrl: "/" });
+                // ★토큰 캐시를 비우지 않으면 로그아웃 후에도 메모리의 JWT 가 최대
+                //   15분(Better Auth 기본 exp)간 Authorization 헤더에 붙는다.
+                clearAuthTokenCache();
+                await authClient.signOut();
+                router.push("/");
+                router.refresh();
               }}
             >
               <LogOut size={14} />

@@ -11,11 +11,11 @@ const { fetchInvites, fetchMembers, fetchWorkspaces, userState } = vi.hoisted(()
   fetchInvites: vi.fn(),
   fetchMembers: vi.fn(),
   fetchWorkspaces: vi.fn(),
-  userState: { current: { id: "clerk-user-1" } },
+  userState: { current: { id: "00000000-0000-0000-0000-000000000001" } },
 }));
 
-vi.mock("@clerk/nextjs", () => ({
-  useUser: () => ({ user: userState.current }),
+vi.mock("@/features/auth/hooks", () => ({
+  useMe: () => ({ data: userState.current }),
 }));
 
 vi.mock("@/lib/use-api-client", () => ({
@@ -134,5 +134,25 @@ describe("useSyncWorkspaceRole", () => {
 
     await waitFor(() => expect(fetchMembers).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(useWorkspaceStore.getState().workspaceRole).toBeNull());
+  });
+
+  // ADR-031 D11 회귀 가드 — 매칭 축이 **내부 UUID(users.id)** 여야 한다.
+  // 예전에는 `member.clerkId === user.id` 로 외부 인증 공급자 ID 를 비교했고,
+  // 그 결합이 이번 전환에서 전 사용자 role=null(권한 UI 전면 붕괴)로 터진 지점이다.
+  // 음성 케이스(위)만 있으면 "항상 null" 인 구현도 통과하므로 양성 케이스가 반드시 필요하다.
+  it("members 의 userId 가 내 users.id 와 일치하면 그 role 을 반영한다", async () => {
+    useWorkspaceStore.setState({ workspaceRole: null });
+    fetchMembers.mockResolvedValue([
+      { id: "m-other", userId: "00000000-0000-0000-0000-0000000000ff", role: "viewer" },
+      { id: "m-me", userId: userState.current.id, role: "admin" },
+    ]);
+
+    renderHook(() => useSyncWorkspaceRole(WID), {
+      wrapper: createWrapper([WORKSPACE]),
+    });
+
+    await waitFor(() =>
+      expect(useWorkspaceStore.getState().workspaceRole).toBe("admin"),
+    );
   });
 });
