@@ -190,6 +190,41 @@ D-1 을 마쳤다면 이미지와 스키마는 이미 서버에 있다. 남은 �
 8. ☐ `just deploy-status` + `/dashboard` 로그인 관통 → 다운타임 종료
 9. ☐ **Clerk dev 인스턴스는 삭제하지 않는다** — 롤백 창 7일 유지
 
+#### ✅ D-0 실행 결과 (2026-08-17, 다운타임 약 5분 17:35~17:40)
+
+| 항목 | 결과 |
+|---|---|
+| 태그 교체 | `d761615` → `9e7dcf8` (api·web) |
+| 공개 경로 | `web=200` · `api_ready=200` · JWKS `kid=SW0G97Og...` (D-1 키 그대로) |
+| Google 로그인 | 완주. `auth_account(providerId='google')` 1행 · `auth_session` 1행 |
+| 재연결 SQL | `DELETE 1 / DELETE 1 / DELETE 1 / UPDATE 1 / COMMIT` |
+| 창업자 행 | `users.id` `f0ae95bc-...` **유지** · `email` 채워짐 · 워크스페이스 6 / 회의 58 복귀 |
+| 데이터 | `total_users=16` · `total_meetings=98` 무손상 |
+| 메모리 | web 66.96MiB / 768MiB · api 135.1MiB / 1.5GiB → `mem_limit` 상향 적정 |
+
+> #### 🔥 컷오버 중 실제로 터진 것 — `deploy-ship` 이 compose 파일을 동기화하지 않는다
+>
+> 태그 교체 직후 **web 이 전면 500** 이었다. 로그: `BetterAuthError: You are using the default secret`.
+>
+> **원인**: 서버의 `docker-compose.prod.yml` 이 최초 부트스트랩(2026-08-14) 버전이었다.
+> 배포 레시피는 이미지와 `.env` 태그만 옮기고 compose 파일은 옮긴 적이 없다. ADR-031 이
+> `web` 서비스에 새로 넣은 `environment:` 5줄이 서버에 도달하지 못해 `BETTER_AUTH_SECRET` 이
+> **빈 문자열로 주입**됐다. `environment:` 치환은 변수가 없어도 에러 없이 통과한다 —
+> `env_file` 과 달리 조용히 실패하는 경로다.
+>
+> **복구**: `scp` 로 compose 파일 교체 → `up -d`. 약 3분.
+>
+> **재발 방지**: `just deploy-sync-config`(신규, `deploy-ship` 의 선행 의존) +
+> `just deploy-verify-env`(신규, `up -d` 직후 자동 실행). 둘 다 프로덕션에서 실동작 검증했다.
+>
+> **진단이 오래 걸린 이유 — `docker compose config` 를 오독했다.** `config` 는 `env_file` 을
+> `environment` 로 확장해 출력하므로 `api`/`migrate` 의 값이 마치 `web` 것처럼 보였다.
+> 다음엔 **`docker inspect kairos-web --format '{{len .Config.Env}}'` 로 주입 개수를 먼저 봐라** —
+> 정상 12개 vs 사고 당시 8개로 1분이면 갈렸다.
+>
+> **D-1 스모크가 못 잡은 이유**: 임시 컨테이너를 `docker run --env-file .env` 로 띄워
+> **compose 경로를 통째로 우회**했다. 스모크는 실제 배포 경로와 같은 경로여야 한다.
+
 > #### ⚠️ 재연결 SQL 함정 2가지 (지난 세션에 실제로 깨뜨려 확인함)
 >
 > **① 순서가 계약이다.** UPDATE 를 먼저 하면 `ix_users_auth_user_id` UNIQUE 위반으로 통째로 실패한다.
