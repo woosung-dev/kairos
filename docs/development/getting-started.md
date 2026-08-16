@@ -5,21 +5,34 @@
 
 ## 사전 요구사항
 
-| 도구 | 최소 버전 | 확인 명령어 |
-|------|----------|------------|
-| Node.js | 20+ | `node -v` |
-| pnpm | 9+ | `pnpm -v` |
-| uv | latest | `uv --version` |
-| just | latest | `just --version` (`brew install just`, ADR-027) |
+| 도구 | 버전 | 확인 명령어 |
+|------|------|------------|
+| **mise** | latest | `mise --version` (`brew install mise`, ADR-032) |
 | Git | 2.30+ | `git --version` |
+
+★**Node · pnpm · uv 는 직접 설치하지 않는다.** 루트 `mise.toml` 의 `[tools]` 가 정본이고
+`mise install` 이 그 버전을 그대로 깔아준다. 값은 프로덕션 Dockerfile 에서 가져온 것이라
+로컬 · CI · 프로덕션이 같은 툴체인을 쓴다 (ADR-032).
+
+| 도구 | 고정 버전 | 출처 |
+|------|----------|------|
+| Node.js | 22 | `apps/web/Dockerfile` |
+| pnpm | 8.15.9 | `apps/web/Dockerfile` |
+| uv | 0.10.4 | `apps/api/Dockerfile` |
+| Python | 3.12 | `apps/api/.python-version` (uv 소유 — `[tools]` 에 없다) |
 
 ## 1. 클론 + 의존성 설치
 
 ```bash
 git clone <repository-url> kairos
 cd kairos
-just install   # = apps/api uv sync --frozen + apps/web pnpm install --frozen-lockfile
+
+mise trust        # 이 레포의 mise.toml 을 신뢰 (최초 1회)
+mise install      # Node 22 / pnpm 8.15.9 / uv 0.10.4 설치
+mise run install  # = apps/api uv sync --frozen + apps/web pnpm install --frozen-lockfile
 ```
+
+명령 목록은 `mise tasks`, 실행은 `mise run <task>` 다.
 
 ## 2. 환경 변수 — **앱마다 파일이 다르다**
 
@@ -66,12 +79,12 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js 는 .env.local 이 표�
 터미널 2개가 필요하다.
 
 ```bash
-just be-migrate     # alembic upgrade head — 최초 1회 + 모델 변경 시마다
-just be-dev         # FastAPI :8000
+mise run be-migrate     # alembic upgrade head — 최초 1회 + 모델 변경 시마다
+mise run be-dev         # FastAPI :8000
 ```
 
 ```bash
-just fe-dev         # Next.js :3000
+mise run fe-dev         # Next.js :3000
 ```
 
 브라우저에서 `http://localhost:3000`.
@@ -82,14 +95,14 @@ just fe-dev         # Next.js :3000
 
 ## 4. 자주 쓰는 명령
 
-전체 목록은 `just --list`. 루트 `justfile` 이 단일 진입점이다 (ADR-027 D3).
+전체 목록은 `mise tasks`. 루트 `mise.toml` 이 단일 진입점이다 (ADR-027 D3).
 
 ```bash
-just ci-local         # 머지 전 게이트 전체 — 아래 testing.md 참조
-just be-test          # pytest (CI 와 문자 동일 호출)
-just fe-build         # Next 빌드 (타입 검사 포함)
-just contracts        # OpenAPI 계약 + FE 타입 재생성
-just e2e              # Playwright
+mise run ci-local         # 머지 전 게이트 전체 — 아래 testing.md 참조
+mise run be-test          # pytest (CI 와 문자 동일 호출)
+mise run fe-build         # Next 빌드 (타입 검사 포함)
+mise run contracts        # OpenAPI 계약 + FE 타입 재생성
+mise run e2e              # Playwright
 ```
 
 테스트 게이트 상세는 [`testing.md`](testing.md), 마이그레이션은 [`migrations.md`](migrations.md).

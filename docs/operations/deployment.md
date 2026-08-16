@@ -41,10 +41,10 @@
 ```bash
 TAG=$(git rev-parse --short HEAD)
 
-just deploy-preflight      # 진행 중인 회의 처리가 0 인지 + .env 인코딩 게이트
-just deploy-build $TAG     # 맥에서 arm64 네이티브 빌드 (BE + FE)
-just deploy-ship $TAG      # docker save | ssh | docker load → 태그 교체 → up -d
-just deploy-status         # 컨테이너 상태 + /ready + 서버 자원
+mise run deploy-preflight      # 진행 중인 회의 처리가 0 인지 + .env 인코딩 게이트
+mise run deploy-build $TAG     # 맥에서 arm64 네이티브 빌드 (BE + FE)
+mise run deploy-ship $TAG      # docker save | ssh | docker load → 태그 교체 → up -d
+mise run deploy-status         # 컨테이너 상태 + /ready + 서버 자원
 ```
 
 레지스트리를 쓰지 않는다. 맥(darwin/arm64)과 서버(aarch64)가 같은 아키텍처라
@@ -56,7 +56,7 @@ just deploy-status         # 컨테이너 상태 + /ready + 서버 자원
 ### 배포 전 반드시 확인
 
 `BackgroundTasks` 는 재시도가 없다. 처리 중인 회의가 있는 상태로 컨테이너를 교체하면
-그 회의는 `transcribing` 으로 영구 정지한다. `just deploy-preflight` 가 이걸 검사한다.
+그 회의는 `transcribing` 으로 영구 정지한다. `mise run deploy-preflight` 가 이걸 검사한다.
 
 ---
 
@@ -65,7 +65,7 @@ just deploy-status         # 컨테이너 상태 + /ready + 서버 자원
 `~/kairos/.env` 의 태그 두 줄을 이전 값으로 되돌리고 `up -d`.
 
 ```bash
-just deploy-rollback <이전TAG>
+mise run deploy-rollback <이전TAG>
 ```
 
 서버에 직전 2개 태그를 남겨 둔다. **마이그레이션은 자동 롤백되지 않으므로** 스키마 변경은
@@ -108,10 +108,10 @@ expand-then-contract 로만 한다.
 
 ```bash
 # 로컬 게이트 (CI 와 동일 invocation)
-just be-test && just fe-test && just fe-typecheck && just contracts-check
+mise run be-test && mise run fe-test && mise run fe-typecheck && mise run contracts-check
 
 # 배포 후
-just deploy-status
+mise run deploy-status
 ./scripts/verify-prod.sh https://kairos-api.woosung.dev
 ```
 

@@ -11,7 +11,7 @@ apps/api/alembic/versions/    리비전 24개 (2026-08-16 기준)
 ## 2. 로컬 절차
 
 ```bash
-just be-migrate                                    # = alembic upgrade head
+mise run be-migrate                                    # = alembic upgrade head
 cd apps/api && uv run alembic revision --autogenerate -m "add action_items table"
 cd apps/api && uv run alembic downgrade -1         # ★ §5 를 먼저 읽어라
 ```
@@ -46,7 +46,7 @@ apps/api/docker-entrypoint.sh       role migrate → exec alembic upgrade head
 
 ## 5. ★ downgrade 를 실행하지 않는다
 
-- 프로덕션에 자동 롤백 경로는 **없다.** `just deploy-rollback` 은 **이미지만** 되돌리며 스키마는 그대로다
+- 프로덕션에 자동 롤백 경로는 **없다.** `mise run deploy-rollback` 은 **이미지만** 되돌리며 스키마는 그대로다
 - 로컬에서도 위험하다 — `apps/api/.env` 의 `DATABASE_URL` 이 **공유 dev DB** 를 가리키기 때문에,
   워크트리에서 downgrade 를 돌리면 메인 체크아웃과 다른 워크트리에 그대로 영향이 간다
   (2026-07-30 dev DB 전 삭제 사고)

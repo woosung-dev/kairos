@@ -18,17 +18,17 @@
 
 ---
 
-## BL-S29-1 — `just docs-check` 게이트 신설 (규칙 재중복 방지) ⏳ **미착수**
+## BL-S29-1 — `mise run docs-check` 게이트 신설 (규칙 재중복 방지) ⏳ **미착수**
 
 **배경**: [ADR-029](adr/029-ai-rules-relocation.md) §2.2 가 「`apps/*/AGENTS.md` 는 `B-NN`·`F-NN`·`I-NN` 불변식을
 재진술하지 않는다」를 규약으로 세웠으나, **강제 수단이 grep 뿐이다.** quant-bridge 는 `docs-audit.sh` 로
-집행하지만 kairos `justfile` 에는 docs recipe 가 0개다.
+집행하지만 kairos `mise.toml` 에는 docs recipe 가 0개다.
 
 누군가 `AGENTS.md` 에 규칙 문장을 다시 쓰면 CONTEXT 와 두 정본이 되고, ADR-029 이전은
 **드리프트를 옮긴 것에 불과**해진다. 이번 이전에서 실제로 정정한 드리프트가 10건이었다는 점이 근거다.
 
 **할 일**:
-1. `just docs-check` recipe 신설 — 아래 3종 grep 을 묶는다
+1. `mise run docs-check` recipe 신설 — 아래 3종 grep 을 묶는다
    - `git grep -n '\.ai/' -- . ':!docs/adr' ':!docs/dev-log'` 에서 tombstone 외 신규 발생 0건
    - `apps/*/AGENTS.md` 에 `B-\d+`/`F-\d+` 패턴이 **정의 형태**(표 행)로 등장하지 않을 것 (포인터 인용은 허용)
    - 옛 규칙 파일명(`backend.md`·`frontend.md`·`global.md`·`workflow.md`·`typescript.md`) 참조 0건

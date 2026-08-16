@@ -71,7 +71,7 @@ GCP 프로젝트 Kairos + OAuth 클라이언트 발급, 서버 ~/kairos/.env 10�
 > - `git show origin/main:apps/api/src/core/config.py:49-50` — 구 이미지의 `Settings` 가
 >   `clerk_secret_key` / `clerk_webhook_secret` 을 **기본값 없이** 요구한다
 > - 지우면 구 이미지의 `get_settings()` 가 터지고 → `migrate` one-shot 이 죽고 →
->   `just deploy-rollback d761615` 이 실패한다. ADR-031 D7 의 "롤백이 이미지 태그만으로 완결" 이 무너진다
+>   `mise run deploy-rollback d761615` 이 실패한다. ADR-031 D7 의 "롤백이 이미지 태그만으로 완결" 이 무너진다
 >
 > 신규 이미지는 `config.py` 의 `extra="ignore"` 로 `CLERK_*` 를 무시하므로 남아 있어도 무해하다.
 
@@ -85,10 +85,10 @@ GCP 프로젝트 Kairos + OAuth 클라이언트 발급, 서버 ~/kairos/.env 10�
 
 **D-1 · dormant 준비** — 사용자 영향 0, Clerk 로그인 그대로 유지. 목적은 컷오버 당일에 처음 시도하는 것을 없애는 것 (ADR-028 이 스스로 남긴 교훈: 인증 실패와 인프라 실패를 같은 창에서 구분할 수 없다).
 
-> #### ⚠️ `just deploy-ship` 을 D-1 에 쓰면 안 된다 (2026-08-17 정정)
+> #### ⚠️ `mise run deploy-ship` 을 D-1 에 쓰면 안 된다 (2026-08-17 정정)
 >
 > 이 절의 이전 판은 `deploy-ship <TAG-A>` 를 D-1 명령으로 적었는데, 그 레시피는
-> **이미지 전송 + `.env` 태그 교체 + `up -d` 를 한 덩어리로** 수행한다(`justfile:137-142`).
+> **이미지 전송 + `.env` 태그 교체 + `up -d` 를 한 덩어리로** 수행한다(`mise.toml:137-142`).
 > 실행하는 순간 web/api 가 교체돼 Better Auth 가 서비스에 뜨고 Clerk 로그인이 끝난다 —
 > "Clerk 는 살아 있고 사용자 영향 0" 이 성립하지 않는다. TAG-A 와 TAG-B 를 나눈 것도
 > 같은 코드에서 나온 두 태그라 의미가 없었다.
@@ -112,8 +112,8 @@ cat ~/kairos-backup-$(date +%Y%m%d).dump | ssh truewords-oracle 'docker exec -i 
 #   → 0 이면 덤프 손상. 로컬에 pg_restore 가 없어도 서버 컨테이너 것을 빌려 쓰면 검증된다
 
 # ① 사전 게이트 + arm64 네이티브 빌드 (맥)
-just deploy-preflight
-just deploy-build $TAG
+mise run deploy-preflight
+mise run deploy-build $TAG
 
 # ② 이미지만 전송 — .env 태그는 건드리지 않는다
 docker save kairos-api:$TAG | gzip -1 | ssh truewords-oracle 'gunzip | docker load'
@@ -167,7 +167,7 @@ D-1 스모크 4항목 (전부 `ssh truewords-oracle` 안에서):
 "롤백은 이미지 태그만으로 완결" 이 추정이 아니라 관측이다.
 
 ★서버에 `kairos-api:d761615` / `kairos-web:d761615` 이미지가 실재함을 확인했다 —
-`just deploy-rollback d761615` 가 이미지 pull 없이 즉시 성립한다.
+`mise run deploy-rollback d761615` 가 이미지 pull 없이 즉시 성립한다.
 
 **D-0 · 컷오버** — ⏱ **다운타임 2~4분 + 전원 재가입.**
 
@@ -175,7 +175,7 @@ D-1 을 마쳤다면 이미지와 스키마는 이미 서버에 있다. 남은 �
 다운타임이 이미지 전송 시간과 무관해진다.
 
 1. ☐ **백업은 D-1 ⓪ 에서 이미 받았다** — D-1 이후 새 회의가 들어왔다면 다시 받는다 (DB 백업 자동화 BL-OCI-1 미완)
-2. ☐ `just deploy-preflight` (진행 중 회의 0 — BackgroundTasks 는 재시도가 없다)
+2. ☐ `mise run deploy-preflight` (진행 중 회의 0 — BackgroundTasks 는 재시도가 없다)
 3. ☐ `docker compose -f docker-compose.prod.yml stop web api` → 다운타임 시작
 4. ☐ **`.env` 태그 2줄 교체 + `up -d`** — 이미지는 D-1 에 적재됐으므로 재전송하지 않는다:
    ```bash
@@ -183,11 +183,11 @@ D-1 을 마쳤다면 이미지와 스키마는 이미 서버에 있다. 남은 �
      sed -i \"s/^KAIROS_API_TAG=.*/KAIROS_API_TAG=$TAG/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=$TAG/\" .env && \
      docker compose -f docker-compose.prod.yml up -d\""
    ```
-   `just deploy-ship $TAG` 를 써도 결과는 같지만 이미지를 다시 전송하느라 다운타임이 길어진다
+   `mise run deploy-ship $TAG` 를 써도 결과는 같지만 이미지를 다시 전송하느라 다운타임이 길어진다
 5. ☐ **`curl https://kairos.woosung.dev/api/auth/jwks` 1회** — 2026-08-17 D-1 ⑤에서 키가 이미 생성됐다(`auth_jwks` 1행, `BETTER_AUTH_SECRET` 동일하므로 그대로 유효). 따라서 여기서는 lazy 생성 트리거가 아니라 **`web` DNS 이름 + Cloudflare 공개 경로 확인**이 목적이다
 6. ☐ **Google 로그인 1회 완주** → `SELECT * FROM auth_account WHERE "providerId"='google'` 1행 (D-1 에서 못 한 항목)
 7. ☐ 창업자 재가입 → **재연결 SQL** (아래 함정)
-8. ☐ `just deploy-status` + `/dashboard` 로그인 관통 → 다운타임 종료
+8. ☐ `mise run deploy-status` + `/dashboard` 로그인 관통 → 다운타임 종료
 9. ☐ **Clerk dev 인스턴스는 삭제하지 않는다** — 롤백 창 7일 유지
 
 #### ✅ D-0 실행 결과 (2026-08-17, 다운타임 약 5분 17:35~17:40)
@@ -214,8 +214,8 @@ D-1 을 마쳤다면 이미지와 스키마는 이미 서버에 있다. 남은 �
 >
 > **복구**: `scp` 로 compose 파일 교체 → `up -d`. 약 3분.
 >
-> **재발 방지**: `just deploy-sync-config`(신규, `deploy-ship` 의 선행 의존) +
-> `just deploy-verify-env`(신규, `up -d` 직후 자동 실행). 둘 다 프로덕션에서 실동작 검증했다.
+> **재발 방지**: `mise run deploy-sync-config`(신규, `deploy-ship` 의 선행 의존) +
+> `mise run deploy-verify-env`(신규, `up -d` 직후 자동 실행). 둘 다 프로덕션에서 실동작 검증했다.
 >
 > **진단이 오래 걸린 이유 — `docker compose config` 를 오독했다.** `config` 는 `env_file` 을
 > `environment` 로 확장해 출력하므로 `api`/`migrate` 의 값이 마치 `web` 것처럼 보였다.
@@ -241,7 +241,7 @@ D-1 을 마쳤다면 이미지와 스키마는 이미 서버에 있다. 남은 �
 
 **롤백**
 
-- **1층 (기본)**: `just deploy-rollback d761615` 만으로 완결. 스키마 가산 전용, RTO 약 2분, 데이터 손실 0.
+- **1층 (기본)**: `mise run deploy-rollback d761615` 만으로 완결. 스키마 가산 전용, RTO 약 2분, 데이터 손실 0.
   - ★**`d761615` 는 추정이 아니라 서버 실측값이다** — 2026-08-17 기준 `~/kairos/.env` 의
     `KAIROS_API_TAG` / `KAIROS_WEB_TAG` 가 둘 다 이 값이고, 이는 `origin/main` HEAD
     (`fix(security): bump next 16.2.6 -> 16.2.11`, PR #175) 와 일치한다
@@ -253,7 +253,7 @@ D-1 을 마쳤다면 이미지와 스키마는 이미 서버에 있다. 남은 �
 
 - [ ] alembic 신규 리비전 — `DROP INDEX ix_users_clerk_id` + `DROP COLUMN users.clerk_id`
 - [ ] `apps/api/src/auth/models.py` 에서 `clerk_id` 필드 삭제 + `auth/CONTEXT.md` §3 레거시 주석 정리
-- [ ] 서버 `~/kairos/.env` 의 `CLERK_*` 잔여 삭제 ← **여기가 유일한 삭제 시점이다.** 이걸 하는 순간 `just deploy-rollback d761615` 가 불가능해지므로, 위의 `clerk_id` DROP 리비전과 **같은 작업 창에서** 실행한다 (둘 다 롤백 창을 닫는 행위라 시점이 갈리면 안 된다)
+- [ ] 서버 `~/kairos/.env` 의 `CLERK_*` 잔여 삭제 ← **여기가 유일한 삭제 시점이다.** 이걸 하는 순간 `mise run deploy-rollback d761615` 가 불가능해지므로, 위의 `clerk_id` DROP 리비전과 **같은 작업 창에서** 실행한다 (둘 다 롤백 창을 닫는 행위라 시점이 갈리면 안 된다)
 - [ ] **Clerk dev 인스턴스 삭제** ← **ADR-031 종료 조건.** 레포가 public 이고 히스토리 675 커밋에 dev secret 이 있다. 키가 무의미해지는 것과 실제로 무효화되는 것은 다르다
 - [ ] `docs/TODO.md` 의 T-SEC-CLERK-ROTATE / T-CLEANUP-1 종결, ADR-031 Status 갱신
 

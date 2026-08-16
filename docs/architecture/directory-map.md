@@ -12,7 +12,7 @@
 >
 > 2026-08-13: ADR-027 App-first 재구성 — `backend/` → `apps/backend/`, `frontend/` → `apps/web/`.
 > 배포 단위(앱)를 최상위 경계로 삼는다. 같은 날 후속 PR 로 `contracts/`(OpenAPI 계약) +
-> 루트 `justfile` + CI change-detection(`test.yml`) 신설 (ADR-027 D2~D4).
+> 루트 `mise.toml` + CI change-detection(`test.yml`) 신설 (ADR-027 D2~D4).
 >
 > 2026-08-16: ADR-030 — `apps/backend/` → `apps/api/`. 같은 라운드에서 `docs/guides/` 를
 > `docs/development/` + `docs/operations/` 로 해체하고 `docs/product/` · `docs/archive/` 를 신설했다.
@@ -25,11 +25,11 @@ kairos/
 ├── apps/
 │   ├── api/                           # FastAPI (OCI 컨테이너 배포 단위, ADR-028/030)
 │   └── web/                           # Next.js (OCI 컨테이너 배포 단위, ADR-028)
-├── contracts/                         # OpenAPI 계약 생성물 (ADR-027 D2) — `just contracts` 재생성, 수정 금지
+├── contracts/                         # OpenAPI 계약 생성물 (ADR-027 D2) — `mise run contracts` 재생성, 수정 금지
 ├── deploy/oci/                        # ★ 서버 운영 정본 — compose + build.env + README(런북)
 ├── docs/                              # canonical docs (development, operations, architecture, adr, product)
 ├── scripts/                           # 레포 공통 스크립트 (verify-prod.sh)
-├── justfile                           # 단일 명령 진입점 (ADR-027 D3). `just ci-local` = 로컬 머지 게이트
+├── mise.toml                           # 단일 명령 진입점 (ADR-027 D3). `mise run ci-local` = 로컬 머지 게이트
 ├── AGENTS.md · CONTEXT-MAP.md · DESIGN.md   # 규칙 / 헌법 / 디자인 (ADR-029)
 └── .github/                           # workflows(test, nightly-e2e, r2-cleanup) + PR·Issue 템플릿 + dependabot
 ```
@@ -37,7 +37,7 @@ kairos/
 각 앱은 `AGENTS.md`(스택 함정) + `CONTEXT.md`(불변식 B-NN / F-NN) + `CLAUDE.md`(둘을 `@` import)
 를 갖는다 (ADR-029).
 
-**배포 워크플로는 없다.** 배포는 CI 가 아니라 로컬 `justfile` → SSH(`truewords-oracle`) →
+**배포 워크플로는 없다.** 배포는 CI 가 아니라 로컬 `mise.toml` → SSH(`truewords-oracle`) →
 `docker save | ssh docker load` → compose up 이다 (ADR-028, 레지스트리 미사용).
 
 규칙: 독립 실행·배포되면 `apps/`, 언어를 넘는 계약이면 `contracts/`, 라이브러리 공유 패키지(`packages/`)는

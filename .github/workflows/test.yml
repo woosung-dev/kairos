@@ -42,7 +42,7 @@ jobs:
               - 'apps/web/package.json'
               - 'apps/web/pnpm-lock.yaml'
               - 'contracts/**'
-              - 'justfile'
+              - 'mise.toml'
               - '.github/workflows/test.yml'
 
   backend-test:
@@ -55,9 +55,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f  # v4
+      # ADR-032 — 툴 버전 정본은 루트 `mise.toml` 의 `[tools]` 다.
+      # 전환 전에는 여기가 uv "latest" 였고 apps/api/Dockerfile 은 0.10.4 로 고정이라
+      # CI 와 프로덕션이 서로 다른 uv 로 같은 커밋을 빌드했다 (2026-08-17 실측).
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac  # v2
         with:
-          version: "latest"
+          version: 2026.8.6
 
       # Sprint 28 BUG-S28-SEC-1 — `--frozen` 강제 (lock-pyproject drift PR CI 통과 차단)
       - name: Install dependencies
@@ -84,15 +87,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
+      # ADR-032 — Node/pnpm 버전 정본은 루트 `mise.toml` 의 `[tools]` 다.
+      # 전환 전에는 여기가 Node 20 / pnpm 9 였고 프로덕션 이미지는 Node 22 / pnpm 8.15.9 라
+      # CI 가 배포되는 것과 다른 런타임에서 테스트하고 있었다 (2026-08-17 실측).
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac  # v2
         with:
-          version: 9
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
-        with:
-          node-version: 20
-          cache: "pnpm"
-          cache-dependency-path: apps/web/pnpm-lock.yaml
+          version: 2026.8.6
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -113,21 +113,19 @@ jobs:
       - name: Install Playwright (chromium only)
         run: pnpm exec playwright install --with-deps chromium
 
-      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3  # v4.0.0
-
-      # ★서버 기동 + wait-on + spec 실행은 `just fe-security-headers` 가 소유한다.
+      # ★서버 기동 + wait-on + spec 실행은 `mise run fe-security-headers` 가 소유한다.
       # 여기에 사본을 두면 로컬과 CI 가 갈라진다 — 2026-08-16 코드리뷰가 정확히 그 상태를 잡았다
-      # (포트/바인드/타임아웃/로그경로 4곳이 이미 달랐다). justfile 상단 "문자 동일" 규약 참조.
+      # (포트/바인드/타임아웃/로그경로 4곳이 이미 달랐다). mise.toml 상단 "문자 동일" 규약 참조.
       - name: Security headers gate (build artifact, public route)
         working-directory: ${{ github.workspace }}
         env:
           # ADR-031: Better Auth 는 빌드타임 공개키가 없다. `next build` 의 page data 수집이
           # auth.ts 를 평가하므로 기본 secret 경고만 없애는 더미를 준다 (DB 접속은 없다).
-          # ★`just fe-security-headers` 의 기본값과 문자 그대로 같은 값이어야 한다
-          #   (justfile 상단 "문자 동일" 규약). 한쪽만 바꾸면 로컬과 CI 가 갈라진다.
+          # ★`mise run fe-security-headers` 의 기본값과 문자 그대로 같은 값이어야 한다
+          #   (mise.toml 상단 "문자 동일" 규약). 한쪽만 바꾸면 로컬과 CI 가 갈라진다.
           BETTER_AUTH_SECRET: "ci-fake-secret-at-least-32-bytes-long"
           NEXT_PUBLIC_API_URL: "http://localhost:8000"
-        run: just fe-security-headers 3000
+        run: mise run fe-security-headers 3000
 
       - name: Upload Next.js log on failure
         if: failure()
@@ -135,7 +133,7 @@ jobs:
 
   # ── API 계약 drift 게이트 (ADR-027 D2) ─────────────────────────────────
   # export_openapi.py 가 src.main import → backend-test 와 동일한 fake env 필요.
-  # `just contracts-check` = 로컬과 문자 그대로 같은 게이트 (justfile 참조).
+  # `mise run contracts-check` = 로컬과 문자 그대로 같은 게이트 (mise.toml 참조).
   contract-check:
     runs-on: ubuntu-latest
     needs: changes
@@ -151,32 +149,21 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f  # v4
+      # ADR-032 — 툴 버전 정본은 루트 `mise.toml` 의 `[tools]` 다.
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac  # v2
         with:
-          version: "latest"
+          version: 2026.8.6
 
       - name: Install backend deps
         working-directory: apps/api
         run: uv sync --frozen
 
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
-        with:
-          version: 9
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
-        with:
-          node-version: 20
-          cache: "pnpm"
-          cache-dependency-path: apps/web/pnpm-lock.yaml
-
       - name: Install frontend deps
         working-directory: apps/web
         run: pnpm install --frozen-lockfile
 
-      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3  # v4.0.0
-
       - name: Contract drift gate (regenerate + diff)
-        run: just contracts-check
+        run: mise run contracts-check
 
   # ── E2E 잡 활성화 방법 ────────────────────────────────────────────────────────
   # 1. Repository Settings → Secrets and variables → Variables 탭
@@ -233,9 +220,10 @@ jobs:
           PGPASSWORD=kairos psql -h localhost -U kairos -d kairos_e2e -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
 
       # ── 백엔드 (uvicorn) 부팅 ─────────────────────────────────────────
-      - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f  # v4
+      # ADR-032 — 툴 버전 정본은 루트 `mise.toml` 의 `[tools]` 다.
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac  # v2
         with:
-          version: "latest"
+          version: 2026.8.6
 
       - name: Install backend deps
         working-directory: apps/api
@@ -295,16 +283,6 @@ jobs:
           exit 1
 
       # ── 프론트엔드 (Next.js) 빌드 + 부팅 ───────────────────────────────
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
-        with:
-          version: 9
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
-        with:
-          node-version: 20
-          cache: "pnpm"
-          cache-dependency-path: apps/web/pnpm-lock.yaml
-
       - name: Install frontend deps
         working-directory: apps/web
         run: pnpm install --frozen-lockfile

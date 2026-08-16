@@ -3,7 +3,7 @@
 ## 0. 판정은 CI, 사전 확인은 로컬
 
 머지 판정은 `.github/workflows/test.yml` 의 **`ci-required`** aggregate job 이 한다.
-`just ci-local` 은 같은 게이트를 로컬에서 먼저 돌려 **푸쉬 왕복을 줄이는 용도**다.
+`mise run ci-local` 은 같은 게이트를 로컬에서 먼저 돌려 **푸쉬 왕복을 줄이는 용도**다.
 
 > 2026-04~08 사이에는 Actions 가 결제 실패로 전면 중단돼 로컬 게이트가 유일한 증거였다.
 > **2026-08-16 레포 public 전환으로 복구됐다** — 그 시기에 머지된 것들은 CI 검증을 받지 않았다는
@@ -12,14 +12,14 @@
 ## 1. 한 방에
 
 ```bash
-just ci-local
+mise run ci-local
 ```
 
 `.github/workflows/test.yml` 의 `backend-test` + `frontend-build` + `contract-check` job 을
 로컬에서 미러한다. **새 명령을 정의하지 않고 기존 recipe 를 조합만 한다** — ADR-027 D3 의
 "로컬 게이트와 CI 게이트는 문자 그대로 같은 명령" 불변을 지키기 위해서다.
 
-- 실패가 환경 문제로 의심되면 `just install` 을 먼저 돌린다.
+- 실패가 환경 문제로 의심되면 `mise run install` 을 먼저 돌린다.
 - **clean tree 에서 실행한다.** `contracts-check` 는 `git diff --exit-code` 라 작업 트리가
   더러우면 계약과 무관한 변경까지 drift 로 잡는다(오탐).
 
@@ -27,12 +27,12 @@ just ci-local
 
 | 로컬 recipe | CI job / step | 검증하는 것 |
 |---|---|---|
-| `just be-test` | `backend-test` "Run tests" | pytest. `transcription` / `r2-cors` 2개 제외가 **정본** (외부 API·실 R2 의존) |
-| `just fe-test` | `frontend-build` "Unit tests (vitest)" | 코드 옆 `__tests__/` 단위 테스트 |
-| `just fe-build` | `frontend-build` "Build (includes type check)" | Next 빌드 = TS strict 타입 검사 |
-| `just fe-security-headers` | `frontend-build` "Run security-headers spec only" | 보안 헤더 회귀 (public route, secrets 불요). **빌드 산출물(`pnpm start`)을 검증한다** — ↓ §2.1 |
-| `just contracts-check` | `contract-check` | OpenAPI 재생성 + `git diff --exit-code` drift 차단 (ADR-027 D2) |
-| `just e2e` | `e2e` job (`vars.E2E_ENABLED`, **현재 미활성**) | Playwright |
+| `mise run be-test` | `backend-test` "Run tests" | pytest. `transcription` / `r2-cors` 2개 제외가 **정본** (외부 API·실 R2 의존) |
+| `mise run fe-test` | `frontend-build` "Unit tests (vitest)" | 코드 옆 `__tests__/` 단위 테스트 |
+| `mise run fe-build` | `frontend-build` "Build (includes type check)" | Next 빌드 = TS strict 타입 검사 |
+| `mise run fe-security-headers` | `frontend-build` "Run security-headers spec only" | 보안 헤더 회귀 (public route, secrets 불요). **빌드 산출물(`pnpm start`)을 검증한다** — ↓ §2.1 |
+| `mise run contracts-check` | `contract-check` | OpenAPI 재생성 + `git diff --exit-code` drift 차단 (ADR-027 D2) |
+| `mise run e2e` | `e2e` job (`vars.E2E_ENABLED`, **현재 미활성**) | Playwright |
 
 CI 가 복구되면 이 표가 대조표가 된다 — 로컬만 green 이고 CI 가 red 이면 차이는 이 표의 행에 있다.
 
@@ -42,7 +42,7 @@ CI 가 복구되면 이 표가 대조표가 된다 — 로컬만 green 이고 CI
 `pnpm start`(빌드 산출물)를 검증한다. 이 차이를 방치하면 **프로덕션에서만 나는 헤더·기동 회귀가
 로컬 게이트를 통과한다** (2026-08-16 codex 리뷰 P2 지적).
 
-그래서 `just fe-security-headers` 는 직접 `pnpm start -p 3005` 를 띄우고 그 서버를 검증한다
+그래서 `mise run fe-security-headers` 는 직접 `pnpm start -p 3005` 를 띄우고 그 서버를 검증한다
 (`reuseExistingServer: true` 라 playwright 가 dev 서버를 새로 띄우지 않는다).
 
 - 포트 **3005** 고정 — dev(`:3000`) / playwright 기본(`:3003`) 과 겹치지 않게 한다
@@ -63,7 +63,7 @@ CI 가 복구되면 이 표가 대조표가 된다 — 로컬만 green 이고 CI
 
 계약 테스트는 디렉터리가 아니라 **파일명 규약**으로 표시한다 —
 `test_list_count_contract.py` / `test_sync_contract.py` / `test_adr019_phase_b_contract.py`.
-실질 계약 게이트는 `just contracts-check` 이고, 이 파일들은 그 하위 계약(목록/카운트 필터 일치 등)을 지킨다.
+실질 계약 게이트는 `mise run contracts-check` 이고, 이 파일들은 그 하위 계약(목록/카운트 필터 일치 등)을 지킨다.
 
 ### 3.1 arch gate — 규칙을 코드로 강제하는 테스트
 
@@ -98,7 +98,7 @@ visibility + RBAC 4-cell + RAG private 누수 0 을 여기서 영구 고정한�
 
 ```bash
 # BE 는 단일 프로세스로 :8000 (--reload 금지 — in-process RBAC 캐시 단일성)
-just be-dev
+mise run be-dev
 
 E2E_RUN_TEAM=true E2E_API_URL=http://localhost:8000 \
   pnpm --dir apps/web exec playwright test --project=team --workers=1
@@ -125,7 +125,7 @@ find /tmp/ci-artifacts -name error-context.md
 |---|---|
 | BE | pytest 결과 요약 + alembic dry-run 출력 |
 | FE | 스크린샷 1장 + `console.error` **0건** 로그 |
-| API 시그니처 | `just contracts-check` + Playwright smoke — **한쪽만 통과하면 차단** |
+| API 시그니처 | `mise run contracts-check` + Playwright smoke — **한쪽만 통과하면 차단** |
 
 `console.error` 0건의 합격 대상은 **앱 집계**다 — 앱 코드 `console.error` + `pageerror` +
 앱 BE `/api/v1/*` 4xx/5xx. 브라우저 generic `Failed to load resource …` 는 같은 실패의 중복

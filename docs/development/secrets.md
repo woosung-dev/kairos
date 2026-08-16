@@ -118,7 +118,7 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 | `.env.local`을 git add | 시크릿 유출 | `.gitignore`에 `.env.local` 확인 |
 | 프로덕션 키를 로컬에서 사용 | 실수로 프로덕 DB 조작 | 로컬은 항상 dev/test 키 사용 |
 | `.env`에 인라인 주석(`KEY=값  # 설명`) | 값에 섞인 한글이 헤더 인코딩을 깨서 500 / CORS 전면 차단 | 설명은 별도 줄 주석으로만. 배포 전 비ASCII 게이트 |
-| 도메인 변경 후 FE 재빌드 누락 | `NEXT_PUBLIC_*`은 빌드타임 인라인이라 런타임 env로 안 바뀜 | `build.env` 수정 → `just deploy-build` |
+| 도메인 변경 후 FE 재빌드 누락 | `NEXT_PUBLIC_*`은 빌드타임 인라인이라 런타임 env로 안 바뀜 | `build.env` 수정 → `mise run deploy-build` |
 | R2 Secret Access Key 재발급 없이 분실 | 재발급 필요 | 발급 직후 즉시 GitHub Secret에 저장 |
 
 ---
@@ -143,6 +143,6 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 백엔드는 서명만 믿는 순수 리소스 서버라 다른 방어선이 없다.
 
 - 절대 `NEXT_PUBLIC_*` 로 만들지 않는다 (브라우저 번들에 박힌다).
-- 절대 `deploy/oci/build.env` 에 넣지 않는다 — `just deploy-build` 가 `--build-arg` 로 넘겨 **이미지 레이어 히스토리에 평문으로 남는다**.
+- 절대 `deploy/oci/build.env` 에 넣지 않는다 — `mise run deploy-build` 가 `--build-arg` 로 넘겨 **이미지 레이어 히스토리에 평문으로 남는다**.
 - 오직 서버 `~/kairos/.env` (0600) 의 런타임 env.
 - 로테이션 절차: 새 시크릿 설정 → `DELETE FROM auth_jwks` (기존 키가 복호화 불가가 되므로 필수) → `web` 재기동 → `curl /api/auth/jwks` 1회 → 전 세션 무효 + 미만료 JWT 는 최대 15분 유효. 급박한 침해면 `api` 도 재기동해 claims 캐시(60초)를 비운다.

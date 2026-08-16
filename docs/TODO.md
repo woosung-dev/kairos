@@ -47,7 +47,7 @@
 - [ ] **LICENSE 선택** `[신규 · 2026-08-16]` public 레포에 라이선스가 없으면 법적으로
   "all rights reserved" 다. 공개 제품 의도와 다를 가능성이 크다. 상용화 계획과 함께 결정할 것.
 - [ ] **`apps/api/tests/` flat 잔여 9개 정리 시점** — 유일하게 코드를 움직이는 정리 작업이고,
-  `justfile:be-test` 와 `test.yml` 의 `--ignore` 경로를 동시 수정해야 한다.
+  `mise.toml:be-test` 와 `test.yml` 의 `--ignore` 경로를 동시 수정해야 한다.
   CI 부재 상태에서는 pytest 수집 손실이 드러나지 않아 미뤄 뒀는데, **2026-08-16 CI 복구로 그 사유가
   사라졌다.** 이동 전후 `collected N` 이 같은지 CI 가 판정해 준다 — 이제 단독 PR 로 진행 가능.
 
@@ -59,7 +59,7 @@
 - [ ] **BL-OCI-1** (P1) **DB 백업 자동화.** 오라클 셀프호스팅 DB 에 백업이 없다. 개발 단계라 의도적으로 제외했고, 운영 전환 시 착수한다(일 1회 `pg_dump` → R2). 그때까지 **`docker compose down -v` 금지** — `-v` 가 `db-data` 볼륨을 지운다. 현재 안전망은 Neon 원본(오라클 DB 가 그 복사본)뿐이므로 **Neon 프로젝트를 지우지 말 것.**
 - [ ] **BL-OCI-2** (P3) **presigned URL 업로드 전환.** Cloudflare Free/Pro 는 요청 바디를 100MB 에서 자른다. 운영 실측 최대 파일이 5MB 라 지금은 무해하고, `MAX_UPLOAD_BYTES=90MB` + FE 사전 가드로 막아 뒀다. 100MB 초과 파일이 실제로 필요해지면 착수(약 5시간). BL-070(500MB RAM 적재)도 함께 해소된다. 2026-05 기각 사유는 "R2 버킷 CORS 미설정"이었고 여전히 미설정이다.
 - [ ] **BL-OCI-3** (P3) **GitHub Actions 자동 배포.** 진입 조건 = 수동 배포 3회 연속 성공 + 컷오버 후 7일 무사고 + 장시간 오디오 1건 end-to-end 완주. GH 러너가 amd64 라 arm64 빌드에 QEMU 가 붙는 문제를 먼저 풀어야 한다.
-- [ ] **BL-OCI-4** (P2) **stuck 상태 복구 경로.** `BackgroundTasks` 는 재시도가 없어 프로세스 재시작 시 진행 중이던 회의가 `transcribing`/`analyzing` 으로 영구 정지한다. 2026-08-14 에 그렇게 좌초한 8건(E2E 6 + uploading 2)을 수동 삭제했다. `just deploy-preflight` 가 최근 2시간만 검사하도록 우회했을 뿐 근본 해결이 아니다.
+- [ ] **BL-OCI-4** (P2) **stuck 상태 복구 경로.** `BackgroundTasks` 는 재시도가 없어 프로세스 재시작 시 진행 중이던 회의가 `transcribing`/`analyzing` 으로 영구 정지한다. 2026-08-14 에 그렇게 좌초한 8건(E2E 6 + uploading 2)을 수동 삭제했다. `mise run deploy-preflight` 가 최근 2시간만 검사하도록 우회했을 뿐 근본 해결이 아니다.
 - [ ] **BL-OCI-5** (P3) **R2 고아 파일 정리.** 삭제된 회의의 원본이 버킷에 남는다. `r2-cleanup.yml` 은 `workflow_dispatch` 전용(cron 미설정)이라 수동 실행이 필요하다. 현재 잔여량은 수십 KB 수준이라 급하지 않다. CI 복구(2026-08-16)로 실행 가능 — `gh workflow run r2-cleanup.yml -f delete=false` dry-run 먼저.
 - [ ] **BL-OCI-6** (P2) **dev 와 prod 가 같은 Neon DB(`neondb`) 를 쓰고 있었다.** 로컬 개발이 운영 데이터를 직접 건드리는 구조. 오라클 이전으로 prod 는 분리됐지만 로컬 개발 DB 분리는 미해결.
 - [ ] **BL-ADR027-OASDIFF** (P3) OpenAPI breaking-change 게이트(oasdiff). 트리거: 외부/모바일 API 소비자 첫 등장. 현재는 FE·BE 가 같은 PR 원자 변경 → `api.gen.ts` diff + FE typecheck 이 그 역할 대행 (ADR-027 D5).

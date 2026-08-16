@@ -5,14 +5,14 @@ OCI 단일 VM 위 컨테이너로 배포된다 ([ADR-028](../../docs/adr/028-oci
 
 ## 실행
 
-명령은 루트 `justfile` 이 단일 진입점이다.
+명령은 루트 `mise.toml` 이 단일 진입점이다.
 
 ```bash
-just install      # uv sync --frozen
-just be-migrate   # alembic upgrade head
-just be-dev       # uvicorn :8000
-just be-test      # pytest (CI 와 문자 동일 호출)
-just contracts    # OpenAPI 계약 + FE 타입 재생성
+mise run install      # uv sync --frozen
+mise run be-migrate   # alembic upgrade head
+mise run be-dev       # uvicorn :8000
+mise run be-test      # pytest (CI 와 문자 동일 호출)
+mise run contracts    # OpenAPI 계약 + FE 타입 재생성
 ```
 
 환경변수는 `.env.example` → `.env`. 전체 매트릭스는
@@ -39,7 +39,7 @@ src/
 - **`uvicorn --workers` 를 1 에서 늘리지 않는다.** `services/ai_resilience.py` 의 circuit breaker 와
   `auth` 의 JWT/User 캐시가 **in-process 싱글턴**이라 멀티워커에서 상태가 파편화된다
 - **`BackgroundTasks` 는 재시도가 없다.** 프로세스가 교체되면 진행 중이던 회의가 중간 상태로 남는다 →
-  배포 전 `just deploy-preflight` 필수. 복구 절차는
+  배포 전 `mise run deploy-preflight` 필수. 복구 절차는
   [런북](../../docs/operations/runbooks/stuck-pipeline.md)
 - 마이그레이션은 앱 기동과 분리된 one-shot 컨테이너가 적용한다 (crash-loop 방지)
 
