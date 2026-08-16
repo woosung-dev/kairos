@@ -97,8 +97,19 @@ GCP 프로젝트 Kairos + OAuth 클라이언트 발급, 서버 ~/kairos/.env 10�
 > 끝내는 형태다. 스키마 리비전이 100% 가산/완화형이라 **구 api 이미지가 새 스키마 위에서
 > 그대로 동작**하기 때문에 성립한다 (ADR-031 D7).
 
+> #### ⚠️ `pg_dump` 는 D-0 이 아니라 여기(D-1 ⓪)다
+>
+> 스키마가 실제로 바뀌는 시점이 D-1 ④ 로 앞당겨졌으므로 백업도 같이 앞당긴다.
+> D-0 체크리스트에 남겨두면 **스키마 변경 뒤에 백업하는 순서**가 되어 2층 롤백이 무의미해진다.
+> 검증까지가 백업이다 — 파일 크기만 보고 넘어가면 손상된 덤프를 안전망으로 착각한다.
+
 ```bash
 TAG=$(git rev-parse --short HEAD)
+
+# ⓪ 프로덕션 DB 백업 + 무결성 검증 (스키마 변경 전 유일한 안전망)
+ssh truewords-oracle 'docker exec -i kairos-db pg_dump -U kairos -d kairos -Fc' > ~/kairos-backup-$(date +%Y%m%d).dump
+cat ~/kairos-backup-$(date +%Y%m%d).dump | ssh truewords-oracle 'docker exec -i kairos-db pg_restore --list' | grep -cE '^[0-9]+;'
+#   → 0 이면 덤프 손상. 로컬에 pg_restore 가 없어도 서버 컨테이너 것을 빌려 쓰면 검증된다
 
 # ① 사전 게이트 + arm64 네이티브 빌드 (맥)
 just deploy-preflight
@@ -135,12 +146,35 @@ D-1 스모크 4항목 (전부 `ssh truewords-oracle` 안에서):
 - **`web` DNS 이름 검증** — 임시 컨테이너 이름이 `web-smoke` 라 `AUTH_JWKS_URL=http://web:3000/...`
   의 호스트명 자체는 D-0 에서 처음 쓰인다 (네트워크 도달성은 2번이 증명)
 
+#### ✅ D-1 실행 결과 (2026-08-17, TAG `9e7dcf8`)
+
+| 단계 | 결과 |
+|---|---|
+| ⓪ 백업 | `~/kairos-backup-20260817.dump` 1.2MB · `pg_restore --list` 261 오브젝트 |
+| ① preflight | 진행 중 회의 `0` · 인코딩 게이트 0줄 |
+| ② 빌드 | `kairos-api:9e7dcf8` 963MB / `kairos-web:9e7dcf8` 236MB (맥 기준) |
+| ② 번들 검증 | founder UUID 2파일 · API URL 2파일 · better-auth 32파일 · **`.next/static` 의 clerk 0파일** |
+| ③ 전송 | 서버 적재 완료. `.env` 태그는 `d761615` 유지 |
+| ④ migrate | `7f6b8c9d0e1f -> c1a7e0b5d3f2`. `auth_*` 5테이블 · `users.auth_user_id` · `clerk_id` nullable=YES · `users` 16행 / `meetings` 98행 무손상 |
+| ⑤ 스모크 1 | `{"alg":"EdDSA","crv":"Ed25519","kty":"OKP","kid":...}` |
+| ⑤ 스모크 2 | api → `web-smoke:3000` **200** |
+| ⑤ 스모크 3 | mem **56.5MiB** / 11.65GiB (idle). `mem_limit: 768m` 은 충분 — 단 scrypt 부하 시 측정이 아니다 |
+| ⑤ 스모크 4 | 로그 에러 0건 |
+| 정리 | `web-smoke` 제거. `auth_jwks` 1행 잔존 (D-0 에 그대로 쓰인다) |
+
+★**ADR-031 D7 이 실측으로 증명됐다.** 스키마 변경 후에도 구 이미지 컨테이너가
+**재생성 없이**(`api`/`web` 둘 다 `Up 4 hours (healthy)`) `ready=200` / `web=200` 을 유지했다.
+"롤백은 이미지 태그만으로 완결" 이 추정이 아니라 관측이다.
+
+★서버에 `kairos-api:d761615` / `kairos-web:d761615` 이미지가 실재함을 확인했다 —
+`just deploy-rollback d761615` 가 이미지 pull 없이 즉시 성립한다.
+
 **D-0 · 컷오버** — ⏱ **다운타임 2~4분 + 전원 재가입.**
 
 D-1 을 마쳤다면 이미지와 스키마는 이미 서버에 있다. 남은 것은 **태그 2줄 교체**뿐이라
 다운타임이 이미지 전송 시간과 무관해진다.
 
-1. ☐ **`pg_dump -Fc` 로컬 저장** ← 빼먹으면 2층 롤백이 통째로 사라진다 (DB 백업 자동화 BL-OCI-1 미완)
+1. ☐ **백업은 D-1 ⓪ 에서 이미 받았다** — D-1 이후 새 회의가 들어왔다면 다시 받는다 (DB 백업 자동화 BL-OCI-1 미완)
 2. ☐ `just deploy-preflight` (진행 중 회의 0 — BackgroundTasks 는 재시도가 없다)
 3. ☐ `docker compose -f docker-compose.prod.yml stop web api` → 다운타임 시작
 4. ☐ **`.env` 태그 2줄 교체 + `up -d`** — 이미지는 D-1 에 적재됐으므로 재전송하지 않는다:
@@ -150,7 +184,7 @@ D-1 을 마쳤다면 이미지와 스키마는 이미 서버에 있다. 남은 �
      docker compose -f docker-compose.prod.yml up -d\""
    ```
    `just deploy-ship $TAG` 를 써도 결과는 같지만 이미지를 다시 전송하느라 다운타임이 길어진다
-5. ☐ **`curl .../api/auth/jwks` 1회** — Better Auth 는 키를 lazy 생성한다. 안 하면 첫 로그인 사용자가 JWKS 빈 셋을 맞는다 (D-1 ④를 했다면 이미 생성돼 있고, 여기서는 `web` DNS 이름과 공개 경로 확인이 목적이다)
+5. ☐ **`curl https://kairos.woosung.dev/api/auth/jwks` 1회** — 2026-08-17 D-1 ⑤에서 키가 이미 생성됐다(`auth_jwks` 1행, `BETTER_AUTH_SECRET` 동일하므로 그대로 유효). 따라서 여기서는 lazy 생성 트리거가 아니라 **`web` DNS 이름 + Cloudflare 공개 경로 확인**이 목적이다
 6. ☐ **Google 로그인 1회 완주** → `SELECT * FROM auth_account WHERE "providerId"='google'` 1행 (D-1 에서 못 한 항목)
 7. ☐ 창업자 재가입 → **재연결 SQL** (아래 함정)
 8. ☐ `just deploy-status` + `/dashboard` 로그인 관통 → 다운타임 종료
