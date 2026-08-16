@@ -1,4 +1,4 @@
-# apps/backend/src/services/ai_processing.py
+# apps/api/src/services/ai_processing.py
 """Gemini AI 처리 서비스. 모든 LLM 호출을 여기서 집중 관리."""
 import logging
 from collections.abc import AsyncGenerator

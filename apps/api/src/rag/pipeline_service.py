@@ -1,4 +1,4 @@
-# apps/backend/src/rag/pipeline_service.py
+# apps/api/src/rag/pipeline_service.py
 """RAG 오케스트레이터 — visibility/member 검증 + RagService.ask AsyncGenerator 위임.
 
 ADR-014 옵션 A: D-3 부채(rag → embeddings.{models, repository, service}) 해소 1차.

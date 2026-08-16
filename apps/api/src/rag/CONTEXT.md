@@ -2,7 +2,7 @@
 
 # rag CONTEXT
 
-> 상위: `/apps/backend/CONTEXT.md` → `/CONTEXT-MAP.md`. 상세 설계: `docs/architecture/rag-pipeline.md`.
+> 상위: `/apps/api/CONTEXT.md` → `/CONTEXT-MAP.md`. 상세 설계: `docs/architecture/rag-pipeline.md`.
 
 ---
 
@@ -86,7 +86,7 @@
 | R-11 | **Gemini 예외는 graceful** — SafetyFilter / API 오류 / 네트워크 오류 발생 시 5xx 대신 SSE `error` + `done` 이벤트 송출 (Sprint 14 BUG-C01). 캐시 오염 방지를 위해 SemanticCache 저장 skip. 빈 답변(`full_answer.strip() == ""`)도 동일 정책. |
 | R-12 | **질문 입력 검증** — `RagAskRequest.question` 은 strip 후 2자 이상 + 500자 이하 (Sprint 14 BUG-C01). prompt-injection 류 거대 입력 차단 + Pydantic 422로 5xx 회피. |
 | R-13 | **Layer 1/3 진입 시 HNSW 세션 변수 강제** (Sprint 16 ADR-020 + CONTEXT-MAP I-21). `embeddings/repository.py`의 `_apply_hnsw_session_params(session)` 헬퍼가 `vector_search` / `find_similar_cache` 진입 직전 `SET LOCAL hnsw.ef_search=40` + `iterative_scan=relaxed_order` + `max_scan_tuples=20000` 적용. RAG 서비스가 별도 호출하지 않음 (embeddings 도메인 캡슐화). 결과: RBAC/visibility 포스트필터 적용 시 결과 부족 자동 해소. |
-| R-14 | **외부 원본 source type** — `source_type` 허용값 SSOT는 `apps/backend/src/embeddings/repository.py`의 `_ALLOWED_SOURCE_TYPES`다. `save_chunk` insert 경로는 이 화이트리스트를 assert하고 `save_chunks`는 이를 우회하므로, `external_document`는 검증된 `save_chunk` 경로로 저장해 RAG 검색을 허용한다. 새 source type은 화이트리스트와 FE의 `(A)` 타입 union, `(B)` 좁은 캐스트/const 목록, `(C)` 라벨·아이콘·분기 구분을 함께 갱신한다. 상세 결정은 `docs/adr/026-external-source-ingest-rail.md` D6을 따른다. 검색 대상은 R-1에 따라 `chunk_level = 2`만이다. |
+| R-14 | **외부 원본 source type** — `source_type` 허용값 SSOT는 `apps/api/src/embeddings/repository.py`의 `_ALLOWED_SOURCE_TYPES`다. `save_chunk` insert 경로는 이 화이트리스트를 assert하고 `save_chunks`는 이를 우회하므로, `external_document`는 검증된 `save_chunk` 경로로 저장해 RAG 검색을 허용한다. 새 source type은 화이트리스트와 FE의 `(A)` 타입 union, `(B)` 좁은 캐스트/const 목록, `(C)` 라벨·아이콘·분기 구분을 함께 갱신한다. 상세 결정은 `docs/adr/026-external-source-ingest-rail.md` D6을 따른다. 검색 대상은 R-1에 따라 `chunk_level = 2`만이다. |
 | R-15 | **SemanticCache 출처 무결성** (2026-08-01) — **읽기**: 비-admin 요청자에게는 `sources` 청크의 실제 가시성을 매번 재검사한다. 행이 없는 청크는 위반으로 본다. `max_visibility` 라벨은 더 이상 검증을 건너뛰는 근거가 아니다. **쓰기**: source 청크가 하나라도 사라진 상태에서는 캐시행을 만들지 않는다. admin/owner 우회는 검색 경로와 같은 정책으로 유지한다. |
 
 > `max_visibility`는 BL-042의 fast path 인덱스에서 저장 시점 라벨로 강등됐다. 브라우저 QA의 scenario_b는 소스 청크가 살아 있는 상태에서 프로젝트 visibility가 `public`에서 `private`로 바뀌어 라벨이 stale해졌고, 변경 전에는 누출됐으나 현재 비-admin 요청에서는 차단됨을 관측했다 (`.claude/spike-gdrive/artifacts/QA.qa.json`, 2026-08-01).

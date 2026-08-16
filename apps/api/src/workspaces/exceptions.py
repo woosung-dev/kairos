@@ -1,4 +1,4 @@
-# apps/backend/src/workspaces/exceptions.py
+# apps/api/src/workspaces/exceptions.py
 """Workspace 도메인 예외."""
 from fastapi import HTTPException
 

@@ -49,7 +49,7 @@ gcloud scheduler jobs create http memory-r2-cleanup \
 
 ```bash
 # 로컬
-cd apps/backend && uv run uvicorn src.main:app --reload
+cd apps/api && uv run uvicorn src.main:app --reload
 # 다른 터미널
 curl -X POST http://localhost:8000/api/v1/admin/memory/r2-cleanup \
   -H "X-Cron-Token: $CRON_SECRET_TOKEN"

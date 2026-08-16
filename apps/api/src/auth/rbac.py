@@ -1,4 +1,4 @@
-# apps/backend/src/auth/rbac.py
+# apps/api/src/auth/rbac.py
 """역할 기반 접근 제어 (RBAC). Depends()로 라우터에 주입."""
 import logging
 import time

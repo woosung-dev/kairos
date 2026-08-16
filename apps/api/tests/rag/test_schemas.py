@@ -1,4 +1,4 @@
-# apps/backend/tests/rag/test_schemas.py
+# apps/api/tests/rag/test_schemas.py
 """RagAskRequest Pydantic 검증 단위 테스트 (T-1 BUG-C01)."""
 import pytest
 from pydantic import ValidationError

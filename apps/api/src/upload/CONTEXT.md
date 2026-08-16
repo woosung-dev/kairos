@@ -2,7 +2,7 @@
 
 # upload CONTEXT
 
-> 상위: `/apps/backend/CONTEXT.md` → `/CONTEXT-MAP.md`.
+> 상위: `/apps/api/CONTEXT.md` → `/CONTEXT-MAP.md`.
 
 ---
 
@@ -57,7 +57,7 @@
 ## 7. 모듈 구조 (Sprint 25 T-SEC-3 expansion)
 
 ```
-apps/backend/src/upload/
+apps/api/src/upload/
 ├── router.py        # HTTP wire + UploadValidator Depends
 ├── service.py       # UploadValidator (AsyncSession 없음 — stateless)
 ├── exceptions.py    # 5 도메인 예외 (Empty/TooLarge/UnsupportedMime/MimeExtMismatch/ContentMismatch)
@@ -70,7 +70,7 @@ settings (env override 가능):
 
 ## 8. 검증 매트릭스
 
-`apps/backend/tests/upload/test_upload_validation.py` 6 case:
+`apps/api/tests/upload/test_upload_validation.py` 6 case:
 
 | 시나리오 | declared MIME | 확장자 | content | 결과 |
 |---|---|---|---|---|

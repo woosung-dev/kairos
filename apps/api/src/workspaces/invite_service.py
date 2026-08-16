@@ -1,4 +1,4 @@
-# apps/backend/src/workspaces/invite_service.py
+# apps/api/src/workspaces/invite_service.py
 """초대/멤버 관리 서비스 — AsyncSession import 금지."""
 import secrets
 import string

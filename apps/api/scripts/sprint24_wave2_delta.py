@@ -5,7 +5,7 @@ worktree 한쪽에서 실행 → 결과 JSON dump.
 baseline = `003908a~1` checkout 한 별도 worktree, post-swap = main worktree.
 
 Usage:
-  cd apps/backend
+  cd apps/api
   uv run python -m scripts.sprint24_wave2_delta --output /tmp/post-swap.json
 
 Codex F-2 fix: AIProcessingService 는 class. 인스턴스 method 호출.

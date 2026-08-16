@@ -1,4 +1,4 @@
-# apps/backend/src/actions/models.py
+# apps/api/src/actions/models.py
 """ActionItem 관련 모델."""
 import uuid
 from datetime import date, datetime

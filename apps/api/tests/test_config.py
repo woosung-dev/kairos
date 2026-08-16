@@ -1,4 +1,4 @@
-# apps/backend/tests/test_config.py
+# apps/api/tests/test_config.py
 """Settings 로딩 테스트."""
 import os
 import pytest

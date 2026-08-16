@@ -1,4 +1,4 @@
-# apps/backend/src/embeddings/service.py
+# apps/api/src/embeddings/service.py
 """임베딩 서비스 — 청킹 + OpenAI 임베딩 생성 + 저장.
 
 I-9 4-C 진입 assertion은 `EmbeddingRepository.save_chunk` 가 강제한다.

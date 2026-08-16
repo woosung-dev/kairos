@@ -1,4 +1,4 @@
-# apps/backend/src/auth/repository.py
+# apps/api/src/auth/repository.py
 """User Repository — AsyncSession 유일 보유자."""
 import uuid
 

@@ -11,7 +11,7 @@ deepening sprint 에서 `common/database.py` → `core/database.py` 이동으로
 import re
 from pathlib import Path
 
-# apps/backend/tests/architecture/* → apps/backend/ 까지 3-up
+# apps/api/tests/architecture/* → apps/api/ 까지 3-up
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 CORE_DIR = BACKEND_ROOT / "src" / "core"
 

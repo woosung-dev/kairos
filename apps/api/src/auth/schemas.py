@@ -1,4 +1,4 @@
-# apps/backend/src/auth/schemas.py
+# apps/api/src/auth/schemas.py
 """Auth 스키마."""
 import uuid
 from datetime import datetime

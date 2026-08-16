@@ -1,4 +1,4 @@
-# apps/backend/src/meetings/router.py
+# apps/api/src/meetings/router.py
 """Meeting 라우터 — HTTP 전용."""
 import uuid
 

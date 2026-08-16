@@ -1,4 +1,4 @@
-# apps/backend/tests/rag/test_rag_service.py
+# apps/api/tests/rag/test_rag_service.py
 """RagService 단위 테스트 — RRF + 캐시 HIT/MISS."""
 import json
 import logging

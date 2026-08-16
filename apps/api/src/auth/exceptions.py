@@ -1,4 +1,4 @@
-# apps/backend/src/auth/exceptions.py
+# apps/api/src/auth/exceptions.py
 """Auth 도메인 예외."""
 from src.common.exceptions import NotFoundError, UnauthorizedError
 

@@ -8,18 +8,18 @@ default:
     @just --list
 
 install:
-    cd apps/backend && uv sync --frozen
+    cd apps/api && uv sync --frozen
     cd apps/web && pnpm install --frozen-lockfile
 
 be-dev:
-    cd apps/backend && uv run uvicorn src.main:app --reload --port 8000
+    cd apps/api && uv run uvicorn src.main:app --reload --port 8000
 
 # CI 와 동일 (README 의 `uv run pytest -v` 아님 — transcription/r2-cors 2개 제외가 정본)
 be-test:
-    cd apps/backend && uv run pytest --ignore=tests/services/test_transcription.py --ignore=tests/test_r2_cors_regression.py -v
+    cd apps/api && uv run pytest --ignore=tests/services/test_transcription.py --ignore=tests/test_r2_cors_regression.py -v
 
 be-migrate:
-    cd apps/backend && uv run alembic upgrade head
+    cd apps/api && uv run alembic upgrade head
 
 fe-dev:
     cd apps/web && pnpm dev
@@ -41,7 +41,7 @@ e2e:
 
 # ── API 계약 (ADR-027 D2) ─────────────────────────────────────────────
 openapi-export:
-    cd apps/backend && uv run python -m scripts.export_openapi
+    cd apps/api && uv run python -m scripts.export_openapi
 
 types-gen:
     cd apps/web && pnpm gen:api
@@ -75,7 +75,7 @@ deploy-preflight:
 
 # 이미지 2종 arm64 빌드. FE 는 NEXT_PUBLIC_* 이 빌드타임 인라인이라 build.env 가 필요하다.
 deploy-build TAG:
-    docker buildx build --platform linux/arm64 -t kairos-api:{{TAG}} --load apps/backend
+    docker buildx build --platform linux/arm64 -t kairos-api:{{TAG}} --load apps/api
     set -a && source deploy/oci/build.env && set +a && \
       docker buildx build --platform linux/arm64 -t kairos-web:{{TAG}} --load \
         --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \

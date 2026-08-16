@@ -1,4 +1,4 @@
-# apps/backend/src/auth/models.py
+# apps/api/src/auth/models.py
 """User 모델."""
 import uuid
 from datetime import datetime

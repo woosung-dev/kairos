@@ -1,4 +1,4 @@
-# apps/backend/src/meetings/repository.py
+# apps/api/src/meetings/repository.py
 """Meeting Repository — AsyncSession 유일 보유자. 헌법 I-9 workspace_id 필수 (Sprint 19 PR #1)."""
 import uuid
 

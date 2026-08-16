@@ -4,14 +4,14 @@
 #
 # 의존: ffmpeg (brew install ffmpeg) — 검증 통과 (v8.1.1)
 # 사용:
-#   chmod +x apps/backend/scripts/record_samples.sh
-#   bash apps/backend/scripts/record_samples.sh
-#   bash apps/backend/scripts/record_samples.sh --device 0   # 마이크 device index 명시
-#   bash apps/backend/scripts/record_samples.sh --skip-long  # 5min 큰 sample skip
-#   bash apps/backend/scripts/record_samples.sh --silent-only  # silent 1개만
+#   chmod +x apps/api/scripts/record_samples.sh
+#   bash apps/api/scripts/record_samples.sh
+#   bash apps/api/scripts/record_samples.sh --device 0   # 마이크 device index 명시
+#   bash apps/api/scripts/record_samples.sh --skip-long  # 5min 큰 sample skip
+#   bash apps/api/scripts/record_samples.sh --silent-only  # silent 1개만
 #
-# 출력: apps/backend/scripts/samples/*.webm + *.mp4
-# 후속: cd apps/backend && uv run python scripts/sprint15_day0_spike.py
+# 출력: apps/api/scripts/samples/*.webm + *.mp4
+# 후속: cd apps/api && uv run python scripts/sprint15_day0_spike.py
 
 set -euo pipefail
 
@@ -158,5 +158,5 @@ ls -lh "$SAMPLES_DIR" | grep -E "\.(webm|mp4)$"
 
 echo ""
 echo "===== 다음 단계 ====="
-echo "  cd apps/backend && uv run python scripts/sprint15_day0_spike.py"
+echo "  cd apps/api && uv run python scripts/sprint15_day0_spike.py"
 echo "  # 결과 → git history §3.1 / §3.3 audio 결과 paste"

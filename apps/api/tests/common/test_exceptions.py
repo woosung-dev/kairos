@@ -1,4 +1,4 @@
-# apps/backend/tests/common/test_exceptions.py
+# apps/api/tests/common/test_exceptions.py
 """common/exceptions.py — NotFoundError/AlreadyExistsError/UnauthorizedError/ForbiddenError.
 
 FastAPI HTTPException 서브클래스 상태 코드 + 메시지 회귀 가드.

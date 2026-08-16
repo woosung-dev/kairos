@@ -28,7 +28,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 | ActionItem | Task, Todo, Issue |
 | MemoryItem | Memory (단독), Capture (Capture 는 동사), Snippet |
 
-> 그 외 (TranscriptSegment / MeetingSummary / EmbeddingChunk / SemanticCache / Note / User) 의 별칭 금지는 `apps/backend/src/<domain>/CONTEXT.md` 에 도메인별 명시.
+> 그 외 (TranscriptSegment / MeetingSummary / EmbeddingChunk / SemanticCache / Note / User) 의 별칭 금지는 `apps/api/src/<domain>/CONTEXT.md` 에 도메인별 명시.
 
 ## 3. CODE 메서드
 
@@ -53,7 +53,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 | cross-domain shared service (`embeddings` / `ai_processing` / `transcription`) | orchestrator (`<domain>/pipeline_service.py` 또는 `services/`) 경계 내부만 |
 | 3+ 모듈 + commit 트랜잭션 | orchestrator 필수 |
 
-강제: code review + `apps/backend/tests/architecture/test_no_memory_to_embeddings_lazy_import.py` (Sprint 24 Wave 2 BL-006 회귀 방지).
+강제: code review + `apps/api/tests/architecture/test_no_memory_to_embeddings_lazy_import.py` (Sprint 24 Wave 2 BL-006 회귀 방지).
 
 ### 4.3 프론트엔드 features (FSD)
 
@@ -63,11 +63,11 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 `Project.visibility = public / draft / private`. public = workspace 전체. draft = creator(작성자) 전용 (admin/owner 우회). private = ProjectMember 만 (admin/owner 우회) + RAG 검색 자동 제외. 별칭 금지: hidden / secret / closed.
 
-> 2026-05-29 전체정검 정정 (BUG-DRAFT-DOC-CONTRADICTION): 이전엔 draft="ProjectMember 만"으로 기술됐으나 실제 코드(`apps/backend/src/projects/repository.py` `_apply_visibility_filter`)는 draft=creator-only 이며 2계정 라이브로 확정됨(member 가 타인 draft 미접근, 404). 코드 = source of truth, `projects/CONTEXT.md` P-5 와도 정합.
+> 2026-05-29 전체정검 정정 (BUG-DRAFT-DOC-CONTRADICTION): 이전엔 draft="ProjectMember 만"으로 기술됐으나 실제 코드(`apps/api/src/projects/repository.py` `_apply_visibility_filter`)는 draft=creator-only 이며 2계정 라이브로 확정됨(member 가 타인 draft 미접근, 404). 코드 = source of truth, `projects/CONTEXT.md` P-5 와도 정합.
 
 `WorkspaceInvite.default_project_visibility` = 초대 가입 사용자 기본값.
 
-> **SSOT (2026-07-13 visibility 통합 리팩토링)**: 규칙 구현은 `apps/backend/src/common/visibility.py` 단일 파일 (decide_project_access + ORM clause + raw SQL 상수). 과거 6 도메인 13 사이트 복붙 → 사본별 보안 버그 독립 재발 이력. 사본 재발은 arch gate `tests/architecture/test_visibility_single_source.py` 가 CI 차단. admin/owner·내부호출 우회 분기만 사이트 소유 (D1/D6 — 사이트별 fail 방향 상이).
+> **SSOT (2026-07-13 visibility 통합 리팩토링)**: 규칙 구현은 `apps/api/src/common/visibility.py` 단일 파일 (decide_project_access + ORM clause + raw SQL 상수). 과거 6 도메인 13 사이트 복붙 → 사본별 보안 버그 독립 재발 이력. 사본 재발은 arch gate `tests/architecture/test_visibility_single_source.py` 가 CI 차단. admin/owner·내부호출 우회 분기만 사이트 소유 (D1/D6 — 사이트별 fail 방향 상이).
 
 ## 6. 핵심 불변식 (위반 즉시 중단)
 
@@ -86,7 +86,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 | I-11 | shadcn `components/ui/` 수정 금지 | `apps/web/src/components/ui/` |
 | I-12 | 언어 정책: 사고/문서/주석 한국어, 코드/네이밍 영어 | AGENTS.md §1 |
 | I-13 | API workspace prefix: `/api/v1/workspaces/{workspace_id}/<resource>` (예외: auth `/api/v1/users`, user-level `/api/v1/feedback` — 워크스페이스 비종속 dogfooding 피드백, OAuth callback `/api/v1/integrations/google-drive/callback` — Google Cloud Console에 사전 등록하는 고정 redirect URI에는 `workspace_id`를 경로에 넣을 수 없으므로, 서명된 state의 `workspace_id`·요청자 ID·nonce·PKCE·만료를 검증해 I-9 격리를 보전; ADR-026 D9) | `<domain>/router.py` |
-| I-14 | Pydantic V2 + 100% async + SQLModel typed query (Sprint 20 BL-054): 상세 allowlist (G1~G3-keep-dialect 5 카테고리) `apps/backend/CONTEXT.md` B-10 | code review |
+| I-14 | Pydantic V2 + 100% async + SQLModel typed query (Sprint 20 BL-054): 상세 allowlist (G1~G3-keep-dialect 5 카테고리) `apps/api/CONTEXT.md` B-10 | code review |
 | I-15 | Secret 은 `SecretStr`, 사용 시 `.get_secret_value()` | `core/config.py` |
 | I-16 | DB snake_case ↔ API camelCase: Pydantic alias 변환 | `<domain>/schemas.py` |
 | I-17 | cross-workspace ProjectMember 추가 차단 = ProjectService. add_member 시 WorkspaceRepository.find_member 검증, None → `CrossWorkspaceMemberError(403)`. I-9(read)와 분리된 write 검증 | `projects/service.py:add_member` |
@@ -106,7 +106,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 ## 8. 진입점
 
-순서: `CONTEXT-MAP.md` → `AGENTS.md` → `DESIGN.md` → 작업 도메인 `apps/backend/src/<domain>/CONTEXT.md` → `docs/TODO.md`. 상세: `docs/README.md`.
+순서: `CONTEXT-MAP.md` → `AGENTS.md` → `DESIGN.md` → 작업 도메인 `apps/api/src/<domain>/CONTEXT.md` → `docs/TODO.md`. 상세: `docs/README.md`.
 
 ## 9. 문서 갱신 원칙
 

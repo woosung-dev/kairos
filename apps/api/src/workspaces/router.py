@@ -1,4 +1,4 @@
-# apps/backend/src/workspaces/router.py
+# apps/api/src/workspaces/router.py
 """Workspace 라우터 — HTTP 전용."""
 import uuid
 

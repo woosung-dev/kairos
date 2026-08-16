@@ -1,7 +1,7 @@
 """OpenAPI 계약 export → contracts/openapi/v1/openapi.json (ADR-027 D2).
 
 사용:
-    cd apps/backend && uv run python -m scripts.export_openapi
+    cd apps/api && uv run python -m scripts.export_openapi
     (루트에서는 `just openapi-export`)
 
 CI:
@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 # src.main import 는 Settings 필수 필드 전부를 요구 (src/core/config.py).
-# 로컬은 apps/backend/.env 가 채우고, CI/신규 클론은 아래 fake 로 충족한다
+# 로컬은 apps/api/.env 가 채우고, CI/신규 클론은 아래 fake 로 충족한다
 # (test.yml backend-test job 의 fake env 블록과 동일 세트).
 # 스키마 내용은 env "값"과 무관 — 출력 결정성에 영향 없음.
 # 프로덕션의 openapi_url=None 게이팅(T-SEC-5)은 URL 노출만 막을 뿐
@@ -39,7 +39,7 @@ for _k, _v in _FAKE_ENV.items():
 
 from src.main import app  # noqa: E402 — env 주입 후 import 필수
 
-# scripts → apps/backend → apps → 레포 루트
+# scripts → apps/api → apps → 레포 루트
 OUT = Path(__file__).resolve().parents[3] / "contracts" / "openapi" / "v1" / "openapi.json"
 
 

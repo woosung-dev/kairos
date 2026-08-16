@@ -1,4 +1,4 @@
-# apps/backend/src/workspaces/templates.py
+# apps/api/src/workspaces/templates.py
 """워크스페이스 생성 시 자동 시딩되는 템플릿 프로젝트 정의."""
 
 

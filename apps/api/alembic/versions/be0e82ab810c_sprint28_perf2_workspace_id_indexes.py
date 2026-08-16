@@ -13,7 +13,7 @@ dashboard fanout 의 각 endpoint 1.5-2.5s 중 일부 = workspace_id WHERE seq s
 notes/models.py:22 만 `index=True` 정합 — 나머지 3 entity 균일 적용.
 
 production 안전: `CREATE INDEX CONCURRENTLY` 명시 (ACCESS EXCLUSIVE lock 회피).
-alembic 의 ddl autocommit_block + CONCURRENTLY 사용은 apps/backend/AGENTS.md §9 정합 패턴.
+alembic 의 ddl autocommit_block + CONCURRENTLY 사용은 apps/api/AGENTS.md §9 정합 패턴.
 """
 from collections.abc import Sequence
 

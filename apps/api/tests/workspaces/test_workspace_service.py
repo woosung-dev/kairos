@@ -1,4 +1,4 @@
-# apps/backend/tests/workspaces/test_workspace_service.py
+# apps/api/tests/workspaces/test_workspace_service.py
 """WorkspaceService 단위 테스트 — 템플릿 프로젝트 시딩 검증."""
 import uuid
 from datetime import datetime

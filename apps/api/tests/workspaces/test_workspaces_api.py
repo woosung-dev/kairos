@@ -1,4 +1,4 @@
-# apps/backend/tests/workspaces/test_workspaces_api.py
+# apps/api/tests/workspaces/test_workspaces_api.py
 """Workspaces API 통합 테스트."""
 import uuid
 from unittest.mock import AsyncMock, MagicMock

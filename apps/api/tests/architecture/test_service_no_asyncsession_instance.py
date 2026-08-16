@@ -13,7 +13,7 @@ architecture deepening sprint(BL-S27e-F)에서 LazySeedService 추출 시 본 al
 import re
 from pathlib import Path
 
-# apps/backend/tests/architecture/* → apps/backend/ 까지 3-up
+# apps/api/tests/architecture/* → apps/api/ 까지 3-up
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = BACKEND_ROOT / "src"
 

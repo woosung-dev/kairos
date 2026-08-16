@@ -1,4 +1,4 @@
-# apps/backend/tests/inbox/test_inbox_service.py
+# apps/api/tests/inbox/test_inbox_service.py
 """InboxService 단위 테스트 — list / classify / dismiss / _to_dict.
 
 기존 inbox 테스트 부재 (BL-029 backlog 검토 시 발견). 287 LOC 도메인 무 coverage 였음.

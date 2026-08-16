@@ -1,4 +1,4 @@
-# apps/backend/src/inbox/router.py
+# apps/api/src/inbox/router.py
 """Inbox 라우터 — HTTP 전용."""
 import uuid
 

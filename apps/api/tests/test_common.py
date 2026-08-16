@@ -1,4 +1,4 @@
-# apps/backend/tests/test_common.py
+# apps/api/tests/test_common.py
 """공통 유틸 테스트."""
 import pytest
 

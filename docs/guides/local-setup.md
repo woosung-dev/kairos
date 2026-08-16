@@ -15,7 +15,7 @@
 ```bash
 git clone <repository-url> kairos
 cd kairos
-just install   # = apps/backend uv sync --frozen + apps/web pnpm install --frozen-lockfile
+just install   # = apps/api uv sync --frozen + apps/web pnpm install --frozen-lockfile
 ```
 
 ## 2. 환경 변수 설정

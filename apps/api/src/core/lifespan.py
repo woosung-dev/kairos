@@ -1,4 +1,4 @@
-# apps/backend/src/core/lifespan.py
+# apps/api/src/core/lifespan.py
 """FastAPI lifespan — startup/shutdown 관리."""
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager

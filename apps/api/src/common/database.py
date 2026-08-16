@@ -1,4 +1,4 @@
-# apps/backend/src/common/database.py
+# apps/api/src/common/database.py
 """비동기 DB 엔진 및 세션 관리."""
 from collections.abc import AsyncGenerator
 

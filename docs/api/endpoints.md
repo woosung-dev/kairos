@@ -220,7 +220,7 @@ Clerk Production 인스턴스 미발급 + Clerk webhook SKIP lock-in
 이전 핸들러는 인증/Svix 서명 검증 부재로 임의 user row 생성·덮어쓰기
 가능 PoC 실측 (Multi-Agent QA 2026-05-21 Sentinel P0). 현재 POST
 요청 시 404/405 반환. GA launch 시 Svix 검증 추가 + 재도입은 별도
-sprint. 회귀 가드: `apps/backend/tests/auth/test_auth_sync_disabled.py`.
+sprint. 회귀 가드: `apps/api/tests/auth/test_auth_sync_disabled.py`.
 
 ---
 
@@ -354,7 +354,7 @@ sprint. 회귀 가드: `apps/backend/tests/auth/test_auth_sync_disabled.py`.
 > 프록시 업로드 endpoint 에 4계층 검증 적용 — size (env `MAX_UPLOAD_BYTES`,
 > 기본 500MB) / MIME 화이트리스트 (env `ALLOWED_UPLOAD_MIMES`, audio/* +
 > application/pdf + text/*) / 확장자 정합 / content signature sniff. 위반 시
-> 400/413/415 응답. 회귀 가드: `apps/backend/tests/upload/test_upload_validation.py`.
+> 400/413/415 응답. 회귀 가드: `apps/api/tests/upload/test_upload_validation.py`.
 
 #### `POST /api/v1/upload/presigned-url`
 
@@ -385,7 +385,7 @@ Cloudflare R2 프리사인드 업로드 URL을 발급한다. 클라이언트는 
 
 ### Meetings
 
-> **Tenant boundary (Sprint 19 PR #1, Codex F-1/F-4/F-6 반영)**: 모든 endpoint 는 `require_member` (POST) / `require_viewer` (GET) 통과. service / repository / pipeline 모든 호출이 path `workspace_id` 동반. cross-tenant `meeting_id` 시도 → 404 (NotFound). pipeline 진입점 (`process_meeting`, `capture_text`) + 내부 mutation (`update_status` / `set_has_*` / `save_*`) 시그니처 모두 workspace_id 필수. secondary FK 없음 (meeting 자체는 workspace 직접 FK). 회귀 가드: `apps/backend/tests/integration/test_workspace_idor_matrix.py::TestMeetingsIDORMatrix`.
+> **Tenant boundary (Sprint 19 PR #1, Codex F-1/F-4/F-6 반영)**: 모든 endpoint 는 `require_member` (POST) / `require_viewer` (GET) 통과. service / repository / pipeline 모든 호출이 path `workspace_id` 동반. cross-tenant `meeting_id` 시도 → 404 (NotFound). pipeline 진입점 (`process_meeting`, `capture_text`) + 내부 mutation (`update_status` / `set_has_*` / `save_*`) 시그니처 모두 workspace_id 필수. secondary FK 없음 (meeting 자체는 workspace 직접 FK). 회귀 가드: `apps/api/tests/integration/test_workspace_idor_matrix.py::TestMeetingsIDORMatrix`.
 
 #### `POST /api/v1/workspaces/{wid}/meetings`
 
@@ -563,7 +563,7 @@ Meeting과 Project은 N:M 관계이며 `MeetingProjectLink` 중간 테이블을 
 
 ### Inbox
 
-> **Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영)**: `require_member` (POST classify/dismiss) / `require_viewer` (GET) 통과. service / repository 호출에 path `workspace_id` 필수 (`classify(inbox_id, workspace_id, project_ids)` / `dismiss(inbox_id, workspace_id)` / `find_by_id(inbox_id, workspace_id)`). secondary FK 검증 (Codex F-2 Critical): classify 의 `project_ids` 모두 같은 workspace 내인지 검증 후 거부 시 404 (`ProjectNotFoundError`). cross-tenant `inbox_id` / `project_id` 시도 → 404. 회귀 가드: `apps/backend/tests/integration/test_workspace_idor_matrix.py::TestInboxIDORMatrix` 4 케이스.
+> **Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영)**: `require_member` (POST classify/dismiss) / `require_viewer` (GET) 통과. service / repository 호출에 path `workspace_id` 필수 (`classify(inbox_id, workspace_id, project_ids)` / `dismiss(inbox_id, workspace_id)` / `find_by_id(inbox_id, workspace_id)`). secondary FK 검증 (Codex F-2 Critical): classify 의 `project_ids` 모두 같은 workspace 내인지 검증 후 거부 시 404 (`ProjectNotFoundError`). cross-tenant `inbox_id` / `project_id` 시도 → 404. 회귀 가드: `apps/api/tests/integration/test_workspace_idor_matrix.py::TestInboxIDORMatrix` 4 케이스.
 
 #### `GET /api/v1/workspaces/{wid}/inbox`
 
@@ -975,7 +975,7 @@ Project
 
 ### Action Items
 
-> **Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영, 3 secondary FK 가장 큰 분량)**: `require_member` (POST/PATCH) / `require_viewer` (GET) 통과. service / repository 호출에 path `workspace_id` 필수 (`update_action_item(action_id, workspace_id, ...)` / `find_by_id(action_id, workspace_id)`). secondary FK 3건 검증 (Codex F-2 Critical): create + update 양쪽 모두 `project_id` (ProjectRepository.find_by_id + workspace_id 일치) + `meeting_id` (MeetingRepository.find_by_id(meeting_id, workspace_id)) + `assignee_id` (WorkspaceRepository.find_member(workspace_id, assignee_id)) 검증 후 거부 시 404. dependencies 에서 3 repo 동반 주입. 회귀 가드: `apps/backend/tests/integration/test_workspace_idor_matrix.py::TestActionsIDORMatrix` 5 케이스.
+> **Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영, 3 secondary FK 가장 큰 분량)**: `require_member` (POST/PATCH) / `require_viewer` (GET) 통과. service / repository 호출에 path `workspace_id` 필수 (`update_action_item(action_id, workspace_id, ...)` / `find_by_id(action_id, workspace_id)`). secondary FK 3건 검증 (Codex F-2 Critical): create + update 양쪽 모두 `project_id` (ProjectRepository.find_by_id + workspace_id 일치) + `meeting_id` (MeetingRepository.find_by_id(meeting_id, workspace_id)) + `assignee_id` (WorkspaceRepository.find_member(workspace_id, assignee_id)) 검증 후 거부 시 404. dependencies 에서 3 repo 동반 주입. 회귀 가드: `apps/api/tests/integration/test_workspace_idor_matrix.py::TestActionsIDORMatrix` 5 케이스.
 
 #### `GET /api/v1/workspaces/{wid}/action-items`
 
@@ -1171,7 +1171,7 @@ Response: SSE stream (event: thinking → search_results → answer → done)
 - 생성/수정 시 BackgroundTasks로 비동기 임베딩
 - Tiptap JSON content + plain_text (임베딩용)
 
-> **Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영)**: 모든 endpoint 가 `require_member` (POST/PATCH/DELETE) / `require_viewer` (GET) 통과. service / repository / pipeline 모든 호출이 path `workspace_id` 동반. secondary FK 검증: `create_note` / `update_note` 의 `project_id` 가 같은 workspace 내인지 `ProjectRepository.find_by_id` 검증 후 거부 시 404 (Codex F-2 Critical). pipeline 옵션 A (Codex H2): `embed_note_async(note_id, workspace_id)` / `delete_note_with_cleanup(note_id, workspace_id)` — pipeline 우회 IDOR 차단. cross-tenant `note_id` 또는 `project_id` 시도 → 404. 회귀 가드: `apps/backend/tests/integration/test_workspace_idor_matrix.py::TestNotesIDORMatrix` 7 케이스. notes 도메인 CONTEXT 신설: `apps/backend/src/notes/CONTEXT.md`.
+> **Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영)**: 모든 endpoint 가 `require_member` (POST/PATCH/DELETE) / `require_viewer` (GET) 통과. service / repository / pipeline 모든 호출이 path `workspace_id` 동반. secondary FK 검증: `create_note` / `update_note` 의 `project_id` 가 같은 workspace 내인지 `ProjectRepository.find_by_id` 검증 후 거부 시 404 (Codex F-2 Critical). pipeline 옵션 A (Codex H2): `embed_note_async(note_id, workspace_id)` / `delete_note_with_cleanup(note_id, workspace_id)` — pipeline 우회 IDOR 차단. cross-tenant `note_id` 또는 `project_id` 시도 → 404. 회귀 가드: `apps/api/tests/integration/test_workspace_idor_matrix.py::TestNotesIDORMatrix` 7 케이스. notes 도메인 CONTEXT 신설: `apps/api/src/notes/CONTEXT.md`.
 
 ---
 

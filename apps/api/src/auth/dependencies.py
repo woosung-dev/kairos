@@ -1,4 +1,4 @@
-# apps/backend/src/auth/dependencies.py
+# apps/api/src/auth/dependencies.py
 """Auth 의존성 — Depends() 조립의 유일한 위치."""
 import hashlib
 import logging

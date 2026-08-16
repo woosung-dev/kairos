@@ -1,4 +1,4 @@
-# apps/backend/src/actions/service.py
+# apps/api/src/actions/service.py
 """ActionItem 서비스 — AsyncSession import 금지. 단일 도메인 CRUD.
 
 헌법 I-9 (Sprint 19 PR #1, Codex F-1): 모든 메서드 workspace_id 필수.

@@ -1,4 +1,4 @@
-# apps/backend/src/workspaces/member_router.py
+# apps/api/src/workspaces/member_router.py
 """멤버 관리 엔드포인트."""
 import uuid
 

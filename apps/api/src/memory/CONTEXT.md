@@ -25,7 +25,7 @@ Memory 도메인은 **개인 메모리 레이어**를 담당. Notion/Apple Notes
 ### 모듈 구조 (Sprint 24 Wave 2 BL-006 해소)
 
 ```
-apps/backend/src/memory/
+apps/api/src/memory/
 ├── router.py              HTTP I/O (POST capture / GET recall / metrics / promote)
 ├── service.py             단일 도메인 로직 (capture/recall/promote + BG task). embeddings.* 직접 import 금지
 ├── pipeline_service.py    cross-domain orchestrator (Sprint 24 Wave 2 신설)
@@ -104,7 +104,7 @@ archived         (cleanup 30일 또는 사용자 요청)
 ## 7. 테스트 표면
 
 ```
-apps/backend/tests/memory/
+apps/api/tests/memory/
 ├── test_api.py            # router 표면 (status code + 시그니처)
 ├── test_service.py        # capture text/voice + status 전이 (BG task 분리)
 ├── test_recall.py         # vector + keyword fallback

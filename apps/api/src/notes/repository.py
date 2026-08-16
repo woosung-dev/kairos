@@ -1,4 +1,4 @@
-# apps/backend/src/notes/repository.py
+# apps/api/src/notes/repository.py
 """노트 DB 접근."""
 import uuid
 

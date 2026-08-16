@@ -2,7 +2,7 @@
 
 # workspaces CONTEXT
 
-> 상위: `/apps/backend/CONTEXT.md` → `/CONTEXT-MAP.md`. 별칭 금지: Workspace ≠ Team / Tenant / Org / Organization (헌법 §2.1).
+> 상위: `/apps/api/CONTEXT.md` → `/CONTEXT-MAP.md`. 별칭 금지: Workspace ≠ Team / Tenant / Org / Organization (헌법 §2.1).
 
 ---
 

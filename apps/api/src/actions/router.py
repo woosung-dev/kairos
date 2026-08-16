@@ -1,4 +1,4 @@
-# apps/backend/src/actions/router.py
+# apps/api/src/actions/router.py
 """ActionItem 라우터 — HTTP 전용."""
 import uuid
 

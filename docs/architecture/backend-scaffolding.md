@@ -1,7 +1,7 @@
 # 백엔드 초기 셋업 가이드
 
 > Kairos 백엔드(FastAPI + SQLModel + asyncpg)를 처음부터 구성하는 단계별 가이드.
-> 모든 규칙은 `apps/backend/AGENTS.md` + `apps/backend/CONTEXT.md` §5 를 따른다.
+> 모든 규칙은 `apps/api/AGENTS.md` + `apps/api/CONTEXT.md` §5 를 따른다.
 
 ---
 
@@ -11,7 +11,7 @@
 # 프로젝트 초기화
 cd kairos/
 uv init backend --no-readme
-cd apps/backend/
+cd apps/api/
 
 # 핵심 의존성
 uv add fastapi "uvicorn[standard]" sqlmodel asyncpg alembic pydantic-settings
@@ -28,7 +28,7 @@ uv add --dev pytest pytest-asyncio httpx
 ## 2. 디렉토리 구조
 
 ```
-apps/backend/
+apps/api/
 ├── pyproject.toml
 ├── alembic.ini
 ├── alembic/
@@ -273,7 +273,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 ### 초기화
 
 ```bash
-cd apps/backend/
+cd apps/api/
 alembic init alembic
 ```
 
@@ -350,7 +350,7 @@ alembic downgrade -1
 
 ```bash
 # 개발 서버 실행
-cd apps/backend/
+cd apps/api/
 uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
 # 또는 축약

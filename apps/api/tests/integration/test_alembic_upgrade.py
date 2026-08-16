@@ -36,9 +36,10 @@ import src.memory.models  # noqa: F401
 
 pytestmark = pytest.mark.integration
 
-# 워크트리 root 기준 alembic.ini 절대 경로 (Config 'apps/backend/alembic.ini' 상대 경로 문제 회피)
-REPO_ROOT = Path(__file__).resolve().parents[3]
-ALEMBIC_INI = REPO_ROOT / "backend" / "alembic.ini"
+# 앱 루트 기준 alembic.ini 절대 경로 (Config 의 상대 경로 문제 회피).
+# ★앱 디렉터리명을 문자열로 적지 않는다 — ADR-030 rename 때 `"backend"` 하드코딩이 이 테스트를 깼다.
+APP_ROOT = Path(__file__).resolve().parents[2]
+ALEMBIC_INI = APP_ROOT / "alembic.ini"
 
 
 def _include_object(obj, name, type_, reflected, compare_to):

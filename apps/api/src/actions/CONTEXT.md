@@ -2,7 +2,7 @@
 
 # actions CONTEXT
 
-> 상위: `/apps/backend/CONTEXT.md` → `/CONTEXT-MAP.md`.
+> 상위: `/apps/api/CONTEXT.md` → `/CONTEXT-MAP.md`.
 
 ---
 
@@ -82,7 +82,7 @@ POST   /{id}/promote    cross-workspace 복제 (I-18, Sprint 23 D4, 202)
   - `title` / `description` / `priority` / `status` / `due_date`: 보존 (history 의미)
 - 임베딩 ledger 부재 → BG embedding 복제 없음. `ItemPromotionAudit.embedding_status='n/a'` + 응답 `status='completed'` (inbox 와 동일, notes/meetings 의 'embedding_pending' 과 차이)
 - 에러: 400 (same_workspace / target_personal), 403 (target_invalid / not_member), 404 (source action_id)
-- 회귀 가드: `apps/backend/tests/actions/test_action_promote.py` 4 케이스
+- 회귀 가드: `apps/api/tests/actions/test_action_promote.py` 4 케이스
 
 ### Tenant boundary (Sprint 19 PR #1, Codex F-1/F-2/F-4/F-6 반영)
 
@@ -97,7 +97,7 @@ POST   /{id}/promote    cross-workspace 복제 (I-18, Sprint 23 D4, 202)
   - create + update 양쪽 동일 검증
 - cross-tenant 응답: 모두 404
 - dependencies: `get_action_service` 가 `ProjectRepository` / `MeetingRepository` / `WorkspaceRepository` 동반 주입 (동일 session 공유)
-- 회귀 가드: `apps/backend/tests/integration/test_workspace_idor_matrix.py::TestActionsIDORMatrix` 5 케이스 + `tests/actions/test_actions_service.py` 18 케이스
+- 회귀 가드: `apps/api/tests/integration/test_workspace_idor_matrix.py::TestActionsIDORMatrix` 5 케이스 + `tests/actions/test_actions_service.py` 18 케이스
 
 ---
 

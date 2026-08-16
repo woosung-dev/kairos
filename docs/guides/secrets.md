@@ -11,7 +11,7 @@
 
 ```bash
 # 1. 템플릿 복사
-cp apps/backend/.env.example apps/backend/.env        # FastAPI: .env 표준
+cp apps/api/.env.example apps/api/.env        # FastAPI: .env 표준
 cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 
 # 2. 각 파일을 열어 실제 값 입력 (아래 발급처 참고)
@@ -31,7 +31,7 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 
 ---
 
-### 백엔드 (`apps/backend/.env`)
+### 백엔드 (`apps/api/.env`)
 
 | 변수명 | 로컬 | CI (test) | 프로덕션 | 발급처 |
 |---|:---:|:---:|:---:|---|

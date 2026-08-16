@@ -1,4 +1,4 @@
-# apps/backend/tests/test_schemas_alias.py
+# apps/api/tests/test_schemas_alias.py
 """헌법 I-16 회귀 차단 — 모든 Request* 스키마의 snake_case 필드는 camelCase alias + populate_by_name 강제.
 
 Sprint 14 T-5 (BUG-H03) 도입. UpdateWorkspaceSettingsRequest 회귀를 잡지 못한 원인이

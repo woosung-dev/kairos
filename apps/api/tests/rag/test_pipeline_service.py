@@ -1,4 +1,4 @@
-# apps/backend/tests/rag/test_pipeline_service.py
+# apps/api/tests/rag/test_pipeline_service.py
 """RagPipelineService 단위 테스트 — visibility 검증 4 시나리오 + admin 우회.
 
 BL-029 refactor 회귀 가드: helper 추출 후에도 동작 등가성 보장.

@@ -338,7 +338,7 @@ PG 가 `ALTER COLUMN TYPE` 자체를 거부한다.
 
 ---
 
-## 10. 스크립트 (`apps/backend/scripts/`)
+## 10. 스크립트 (`apps/api/scripts/`)
 
 목록·안전망은 `CONTEXT.md` §9 가 정본. 아래 둘은 실행 함정이다.
 
@@ -371,7 +371,7 @@ PYTHONUNBUFFERED=1 uv run python -u scripts/bench_vector_search.py | tee /tmp/be
 ## 11. 백엔드 폴더 구조
 
 ```
-apps/backend/src/
+apps/api/src/
 ├── [domain]/       # 도메인별 모듈 (router/service/repository/schemas/models)
 ├── auth/           # Clerk JWT 검증 + RBAC
 ├── common/

@@ -5,9 +5,9 @@
 ## 사용 (옵션 B 합성 corpus)
 
 ```bash
-cd apps/backend
+cd apps/api
 uv run python tests/embeddings/fixtures/generate_recall_corpus.py
-# → apps/backend/tests/embeddings/fixtures/recall_corpus.json (gitignore)
+# → apps/api/tests/embeddings/fixtures/recall_corpus.json (gitignore)
 ```
 
 옵션:
@@ -38,7 +38,7 @@ COPY (
 
 ## bench_vector_search.py와의 연동
 
-`apps/backend/scripts/bench_vector_search.py --mode recall` 실행 시 본 디렉토리의
+`apps/api/scripts/bench_vector_search.py --mode recall` 실행 시 본 디렉토리의
 `recall_corpus.json`을 자동 로드. 미존재 시 안내 메시지 출력.
 
 ## ADR-020 합격선

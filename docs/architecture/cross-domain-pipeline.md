@@ -178,7 +178,7 @@ GET /workspaces/{wid}/notes/{id}/embedding-status  (NEW, require_viewer)
 Sprint 15 신설 당시 `memory/service.py` 는 `_bg_distill_and_embed` (capture flow) 와 module-level `_bg_promote_embed` (R6 promote flow) 안에서 `from src.embeddings.repository import EmbeddingRepository` 를 lazy import 후 직접 `save_chunk` 호출. CONTEXT-MAP §4.2 + ADR-014 옵션 A 위반.
 
 ```
-apps/backend/src/memory/
+apps/api/src/memory/
 ├── service.py               capture/recall/promote + BG task — `embeddings.*` 직접 import 금지 (architecture gate 강제)
 ├── pipeline_service.py      MemoryPipelineService (Sprint 24 Wave 2 신설)
 │   └── save_memory_chunk(session, ...) — EmbeddingRepository.save_chunk 호출 캡슐화
@@ -197,7 +197,7 @@ apps/backend/src/memory/
 - vector_search 자체를 embeddings 도메인으로 흡수하는 작업은 LOC vs 가치 비대칭 → 후속 sprint.
 
 **회귀 방지 (architecture gate)**:
-- `apps/backend/tests/architecture/test_no_memory_to_embeddings_lazy_import.py` — 2 케이스:
+- `apps/api/tests/architecture/test_no_memory_to_embeddings_lazy_import.py` — 2 케이스:
   - `test_memory_service_no_embeddings_import` — `memory/service.py` 에 `from src.embeddings.*` 0 hit assertion (lazy import 회귀 차단).
   - `test_memory_repository_apply_hnsw_helper_keep` — `memory/repository.py` 에 `_apply_hnsw_session_params` import 1 hit 유지 (E-9 예외 침해 차단).
 

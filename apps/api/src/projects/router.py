@@ -1,4 +1,4 @@
-# apps/backend/src/projects/router.py
+# apps/api/src/projects/router.py
 """Project 라우터 — HTTP 전용.
 
 Sprint 19 PR #1 C9 (Codex F-1/F-3/F-4/F-6):

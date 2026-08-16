@@ -1,4 +1,4 @@
-# apps/backend/src/meetings/pipeline_service.py
+# apps/api/src/meetings/pipeline_service.py
 """회의 처리 오케스트레이터. BackgroundTasks에서 실행.
 
 도메인 간 직접 import 금지 원칙을 준수:

@@ -1,4 +1,4 @@
-# apps/backend/src/workspaces/service.py
+# apps/api/src/workspaces/service.py
 """Workspace 서비스 — AsyncSession import 금지."""
 import uuid
 

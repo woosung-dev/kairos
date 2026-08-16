@@ -28,7 +28,7 @@
 ### 1. 환경변수 설정
 
 ```bash
-cp apps/backend/.env.example apps/backend/.env        # FastAPI: .env 표준
+cp apps/api/.env.example apps/api/.env        # FastAPI: .env 표준
 cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 ```
 
@@ -38,7 +38,7 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 ### 2. 백엔드 실행
 
 ```bash
-cd apps/backend
+cd apps/api
 uv sync
 uv run alembic upgrade head   # DB 마이그레이션
 uv run uvicorn src.main:app --reload --port 8000

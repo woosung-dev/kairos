@@ -1,4 +1,4 @@
-# apps/backend/src/meetings/service.py
+# apps/api/src/meetings/service.py
 """Meeting 서비스 — AsyncSession import 금지. 단일 도메인 CRUD만.
 
 Sprint 23 D4 Task 2 Step 2.2: cross-workspace promote 추가 (4 도메인 중 meeting).

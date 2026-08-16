@@ -13,7 +13,7 @@
 - 결과 JSON dump + report 용 데이터
 
 실행:
-  cd apps/backend
+  cd apps/api
   uv run python -m scripts.sprint24_wave2_perf_spike
   # 결과는 stdout + git history
 
@@ -43,7 +43,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-# sys.path에 apps/backend/ 추가 — src.* import 가능
+# sys.path에 apps/api/ 추가 — src.* import 가능
 SCRIPT_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = SCRIPT_DIR.parent
 sys.path.insert(0, str(BACKEND_DIR))

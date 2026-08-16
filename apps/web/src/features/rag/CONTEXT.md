@@ -2,7 +2,7 @@
 
 # features/rag CONTEXT (FE)
 
-> 상위: `/apps/web/src/CONTEXT.md` (있다면) · 백엔드 도메인 헌법: `apps/backend/src/rag/CONTEXT.md`.
+> 상위: `/apps/web/src/CONTEXT.md` (있다면) · 백엔드 도메인 헌법: `apps/api/src/rag/CONTEXT.md`.
 
 ---
 

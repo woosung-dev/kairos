@@ -155,7 +155,7 @@ AI가 "구현하겠습니다"라고 할 때, 아직 설계가 안 끝났으면 "
 ### AI가 규칙을 자동으로 아는가?
 
 - `AGENTS.md` (= `.claude/CLAUDE.md`) → **매 세션 자동 로드** (워크플로우, 스택, 현재 상태)
-- `apps/backend/AGENTS.md` · `apps/web/AGENTS.md` → **그 디렉터리 파일을 여는 순간** 자동 로드 (ADR-029)
+- `apps/api/AGENTS.md` · `apps/web/AGENTS.md` → **그 디렉터리 파일을 여는 순간** 자동 로드 (ADR-029)
 - `CONTEXT-MAP.md` (헌법) → **자동 로드 안 됨**, 요청해야 읽음
 
 그래서 세션 시작 시 이렇게 하면 가장 정확하다:

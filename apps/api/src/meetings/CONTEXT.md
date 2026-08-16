@@ -2,7 +2,7 @@
 
 # meetings CONTEXT
 
-> 상위: `/apps/backend/CONTEXT.md` → `/CONTEXT-MAP.md`.
+> 상위: `/apps/api/CONTEXT.md` → `/CONTEXT-MAP.md`.
 
 ---
 
@@ -124,7 +124,7 @@ POST   /{id}/promote      cross-workspace 복제 (I-18, 202 + BG embedding 복�
   - router `BackgroundTasks.add_task` 에서 path `workspace_id` 동반 전달
 - cross-tenant 응답: path workspace 안에 없는 `meeting_id` → 404 (NotFound). `require_*` 거부 → 403. (F-4 lock-in)
 - secondary FK: meeting 자체는 secondary FK 없음 (workspace 직접 FK). 단 `service.export_meeting` 의 `action_repo.find_by_meeting(meeting_id)` 는 actions 도메인 workspace 격리에 의존 (Phase 5 commit C4 에서 강제)
-- 회귀 가드: `apps/backend/tests/integration/test_workspace_idor_matrix.py::TestMeetingsIDORMatrix` 6 케이스 + `tests/meetings/test_pipeline.py` 4 케이스 + `tests/meetings/test_meeting_service.py` 3 케이스
+- 회귀 가드: `apps/api/tests/integration/test_workspace_idor_matrix.py::TestMeetingsIDORMatrix` 6 케이스 + `tests/meetings/test_pipeline.py` 4 케이스 + `tests/meetings/test_meeting_service.py` 3 케이스
 
 ---
 

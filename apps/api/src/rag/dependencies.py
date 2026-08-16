@@ -1,4 +1,4 @@
-# apps/backend/src/rag/dependencies.py
+# apps/api/src/rag/dependencies.py
 """RAG 서비스 의존성 — ADR-014 옵션 A 정합 (D-3 부채 해소 1차).
 
 RagService = 6-Layer 비즈니스 로직. RagPipelineService = visibility 검증 + 위임.

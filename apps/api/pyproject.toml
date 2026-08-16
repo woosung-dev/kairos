@@ -1,5 +1,5 @@
 [project]
-name = "backend"
+name = "kairos-api"
 version = "0.1.0"
 description = "Kairos API - AI-powered meeting & knowledge management platform"
 requires-python = ">=3.12"

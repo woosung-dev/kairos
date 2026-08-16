@@ -1,4 +1,4 @@
-# apps/backend/src/common/r2.py
+# apps/api/src/common/r2.py
 """Cloudflare R2 스토리지 서비스. aioboto3 비동기."""
 import asyncio
 import uuid

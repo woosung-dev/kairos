@@ -1,13 +1,13 @@
 {
-  "venvPath": "apps/backend",
+  "venvPath": "apps/api",
   "venv": ".venv",
   "pythonVersion": "3.12",
-  "extraPaths": ["apps/backend"],
-  "include": ["apps/backend/src", "apps/backend/tests", "apps/backend/scripts", "apps/backend/alembic"],
+  "extraPaths": ["apps/api"],
+  "include": ["apps/api/src", "apps/api/tests", "apps/api/scripts", "apps/api/alembic"],
   "executionEnvironments": [
-    { "root": "apps/backend", "extraPaths": ["."] },
-    { "root": "apps/backend/src", "extraPaths": [".."] },
-    { "root": "apps/backend/tests", "extraPaths": [".."] },
-    { "root": "apps/backend/scripts", "extraPaths": [".."] }
+    { "root": "apps/api", "extraPaths": ["."] },
+    { "root": "apps/api/src", "extraPaths": [".."] },
+    { "root": "apps/api/tests", "extraPaths": [".."] },
+    { "root": "apps/api/scripts", "extraPaths": [".."] }
   ]
 }

@@ -1,4 +1,4 @@
-# apps/backend/src/notes/service.py
+# apps/api/src/notes/service.py
 """노트 비즈니스 로직 — 순수 노트 CRUD (ADR-014 옵션 A: embedding 의존 제거).
 
 embeddings.service 호출은 NotePipelineService(orchestrator) 내부에서만 수행 — 헌법 §4.2 정합.

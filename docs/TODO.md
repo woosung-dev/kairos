@@ -52,7 +52,7 @@
 - [x] **BL-EXT-OAUTH-1** (P1) OAuth `nonce` 미소비 → **해소** (`6bc5ab8`). `integration_oauth_states` 테이블 + callback 의 `DELETE ... RETURNING` 단문 원자 소비. 소비를 Google 토큰 교환보다 앞에 두어 재사용 요청이 외부 호출에 도달하지 않는다. 브라우저 실측 — callback 3회에 Google 아웃바운드 1회.
 - [x] **BL-EXT-CACHE-3** (P1) **해소 (2026-08-01).** 비-admin `max_visibility='public'` fast path를 제거하고, 캐시 저장 직전에 source chunk 존재 fence를 둬 사라진 source를 참조하는 캐시행을 저장하지 않는다.
 - [x] **BL-EXT-CACHE-1** (P1) **해소 (2026-08-01).** `ALL_CHUNKS_VISIBLE_SQL` anti-join이 source chunk 행 부재를 위반으로 판정하는 fail-closed가 됐다.
-  - (2026-08-01 사용자 결정; `apps/backend/src/embeddings/repository.py:389-400`, `apps/backend/src/rag/service.py:234-265` 기준) 기존 캐시행은 일회성 전량 무효화하지 않고 TTL 7일로 자연 배출한다. admin/owner 우회는 유지하며, 안3 epoch 카운터는 기각했고 fence에 `FOR SHARE`를 도입하지 않는다.
+  - (2026-08-01 사용자 결정; `apps/api/src/embeddings/repository.py:389-400`, `apps/api/src/rag/service.py:234-265` 기준) 기존 캐시행은 일회성 전량 무효화하지 않고 TTL 7일로 자연 배출한다. admin/owner 우회는 유지하며, 안3 epoch 카운터는 기각했고 fence에 `FOR SHARE`를 도입하지 않는다.
   - 비-admin source 재검사에 따른 캐시 miss 증가는 노출 차단을 위한 감수한 트레이드오프다.
 - [x] **BL-EXT-REVISION-2** (P1) revision guard 가 경쟁 동기화에서 무력 → **해소** (`87e1963`). `version` 단독 + 본문 갱신 CAS. ⚠ CAS 는 "최신 보존" 이 아니라 **"선착순 보존"** 이며 완료·오류 상태 전이는 CAS 미보호 (`integrations/CONTEXT.md` §6 기록).
 - [x] **BL-EXT-SYNC-1** (P2) 최초 import 의 unsupported MIME 무상태 → **해소** (`5af8261`). metadata 직후 판별 → 빈 행 생성 → raise. ⚠ ADR-026 D4 **부분 충족** — 사유는 문서별로 남지 않는다 (아래 신규 BL 참조).
@@ -93,7 +93,7 @@
   게이트**로, 노트 1건짜리 프로젝트에서 실 콘텐츠가 온보딩 뷰에 덮였다. 게이트를 `=== 0` 으로 좁혔고
   `docs/adr/006-app-redesign-brainstorm.md` §6 에 갱신 이력을 남겼다(ADR 에 문서화된 설계 결정이었으므로).
 - [x] **BL-FE-RAG-STALE-BANNER-1** (P3) → **해소.** ⚠ **FE 결함이 아니었다.** `⚠️ 오래된 소스입니다 (…기준)`
-  문자열은 FE 어디에도 없다. 출처는 `apps/backend/src/common/prompts.py` `RAG_SYSTEM_PROMPT` 규칙 4 —
+  문자열은 FE 어디에도 없다. 출처는 `apps/api/src/common/prompts.py` `RAG_SYSTEM_PROMPT` 규칙 4 —
   LLM 에게 답변 본문에 그 경고를 넣으라는 지시였고, LLM 이 당일 소스에 잘못 붙였다(QA BEFORE 4라운드 중 2회
   재현 = 실재하나 비결정적). BE 는 이미 `rag/service.py _format_sources` 로 freshness 를 결정론적으로
   계산해 FE 배지로 노출하므로 규칙 4는 중복이자 비결정적 두 번째 판정 경로였다 → 규칙 4 제거.
@@ -161,7 +161,7 @@
     **게이트 순서가 계약** — visibility 404 가 먼저, 작성자 403 이 나중(존재 누출 방지).
   - ⚠ 기존 회귀 1건(`test_member_delete_ok`)의 전제가 새 정책과 충돌해 보정했다 —
     "비-작성자 ProjectMember 삭제 성공" → "ProjectMember **작성자** 삭제 성공"으로 의도 보존.
-  - 회귀: `apps/backend/tests/integration/test_note_delete_authorship.py`(실 라우팅+실 RBAC+실 DB 10건) +
+  - 회귀: `apps/api/tests/integration/test_note_delete_authorship.py`(실 라우팅+실 RBAC+실 DB 10건) +
     `note-detail.test.tsx` 4건.
 
 > **2026-08-02 BL-NOTE-DELETE-POLICY-1 라운드 G4(codex 교차 리뷰) 부수 발견 — 이번 변경과 무관한 선재 이슈.**
@@ -183,7 +183,7 @@
   BL-BE-RBAC-CACHE-DESTRUCTIVE-1 과 같은 방식(`require_member_fresh`)으로 확대할지 판단 필요.
   ⚠ 확대 시 **성능 회귀 주의** — 캐시를 넣은 이유가 Stage 2 #6 이다.
 - [x] **BL-BE-NOTE-SERVICE-DELETE-DEAD-1** (P4) → **해소.** `NoteService.delete_note` 제거 +
-  `notes/CONTEXT.md` 갱신. 삭제 전 `rg -n "\.delete_note\(" apps/backend/src apps/backend/tests` 로 호출부 0건을
+  `notes/CONTEXT.md` 갱신. 삭제 전 `rg -n "\.delete_note\(" apps/api/src apps/api/tests` 로 호출부 0건을
   재확인했다(`delete_note_with_cleanup` 부분 문자열 히트 제외). 전체 스위트 통과 수 감소 0 으로 증명.
 - [x] **BL-RAG-PROMPT-HYGIENE-1** (P3) → **해소. ⚠ 등재된 원인이 틀렸다.** 앵커를
   "`RAG_SYSTEM_PROMPT` 소스 취급 규칙" 으로 적었으나 **그런 규칙은 없었다** — PR #146 이 규칙 4를
@@ -275,7 +275,7 @@
 > Sprint 25 moonlit-sutton 완료 — PR draft 진입 (2026-05-21). 다음 Sprint 진입 계획은 Recently Completed 섹션 참조.
 
 ### 📋 사용자 작업 대기
-- [ ] **T-SEC-CLERK-ROTATE** (운영자) Clerk dev `CLERK_SECRET_KEY` **rotation** — 노출 키(`sk_test_mvhptL…`) 무효화. 파일 redaction 은 PR #115(d5463cc) 완료됐으나 라이브 키 무효화가 진짜 fix. Clerk 대시보드 → API Keys → Secret key regenerate 후 `.env.local`/`apps/backend/.env`·Cloud Run/Vercel env 갱신. **시급 아님**(dev 키 + repo private, 2026-05-29 사용자 판단). git 히스토리 1 commit 잔존(SEC-CLERK-SECRET-COMMITTED).
+- [ ] **T-SEC-CLERK-ROTATE** (운영자) Clerk dev `CLERK_SECRET_KEY` **rotation** — 노출 키(`sk_test_mvhptL…`) 무효화. 파일 redaction 은 PR #115(d5463cc) 완료됐으나 라이브 키 무효화가 진짜 fix. Clerk 대시보드 → API Keys → Secret key regenerate 후 `.env.local`/`apps/api/.env`·Cloud Run/Vercel env 갱신. **시급 아님**(dev 키 + repo private, 2026-05-29 사용자 판단). git 히스토리 1 commit 잔존(SEC-CLERK-SECRET-COMMITTED).
 - [ ] **T-CLEANUP-1** production DB Neon SQL editor에서 `DELETE FROM users WHERE clerk_id='user_QA20260521_sentinel_test_doNotUse'` (Sprint 25 PoC 잔존 정리)
 - [ ] **PR #102 (Sprint 25 moonlit-sutton) ready review + squash merge** — 사용자 승인 후 main 머지
 - [ ] **post-merge 배포 verify** — Cloud Run rollout 후 `POST /api/v1/users/sync` 404 응답 + `/health` 200 + `/dashboard` 회귀 0건
@@ -618,7 +618,7 @@
 
 - [x] **BL-003 구현** — `EmbeddingRepository.find_chunks_by_ids()` 추가 + `_enrich_context` N+1 → 배치 1회. 테스트 3개 추가.
 - [x] **BL-004 구현** — `MeetingSummaryResult` / `MeetingActionsResult` Pydantic 모델 추가 + `ai_processing.py` 경계 검증. 테스트 4개 추가.
-- [x] **pyrightconfig.json** — apps/backend/ + 루트 추가. IDE Pyright venv 경로 설정.
+- [x] **pyrightconfig.json** — apps/api/ + 루트 추가. IDE Pyright venv 경로 설정.
 - 테스트: 신규 7개 추가 (BL-003: 3, BL-004: 4) / 전체 87 passed
 
 ### Sprint 14 — 가입 첫 5분 신뢰 회복 + RAG 안정화 (2026-05-14 완료, PR 대기)

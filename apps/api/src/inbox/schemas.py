@@ -1,4 +1,4 @@
-# apps/backend/src/inbox/schemas.py
+# apps/api/src/inbox/schemas.py
 """Inbox Pydantic V2 입출력 스키마."""
 import uuid
 

@@ -1,4 +1,4 @@
-# apps/backend/src/inbox/models.py
+# apps/api/src/inbox/models.py
 """InboxItem 관련 모델."""
 import uuid
 from datetime import datetime

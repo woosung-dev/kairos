@@ -1,4 +1,4 @@
-# apps/backend/src/embeddings/repository.py
+# apps/api/src/embeddings/repository.py
 """임베딩 청크 + 시맨틱 캐시 DB 접근."""
 import uuid
 from datetime import timedelta

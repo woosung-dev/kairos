@@ -1,4 +1,4 @@
-# apps/backend/src/projects/models.py
+# apps/api/src/projects/models.py
 """Project 관련 모델."""
 import uuid
 from datetime import datetime

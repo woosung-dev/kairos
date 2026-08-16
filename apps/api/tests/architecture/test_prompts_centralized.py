@@ -7,7 +7,7 @@ service / pipeline_service / services 등 어디에도 인라인 프롬프트 �
 import re
 from pathlib import Path
 
-# apps/backend/tests/architecture/* → apps/backend/ 까지 3-up
+# apps/api/tests/architecture/* → apps/api/ 까지 3-up
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = BACKEND_ROOT / "src"
 PROMPTS_FILE = SRC_DIR / "common" / "prompts.py"

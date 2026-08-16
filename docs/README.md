@@ -61,4 +61,4 @@
 본 docs/ 외부에 위치하지만 진입점:
 - [`CONTEXT-MAP.md`](../CONTEXT-MAP.md) — 도메인 경계 + 핵심 불변식 (I-1 ~ I-21) + §9 문서 갱신 원칙
 - [`DESIGN.md`](../DESIGN.md) — 디자인 시스템
-- 도메인별 `apps/backend/src/<domain>/CONTEXT.md` (workspaces, projects, meetings, notes, inbox, rag, embeddings, memory)
+- 도메인별 `apps/api/src/<domain>/CONTEXT.md` (workspaces, projects, meetings, notes, inbox, rag, embeddings, memory)

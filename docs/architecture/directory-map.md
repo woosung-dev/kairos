@@ -10,7 +10,7 @@
 >
 > 2026-07-31: `integrations` 도메인 구현 완료(ADR-026 Wave 3). FE 에 `features/integrations/`(외부 문서 상세 조회 API·hooks)를 추가했다.
 >
-> 2026-08-13: ADR-027 App-first 재구성 — `backend/` → `apps/backend/`, `frontend/` → `apps/web/`.
+> 2026-08-13: ADR-027 App-first 재구성 — `backend/` → `apps/api/`, `frontend/` → `apps/web/`.
 > 배포 단위(앱)를 최상위 경계로 삼는다. 같은 날 후속 PR 로 `contracts/`(OpenAPI 계약) +
 > 루트 `justfile` + CI change-detection(`test.yml`) 신설 (ADR-027 D2~D4).
 
@@ -90,7 +90,7 @@ apps/web/
 ## 백엔드 (도메인 모듈러 구조, BE 17 모듈 = 14 도메인 + common/core/services — 2026-07-31 기준)
 
 ```
-apps/backend/
+apps/api/
 └── src/
     ├── auth/                          # Clerk JWT 검증 + lazy seed + RBAC + User/Member cache (Sprint 28)
     ├── inbox/                         # Inbox 적재 + 분류
@@ -139,7 +139,7 @@ apps/backend/
 
 **common 의 audit / promote 도메인 분리 권고**: `common/audit_*.py` + `common/promote_*.py`
 5 파일은 사실상 audit 도메인 — Sprint 27e BUG-S27e-ARCH-3 + Sprint 28 BUG-S28-ARCH-1 carry.
-BL-S27e-F (architecture deepening sprint) 진입 시 `apps/backend/src/audit/` 신설 권고 (2026-07-30 문서 기준 BE 17 — `audit` 추가 시 18).
+BL-S27e-F (architecture deepening sprint) 진입 시 `apps/api/src/audit/` 신설 권고 (2026-07-30 문서 기준 BE 17 — `audit` 추가 시 18).
 
 **의존성 cycle**: Sprint 28 BUG-S28-ARCH-4 측정 — 11 쌍 양방향 (`core ↔ common` layered
 최하위 cycle 포함). runtime 은 lazy import + model-only 회피로 ImportError 0 (Round B verify),

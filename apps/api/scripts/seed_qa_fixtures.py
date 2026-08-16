@@ -11,7 +11,7 @@ Project + Note + EmbeddingChunk) 만 담당.
     # 1. 사용자가 Clerk dev에서 5계정 만들고 JWT 발급
     # 2. seed-credentials.env 채움
     # 3. backend 디렉터리에서:
-    cd apps/backend
+    cd apps/api
     uv run python scripts/seed_qa_fixtures.py \
         --env ~/.kairos-qa-secrets/seed-credentials.env \
         --out /tmp/seed-fixtures.json
@@ -24,7 +24,7 @@ Project + Note + EmbeddingChunk) 만 담당.
     --skip-embeddings       임베딩 생성 스킵 (OpenAI 호출 회피, 빠른 dry-run)
 
 종속:
-    apps/backend/src/* 모듈 import (uv run 안에서만 동작).
+    apps/api/src/* 모듈 import (uv run 안에서만 동작).
     OpenAI API 키 (settings.openai_api_key) — 임베딩 4건 생성 ~$0.001.
 
 산출:
