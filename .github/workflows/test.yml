@@ -53,7 +53,7 @@ jobs:
       run:
         working-directory: apps/api
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v4
 
       - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f  # v4
         with:
@@ -84,7 +84,7 @@ jobs:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v4
 
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa  # v4
         with:
@@ -155,7 +155,7 @@ jobs:
       GEMINI_API_KEY: "fake"
       OPENAI_API_KEY: "fake"
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v4
 
       - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f  # v4
         with:
@@ -223,7 +223,7 @@ jobs:
       LOCAL_DATABASE_URL: postgresql+asyncpg://kairos:kairos@localhost:5432/kairos_e2e
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v4
 
       # ── pgvector 확장 활성화 (CREATE EXTENSION vector + pg_trgm) ─────
       - name: Enable Postgres extensions

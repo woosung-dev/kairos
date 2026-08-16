@@ -35,7 +35,7 @@ jobs:
       LOCAL_DATABASE_URL: postgresql+asyncpg://kairos:kairos@localhost:5432/kairos_e2e
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v4
 
       # ── ffmpeg 설치 (m4a/webm/mp4 → wav 변환용 — memory voice 경로) ─
       - name: Install ffmpeg
