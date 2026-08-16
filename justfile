@@ -133,13 +133,40 @@ deploy-build TAG:
         --build-arg NEXT_PUBLIC_APP_ENV="$NEXT_PUBLIC_APP_ENV" \
         apps/web
 
-# 레지스트리 없이 SSH 파이프로 전송 후 태그 교체 + 기동
-deploy-ship TAG:
+# 서버의 compose 파일을 레포 정본으로 동기화한다.
+#
+# ★2026-08-17 Better Auth 컷오버 사고의 재발 방지 레시피다.
+#   그날까지 배포는 이미지와 .env 태그만 옮겼고 compose 파일은 "최초 부트스트랩" 때 한 번
+#   복사한 게 전부였다(서버 파일 mtime 8/14). ADR-031 이 web 서비스에 새로 추가한
+#   environment 5줄(BETTER_AUTH_*, GOOGLE_CLIENT_*)이 서버에 도달하지 못했고,
+#   그 결과 BETTER_AUTH_SECRET 이 빈 값으로 주입돼 web 이 전면 500 이었다
+#   (BetterAuthError: You are using the default secret).
+#
+#   교훈: 배포 단위는 "이미지"가 아니라 "이미지 + 그 이미지를 띄우는 방법"이다.
+#   compose 파일이 레포에 있는데 서버로 갈 경로가 없으면 그건 배포가 아니라 반쪽이다.
+deploy-sync-config:
+    ssh {{oci_host}} 'bash -lc "cd {{oci_dir}} && cp docker-compose.prod.yml docker-compose.prod.yml.bak"'
+    scp deploy/oci/docker-compose.prod.yml {{oci_host}}:{{oci_dir}}/docker-compose.prod.yml
+    # 문법 검증 — .env 참조가 깨졌으면 여기서 죽는다 (up -d 이후가 아니라)
+    ssh {{oci_host}} 'bash -lc "cd {{oci_dir}} && {{oci_compose}} config -q && echo \"compose 문법 OK\""'
+
+# 레지스트리 없이 SSH 파이프로 전송 후 태그 교체 + 기동.
+# ★compose 동기화가 선행 의존이다 — 순서를 바꾸면 위 사고가 그대로 재현된다.
+deploy-ship TAG: deploy-sync-config
     docker save kairos-api:{{TAG}} | gzip -1 | ssh {{oci_host}} 'gunzip | docker load'
     docker save kairos-web:{{TAG}} | gzip -1 | ssh {{oci_host}} 'gunzip | docker load'
     ssh {{oci_host}} 'bash -lc "cd {{oci_dir}} && \
       sed -i \"s/^KAIROS_API_TAG=.*/KAIROS_API_TAG={{TAG}}/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG={{TAG}}/\" .env && \
       {{oci_compose}} up -d"'
+    @just deploy-verify-env
+
+# 컨테이너에 런타임 env 가 실제로 주입됐는지 확인한다.
+# compose 의 `environment:` 치환은 변수가 없어도 빈 문자열로 조용히 통과하므로
+# (env_file 과 달리 에러가 안 난다) 이 게이트가 없으면 첫 로그인에서야 드러난다.
+deploy-verify-env:
+    ssh {{oci_host}} 'bash -lc "docker exec kairos-web env | grep -q \"^BETTER_AUTH_SECRET=.\" && echo \"web: BETTER_AUTH_SECRET 주입 OK\""'
+    ssh {{oci_host}} 'bash -lc "docker exec kairos-web env | grep -q \"^GOOGLE_CLIENT_SECRET=.\" && echo \"web: GOOGLE_CLIENT_SECRET 주입 OK\""'
+    ssh {{oci_host}} 'bash -lc "docker exec kairos-api env | grep -q \"^AUTH_JWKS_URL=.\" && echo \"api: AUTH_JWKS_URL 주입 OK\""'
 
 deploy-status:
     ssh {{oci_host}} 'bash -lc "cd {{oci_dir}} && {{oci_compose}} ps"'
