@@ -24,7 +24,7 @@
 | feedback | dogfooding 피드백 (user-level) | [`src/feedback/CONTEXT.md`](../../../apps/api/src/feedback/CONTEXT.md) | `feedback/` |
 
 BE 전용 공용 레이어 — `common/` (visibility · pagination · prompts · r2 · audit/promote),
-`core/` (config · lifespan · database), `services/` (외부 API wrapper: transcription · ai_processing · ai_resilience).
+`core/` (config · lifespan), `services/` (외부 API wrapper: transcription · ai_processing · ai_resilience).
 이들은 도메인이 아니므로 `CONTEXT.md` 를 갖지 않는다.
 
 BE 도메인에 1:1 로 매핑되지 않는 FE feature — `home/`(대시보드 다도메인 조합),

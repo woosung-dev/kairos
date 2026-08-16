@@ -60,28 +60,35 @@ contracts-check: contracts
 # ★포트는 3005 고정 — dev(:3000)/playwright 기본(:3003)과 겹치지 않게. 이미 점유돼 있으면
 #   남의 서버를 검증하게 되므로 **중단**한다. 헤더 단언은 포트에 의존하지 않아 CI(:3000)와 동치다.
 #   `.next` 가 최신이어야 한다 — `ci-local` 이 `fe-build` 를 먼저 돌려 그 순서를 보장한다.
+# ★CI 도 이 recipe 를 호출한다 (`test.yml` frontend-build, PORT="3000"). 사본을 두지 않는다 —
+#   사본이 갈라지는 게 정확히 이 게이트가 잡으려는 버그 클래스다 (2026-08-16 코드리뷰 지적).
 # CI frontend-build 의 보안 헤더 스텝 (public route, secrets·BE 불요)
-fe-security-headers:
+fe-security-headers PORT="3005":
     #!/usr/bin/env bash
     set -euo pipefail
     cd apps/web
-    if lsof -nP -iTCP:3005 -sTCP:LISTEN >/dev/null 2>&1; then
-      echo "포트 3005 가 이미 사용 중이다. 그 서버를 검증하게 되므로 중단한다." >&2
+    if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:{{PORT}} -sTCP:LISTEN >/dev/null 2>&1; then
+      echo "포트 {{PORT}} 가 이미 사용 중이다. 그 서버를 검증하게 되므로 중단한다." >&2
+      echo "  정리: lsof -ti:{{PORT}} | xargs kill" >&2
       exit 1
     fi
-    CLERK_SECRET_KEY="${CLERK_SECRET_KEY:-sk_test_fake}" pnpm start -p 3005 > /tmp/kairos-next-headers.log 2>&1 &
+    CLERK_SECRET_KEY="${CLERK_SECRET_KEY:-sk_test_fake}" pnpm start -p {{PORT}} -H 0.0.0.0 > /tmp/kairos-next-headers.log 2>&1 &
     _pid=$!
-    trap 'kill "$_pid" 2>/dev/null || true' EXIT
-    npx wait-on http://127.0.0.1:3005/sign-in -t 120000 || { echo "--- next start 로그 ---"; cat /tmp/kairos-next-headers.log; exit 1; }
-    E2E_PORT=3005 E2E_BASE_URL=http://localhost:3005 pnpm exec playwright test --project=public-only
+    # pnpm 이 SIGTERM 을 자식(next start)에 전달하지 못하는 경우가 있어 프로세스 그룹까지 정리한다.
+    trap 'pkill -P "$_pid" 2>/dev/null || true; kill "$_pid" 2>/dev/null || true' EXIT
+    pnpm exec wait-on http://127.0.0.1:{{PORT}}/sign-in -t 180000 -v || { echo "--- next start 로그 ---"; cat /tmp/kairos-next-headers.log; exit 1; }
+    E2E_PORT={{PORT}} E2E_BASE_URL=http://localhost:{{PORT}} pnpm exec playwright test --project=public-only
 
 # ★새 명령을 정의하지 않고 기존 recipe 를 조합만 한다 — "로컬 = CI 문자 동일" 불변 보존.
 # GitHub Actions 가 결제 실패로 중단된 동안 이 출력이 유일한 머지 증거다 (docs/development/testing.md).
 #   - 실패가 환경 문제로 의심되면 `just install` 을 먼저 돌린다.
 #   - ★clean tree 에서 실행한다. contracts-check 는 `git diff --exit-code` 라
 #     작업 트리가 더러우면 계약과 무관한 변경까지 drift 로 잡는다(오탐).
+# ★contracts-check 를 fe-test/fe-build **앞**에 둔다. 이게 api.gen.ts 를 재생성하므로,
+#   뒤에 두면 fe-build(=타입 검사)가 **낡은 생성 타입**으로 통과한 뒤에야 drift 가 잡힌다 —
+#   그때 PR 에 붙일 빌드 결과는 새 계약을 검증한 적이 없다 (2026-08-16 코드리뷰 지적).
 # 머지 게이트 — CI 의 backend-test + frontend-build + contract-check 로컬 미러
-ci-local: be-test fe-test fe-build fe-security-headers contracts-check
+ci-local: be-test contracts-check fe-test fe-build fe-security-headers
 
 verify-prod *args:
     ./scripts/verify-prod.sh {{args}}

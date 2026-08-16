@@ -57,7 +57,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 ### 4.3 프론트엔드 features (FSD)
 
-`actions · audit · feedback · home · inbox · meetings · members · memory · notes · onboarding · projects · rag · sources · upload · workspaces` (16). shadcn `components/ui/` 수정 금지 (DESIGN.md). TiptapEditor (useEditor/EditorContent) 는 `features/notes/components/note-detail.tsx` (Sprint 29 R3 정정 — 옛 `note-editor.tsx` 는 importer 0 dead-code 로 삭제).
+`actions · audit · feedback · home · inbox · integrations · meetings · members · memory · notes · onboarding · projects · rag · sources · upload · workspaces` (16). shadcn `components/ui/` 수정 금지 (DESIGN.md). TiptapEditor (useEditor/EditorContent) 는 `features/notes/components/note-detail.tsx` (Sprint 29 R3 정정 — 옛 `note-editor.tsx` 는 importer 0 dead-code 로 삭제).
 
 ## 5. visibility 도메인 용어 (ADR-014)
 
@@ -100,7 +100,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 > 원 부여인 halfvec(ADR-020, 2026-05, 외부 인용 14곳)을 **보존**하고, 후발로 번호를 재사용한
 > FE wire 타입 행(ADR-027, 2026-08, 인용 2곳)을 **I-22 로 재부여**했다. 재사용된 번호는 다시 쓰지 않는다.
 
-> **회귀 가드 (2026-06-18, 2026-07-05 T19~T20 확장)**: I-9/I-13/I-17/I-19 + §5 visibility + RBAC 4-cell + RAG private 누수 0 + revocation 캐시 즉시성 + promote 검색성 + ws 삭제 + 생성 다이얼로그 visibility(W-5 시드)는 멀티계정 e2e 회귀 스위트 `apps/web/e2e/tests/team/`(T1~T20, owner+member 2-토큰 실 RBAC 관통, anti-hollow-green mutation-gated) 로 영구 고정. 로컬 게이트 `E2E_RUN_TEAM=true E2E_API_URL=http://localhost:8000 pnpm --dir apps/web exec playwright test --project=team --workers=1` (BE :8000 단일 프로세스 + CORS `:3003`). 설계: `docs/plans/active/2026-06-18-team-spine-e2e-regression.md`.
+> **회귀 가드 (2026-06-18, 2026-07-05 T19~T20 확장)**: I-9/I-13/I-17/I-19 + §5 visibility + RBAC 4-cell + RAG private 누수 0 + revocation 캐시 즉시성 + promote 검색성 + ws 삭제 + 생성 다이얼로그 visibility(W-5 시드)는 멀티계정 e2e 회귀 스위트 `apps/web/e2e/tests/team/`(T1~T23, owner+member 2-토큰 실 RBAC 관통, anti-hollow-green mutation-gated) 로 영구 고정. 로컬 게이트 `E2E_RUN_TEAM=true E2E_API_URL=http://localhost:8000 pnpm --dir apps/web exec playwright test --project=team --workers=1` (BE :8000 단일 프로세스 + CORS `:3003`). 설계: `docs/plans/active/2026-06-18-team-spine-e2e-regression.md`.
 
 ## 7. 현재 부채
 

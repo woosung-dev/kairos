@@ -116,41 +116,26 @@ jobs:
       - name: Install Playwright (chromium only)
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Start Next.js app for security-headers spec
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3  # v4.0.0
+
+      # ★서버 기동 + wait-on + spec 실행은 `just fe-security-headers` 가 소유한다.
+      # 여기에 사본을 두면 로컬과 CI 가 갈라진다 — 2026-08-16 코드리뷰가 정확히 그 상태를 잡았다
+      # (포트/바인드/타임아웃/로그경로 4곳이 이미 달랐다). justfile 상단 "문자 동일" 규약 참조.
+      - name: Security headers gate (build artifact, public route)
+        working-directory: ${{ github.workspace }}
         env:
           # Clerk 7.4.1 publishable key 검증 통과 형식 — pk_test_ + base64(host$).
           # `clerk.example.com$` → Y2xlcmsuZXhhbXBsZS5jb20k. 실제 fake 라 API 호출 X.
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZXhhbXBsZS5jb20k"
           # Sprint 27e Round 2 r2-1 — Next.js 16 + Clerk 7.4.1 runtime 가 server-side
-          # secretKey 필요 (build 시점만 아니라 next start 도). fake 값으로 부팅 OK
-          # (validation 없음, secrets 없이 public route 만 검증하므로 영향 0).
+          # secretKey 필요 (build 시점만 아니라 next start 도). fake 값으로 부팅 OK.
           CLERK_SECRET_KEY: "sk_test_fake"
           NEXT_PUBLIC_API_URL: "http://localhost:8000"
-        # 0.0.0.0 bind 명시 — CI 환경에서 IPv4/IPv6 dual-stack 보장.
-        run: |
-          pnpm start -p 3000 -H 0.0.0.0 > /tmp/next.log 2>&1 &
-          echo "Next.js PID $!"
-
-      - name: Wait for Next.js (security-headers gate)
-        # Sprint 27e Round 2 r2-1: wait-on 은 OS DNS (Node.js) 사용 — localhost OK.
-        # chromium 만 별도 fix (playwright.config.ts --host-resolver-rules 매핑).
-        run: |
-          npx wait-on http://127.0.0.1:3000/sign-in -t 180000 -v || {
-            echo "--- wait-on failed; /tmp/next.log ---"
-            cat /tmp/next.log || true
-            exit 1
-          }
-
-      - name: Run security-headers spec only (public route, no secrets)
-        env:
-          E2E_PORT: "3000"
-          # baseURL localhost — chromium 의 --host-resolver-rules 가 127.0.0.1 매핑.
-          E2E_BASE_URL: "http://localhost:3000"
-        run: pnpm exec playwright test --project=public-only
+        run: just fe-security-headers PORT="3000"
 
       - name: Upload Next.js log on failure
         if: failure()
-        run: cat /tmp/next.log || true
+        run: cat /tmp/kairos-next-headers.log || true
 
   # ── API 계약 drift 게이트 (ADR-027 D2) ─────────────────────────────────
   # export_openapi.py 가 src.main import → backend-test 와 동일한 fake env 필요.

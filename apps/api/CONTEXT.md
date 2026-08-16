@@ -112,8 +112,12 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 ## 8. 마이그레이션 (Alembic)
 
 - `models.py` 변경 시 반드시 Alembic 마이그레이션 생성 + 커밋 포함
-- 프로덕션 배포 entrypoint에서 `alembic upgrade head` 자동 실행
+- 프로덕션은 **앱 기동과 분리된 one-shot `migrate` 컨테이너**가 적용한다
+  (`docker-entrypoint.sh` role `migrate`, `docker-compose.prod.yml` `restart: "no"`).
+  ★**api role 에 묶지 마라** — `restart: unless-stopped` 와 결합해 마이그레이션 실패가
+  무한 재시작 루프가 된다 (2026-06-30 프로덕션 crash-loop). entrypoint 헤더 주석 참조
 - 컬럼 삭제는 2단계 배포 (사용 중단 → 다음 배포에서 삭제)
+- 상세: [`docs/development/migrations.md`](../../docs/development/migrations.md)
 
 ---
 

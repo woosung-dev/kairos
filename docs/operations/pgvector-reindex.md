@@ -64,14 +64,23 @@ uv run python apps/api/scripts/reindex_vectors.py --force
 # 모든 INDEXES 대상 REINDEX
 ```
 
-## 5. cron 등록 (선택)
+## 5. 주기 실행 (선택)
 
-운영 환경에서 월 1회 실행 (Cloud Run Jobs 는 ADR-028 로 철거됨 — 현재는 서버에서 수동/cron):
+Cloud Run Jobs 는 ADR-028 로 철거됐다. **그리고 API 컨테이너 안에서는 이 스크립트를 돌릴 수 없다** —
+`apps/api/Dockerfile` 은 `pyproject.toml uv.lock alembic.ini alembic/ src/ docker-entrypoint.sh` 만
+COPY 하고 **`scripts/` 는 이미지에 넣지 않는다.** `uv` 도 런타임 스테이지 PATH 에 없다
+(entrypoint 가 `/app/.venv/bin` 바이너리를 직접 호출한다).
+
+따라서 **개발 머신에서 프로덕션 DB 를 향해 실행**한다. 월 1회 수동이 현재 방식이다.
 
 ```bash
-# 오라클 VM crontab
-0 3 1 * *   cd /app/backend && uv run python scripts/reindex_vectors.py
+# 맥에서 (터널/방화벽 경유 프로덕션 DB URL 을 명시)
+cd apps/api && DATABASE_URL='<prod url>' uv run python scripts/reindex_vectors.py --force
 ```
+
+> 서버 안에서 돌려야 한다면 Dockerfile 에 `COPY scripts/ scripts/` 를 추가하고
+> `/app/.venv/bin/python scripts/reindex_vectors.py` 를 쓴다. 지금은 그렇게 돼 있지 않다
+> (2026-08-16 실측 — 이 절이 오래 `cd /app/backend` 를 안내하고 있었고 그 경로는 존재한 적이 없다).
 
 ## 6. 실패 대응
 

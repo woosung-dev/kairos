@@ -77,7 +77,7 @@
 | 변경 유형 | canonical doc |
 |---|---|
 | 엔티티/모델 (`models.py`) | `docs/architecture/erd.md` |
-| API endpoint (`router.py`) | `docs/api/endpoints.md` |
+| API endpoint (`router.py`) | `contracts/` 재생성 (`just contracts`) + 도메인 `CONTEXT.md` |
 | 도메인 경계·불변식 | `CONTEXT-MAP.md` |
 | 파이프라인·아키텍처 | `docs/architecture/*.md` |
 | 의사결정 (대형) | `docs/adr/NNN-*.md` |

@@ -24,7 +24,7 @@ just contracts    # OpenAPI 계약 + FE 타입 재생성
 ```
 src/
 ├── main.py            FastAPI app + 라우터 조립
-├── core/              config(get_settings) · lifespan · database
+├── core/              config(get_settings) · lifespan
 ├── common/            visibility · pagination · prompts · r2 · fk_guard · audit/promote
 ├── services/          외부 API wrapper (transcription · ai_processing · ai_resilience)
 └── <domain>/          router · service · repository · schemas · models · dependencies · exceptions

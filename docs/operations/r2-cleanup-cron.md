@@ -1,10 +1,16 @@
-# R2 30일 Voice 메모 cleanup — Cloud Scheduler 설정
+# R2 30일 Voice 메모 cleanup
 
-> **Sprint 15 R-CRON / O-E lock-in**: voice 메모는 R2 store + 30일 TTL. 매일 GCP Cloud Scheduler가 admin endpoint 호출 → 30일 경과한 R2 객체 삭제 + `memory_items.r2_audio_key` NULL 처리.
+> **Sprint 15 R-CRON / O-E lock-in**: voice 메모는 R2 store + 30일 TTL. admin endpoint 호출 →
+> 30일 경과한 R2 객체 삭제 + `memory_items.r2_audio_key` NULL 처리.
+>
+> ★ **2026-08-16 정정** — 이 문서의 실행 절차는 GCP Cloud Scheduler / Cloud Run / Secret Manager
+> 전제로 쓰여 있었고, 그것들은 [ADR-028](../adr/028-oci-selfhosting.md) 로 **전부 철거됐다.**
+> **현재 실행 수단은 `.github/workflows/r2-cleanup.yml` 하나뿐이고 `workflow_dispatch` 전용이다**
+> (cron 미설정 — `docs/TODO.md` BL-OCI-5). 아래 §2/§3 은 그 사실에 맞춰 다시 썼다.
 
 ## §1. 엔드포인트 명세
 
-- **URL**: `https://<cloud-run-url>/api/v1/admin/memory/r2-cleanup`
+- **URL**: `https://kairos-api.woosung.dev/api/v1/admin/memory/r2-cleanup`
 - **Method**: `POST`
 - **Header**: `X-Cron-Token: <CRON_SECRET_TOKEN>`
 - **Query (optional)**: `?days=30` (기본 30, 1~365 범위)
@@ -16,31 +22,25 @@
 ```bash
 # 32바이트 hex 토큰 생성
 openssl rand -hex 32
-# 예) 7a1c4f8b2d3e5f6a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a
 
-# 서버 `~/kairos/.env` 에 저장 (ADR-028 — Cloud Run/Secret Manager 는 철거됨)
-gcloud secrets create cron-secret-token --replication-policy=automatic
-echo -n "<token>" | gcloud secrets versions add cron-secret-token --data-file=-
-
-# 서버 .env 갱신 후 compose 재기동 — CRON_SECRET_TOKEN env 매핑
-gcloud run services update kairos-backend \
-  --update-secrets CRON_SECRET_TOKEN=cron-secret-token:latest \
-  --region asia-northeast3
+# 서버 ~/kairos/.env 에 CRON_SECRET_TOKEN=<token> 추가 후 재기동
+ssh truewords-oracle 'bash -lc "cd ~/kairos && docker compose -f docker-compose.prod.yml up -d api"'
 ```
 
-backend `.env`에는 동일 token을 `CRON_SECRET_TOKEN=...`로 저장 (로컬 테스트 시).
+로컬 테스트 시에는 `apps/api/.env` 에 같은 토큰을 넣는다.
 
-## §3. Cloud Scheduler 등록
+## §3. 실행
+
+**현재 스케줄러는 없다.** 수동 실행이 유일한 경로다.
 
 ```bash
-gcloud scheduler jobs create http memory-r2-cleanup \
-  --schedule="0 3 * * *" \
-  --time-zone="Asia/Seoul" \
-  --uri="https://<cloud-run-url>/api/v1/admin/memory/r2-cleanup" \
-  --http-method=POST \
-  --headers="X-Cron-Token=$(gcloud secrets versions access latest --secret=cron-secret-token)" \
-  --location=asia-northeast3
+# GitHub Actions (workflow_dispatch 전용, cron 미설정)
+gh workflow run r2-cleanup.yml --repo woosung-dev/kairos -f days=30 -f delete=false   # dry-run 먼저
+gh workflow run r2-cleanup.yml --repo woosung-dev/kairos -f days=30 -f delete=true
 ```
+
+주기 실행이 필요해지면 오라클 VM crontab 에 curl 을 걸거나 `r2-cleanup.yml` 에 `schedule:` 을
+추가한다 (BL-OCI-5). **GitHub Actions 결제가 복구돼야 워크플로가 돈다.**
 
 - 매일 03:00 KST (사용자 idle 시간대)
 - 응답 200 OK 외엔 GCP Cloud Logging에 alert (수동 확인 또는 PagerDuty 연동 — Sprint 16+)
@@ -63,6 +63,7 @@ curl -X POST http://localhost:8000/api/v1/admin/memory/r2-cleanup \
 
 ## §5. 모니터링
 
-- Cloud Scheduler job 실행 이력: GCP console → Cloud Scheduler → memory-r2-cleanup → "Logs"
-- 실패 알람: Sprint 16+ Stackdriver alert policy 추가 (현재는 manual 확인)
+- 실행 이력: GitHub Actions → `R2 Cleanup` 워크플로 run 로그
+- 서버측: `ssh truewords-oracle 'bash -lc "docker logs --tail 200 kairos-api"'` (ADR-028 — 관측은 `docker logs`)
+- 실패 알람: 없음. 수동 확인
 - 삭제 카운트 trend: `memory_events` 테이블 직접 SQL 조회 (R7 metrics 페이지 통합은 Sprint 17+)

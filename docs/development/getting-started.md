@@ -42,8 +42,16 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js 는 .env.local 이 표�
 | `apps/web/.env.local` | `NEXT_PUBLIC_API_URL` | **`http://localhost:8000`** — 경로(`/api/v1`)를 붙이지 않는다 |
 | `apps/web/.env.local` | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` · `CLERK_SECRET_KEY` | 같은 Clerk 앱 |
 
-> `core/config.py` 는 `.env.example` 에 없는 변수를 참조하지 않는다. 반대로
-> **`.env.example` 에 있는 키는 빠지면 부팅 단계에서 `ValidationError` 로 죽는다** (Pydantic settings).
+> **없으면 부팅이 죽는 키는 9개뿐이다** — `Settings`(`src/core/config.py`)에서 기본값이 없는 필드다:
+> `DATABASE_URL` · `CLERK_SECRET_KEY` · `CLERK_WEBHOOK_SECRET` · `R2_ACCOUNT_ID` ·
+> `R2_ACCESS_KEY_ID` · `R2_SECRET_ACCESS_KEY` · `R2_BUCKET_NAME` · `GEMINI_API_KEY` · `OPENAI_API_KEY`.
+> 나머지(`APP_ENV` `LOG_LEVEL` `CORS_ORIGINS` `FRONTEND_URL` `GOOGLE_OAUTH_*` 등)는 기본값이 있어
+> 비워도 부팅한다 — Google Drive 키는 `.env.example` 자신이 "비워두면 기존 부팅에 영향 없음" 이라고 적어 뒀다.
+>
+> 반대 방향도 성립하지 않는다. `Settings` 에는 있는데 `.env.example` 에 없는 필드가 8개다
+> (`db_pool_size` `db_max_overflow` `max_upload_bytes` `allowed_upload_mimes` `clerk_jwt_issuer`
+> `clerk_jwt_audience` `clerk_prod_hardening` `slack_feedback_webhook_url`) — 전부 기본값이 있어
+> 평소엔 안 보이지만, 튜닝하려면 `config.py` 를 봐야 한다. **`.env.example` 은 필수 키 목록이지 전체 목록이 아니다.**
 
 ### Clerk 키 발급
 

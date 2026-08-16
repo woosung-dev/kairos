@@ -144,9 +144,11 @@ apps/api/
     │   └── promote_models.py          # ItemPromotionAudit ORM 모델
     └── core/
         ├── config.py                  # pydantic-settings (Sprint 27e SEC-3/4 + cutover hardening)
-        ├── database.py                # init_engine / dispose_engine (S28-ARCH-4 후 이동 권고)
-        └── lifespan.py                # FastAPI lifespan (Sentry init conditional)
+        └── lifespan.py                # FastAPI lifespan — common/database.py 의 init/dispose_engine 호출
 ```
+
+> ★ **`core/database.py` 는 존재하지 않는다.** engine 은 `common/database.py` 가 소유한다.
+> 아래 "의존성 cycle" 절의 `core/database.py` 이동 권고는 **미실행 상태**다 (2026-08-16 실측).
 
 > ★ `src/integrations/` 는 **ADR-026 외부 소스 도메인**(Google Drive 연결·ExternalDocument)이다.
 > 일반 모노레포 권고안이 말하는 `integrations/`(외부 SDK 어댑터 레이어)와 이름은 같고 역할이 다르다 —

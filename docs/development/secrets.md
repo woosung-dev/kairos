@@ -80,7 +80,7 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 | Clerk | `CLERK_SECRET_KEY` 🔒, `CLERK_WEBHOOK_SECRET` 🔒, `CLERK_JWT_ISSUER` |
 | R2 | `R2_ACCOUNT_ID` 🔒, `R2_ACCESS_KEY_ID` 🔒, `R2_SECRET_ACCESS_KEY` 🔒, `R2_BUCKET_NAME` |
 | AI | `GEMINI_API_KEY` 🔒, `OPENAI_API_KEY` 🔒 |
-| 운영 | `CRON_SECRET_TOKEN` 🔒 (`openssl rand -hex 32`), `SENTRY_DSN` |
+| 운영 | `CRON_SECRET_TOKEN` 🔒 (`openssl rand -hex 32`) |
 
 **FE 빌드 인자**는 별도 파일 `deploy/oci/build.env` (gitignore, 템플릿 `build.env.example`).
 전부 `NEXT_PUBLIC_*` 이라 브라우저 번들에 인라인되므로 시크릿이 아니지만,
