@@ -25,10 +25,10 @@
 
 ## 로컬 게이트
 
-> ★ **GitHub Actions 가 결제 실패로 중단 중이다.** 이 출력이 유일한 머지 증거다.
-> clean tree 에서 `just ci-local` 을 돌리고 결과를 붙여넣는다.
+> 푸쉬 전 사전 확인. 최종 판정은 CI(`ci-required`)가 한다 — CI 가 red 면 아래 체크와 무관하게 차단이다.
+> clean tree 에서 돌린다 (`contracts-check` 가 `git diff --exit-code` 라 더러운 트리에서 오탐한다).
 
-- [ ] `just ci-local` 통과
+- [ ] `just ci-local` 통과 (또는 CI green 으로 갈음)
 
 ```
 <!-- 출력 요약 (pytest N passed / vitest / build / contracts drift 0) -->

@@ -1,24 +1,24 @@
 # Dependabot 설정.
 #
-# ★주기를 monthly + limit 3 으로 억제해 둔 이유:
-#   GitHub Actions 가 결제 실패로 중단돼 있어(docs/TODO.md Blocked) 열린 PR 을 검증할 CI 가 없다.
-#   weekly 로 두면 "머지 판단이 불가능한 PR" 만 쌓인다.
-#   결제 복구 후 weekly 로 올린다 (docs/TODO.md "이번 라운드에서 생긴 후속").
+# ★`open-pull-requests-limit` 은 **생태계당** 상한이다. 아래 3 생태계 × 5 = 최대 15개가
+#   동시에 열릴 수 있다. 2026-08-16 최초 실행 때 3×3=9개가 한 번에 열려서 실측으로 확인했다.
+#   (설정을 처음 추가하면 interval 과 무관하게 즉시 1회 돈다.)
+# 2026-08-16 레포 public 전환으로 Actions 가 복구돼 monthly 억제를 풀었다.
 version: 2
 updates:
   - package-ecosystem: "uv"
     directory: "/apps/api"
     schedule:
-      interval: "monthly"
-    open-pull-requests-limit: 3
+      interval: "weekly"
+    open-pull-requests-limit: 5
     commit-message:
       prefix: "chore"
 
   - package-ecosystem: "npm"
     directory: "/apps/web"
     schedule:
-      interval: "monthly"
-    open-pull-requests-limit: 3
+      interval: "weekly"
+    open-pull-requests-limit: 5
     commit-message:
       prefix: "chore"
 
@@ -27,7 +27,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "monthly"
-    open-pull-requests-limit: 3
+      interval: "weekly"
+    open-pull-requests-limit: 5
     commit-message:
       prefix: "chore"

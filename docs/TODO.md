@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 갱신: **2026-08-16** (ADR-030 라운드 — 열린 항목만 남기고 완료 이력을 아카이브로 분리)
+> 마지막 갱신: **2026-08-16** (레포 public 전환 → Actions 복구. ADR-030 라운드 후속)
 > 4 섹션 운영: Completed / Blocked / Questions / Next Actions (`AGENTS.md` §5)
 > 완료 이력 정본 = `git log` + `docs/REFACTORING-BACKLOG.md`. 분할 직전 원본 = [`archive/todo-2026h1.md`](archive/todo-2026h1.md)
 >
@@ -22,7 +22,10 @@
 ## Blocked
 
 > 차단 사유 + 필요한 조치를 함께 기록한다. 빈번한 질문 대신 여기 누적 후 일괄 전달.
-- [ ] 🔴 **GitHub Actions 결제 복구** — `recent account payments have failed` 로 워크플로가 **시작조차 안 된다**(`changes` job 4초 실패 → 나머지 전부 skip). PR #152 머지 게이트가 막혀 있고, 앞으로 모든 PR 에서 pytest·vitest·contract-check·nightly E2E 가 안 돈다. **최우선.**
+- [x] ~~🔴 **GitHub Actions 결제 복구**~~ — **2026-08-16 해소.** 레포를 public 으로 전환해 Actions 가 복구됐다
+  (public 레포는 standard 러너가 무료). 결제 자체를 고친 게 아니라 **과금 대상에서 벗어난 것**이다 —
+  private 로 되돌리면 즉시 재발한다. 복구 확인: dependabot PR #163 재실행에서 `changes` success /
+  `contract-check` success (그 전 5 run 은 전부 4~8초 만에 실패).
 - ~~Sentry DSN 발급~~ — **2026-08-14 ADR-028 로 Sentry 자체를 제거**했다. DSN 이 한 번도 설정된 적 없어 BE·FE 모두 비활성 상태였고, 의존성·번들 비용만 지불 중이었다. 재도입 지점은 `apps/web/src/lib/track-error.ts` seam. 현재 관측은 `docker logs`.
 - [ ] **외부 user 1명 실제 dogfooding** — Sprint 22 spec `git history` 12분 walkthrough.
 - [ ] **T-3 Sprint 14 Clerk Production 인스턴스 발급** [확인 필요]
@@ -41,11 +44,16 @@
 
 > 사용자 결정이 필요한 항목.
 
-- [ ] **레포 public/private 여부** — `LICENSE` · `.github/SECURITY.md` 실효성이 여기 달렸다.
-  private 이면 SECURITY.md 는 형식적이고 LICENSE 는 불필요하다.
+- [x] ~~레포 public/private 여부~~ — **2026-08-16 public 전환 확정.** 따라서:
+  - `.github/SECURITY.md` 는 형식적이 아니라 **실효**다. ★Settings → Security 에서
+    **private vulnerability reporting 을 켜야** `ISSUE_TEMPLATE/config.yml` 의 advisories 링크가 동작한다
+  - `ISSUE_TEMPLATE/` 3종도 존치 — 외부 제보 창구가 실제로 생겼다
+- [ ] **LICENSE 선택** `[신규 · 2026-08-16]` public 레포에 라이선스가 없으면 법적으로
+  "all rights reserved" 다. 공개 제품 의도와 다를 가능성이 크다. 상용화 계획과 함께 결정할 것.
 - [ ] **`apps/api/tests/` flat 잔여 9개 정리 시점** — 유일하게 코드를 움직이는 정리 작업이고,
   `justfile:be-test` 와 `test.yml` 의 `--ignore` 경로를 동시 수정해야 한다.
-  CI 부재 상태에서 pytest 수집 손실은 드러나지 않으므로 **결제 복구 후 단독 PR** 을 권고한다.
+  CI 부재 상태에서는 pytest 수집 손실이 드러나지 않아 미뤄 뒀는데, **2026-08-16 CI 복구로 그 사유가
+  사라졌다.** 이동 전후 `collected N` 이 같은지 CI 가 판정해 준다 — 이제 단독 PR 로 진행 가능.
 
 ---
 
@@ -56,7 +64,7 @@
 - [ ] **BL-OCI-2** (P3) **presigned URL 업로드 전환.** Cloudflare Free/Pro 는 요청 바디를 100MB 에서 자른다. 운영 실측 최대 파일이 5MB 라 지금은 무해하고, `MAX_UPLOAD_BYTES=90MB` + FE 사전 가드로 막아 뒀다. 100MB 초과 파일이 실제로 필요해지면 착수(약 5시간). BL-070(500MB RAM 적재)도 함께 해소된다. 2026-05 기각 사유는 "R2 버킷 CORS 미설정"이었고 여전히 미설정이다.
 - [ ] **BL-OCI-3** (P3) **GitHub Actions 자동 배포.** 진입 조건 = 수동 배포 3회 연속 성공 + 컷오버 후 7일 무사고 + 장시간 오디오 1건 end-to-end 완주. GH 러너가 amd64 라 arm64 빌드에 QEMU 가 붙는 문제를 먼저 풀어야 한다.
 - [ ] **BL-OCI-4** (P2) **stuck 상태 복구 경로.** `BackgroundTasks` 는 재시도가 없어 프로세스 재시작 시 진행 중이던 회의가 `transcribing`/`analyzing` 으로 영구 정지한다. 2026-08-14 에 그렇게 좌초한 8건(E2E 6 + uploading 2)을 수동 삭제했다. `just deploy-preflight` 가 최근 2시간만 검사하도록 우회했을 뿐 근본 해결이 아니다.
-- [ ] **BL-OCI-5** (P3) **R2 고아 파일 정리.** 삭제된 회의의 원본이 버킷에 남는다. `r2-cleanup.yml` 은 `workflow_dispatch` 전용(cron 미설정)이라 수동 실행이 필요하다. 현재 잔여량은 수십 KB 수준이라 급하지 않다. GH Actions 결제 복구 후 dry-run 먼저.
+- [ ] **BL-OCI-5** (P3) **R2 고아 파일 정리.** 삭제된 회의의 원본이 버킷에 남는다. `r2-cleanup.yml` 은 `workflow_dispatch` 전용(cron 미설정)이라 수동 실행이 필요하다. 현재 잔여량은 수십 KB 수준이라 급하지 않다. CI 복구(2026-08-16)로 실행 가능 — `gh workflow run r2-cleanup.yml -f delete=false` dry-run 먼저.
 - [ ] **BL-OCI-6** (P2) **dev 와 prod 가 같은 Neon DB(`neondb`) 를 쓰고 있었다.** 로컬 개발이 운영 데이터를 직접 건드리는 구조. 오라클 이전으로 prod 는 분리됐지만 로컬 개발 DB 분리는 미해결.
 - [ ] **BL-ADR027-OASDIFF** (P3) OpenAPI breaking-change 게이트(oasdiff). 트리거: 외부/모바일 API 소비자 첫 등장. 현재는 FE·BE 가 같은 PR 원자 변경 → `api.gen.ts` diff + FE typecheck 이 그 역할 대행 (ADR-027 D5).
 - [ ] **BL-ADR027-NX** (P4) Nx/Turborepo 도입. 트리거: 지속적 CI 병목(>15분) 또는 영향도 계산 수동 유지 불가. test.yml change-detection(2026-08-13 도입)을 먼저 소진 (ADR-027 D5).
@@ -155,11 +163,20 @@
 
 ### 이번 라운드에서 생긴 후속 (2026-08-16, ADR-030)
 
-- [ ] **CI paths-filter 재확인** — `test.yml` 의 dorny 필터 식별자를 `backend` → `api` 로 바꾸고
-  경로도 `apps/api/**` 로 옮겼다. 식별자와 `needs.changes.outputs.*` 가 어긋나면 **모든 job 이
-  조용히 skip 되고 `ci-required` 는 green 이 된다**(skip 허용 설계). 결제 복구 후 첫 PR 에서
-  backend job 이 실제로 실행되는지 눈으로 확인할 것.
-- [ ] **`.github/dependabot.yml` 주기 상향** — 현재 `monthly` + `open-pull-requests-limit: 3`.
-  CI 가 없어 열린 PR 의 머지 판단이 불가하므로 소음을 억제해 뒀다. 결제 복구 후 재검토.
+- [x] ~~**CI paths-filter 재확인**~~ — **2026-08-16 검증 완료.** dependabot PR #163
+  (`apps/web/{package.json,pnpm-lock.yaml}` 만 변경) 에서 필터가 기대대로 판정했다 —
+  `api` false → `backend-test` **skip**(올바름), `web`/`contracts` true → `frontend-build`/
+  `contract-check` 실행·success. 식별자 `backend`→`api` 개명이 소비 지점과 정합함을 실측으로 확인.
+- [x] ~~**`.github/dependabot.yml` 주기 상향**~~ — 본 PR 에서 `weekly` + limit 5 로 상향.
+  ★`open-pull-requests-limit` 은 **생태계당** 상한이다 — 최초 실행에서 3×3=9개가 한 번에 열렸다.
 - [ ] **`.github/actions/` composite 추출** — uv/pnpm/node setup 이 4곳 중복이다.
-  지금 추출하면 검증할 CI 가 없다. 결제 복구 후 첫 green run 이 트리거.
+  CI 복구로 보류 사유는 사라졌으나, **dependabot #155/#156/#157 이 같은 워크플로 파일을 건드리고 있어**
+  그 3건을 먼저 머지한 뒤 착수한다(충돌 회피).
+- [ ] **`ci-required` 를 required check 로 등록** `[신규 · 2026-08-16]` public 전환으로 Free 에서도
+  ruleset 을 쓸 수 있다. `test.yml` 주석이 "branch protection 도입 시 이 job 하나만 등록" 이라고
+  적어둔 그 지점이다. 등록 전까지는 CI 가 red 여도 머지가 물리적으로 가능하다.
+- [ ] **public 노출 표면 점검** `[신규 · 2026-08-16]` `deploy/oci/README.md` 등 7파일에 SSH 별칭
+  (`truewords-oracle`) · 포트 매핑 · 배포 절차가 있다. 시크릿은 아니지만 정찰 정보다.
+- [ ] **Better Auth 전환 시 Clerk dev 인스턴스 삭제** `[신규 · 2026-08-16]` git 히스토리 675 커밋에
+  Clerk dev secret 이 남아 있고 레포가 public 이다. 전환 완료로 키가 무의미해지는 것과, 키가
+  **실제로 무효화되는 것**은 다르다 — 인스턴스 삭제까지가 종료 조건이다.
