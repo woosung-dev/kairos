@@ -40,7 +40,7 @@ test.describe("T23 접근 불가 wid 자동 복구", () => {
     const errors = collectConsoleErrors(memberPage);
 
     await memberPage.goto("/");
-    await injectActiveWorkspace(memberPage, ownerPersonalWsId, memberMe.clerkId ?? "");
+    await injectActiveWorkspace(memberPage, ownerPersonalWsId, memberMe.id);
     await memberPage.goto("/projects");
 
     // 1) 자동 교정 — activeWorkspaceId 가 접근 가능한 ws 로 바뀐다

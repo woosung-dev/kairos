@@ -29,7 +29,7 @@ def _make_mock_member(role: str = "admin") -> WorkspaceMember:
 def _make_mock_user() -> User:
     user = MagicMock(spec=User)
     user.id = USER_ID
-    user.clerk_id = "user_test"
+    user.auth_user_id = "user_test"
     user.display_name = "테스트"
     user.email = "test@example.com"
     return user

@@ -15,11 +15,11 @@ from src.common.database import get_async_session
 # Sprint 28 BUG-S28-SEC-3 — JWT 검증 실패 forensic logging (stdout 이 유일한 관측 경로).
 _auth_logger = logging.getLogger("src.auth.jwt_failure")
 
-# Clerk JWKS 캐시
+# JWKS 클라이언트 싱글톤 (Better Auth `/api/auth/jwks`)
 _jwks_client = None
 
 # Sprint 24 Wave 2 T-BE-PERF Top 1 fix (BUG-MOBILE-005):
-# verify_clerk_token 결과(claims) 을 token hash → (claims, expires_at) 으로 in-process 캐시.
+# verify_bearer_token 결과(claims) 을 token hash → (claims, expires_at) 으로 in-process 캐시.
 # 동일 token 으로 dashboard 4 API 직렬 호출 시 PyJWKClient.get_signing_key_from_jwt +
 # jwt.decode 가 매번 RSA 검증을 반복 → 첫 진입 latency 의 일부.
 # 캐시 hit 시 dict lookup 만으로 종료 → JWT verify cost 0 화.
@@ -34,9 +34,9 @@ def _token_cache_key(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-# Sprint 28 BUG-S28-PERF-RT-1 fix — User in-process TTL cache (clerk_id → User).
-# Round B dynamic verify 결과: find_by_clerk_id 가 매 호출 1.2-4.5s (Neon dev cold start + RTT).
-# dashboard 5 endpoint fanout 시 5× SELECT users WHERE clerk_id = 4-22s hidden cost.
+# Sprint 28 BUG-S28-PERF-RT-1 fix — User in-process TTL cache (auth_user_id → User).
+# Round B dynamic verify 결과: 조회가 매 호출 1.2-4.5s (당시 Neon cold start + RTT).
+# dashboard 5 endpoint fanout 시 5× SELECT users = 4-22s hidden cost.
 # JWT cache 와 동일 패턴 + 동일 TTL 60s. cache hit 시 SELECT 0 → 외부 사용자 매 클릭 sub-ms.
 _USER_CACHE: dict[str, tuple[User, float]] = {}
 _USER_CACHE_TTL_SEC = 60.0
@@ -57,27 +57,28 @@ def _is_expired_orm_instance(instance: object) -> bool:
     return bool(state.expired_attributes) or "id" not in instance.__dict__
 
 
-def _user_cache_get(clerk_id: str) -> User | None:
-    entry = _USER_CACHE.get(clerk_id)
+def _user_cache_get(auth_user_id: str) -> User | None:
+    entry = _USER_CACHE.get(auth_user_id)
     if entry is None:
         return None
     user, expires_at = entry
     if time.time() >= expires_at:
-        _USER_CACHE.pop(clerk_id, None)
+        _USER_CACHE.pop(auth_user_id, None)
         return None
     if _is_expired_orm_instance(user):
         # BUG-CACHE-DETACHED-EXPIRED (2026-07-05): 캐시는 live ORM 인스턴스를 보관하는데,
         # 보관 후 원 세션 수명 이벤트(rollback 등)로 인스턴스가 expire+detach 되면 이후
         # 모든 요청의 속성 접근이 DetachedInstanceError → 500 연쇄. miss 처리로 자가치유.
         logging.getLogger(__name__).warning(
-            "user cache 에 expired-detached 인스턴스 감지 — drop (clerk_id=%s)", clerk_id
+            "user cache 에 expired-detached 인스턴스 감지 — drop (auth_user_id=%s)",
+            auth_user_id,
         )
-        _USER_CACHE.pop(clerk_id, None)
+        _USER_CACHE.pop(auth_user_id, None)
         return None
     return user
 
 
-def _user_cache_set(clerk_id: str, user: User) -> None:
+def _user_cache_set(auth_user_id: str, user: User) -> None:
     now = time.time()
     if len(_USER_CACHE) >= _USER_CACHE_MAX_SIZE:
         expired = [k for k, (_, exp) in _USER_CACHE.items() if exp <= now]
@@ -86,12 +87,12 @@ def _user_cache_set(clerk_id: str, user: User) -> None:
         if len(_USER_CACHE) >= _USER_CACHE_MAX_SIZE:
             oldest = next(iter(_USER_CACHE))
             _USER_CACHE.pop(oldest, None)
-    _USER_CACHE[clerk_id] = (user, now + _USER_CACHE_TTL_SEC)
+    _USER_CACHE[auth_user_id] = (user, now + _USER_CACHE_TTL_SEC)
 
 
-def invalidate_user_cache(clerk_id: str) -> None:
+def invalidate_user_cache(auth_user_id: str) -> None:
     """User cache 강제 invalidate — onboarding step 증가 직후 호출 권고 (60s 지연 회피)."""
-    _USER_CACHE.pop(clerk_id, None)
+    _USER_CACHE.pop(auth_user_id, None)
 
 
 def _jwt_cache_get(key: str) -> dict | None:
@@ -136,11 +137,14 @@ def _jwt_cache_set(key: str, claims: dict, token_exp: float | None = None) -> No
 
 
 def _get_jwks_client():
-    """Clerk JWKS 클라이언트를 가져온다 (싱글톤).
+    """JWKS 클라이언트를 가져온다 (싱글톤).
 
-    Sprint 27e BUG-S27e-SEC-3 — Clerk issuer URL 을 settings 기반으로 분리.
-      이전: 하드코드 dev URL → ADR-024 Clerk Production cutover 시 swap 결손 risk.
-      이후: settings.clerk_jwt_issuer + "/.well-known/jwks.json" — production env 로 override.
+    ADR-031 — Better Auth jwt 플러그인이 `{baseURL}/api/auth/jwks` 로 공개키를 노출한다.
+
+    ★URL 을 issuer 에서 조립하지 않는다. 이전에는 `issuer + "/.well-known/jwks.json"` 으로
+      합성해 둘이 하드 결합돼 있었다. 분리하면 prod 에서 issuer 는 공개 URL 로 두고 JWKS 만
+      compose 내부망(`http://web:3000/api/auth/jwks`)에서 가져올 수 있다 — 인증 경로에서
+      Cloudflare Tunnel 왕복이 빠진다.
 
     cache_keys=True (Sprint 24 Wave 2 T-BE-PERF, low-risk 보강).
     """
@@ -148,15 +152,22 @@ def _get_jwks_client():
     if _jwks_client is None:
         from src.core.config import get_settings
         settings = get_settings()
-        _jwks_client = jwt.PyJWKClient(
-            f"{settings.clerk_jwt_issuer}/.well-known/jwks.json",
-            cache_keys=True,
-        )
+        _jwks_client = jwt.PyJWKClient(settings.auth_jwks_url, cache_keys=True)
     return _jwks_client
 
 
-async def verify_clerk_token(authorization: str = Header(default="")) -> dict:
-    """Clerk JWT 검증. Bearer 토큰에서 클레임 추출.
+def reset_jwks_client() -> None:
+    """싱글톤 JWKS 클라이언트를 버린다.
+
+    settings 를 갈아끼우는 테스트에서만 쓴다 — 런타임 코드는 호출하지 않는다.
+    (`_jwks_client` 는 프로세스 수명 동안 유지되는 것이 정상 동작이다.)
+    """
+    global _jwks_client
+    _jwks_client = None
+
+
+async def verify_bearer_token(authorization: str = Header(default="")) -> dict:
+    """Better Auth 가 발급한 JWT 검증. Bearer 토큰에서 클레임 추출.
 
     T-BE-PERF Top 1 fix: in-process TTL cache (60s) 로 동일 token 재검증 cost 제거.
     캐시 hit 시 PyJWKClient + jwt.decode 우회 → dict lookup 만 (sub-ms).
@@ -178,30 +189,32 @@ async def verify_clerk_token(authorization: str = Header(default="")) -> dict:
         settings = get_settings()
         jwks_client = _get_jwks_client()
         signing_key = jwks_client.get_signing_key_from_jwt(token)
-        # Sprint 27e BUG-S27e-SEC-3 — issuer 검증 명시 + audience 명시 (None 이면 PyJWT 가 skip).
-        # 이전: options={"verify_aud": False} + issuer 미전달 → cross-account JWT 통과 risk.
-        # 이후: 환경별 issuer 강제 + audience 일치 검증 (audience 미설정 시 PyJWT default).
+        # issuer 검증 명시 + audience 명시 (None 이면 PyJWT 가 skip) — 27e SEC-3 가드 승계.
+        # ★algorithms 는 반드시 허용 목록이어야 한다. 토큰 헤더의 alg 를 신뢰하면
+        #   alg confusion 공격의 정석 진입점이 된다.
         decode_kwargs: dict = {
-            "algorithms": ["RS256"],
-            "issuer": settings.clerk_jwt_issuer,
-            # Sprint 27e Post-Merge BUG-QA-2 — Clerk dev JWT exp = 60s + FE Clerk SDK
-            # 의 stale token cache 결합으로 페이지 전환 시 401 다발. 10s clock skew
-            # 허용으로 short window 통과 — 정상 사용자 UX 회복.
-            # production 에선 token exp 가 더 길어 leeway 영향 마이크로.
-            "leeway": 10,
+            "algorithms": [
+                item.strip()
+                for item in settings.auth_jwt_algorithms.split(",")
+                if item.strip()
+            ],
+            "issuer": settings.auth_jwt_issuer,
+            # clock skew 만 허용한다. 이전의 leeway=10 은 Clerk dev JWT 의 exp=60s 와 FE SDK
+            # stale cache 가 겹쳐 나던 401 다발을 막으려던 것이고, Better Auth 기본 exp 는
+            # 15분이라 그 압력이 사라졌다. 그래도 서버 간 시계 오차는 남으므로 0 은 아니다.
+            "leeway": 5,
         }
-        if settings.clerk_jwt_audience is not None:
-            decode_kwargs["audience"] = settings.clerk_jwt_audience
+        if settings.auth_jwt_audience is not None:
+            decode_kwargs["audience"] = settings.auth_jwt_audience
         else:
-            # Clerk JWT Template 미설정 환경 — audience claim 자체 검증은 skip
+            # dev 편의 — non-dev 에서는 config validator 가 None 을 거부한다.
             decode_kwargs["options"] = {"verify_aud": False}
         claims = jwt.decode(token, signing_key.key, **decode_kwargs)
-        # Clerk JWT의 sub 클레임 = Clerk 사용자 ID
+        # sub = Better Auth 의 auth_user.id (users.auth_user_id 와 조인되는 키)
         result = {"sub": claims["sub"]}
-        # Sprint 29 R1 (auth-claim): name/email claim 보존. 이전엔 sub 만 남겨 lazy seed
-        # (get_current_user)의 claims.get("name"/"email") 이 항상 fallback("사용자"/"")로
-        # 동작 → 신규 user 이름/이메일 누락. JWT 에 해당 claim 이 있으면 사용, 없으면 caller
-        # 의 fallback 유지(현 동작 보존). claim 노출은 Clerk JWT Template 설정에 의존(외부).
+        # name/email claim 보존 (Sprint 29 R1). lazy seed 가 신규 User 의 이름·이메일을
+        # 여기서 받는다 — 없으면 caller 의 fallback("사용자"/"")이 그대로 쓰인다.
+        # Better Auth 쪽 노출은 `apps/web/src/lib/auth.ts` 의 jwt.definePayload 소관이다.
         for optional_key in ("name", "email"):
             if optional_key in claims:
                 result[optional_key] = claims[optional_key]
@@ -226,20 +239,20 @@ async def verify_clerk_token(authorization: str = Header(default="")) -> dict:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
 
 
-async def get_user_by_clerk_id(
-    clerk_id: str,
+async def get_user_by_auth_user_id(
+    auth_user_id: str,
     session: AsyncSession,
 ) -> User:
-    """Clerk ID로 DB 사용자 조회."""
+    """외부 인증 ID(Better Auth auth_user.id)로 DB 사용자 조회."""
     repo = UserRepository(session)
-    user = await repo.find_by_clerk_id(clerk_id)
+    user = await repo.find_by_auth_user_id(auth_user_id)
     if user is None:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     return user
 
 
 async def get_current_user(
-    claims: dict = Depends(verify_clerk_token),
+    claims: dict = Depends(verify_bearer_token),
     session: AsyncSession = Depends(get_async_session),
 ) -> User:
     """현재 인증된 사용자를 반환. 없으면 자동 생성 (첫 로그인).
@@ -251,18 +264,18 @@ async def get_current_user(
     """
     from sqlmodel import text as _text
 
-    # Sprint 28 BUG-S28-PERF-RT-1 fix — User in-process TTL cache (clerk_id → User, 60s).
+    # Sprint 28 BUG-S28-PERF-RT-1 fix — User in-process TTL cache (auth_user_id → User, 60s).
     # JWT cache 와 동일 패턴 + 동일 TTL. Neon dev cold start + RTT 1.2-4.5s 의 hidden cost
     # 가 dashboard 5 endpoint fanout 시 5× = 6-22s 잠재 (실측 4286ms critical path).
     # cache hit 시 SELECT 1번도 SKIP → fast path 보다 더 빨라짐 (DB query 0).
     # 60s 안 onboarding_step 갱신은 cache TTL 만료 후 반영 (acceptable, hook 자체는 동기 DB write).
-    clerk_id = claims["sub"]
-    cached_user = _user_cache_get(clerk_id)
+    auth_user_id = claims["sub"]
+    cached_user = _user_cache_get(auth_user_id)
     if cached_user is not None:
         return cached_user
 
     repo = UserRepository(session)
-    user = await repo.find_by_clerk_id(clerk_id)
+    user = await repo.find_by_auth_user_id(auth_user_id)
 
     # Sprint 27e Post-Merge BUG-QA-1 fast path — 이미 onboarding_step >= 1 (lazy seed 완료)
     # 사용자는 매 request lazy seed SKIP (workspace + member + onboarding hook).
@@ -270,30 +283,32 @@ async def get_current_user(
     # 신규 user / step=0 (lazy seed 미완료) 는 기존 경로로 fall-through.
     if user is not None and user.onboarding_step >= 1:
         # Sprint 28 — User cache 저장 (fast path 도달 시점에만 — onboarding 완료 user 한정).
-        _user_cache_set(clerk_id, user)
+        _user_cache_set(auth_user_id, user)
         return user
 
     is_new_user = user is None
     if user is None:
         # 첫 로그인: race-safe lazy seed (ON CONFLICT, workspace INSERT 패턴 정합)
         # FE 가 dashboard 첫 진입 시 5+ API 동시 호출 → 각 transaction 의 User INSERT 동시 시도
-        # → UniqueViolation `ix_users_clerk_id` race → 500. Sprint 27c audit P0-S27c-1 fix.
+        # → UniqueViolation `ix_users_auth_user_id` race → 500. Sprint 27c audit P0-S27c-1 fix.
+        # ★ON CONFLICT 는 index inference 로 `ix_users_auth_user_id` 를 찾는다 —
+        #   alembic 리비전 c1a7e0b5d3f2 의 인덱스 이름/컬럼과 한 쌍이다.
         await session.execute(
             _text(
                 """
-                INSERT INTO users (id, clerk_id, display_name, email, created_at, updated_at, onboarding_step)
-                VALUES (gen_random_uuid(), :clerk_id, :name, :email, now(), now(), 0)
-                ON CONFLICT (clerk_id) DO NOTHING
+                INSERT INTO users (id, auth_user_id, display_name, email, created_at, updated_at, onboarding_step)
+                VALUES (gen_random_uuid(), :auth_user_id, :name, :email, now(), now(), 0)
+                ON CONFLICT (auth_user_id) DO NOTHING
                 """
             ),
             {
-                "clerk_id": claims["sub"],
+                "auth_user_id": auth_user_id,
                 "name": claims.get("name", "사용자"),
                 "email": claims.get("email", ""),
             },
         )
         # Re-fetch after race-safe INSERT — one row guaranteed (this tx or concurrent winner)
-        user = await repo.find_by_clerk_id(claims["sub"])
+        user = await repo.find_by_auth_user_id(auth_user_id)
         if user is None:
             # 극단적 DB 일관성 issue — race 모두 fail. graceful 401 으로 사용자 재시도 유도
             raise HTTPException(status_code=500, detail="사용자 초기화에 실패했습니다")

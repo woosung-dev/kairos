@@ -26,10 +26,11 @@ test("Sentinel-P1: extract fresh JWT for Sentinel A", async ({ page }) => {
   await page.waitForURL(/\/dashboard|\/$/, { timeout: 30_000 });
 
   const token: string | null = await page.evaluate(async () => {
-    // @ts-expect-error Clerk SDK global
-    const clerk = window?.Clerk;
-    if (!clerk?.session) return null;
-    return await clerk.session.getToken();
+    // ADR-031: Better Auth jwt 플러그인 엔드포인트. window 전역 의존 없음.
+    const res = await fetch("/api/auth/token", { credentials: "include" });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { token?: string };
+    return data.token ?? null;
   });
   expect(token).toBeTruthy();
   fs.writeFileSync("/tmp/qa-jwt-sentinel-a.txt", token!);

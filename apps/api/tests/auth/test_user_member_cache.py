@@ -1,7 +1,7 @@
 # Sprint 28 BUG-S28-PERF-RT-1 회귀 가드 — User + WorkspaceMember in-process cache.
-"""Round B 측정: find_by_clerk_id 1.2-4.5s × 5 endpoint fanout = dogfooding-blocker.
+"""Round B 측정: find_by_auth_user_id 1.2-4.5s × 5 endpoint fanout = dogfooding-blocker.
 
-User cache (clerk_id → User, TTL 60s) + Member cache ((workspace_id, user_id) → Member, TTL 15s)
+User cache (auth_user_id → User, TTL 60s) + Member cache ((workspace_id, user_id) → Member, TTL 15s)
 도입으로 dashboard fanout critical path 4286ms → 1586ms 측정 (63% 감소).
 Member cache 는 Stage 2 #6 (2026-07-05) 하드닝: TTL 60→15s + admin/owner 게이트 bypass.
 
@@ -34,7 +34,7 @@ def test_user_cache_set_get_roundtrip():
     """단일 set → get cache hit."""
     user = MagicMock()
     user.id = uuid.uuid4()
-    user.clerk_id = "user_abc"
+    user.auth_user_id = "user_abc"
     user.onboarding_step = 1
 
     auth_deps._user_cache_set("user_abc", user)
@@ -42,15 +42,15 @@ def test_user_cache_set_get_roundtrip():
     assert cached is user
 
 
-def test_user_cache_miss_for_unknown_clerk_id():
-    """미등록 clerk_id → None."""
+def test_user_cache_miss_for_unknown_auth_user_id():
+    """미등록 auth_user_id → None."""
     assert auth_deps._user_cache_get("user_unknown") is None
 
 
 def test_user_cache_ttl_expiry(monkeypatch):
     """TTL 60s 경과 후 cache miss."""
     user = MagicMock()
-    user.clerk_id = "user_ttl"
+    user.auth_user_id = "user_ttl"
 
     # 시간 freeze
     fake_now = [1000.0]
@@ -86,7 +86,7 @@ def test_user_cache_lru_eviction():
         auth_deps._USER_CACHE_MAX_SIZE = monkeypatch_size
         for i in range(monkeypatch_size + 2):
             u = MagicMock()
-            u.clerk_id = f"user_{i}"
+            u.auth_user_id = f"user_{i}"
             auth_deps._user_cache_set(f"user_{i}", u)
         assert len(auth_deps._USER_CACHE) <= monkeypatch_size
     finally:
@@ -274,7 +274,7 @@ def test_user_cache_drops_expired_detached_instance():
     """expired-detached User 는 cache miss 처리 (500 연쇄 자가치유)."""
     from src.auth.models import User
 
-    user = User(clerk_id="user_det", email="d@e.com", display_name="d")
+    user = User(auth_user_id="user_det", email="d@e.com", display_name="d")
     auth_deps._user_cache_set("user_det", user)
     _expired_detached(user)
 
@@ -314,12 +314,12 @@ async def test_admin_gate_write_through_refreshes_cache():
 
 @pytest.mark.asyncio
 async def test_get_current_user_uses_user_cache_when_present():
-    """User cache hit 시 find_by_clerk_id 호출 0건 (Neon RTT SKIP)."""
+    """User cache hit 시 find_by_auth_user_id 호출 0건 (Neon RTT SKIP)."""
     from src.auth.dependencies import get_current_user
 
     cached_user = MagicMock()
     cached_user.id = uuid.uuid4()
-    cached_user.clerk_id = "user_cached"
+    cached_user.auth_user_id = "user_cached"
     cached_user.onboarding_step = 1
     auth_deps._user_cache_set("user_cached", cached_user)
 
@@ -328,13 +328,13 @@ async def test_get_current_user_uses_user_cache_when_present():
 
     with patch("src.auth.dependencies.UserRepository") as MockRepo:
         repo = AsyncMock()
-        repo.find_by_clerk_id = AsyncMock(return_value=None)  # should not be called
+        repo.find_by_auth_user_id = AsyncMock(return_value=None)  # should not be called
         MockRepo.return_value = repo
 
         result = await get_current_user(claims=claims, session=mock_session)
 
-    # User cache hit → repo.find_by_clerk_id 호출 0건
-    assert repo.find_by_clerk_id.call_count == 0
+    # User cache hit → repo.find_by_auth_user_id 호출 0건
+    assert repo.find_by_auth_user_id.call_count == 0
     assert result is cached_user
 
 
@@ -345,7 +345,7 @@ async def test_get_current_user_fills_cache_on_fast_path():
 
     user = MagicMock()
     user.id = uuid.uuid4()
-    user.clerk_id = "user_fill"
+    user.auth_user_id = "user_fill"
     user.onboarding_step = 1
 
     mock_session = AsyncMock()
@@ -353,7 +353,7 @@ async def test_get_current_user_fills_cache_on_fast_path():
 
     with patch("src.auth.dependencies.UserRepository") as MockRepo:
         repo = AsyncMock()
-        repo.find_by_clerk_id = AsyncMock(return_value=user)
+        repo.find_by_auth_user_id = AsyncMock(return_value=user)
         MockRepo.return_value = repo
 
         result = await get_current_user(claims=claims, session=mock_session)

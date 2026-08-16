@@ -13,8 +13,8 @@ import { workspaceKeys } from "@/lib/query-keys";
 import { acceptInvite } from "../api";
 import { useAcceptInvite } from "../hooks";
 
-vi.mock("@clerk/nextjs", () => ({
-  useUser: () => ({ user: null }),
+vi.mock("@/features/auth/hooks", () => ({
+  useMe: () => ({ data: null }),
 }));
 
 vi.mock("@/lib/use-api-client", () => ({

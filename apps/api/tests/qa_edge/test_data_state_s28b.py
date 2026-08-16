@@ -31,7 +31,7 @@ pytestmark = pytest.mark.integration
 
 async def _make_user(session: AsyncSession, name: str = "유저") -> User:
     user = User(
-        clerk_id=f"clerk_{uuid.uuid4().hex}",
+        auth_user_id=f"ba_{uuid.uuid4().hex}",
         display_name=name,
         email=f"{uuid.uuid4().hex}@kairos.test",
     )

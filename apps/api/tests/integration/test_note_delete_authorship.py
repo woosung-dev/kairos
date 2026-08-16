@@ -10,7 +10,7 @@ member 는 남이 쓴 노트를 삭제할 수 있었다.
 
 anti-hollow-green: 라우터 / RBAC(`require_member`) / `NotePipelineService` / repository 를 전부
 실물로 두고 실 PostgreSQL(`integration_session`) 위에서 **HTTP 로** 행사한다. override 는
-인증 신원(`get_current_user` — Clerk JWT 는 테스트에서 재현 불가)과 DB 세션뿐이며,
+인증 신원(`get_current_user` — 실서명 JWT 는 이 테스트에서 재현 대상이 아님)과 DB 세션뿐이며,
 이는 conftest 의 `memory_client` 픽스처와 동일한 선례다.
 (참고: `tests/notes/test_notes_api.py` 는 `delete_note_with_cleanup` 을 AsyncMock 으로
 대체하므로 인가 신호가 아니다.)
@@ -46,7 +46,7 @@ async def _new_user(session: AsyncSession, tag: str):
     from src.auth.models import User
 
     user = User(
-        clerk_id=f"clerk_{uuid.uuid4().hex}",
+        auth_user_id=f"ba_{uuid.uuid4().hex}",
         display_name=f"유저 {tag}",
         email=f"del_{tag}_{uuid.uuid4().hex}@example.com",
     )

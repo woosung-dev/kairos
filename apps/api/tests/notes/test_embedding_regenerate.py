@@ -175,7 +175,7 @@ async def test_embedding_status_endpoint_rbac_and_response(
     from src.main import app
 
     non_member = User(
-        clerk_id="non_member_clerk_bl064",
+        auth_user_id="non_member_ba_bl064",
         display_name="외부인",
         email="nonmember_bl064@kairos.test",
     )

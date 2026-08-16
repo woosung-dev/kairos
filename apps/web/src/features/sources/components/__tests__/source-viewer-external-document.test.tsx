@@ -5,11 +5,18 @@ import { SourceViewer } from "../source-viewer";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import type { SourceDocument } from "../../types";
 
-vi.mock("@clerk/nextjs", () => ({
-  useAuth: () => ({
-    getToken: vi.fn().mockResolvedValue("test-jwt"),
-  }),
-}));
+/* ── 토큰 주입 seam 목 (ADR-031) ──
+   인증 벤더가 아니라 `useApiClient` 를 목한다. 벤더 SDK 를 목하면 전환 때마다 이 파일이
+   따라 깨진다 — seam 을 목하면 그 결합이 사라진다. */
+vi.mock("@/lib/use-api-client", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api-client")>(
+    "@/lib/api-client",
+  );
+  return {
+    useApiClient: () => actual.createApiClient(async () => "test-jwt"),
+    clearAuthTokenCache: vi.fn(),
+  };
+});
 
 const WORKSPACE_ID = "11111111-1111-1111-1111-111111111111";
 const DOCUMENT_ID = "22222222-2222-2222-2222-222222222222";

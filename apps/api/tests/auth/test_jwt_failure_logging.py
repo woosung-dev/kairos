@@ -20,13 +20,13 @@ def capture_logs(caplog):
 @pytest.mark.asyncio
 async def test_jwt_expired_signature_logs_warning(capture_logs):
     """ExpiredSignatureError → logger.warning('jwt_expired')."""
-    from src.auth.dependencies import verify_clerk_token
+    from src.auth.dependencies import verify_bearer_token
 
     with patch("src.auth.dependencies._jwt_cache_get", return_value=None), \
          patch("src.auth.dependencies._get_jwks_client") as mock_jwks:
         mock_jwks.return_value.get_signing_key_from_jwt.side_effect = jwt.ExpiredSignatureError()
         with pytest.raises(HTTPException) as exc:
-            await verify_clerk_token(authorization="Bearer fake.fake.fake")
+            await verify_bearer_token(authorization="Bearer fake.fake.fake")
         assert exc.value.status_code == 401
 
     assert any(
@@ -38,13 +38,13 @@ async def test_jwt_expired_signature_logs_warning(capture_logs):
 @pytest.mark.asyncio
 async def test_jwt_invalid_issuer_logs_warning(capture_logs):
     """InvalidIssuerError → logger.warning('jwt_invalid_issuer')."""
-    from src.auth.dependencies import verify_clerk_token
+    from src.auth.dependencies import verify_bearer_token
 
     with patch("src.auth.dependencies._jwt_cache_get", return_value=None), \
          patch("src.auth.dependencies._get_jwks_client") as mock_jwks:
         mock_jwks.return_value.get_signing_key_from_jwt.side_effect = jwt.InvalidIssuerError()
         with pytest.raises(HTTPException) as exc:
-            await verify_clerk_token(authorization="Bearer fake.fake.fake")
+            await verify_bearer_token(authorization="Bearer fake.fake.fake")
         assert exc.value.status_code == 401
         assert "발급자" in exc.value.detail
 
@@ -54,13 +54,13 @@ async def test_jwt_invalid_issuer_logs_warning(capture_logs):
 @pytest.mark.asyncio
 async def test_jwt_invalid_audience_logs_warning(capture_logs):
     """InvalidAudienceError → logger.warning('jwt_invalid_audience')."""
-    from src.auth.dependencies import verify_clerk_token
+    from src.auth.dependencies import verify_bearer_token
 
     with patch("src.auth.dependencies._jwt_cache_get", return_value=None), \
          patch("src.auth.dependencies._get_jwks_client") as mock_jwks:
         mock_jwks.return_value.get_signing_key_from_jwt.side_effect = jwt.InvalidAudienceError()
         with pytest.raises(HTTPException) as exc:
-            await verify_clerk_token(authorization="Bearer fake.fake.fake")
+            await verify_bearer_token(authorization="Bearer fake.fake.fake")
         assert exc.value.status_code == 401
 
     assert any("jwt_invalid_audience" in r.message for r in capture_logs.records)
@@ -69,13 +69,13 @@ async def test_jwt_invalid_audience_logs_warning(capture_logs):
 @pytest.mark.asyncio
 async def test_jwt_unexpected_error_logs_warning(capture_logs):
     """generic Exception → logger.warning('jwt_verify_unexpected_error') + error_type."""
-    from src.auth.dependencies import verify_clerk_token
+    from src.auth.dependencies import verify_bearer_token
 
     with patch("src.auth.dependencies._jwt_cache_get", return_value=None), \
          patch("src.auth.dependencies._get_jwks_client") as mock_jwks:
         mock_jwks.return_value.get_signing_key_from_jwt.side_effect = RuntimeError("unexpected")
         with pytest.raises(HTTPException) as exc:
-            await verify_clerk_token(authorization="Bearer fake.fake.fake")
+            await verify_bearer_token(authorization="Bearer fake.fake.fake")
         assert exc.value.status_code == 401
 
     matched = [

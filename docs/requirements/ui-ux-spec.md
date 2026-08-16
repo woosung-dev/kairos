@@ -234,8 +234,8 @@ NotebookLM 스튜디오를 대체하는 경량 허브.
 
 ```
 /                              → Today 피드 (홈)
-/(auth)/sign-in                → Clerk 로그인
-/(auth)/sign-up                → Clerk 회원가입
+/(auth)/sign-in                → 로그인 (Google OAuth + 이메일/비밀번호)
+/(auth)/sign-up                → 회원가입 (동일)
 /inbox                         → Inbox 스마트 일괄 처리
 /new                           → 콘텐츠 추가 (회의 업로드 / 노트 / 자료)
 /notes                         → 빠른 메모 목록 + 작성

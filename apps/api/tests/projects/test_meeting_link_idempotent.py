@@ -23,7 +23,7 @@ async def _seed(session: AsyncSession):
     from src.workspaces.models import Workspace
 
     user = User(
-        clerk_id=f"clerk_{uuid.uuid4().hex}",
+        auth_user_id=f"ba_{uuid.uuid4().hex}",
         display_name="유저",
         email=f"{uuid.uuid4().hex}@example.test",
     )

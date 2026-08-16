@@ -1,12 +1,14 @@
 import { test as setup } from "@playwright/test";
 import path from "node:path";
 
+import { ensureAccount, login } from "./team-helpers";
+
 /**
- * Clerk 로그인 + 워크스페이스 보장 setup.
+ * 로그인 + 워크스페이스 보장 setup (ADR-031 — Better Auth).
  * 저장된 storageState (cookies + localStorage)를 이후 테스트들이 재사용.
  *
  * 동작:
- *   1) Clerk dev 인스턴스에 email/password 로그인
+ *   1) /sign-in 폼에 email/password 로그인 (Google OAuth 는 자동화 대상 아님)
  *   2) /api/v1/workspaces로 워크스페이스 보장 (없으면 생성)
  *   3) localStorage.kairos-workspace에 activeWorkspaceId 주입
  *      → 다른 페이지(/new, /search 등)에서 워크스페이스 컨텍스트를 즉시 사용 가능
@@ -21,6 +23,18 @@ import path from "node:path";
 
 const AUTH_FILE = path.join(__dirname, ".auth/user.json");
 
+/** Better Auth jwt 플러그인이 발급하는 JWT. 세션 쿠키가 있어야 200 이다. */
+async function getAuthToken(page: import("@playwright/test").Page): Promise<string> {
+  // 페이지 origin 기준 절대 URL — baseURL 상속에 의존하지 않는다 (team-helpers 와 동일 이유).
+  const res = await page.request.get(new URL("/api/auth/token", page.url()).toString());
+  if (!res.ok()) {
+    throw new Error(`GET /api/auth/token → ${res.status()} (세션 쿠키 확인 필요)`);
+  }
+  const { token } = (await res.json()) as { token?: string };
+  if (!token) throw new Error("토큰 응답에 token 필드가 없습니다.");
+  return token;
+}
+
 setup("authenticate", async ({ page }) => {
   setup.setTimeout(60_000);
 
@@ -34,25 +48,16 @@ setup("authenticate", async ({ page }) => {
     );
   }
 
-  // ── Clerk 로그인 ──
-  // BL-021 fix: Clerk koKR localization (Sprint 14 9ea1a78) 후 label "이메일 주소"로 변경.
-  // 영문 정규식 `/email/i` 매치 실패 → 60s timeout regression.
-  // Clerk SDK standard input `name="identifier"` 사용 — locale 변화 무관.
+  // ── 계정 보장 + 로그인 ──
+  // CI 는 매 실행 새 DB 를 띄우므로 계정 생성이 선행돼야 한다 (ADR-031).
+  // 로그인은 폼 경로를 그대로 관통한다 — data-testid 가 e2e 계약이다.
   await page.goto("/sign-in");
-  await page.locator('input[name="identifier"]').fill(email);
-  await page.getByRole("button", { name: /continue|계속/i }).click();
-  await page.locator('input[type="password"]').fill(password);
-  await page.getByRole("button", { name: /continue|sign in|로그인|계속/i }).click();
-  await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
+  await ensureAccount(page, email, password, "E2E 사용자");
+  await login(page, email, password);
 
   // ── 워크스페이스 보장 (API 직접 호출) ──
-  const token: string | null = await page.evaluate(async () => {
-    // @ts-ignore - Clerk SDK는 window에 globals 주입
-    const clerk = window?.Clerk;
-    if (!clerk?.session) return null;
-    return await clerk.session.getToken();
-  });
-  if (!token) throw new Error("Clerk 토큰을 가져올 수 없습니다.");
+  // 토큰은 Better Auth jwt 플러그인의 엔드포인트에서 받는다 (window 전역 의존 없음).
+  const token = await getAuthToken(page);
 
   const headers = { Authorization: `Bearer ${token}` };
   // BL-027 fix: GET/POST 응답 .ok() 가드 + 명시 throw.
@@ -65,7 +70,7 @@ setup("authenticate", async ({ page }) => {
     throw new Error(
       `[e2e auth.setup] GET /api/v1/workspaces 실패 — status=${wsRes.status()} ` +
         `apiUrl=${apiUrl} body[0..200]=${body.slice(0, 200)}\n` +
-        `→ E2E_API_URL secret 또는 Cloud Run service URL 점검 필요 (BL-027).`,
+        `→ E2E_API_URL secret 또는 백엔드 기동 상태 점검 필요 (BL-027).`,
     );
   }
   const wsList = await wsRes.json();
@@ -83,7 +88,7 @@ setup("authenticate", async ({ page }) => {
       throw new Error(
         `[e2e auth.setup] POST /api/v1/workspaces 실패 — status=${createRes.status()} ` +
           `apiUrl=${apiUrl} body[0..200]=${body.slice(0, 200)}\n` +
-          `→ E2E_API_URL secret 또는 Cloud Run service URL 점검 필요 (BL-027).`,
+          `→ E2E_API_URL secret 또는 백엔드 기동 상태 점검 필요 (BL-027).`,
       );
     }
     const created = await createRes.json();
@@ -94,7 +99,9 @@ setup("authenticate", async ({ page }) => {
   await page.evaluate((id) => {
     localStorage.setItem(
       "kairos-workspace",
-      JSON.stringify({ state: { activeWorkspaceId: id }, version: 0 }),
+      // version 은 store.ts 의 persist version 과 일치해야 한다 — 낮으면 migrate 가
+      // 값을 버려서 주입이 무효화된다 (ADR-031 로 0 → 1).
+      JSON.stringify({ state: { activeWorkspaceId: id }, version: 1 }),
     );
   }, wsId);
 

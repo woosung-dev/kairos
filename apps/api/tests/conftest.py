@@ -69,7 +69,7 @@ async def auth_user(integration_session):
     from src.auth.models import User
 
     user = User(
-        clerk_id="test_clerk_memory_user",
+        auth_user_id="test_ba_memory_user",
         display_name="메모리 테스터",
         email="memory_test@kairos.test",
     )

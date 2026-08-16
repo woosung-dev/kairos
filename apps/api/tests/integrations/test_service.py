@@ -51,7 +51,7 @@ async def _seed_service_workspace(
 ) -> _ServiceSeed:
     suffix = uuid.uuid4().hex[:8]
     user = User(
-        clerk_id=f"clerk_service_{tag}_{suffix}",
+        auth_user_id=f"ba_service_{tag}_{suffix}",
         display_name=f"Service {tag}",
         email=f"service_{tag}_{suffix}@k.test",
     )
@@ -186,7 +186,7 @@ async def test_connect_disconnect_reauthorize_reuses_connection(
     await service.disconnect_connection(first.id, seed.workspace.id)
     token_expires_at = datetime.now(UTC).replace(tzinfo=None)
     reauthorizing_user = User(
-        clerk_id=f"clerk_service_reauthorize_{uuid.uuid4().hex[:8]}",
+        auth_user_id=f"ba_service_reauthorize_{uuid.uuid4().hex[:8]}",
         display_name="Reauthorize User",
         email=f"reauthorize_{uuid.uuid4().hex[:8]}@k.test",
     )

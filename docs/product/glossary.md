@@ -34,7 +34,7 @@ Organize·Distill 하고, RAG 로 Express 한다. 핵심 차별점은 **Distill 
 | WorkspaceMember | 워크스페이스 구성원 + 역할(owner/admin/member/viewer) | `src/workspaces/CONTEXT.md` · [ADR-025](../adr/025-rbac-and-pricing-decisions.md) |
 | Project | 워크스페이스 안의 주제 단위. `visibility` 를 소유 | 헌법 §5 · `src/projects/CONTEXT.md` |
 | ProjectMember | `private` 프로젝트 접근 주체 | 헌법 §5 |
-| User | Clerk 신원 매핑 + `onboarding_step`(0~4) | `src/auth/CONTEXT.md` |
+| User | 외부 인증 신원(Better Auth `auth_user.id`) 매핑 + `onboarding_step`(0~4) | `src/auth/CONTEXT.md` |
 | InboxItem | Capture 진입점. AI 분류 대기열 | `src/inbox/CONTEXT.md` |
 | Meeting | 오디오 인제스트 → STT → AI 파이프라인 | `src/meetings/CONTEXT.md` |
 | TranscriptSegment / MeetingSummary | 회의의 L1 산출물 | `src/meetings/CONTEXT.md` |

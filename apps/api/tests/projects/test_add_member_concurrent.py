@@ -54,8 +54,8 @@ async def _seed_ws_project(engine) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
 
     sm = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with sm() as s:
-        owner = User(clerk_id=f"clerk_o_{uuid.uuid4().hex}", display_name="o", email=f"o_{uuid.uuid4().hex}@c.test")
-        acceptor = User(clerk_id=f"clerk_a_{uuid.uuid4().hex}", display_name="a", email=f"a_{uuid.uuid4().hex}@c.test")
+        owner = User(auth_user_id=f"ba_o_{uuid.uuid4().hex}", display_name="o", email=f"o_{uuid.uuid4().hex}@c.test")
+        acceptor = User(auth_user_id=f"ba_a_{uuid.uuid4().hex}", display_name="a", email=f"a_{uuid.uuid4().hex}@c.test")
         s.add(owner)
         s.add(acceptor)
         await s.flush()

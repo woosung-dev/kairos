@@ -1,5 +1,5 @@
-# T-BE-PERF Top 1 fix: verify_clerk_token in-process TTL cache 검증
-"""verify_clerk_token 의 JWT claims 캐시 — hit / miss / TTL 만료 / maxsize 회전."""
+# T-BE-PERF Top 1 fix: verify_bearer_token in-process TTL cache 검증
+"""verify_bearer_token 의 JWT claims 캐시 — hit / miss / TTL 만료 / maxsize 회전."""
 import time
 from unittest.mock import MagicMock, patch
 
@@ -33,8 +33,8 @@ async def test_jwt_cache_hit_on_second_call(monkeypatch):
     monkeypatch.setattr(deps.jwt, "decode", _fake_decode)
 
     token = "Bearer dummy.jwt.token"
-    r1 = await deps.verify_clerk_token(authorization=token)
-    r2 = await deps.verify_clerk_token(authorization=token)
+    r1 = await deps.verify_bearer_token(authorization=token)
+    r2 = await deps.verify_bearer_token(authorization=token)
     assert r1 == r2 == {"sub": "user_abc"}
     # 첫 호출만 decode — 두번째는 캐시 hit
     assert decode_calls["n"] == 1
@@ -57,8 +57,8 @@ async def test_jwt_cache_miss_on_different_token(monkeypatch):
     monkeypatch.setattr(deps, "_get_jwks_client", lambda: mock_jwks)
     monkeypatch.setattr(deps.jwt, "decode", _fake_decode)
 
-    await deps.verify_clerk_token(authorization="Bearer token.A")
-    await deps.verify_clerk_token(authorization="Bearer token.B")
+    await deps.verify_bearer_token(authorization="Bearer token.A")
+    await deps.verify_bearer_token(authorization="Bearer token.B")
     assert decode_calls["n"] == 2
 
 
@@ -80,10 +80,10 @@ async def test_jwt_cache_expires(monkeypatch):
     monkeypatch.setattr(deps, "_JWT_CACHE_TTL_SEC", 0.0)
 
     token = "Bearer token.expiring"
-    await deps.verify_clerk_token(authorization=token)
+    await deps.verify_bearer_token(authorization=token)
     # 한 tick 대기 (epoch 진행 보장)
     time.sleep(0.01)
-    await deps.verify_clerk_token(authorization=token)
+    await deps.verify_bearer_token(authorization=token)
     # 두 호출 모두 decode 통과 (캐시 만료)
     assert decode_calls["n"] == 2
 
@@ -102,7 +102,7 @@ async def test_jwt_cache_invalid_token_not_cached(monkeypatch):
     monkeypatch.setattr(deps.jwt, "decode", _fake_decode)
 
     with pytest.raises(HTTPException) as exc_info:
-        await deps.verify_clerk_token(authorization="Bearer bad.token")
+        await deps.verify_bearer_token(authorization="Bearer bad.token")
     assert exc_info.value.status_code == 401
     # 캐시에 아무 것도 저장되지 않아야 함
     assert len(deps._JWT_CLAIMS_CACHE) == 0
@@ -124,6 +124,6 @@ async def test_jwt_cache_maxsize_eviction(monkeypatch):
     monkeypatch.setattr(deps, "_JWT_CACHE_MAX_SIZE", 3)
 
     for i in range(5):
-        await deps.verify_clerk_token(authorization=f"Bearer tok.{i}")
+        await deps.verify_bearer_token(authorization=f"Bearer tok.{i}")
 
     assert len(deps._JWT_CLAIMS_CACHE) <= 3

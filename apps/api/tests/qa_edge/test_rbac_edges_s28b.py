@@ -47,7 +47,7 @@ pytestmark = pytest.mark.integration
 
 async def _make_user(session: AsyncSession, name: str = "유저") -> User:
     user = User(
-        clerk_id=f"clerk_{uuid.uuid4().hex}",
+        auth_user_id=f"ba_{uuid.uuid4().hex}",
         display_name=name,
         email=f"{uuid.uuid4().hex}@kairos.test",
     )
@@ -406,7 +406,7 @@ async def test_concurrent_same_user_accept_duplicate_members(
     # seed: inviter + owner member + team ws + max_uses 없는 invite + 새 user
     async with sm() as setup:
         inviter = User(
-            clerk_id=f"clerk_{uuid.uuid4().hex}",
+            auth_user_id=f"ba_{uuid.uuid4().hex}",
             display_name="초대자",
             email=f"{uuid.uuid4().hex}@kairos.test",
         )
@@ -419,7 +419,7 @@ async def test_concurrent_same_user_accept_duplicate_members(
             WorkspaceMember(workspace_id=ws.id, user_id=inviter.id, role="owner")
         )
         new_user = User(
-            clerk_id=f"clerk_{uuid.uuid4().hex}",
+            auth_user_id=f"ba_{uuid.uuid4().hex}",
             display_name="신규",
             email=f"{uuid.uuid4().hex}@kairos.test",
         )
@@ -491,7 +491,7 @@ async def test_interleave_dup_blocked_by_unique_constraint(concurrent_engine):
     )
     async with sm() as setup:
         owner = User(
-            clerk_id=f"clerk_{uuid.uuid4().hex}",
+            auth_user_id=f"ba_{uuid.uuid4().hex}",
             display_name="오너",
             email=f"{uuid.uuid4().hex}@kairos.test",
         )
@@ -501,7 +501,7 @@ async def test_interleave_dup_blocked_by_unique_constraint(concurrent_engine):
         setup.add(ws)
         await setup.flush()
         target = User(
-            clerk_id=f"clerk_{uuid.uuid4().hex}",
+            auth_user_id=f"ba_{uuid.uuid4().hex}",
             display_name="대상",
             email=f"{uuid.uuid4().hex}@kairos.test",
         )

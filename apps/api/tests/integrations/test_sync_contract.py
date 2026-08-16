@@ -159,12 +159,12 @@ async def sync_contract(
         expire_on_commit=False,
     )
     owner = User(
-        clerk_id=f"drive-contract-owner-{uuid.uuid4().hex}",
+        auth_user_id=f"drive-contract-owner-{uuid.uuid4().hex}",
         display_name="Drive Contract Owner",
         email=f"drive-owner-{uuid.uuid4().hex}@kairos.test",
     )
     viewer = User(
-        clerk_id=f"drive-contract-viewer-{uuid.uuid4().hex}",
+        auth_user_id=f"drive-contract-viewer-{uuid.uuid4().hex}",
         display_name="Drive Contract Viewer",
         email=f"drive-viewer-{uuid.uuid4().hex}@kairos.test",
     )

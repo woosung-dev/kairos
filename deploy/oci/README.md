@@ -42,7 +42,7 @@ Cloudflare Zero Trust → Networks → Tunnels 에서 `kairos` 터널을 만들�
 - `kairos-api.woosung.dev` → `http://localhost:8200`
 
 **API 호스트명에는 Cloudflare Access 를 걸지 말 것.** Access 는 브라우저 리다이렉트로 인증하는데
-XHR 과 SSR 헤어핀이 그 리다이렉트를 따라가지 못한다. API 의 문은 Clerk JWT 다.
+XHR 과 SSR 헤어핀이 그 리다이렉트를 따라가지 못한다. API 의 문은 Better Auth 가 발급한 JWT 다 (ADR-031).
 
 ## 배포
 
@@ -58,10 +58,9 @@ docker buildx build --platform linux/arm64 -t kairos-api:$TAG --load apps/api
 # FE — NEXT_PUBLIC_* 는 빌드타임 인라인이다. 도메인이 바뀌면 반드시 재빌드.
 docker buildx build --platform linux/arm64 -t kairos-web:$TAG --load \
   --build-arg NEXT_PUBLIC_API_URL=https://kairos-api.woosung.dev \
-  --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_... \
   --build-arg NEXT_PUBLIC_RECALL_ENABLED=true \
   --build-arg NEXT_PUBLIC_APP_ENV=production \
-  --build-arg NEXT_PUBLIC_FOUNDER_CLERK_ID=user_... \
+  --build-arg NEXT_PUBLIC_FOUNDER_USER_ID=<users.id UUID> \
   apps/web
 
 # 전송
@@ -115,9 +114,10 @@ uptime && free -h
 
 ## 함정
 
-- **`/health` 200 은 배포 검증이 아니다.** 플레이스홀더 Clerk 키로도 200 이 난다. 검증은
+- **`/health` 200 은 배포 검증이 아니다.** 플레이스홀더 키로도 200 이 난다. 인증까지 살아 있는지는
+  `curl -s https://kairos.woosung.dev/api/auth/jwks` 가 키를 돌려주는지로 본다. 검증은
   반드시 브라우저 로그인 후 데이터 화면까지.
-- **`.env` 인라인 주석 금지.** 값에 섞인 한글이 Clerk 헤더 ascii 인코딩에서 터져 500 을 만든다.
+- **`.env` 인라인 주석 금지.** 값에 섞인 한글이 헤더 ascii 인코딩에서 터져 500 을 만든다.
   `CORS_ORIGINS` 오염은 조용한 CORS 전면 차단으로 나타난다.
 - **원격 실행은 `bash -lc`.** 비로그인 셸의 PATH 문제.
 - **`docker compose down -v` 금지.** `-v` 는 `db-data` 볼륨을 지운다. 백업이 아직 없다.

@@ -18,8 +18,8 @@ import { PanelLayout } from "../panel-layout";
 const CURRENT_USER = "user_A";
 const { toast } = vi.hoisted(() => ({ toast: vi.fn() }));
 
-vi.mock("@clerk/nextjs", () => ({
-  useAuth: () => ({ userId: CURRENT_USER }),
+vi.mock("@/features/auth/hooks", () => ({
+  useMe: () => ({ data: { id: CURRENT_USER } }),
 }));
 
 vi.mock("sonner", () => ({ toast }));
@@ -37,7 +37,7 @@ vi.mock("@/hooks/use-media-query", () => ({
   useBreakpoint: () => ({ isMobile: false, isCompact: false }),
 }));
 
-// 레이아웃 크롬 — 판정 대상이 아니고 각자 Clerk/router/데이터에 의존한다.
+// 레이아웃 크롬 — 판정 대상이 아니고 각자 세션/router/데이터에 의존한다.
 vi.mock("../sidebar", () => ({ Sidebar: () => null }));
 vi.mock("../header", () => ({ Header: () => null }));
 vi.mock("../bottom-nav", () => ({ BottomNav: () => null }));

@@ -63,7 +63,7 @@ async def two_workspaces_seed(integration_session: AsyncSession) -> TwoWorkspace
     """2-workspace seed — composite FK 시나리오 공통 fixture."""
     suffix = uuid.uuid4().hex[:8]
     user = User(
-        clerk_id=f"clerk_compfk_{suffix}",
+        auth_user_id=f"ba_compfk_{suffix}",
         display_name="CompFK Tester",
         email=f"compfk_{suffix}@k.test",
     )

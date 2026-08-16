@@ -18,7 +18,7 @@ async def test_owner_sees_all_visibilities(integration_session, auth_user, team_
     """owner 역할 requester 는 public + draft + private 모두 조회."""
     # 다른 user (draft creator)
     other = User(
-        clerk_id="other_for_owner_vis_test",
+        auth_user_id="other_for_owner_vis_test",
         display_name="다른 작성자",
         email="other_owner_vis@kairos.test",
     )
@@ -56,7 +56,7 @@ async def test_owner_sees_all_visibilities(integration_session, auth_user, team_
 async def test_member_hides_others_draft(integration_session, auth_user, team_ws):
     """member 역할은 본인이 만들지 않은 draft project 미노출."""
     other = User(
-        clerk_id="other_draft_owner_member_test",
+        auth_user_id="other_draft_owner_member_test",
         display_name="다른 작성자",
         email="other_draft_member@kairos.test",
     )
@@ -96,7 +96,7 @@ async def test_member_hides_others_draft(integration_session, auth_user, team_ws
 async def test_member_private_only_when_mapped(integration_session, auth_user, team_ws):
     """private project 는 ProjectMember 매핑된 member 에게만 노출."""
     other = User(
-        clerk_id="other_private_creator_member_test",
+        auth_user_id="other_private_creator_member_test",
         display_name="다른 사람",
         email="other_private_creator@kairos.test",
     )

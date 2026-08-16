@@ -7,7 +7,7 @@ interface WorkspaceState {
   activeWorkspaceId: string | null;
   setActiveWorkspaceId: (id: string) => void;
 
-  /** 이 persist 를 소유한 Clerk user id — 계정 전환 시 stale workspace 정리용 (BL-S27c-12) */
+  /** 이 persist 를 소유한 내부 user id (users.id) — 계정 전환 시 stale workspace 정리용 (BL-S27c-12) */
   ownerUserId: string | null;
   /**
    * 현재 로그인 user 와 persist 소유자 불일치 시 activeWorkspaceId 를 초기화한다.
@@ -58,6 +58,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     }),
     {
       name: "kairos-workspace",
+      // ADR-031: ownerUserId 의 의미가 외부 인증 ID → 내부 UUID 로 바뀌었다.
+      // version 을 올려 옛 값을 명시적으로 버린다. 안 올리면 ensureOwner 가
+      // 옛 ID 와 새 ID 를 "다른 계정" 으로 읽어 사용자마다 한 번씩 워크스페이스가
+      // 리셋되는데, 그건 의도된 자가치유와 구별이 안 되어 원인 추적이 어렵다.
+      version: 1,
+      migrate: () => ({ activeWorkspaceId: null, ownerUserId: null }),
       // workspaceRole은 persist 제외 (매 세션마다 API에서 가져옴)
       partialize: (state) => ({
         activeWorkspaceId: state.activeWorkspaceId,

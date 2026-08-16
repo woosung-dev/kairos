@@ -26,8 +26,6 @@ def _set_crypto_key(monkeypatch: pytest.MonkeyPatch, key: str) -> None:
 
 def _set_required_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
-    monkeypatch.setenv("CLERK_SECRET_KEY", "sk_test_xxx")
-    monkeypatch.setenv("CLERK_WEBHOOK_SECRET", "whsec_xxx")
     monkeypatch.setenv("R2_ACCOUNT_ID", "test_account")
     monkeypatch.setenv("R2_ACCESS_KEY_ID", "test_key")
     monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "test_secret")

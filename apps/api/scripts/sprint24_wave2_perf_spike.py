@@ -7,7 +7,7 @@
 
 목적:
 - 4 API (workspaces / members / meetings / inbox) 직렬 호출 latency 분해
-- Clerk JWT verify cold vs cached 측정 (in-process LRU cache 도입 효과 검증)
+- JWT verify cold vs cached 측정 (in-process LRU cache 도입 효과 검증)
 - SQLAlchemy event listener 로 Top slow queries
 - cProfile 로 Top cumulative
 - 결과 JSON dump + report 용 데이터
@@ -19,7 +19,8 @@
 
 전제:
 - testcontainers PostgreSQL 사용 (Neon cold start 노이즈 격리)
-- pyjwt + RS256 self-signed key 로 verify_clerk_token 흐름 simulate
+- pyjwt + EdDSA self-signed key 로 verify_bearer_token 흐름 simulate
+  (재사용 가능한 형태는 tests/auth/conftest.py 로 승격됨 — ADR-031)
   (network 없이 JWKS client 측 캐싱 효과 측정 가능)
 
 산출:
@@ -82,35 +83,35 @@ def _install_query_listener(sync_engine) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Clerk JWT verify — local self-signed RS256 simulate
+# JWT verify — local self-signed EdDSA simulate (Better Auth 기본 알고리즘)
 # ---------------------------------------------------------------------------
 
-def _gen_rsa_keypair() -> tuple[Any, Any]:
-    """RSA keypair 생성 (한 번만)."""
-    from cryptography.hazmat.primitives.asymmetric import rsa
+def _gen_keypair() -> tuple[Any, Any]:
+    """Ed25519 keypair 생성 (한 번만) — Better Auth jwt 플러그인의 기본 알고리즘."""
+    from cryptography.hazmat.primitives.asymmetric import ed25519
 
-    private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private = ed25519.Ed25519PrivateKey.generate()
     public = private.public_key()
     return private, public
 
 
-def _make_clerk_token(private_key, clerk_user_id: str) -> str:
-    """RS256 JWT 생성 — Clerk JWT 흐름 simulate."""
+def _make_auth_token(private_key, auth_user_id: str) -> str:
+    """EdDSA JWT 생성 — Better Auth 발급 흐름 simulate."""
     import jwt as pyjwt
 
     return pyjwt.encode(
         {
-            "sub": clerk_user_id,
+            "sub": auth_user_id,
             "iat": int(time.time()),
             "exp": int(time.time()) + 3600,
         },
         private_key,
-        algorithm="RS256",
+        algorithm="EdDSA",
     )
 
 
-def _patch_verify_clerk_token(public_key) -> None:
-    """src.auth.dependencies.verify_clerk_token 의 jwks_client 를 local public key 로 교체.
+def _patch_verify_bearer_token(public_key) -> None:
+    """src.auth.dependencies 의 jwks_client 를 local public key 로 교체.
 
     network call (PyJWKClient.get_signing_key_from_jwt) 를 우회하면서도
     실제 jwt.decode 흐름은 그대로 측정 — cache 미적용 시점의 cost 가 명확히 나타남.
@@ -139,16 +140,16 @@ def _patch_verify_clerk_token(public_key) -> None:
 async def _seed_dashboard_state(session) -> tuple[uuid.UUID, uuid.UUID, str]:
     """user + team workspace + 멤버 + meetings 5건 + inbox items 5건 seed.
 
-    Returns: (user_id, workspace_id, clerk_id)
+    Returns: (user_id, workspace_id, auth_user_id)
     """
     from src.auth.models import User
     from src.inbox.models import InboxItem
     from src.meetings.models import Meeting
     from src.workspaces.models import Workspace, WorkspaceMember
 
-    clerk_id = "user_perf_spike_001"
+    auth_user_id = "ba_user_perf_spike_001"
     user = User(
-        clerk_id=clerk_id,
+        auth_user_id=auth_user_id,
         display_name="Perf Spike Tester",
         email="perf@kairos.test",
     )
@@ -187,7 +188,7 @@ async def _seed_dashboard_state(session) -> tuple[uuid.UUID, uuid.UUID, str]:
             )
         )
     await session.commit()
-    return user.id, ws.id, clerk_id
+    return user.id, ws.id, auth_user_id
 
 
 async def _make_http_client(integration_engine, user, async_session_factory):
@@ -258,7 +259,7 @@ async def simulate_dashboard_first_visit() -> dict[str, Any]:
         # seed
         CURRENT_PHASE["phase"] = "seed"
         async with async_session_factory() as session:
-            user_id, workspace_id, clerk_id = await _seed_dashboard_state(session)
+            user_id, workspace_id, auth_user_id = await _seed_dashboard_state(session)
 
         # user 객체 다시 fetch (FastAPI override 에 주입)
         from sqlmodel import select
@@ -270,23 +271,23 @@ async def simulate_dashboard_first_visit() -> dict[str, Any]:
             user = result.one()
 
         # ---- JWT verify timing ----
-        # local RS256 setup
-        private, public = _gen_rsa_keypair()
-        token = _make_clerk_token(private, clerk_id)
-        _patch_verify_clerk_token(public)
+        # local EdDSA setup
+        private, public = _gen_keypair()
+        token = _make_auth_token(private, auth_user_id)
+        _patch_verify_bearer_token(public)
 
-        from src.auth.dependencies import verify_clerk_token
+        from src.auth.dependencies import verify_bearer_token
 
         CURRENT_PHASE["phase"] = "jwt_cold"
         t0 = time.time()
-        await verify_clerk_token(authorization=f"Bearer {token}")
+        await verify_bearer_token(authorization=f"Bearer {token}")
         timings["jwt_verify_cold_ms"] = (time.time() - t0) * 1000
 
         # 10회 반복 — Top 1 fix 캐시 적용 상태에서 cost (2회차부터 캐시 hit)
         cached_samples = []
         for _ in range(10):
             t0 = time.time()
-            await verify_clerk_token(authorization=f"Bearer {token}")
+            await verify_bearer_token(authorization=f"Bearer {token}")
             cached_samples.append((time.time() - t0) * 1000)
         timings["jwt_verify_with_cache_p50_ms"] = round(statistics.median(cached_samples), 2)
         timings["jwt_verify_with_cache_mean_ms"] = round(statistics.fmean(cached_samples), 2)
@@ -298,7 +299,7 @@ async def simulate_dashboard_first_visit() -> dict[str, Any]:
         for _ in range(10):
             deps_mod._JWT_CLAIMS_CACHE.clear()  # 매 호출마다 캐시 강제 무효화
             t0 = time.time()
-            await verify_clerk_token(authorization=f"Bearer {token}")
+            await verify_bearer_token(authorization=f"Bearer {token}")
             nocache_samples.append((time.time() - t0) * 1000)
         timings["jwt_verify_no_cache_p50_ms"] = round(statistics.median(nocache_samples), 2)
         timings["jwt_verify_no_cache_mean_ms"] = round(statistics.fmean(nocache_samples), 2)
@@ -379,14 +380,14 @@ async def simulate_dashboard_first_visit() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 async def measure_jwt_with_cache() -> dict[str, float]:
-    """verify_clerk_token 의 jwks_client.get_signing_key_from_jwt 결과를 module-level dict 로 1회 캐싱.
+    """verify_bearer_token 의 jwks_client.get_signing_key_from_jwt 결과를 module-level dict 로 1회 캐싱.
 
     Top 1 fix simulate — 실제 fix 는 dependencies.py 에 반영. 여기서는 fix 적용 전후 비교용
     no-cache 와 with-cache 두 가지 모두 측정.
     """
-    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives.asymmetric import ed25519
 
-    private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private = ed25519.Ed25519PrivateKey.generate()
     public = private.public_key()
 
     import jwt as pyjwt
@@ -394,7 +395,7 @@ async def measure_jwt_with_cache() -> dict[str, float]:
     token = pyjwt.encode(
         {"sub": "user_x", "iat": int(time.time()), "exp": int(time.time()) + 3600},
         private,
-        algorithm="RS256",
+        algorithm="EdDSA",
     )
 
     # 캐시: token kid → signing key
@@ -406,7 +407,7 @@ async def measure_jwt_with_cache() -> dict[str, float]:
         if kid not in cache:
             cache[kid] = public  # cold path
         key = cache[kid]
-        claims = pyjwt.decode(tok, key, algorithms=["RS256"], options={"verify_aud": False})
+        claims = pyjwt.decode(tok, key, algorithms=["EdDSA"], options={"verify_aud": False})
         return {"sub": claims["sub"]}
 
     # 1st = cold

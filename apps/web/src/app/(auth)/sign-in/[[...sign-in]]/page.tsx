@@ -1,4 +1,6 @@
-import { SignIn } from "@clerk/nextjs";
+import { Suspense } from "react";
+
+import { AuthForm } from "@/features/auth/components/auth-form";
 
 export default function SignInPage() {
   return (
@@ -6,10 +8,13 @@ export default function SignInPage() {
     // sign-up 패턴 mirror — div → main id="main-content" wrap.
     <main
       id="main-content"
-      className="flex items-center justify-center min-h-screen"
+      className="flex items-center justify-center min-h-screen px-4"
       style={{ background: "var(--background)" }}
     >
-      <SignIn forceRedirectUrl="/dashboard" signUpForceRedirectUrl="/dashboard" />
+      {/* useSearchParams(callbackURL 읽기) 는 Suspense 경계를 요구한다. */}
+      <Suspense fallback={null}>
+        <AuthForm mode="signIn" />
+      </Suspense>
     </main>
   );
 }

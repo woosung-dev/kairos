@@ -29,7 +29,7 @@ async def _seed_two_workspaces(session: AsyncSession) -> dict:
     """공통 setup: user + workspace A/B + project A/B + meeting A."""
     suffix = uuid.uuid4().hex[:8]
     user = User(
-        clerk_id=f"clerk_fk_{suffix}",
+        auth_user_id=f"ba_fk_{suffix}",
         display_name="FK Tester",
         email=f"fk_{suffix}@k.test",
     )

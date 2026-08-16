@@ -12,12 +12,18 @@ const SOURCE_WID = "11111111-1111-1111-1111-111111111111";
 const TARGET_WID = "22222222-2222-2222-2222-222222222222";
 const ITEM_ID = "33333333-3333-3333-3333-333333333333";
 
-/* ── Clerk getToken 목 ── */
-vi.mock("@clerk/nextjs", () => ({
-  useAuth: () => ({
-    getToken: vi.fn().mockResolvedValue("test-jwt"),
-  }),
-}));
+/* ── 토큰 주입 seam 목 (ADR-031) ──
+   인증 벤더가 아니라 `useApiClient` 를 목한다. 벤더 SDK 를 목하면 전환 때마다 이 파일이
+   따라 깨진다 — seam 을 목하면 그 결합이 사라진다. */
+vi.mock("@/lib/use-api-client", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api-client")>(
+    "@/lib/api-client",
+  );
+  return {
+    useApiClient: () => actual.createApiClient(async () => "test-jwt"),
+    clearAuthTokenCache: vi.fn(),
+  };
+});
 
 /* ── sonner toast 목 (사이드 이펙트 격리) — Sprint 24 BL-064: loading 추가. ── */
 vi.mock("sonner", () => ({

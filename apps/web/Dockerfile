@@ -27,18 +27,23 @@ COPY . .
 # NEXT_PUBLIC_* 는 빌드타임에 번들로 인라인된다 (src/lib/api-client.ts:2).
 # → 도메인이 바뀌면 반드시 재빌드해야 한다. 런타임 env 로는 바뀌지 않는다.
 ARG NEXT_PUBLIC_API_URL
-ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 ARG NEXT_PUBLIC_RECALL_ENABLED
-ARG NEXT_PUBLIC_FOUNDER_CLERK_ID
+ARG NEXT_PUBLIC_FOUNDER_USER_ID
 ARG NEXT_PUBLIC_APP_ENV
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
-    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY \
     NEXT_PUBLIC_RECALL_ENABLED=$NEXT_PUBLIC_RECALL_ENABLED \
-    NEXT_PUBLIC_FOUNDER_CLERK_ID=$NEXT_PUBLIC_FOUNDER_CLERK_ID \
+    NEXT_PUBLIC_FOUNDER_USER_ID=$NEXT_PUBLIC_FOUNDER_USER_ID \
     NEXT_PUBLIC_APP_ENV=$NEXT_PUBLIC_APP_ENV \
     NEXT_TELEMETRY_DISABLED=1
 
-RUN pnpm build
+# ADR-031: Better Auth 는 빌드타임 공개키 개념이 없다 — 인증 build-arg 가 0개다.
+# 다만 `next build` 의 page data 수집이 auth.ts 를 평가하므로, 기본 secret 경고를
+# 없애기 위해 빌드 전용 더미가 필요하다. 런타임 값은 compose 의 environment 가 준다.
+#
+# ★`ENV` 가 아니라 `RUN` 인라인으로 준다. ENV 로 두면 이미지 메타데이터에 남고
+#   docker 가 SecretsUsedInArgOrEnv 로 경고한다 — 더미라도 그 경고가 매 빌드 노이즈가 되고,
+#   진짜 시크릿이 섞여 들어갈 때 경고가 이미 무시되는 상태를 만든다.
+RUN BETTER_AUTH_SECRET=build-time-placeholder-not-used-at-runtime pnpm build
 
 # ── runner: standalone 산출물만 ────────────────────────────────────────────
 FROM base AS runner

@@ -70,15 +70,15 @@ async def test_lazy_seed_idempotent_single_personal_workspace(
     """
     user_id = uuid.uuid4()
 
-    # Pre-seed user row (Clerk 동기화 가정)
+    # Pre-seed user row (인증 공급자 동기화 가정)
     await integration_session.execute(
         text(
-            "INSERT INTO users (id, clerk_id, display_name, email, created_at, updated_at) "
-            "VALUES (:id, :clerk, :name, :email, now(), now())"
+            "INSERT INTO users (id, auth_user_id, display_name, email, created_at, updated_at) "
+            "VALUES (:id, :ba, :name, :email, now(), now())"
         ),
         {
             "id": str(user_id),
-            "clerk": f"clerk_{user_id}",
+            "ba": f"ba_{user_id}",
             "name": "Alice",
             "email": f"{user_id}@test.com",
         },
@@ -111,12 +111,12 @@ async def test_lazy_seed_creates_workspace_member_owner(
 
     await integration_session.execute(
         text(
-            "INSERT INTO users (id, clerk_id, display_name, email, created_at, updated_at) "
-            "VALUES (:id, :clerk, :name, :email, now(), now())"
+            "INSERT INTO users (id, auth_user_id, display_name, email, created_at, updated_at) "
+            "VALUES (:id, :ba, :name, :email, now(), now())"
         ),
         {
             "id": str(user_id),
-            "clerk": f"clerk_{user_id}",
+            "ba": f"ba_{user_id}",
             "name": "Bob",
             "email": f"{user_id}@test.com",
         },
@@ -149,12 +149,12 @@ async def test_lazy_seed_member_idempotent_on_repeat(
 
     await integration_session.execute(
         text(
-            "INSERT INTO users (id, clerk_id, display_name, email, created_at, updated_at) "
-            "VALUES (:id, :clerk, :name, :email, now(), now())"
+            "INSERT INTO users (id, auth_user_id, display_name, email, created_at, updated_at) "
+            "VALUES (:id, :ba, :name, :email, now(), now())"
         ),
         {
             "id": str(user_id),
-            "clerk": f"clerk_{user_id}",
+            "ba": f"ba_{user_id}",
             "name": "Carol",
             "email": f"{user_id}@test.com",
         },

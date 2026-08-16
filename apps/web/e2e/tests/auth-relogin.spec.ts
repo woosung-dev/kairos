@@ -24,13 +24,13 @@ test.describe("G7 — logout → login → state 보존 (Sprint 22, Sprint 23 F4
     expect(wsIdBefore).toBeTruthy();
 
     // 헤더의 user menu / signout 버튼 위치는 codebase 따라 다름.
-    // 본 spec 은 fallback — UserButton (Clerk) 또는 settings link → signout
+    // 본 spec 은 fallback — user-menu 또는 settings link → signout
     const userMenu = page.locator(
       '[data-testid="user-menu"], button[aria-label*="user" i], button[aria-label*="profile" i]',
     ).first();
     const menuExists = await userMenu.count();
     if (menuExists === 0) {
-      test.skip(true, "user-menu testid 미설정 — Clerk UserButton fallback 미구현 carry-over");
+      test.skip(true, "user-menu testid 미설정 — carry-over");
       return;
     }
 
@@ -44,7 +44,7 @@ test.describe("G7 — logout → login → state 보존 (Sprint 22, Sprint 23 F4
     await signoutBtn.click();
     await page.waitForURL(/sign-in|\/$/, { timeout: 10_000 });
 
-    // 재로그인 (Clerk dev key) — auth.setup.ts 가 storageState 갱신했다고 가정.
+    // 재로그인 — auth.setup.ts 가 storageState 갱신했다고 가정.
     // 본 test 는 storageState 자동 reuse 가 동작하는지 verify.
     await page.goto("/dashboard");
     await page.waitForLoadState("networkidle");

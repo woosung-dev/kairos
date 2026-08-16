@@ -47,13 +47,13 @@ kairos/
 
 ```
 apps/web/
-├── proxy.ts                           # Clerk 인증 미들웨어 (Next.js 16)
+├── proxy.ts                           # 세션 쿠키 리다이렉트 (Next.js 16 명칭). 인가는 BE 몫
 └── src/
     ├── app/                           # 라우트 진입점 (Thin Component). route group 3개
     │   ├── (landing)/                 # 랜딩
     │   │   ├── page.tsx               #   "/"
     │   │   └── pricing/
-    │   ├── (auth)/                    # Clerk 인증
+    │   ├── (auth)/                    # 자체 sign-in / sign-up 폼
     │   │   ├── sign-in/[[...sign-in]]/
     │   │   └── sign-up/[[...sign-up]]/
     │   ├── (app)/                     # 인증된 앱 영역 (layout/loading/error 보유)
@@ -92,7 +92,7 @@ apps/web/
     ├── hooks/                         # 공통 유틸리티 훅
     ├── lib/                           # 서드파티 설정, 유틸 (query-client, constants)
     │   ├── api-client.ts              # ★ ApiClient seam (2026-07-13) — createApiClient(getToken), 토큰 주입 SSOT
-    │   ├── use-api-client.ts          # useApiClient() — Clerk getToken 클로저 주입 훅
+    │   ├── use-api-client.ts          # useApiClient() — JWT 캐시 + single-flight 주입 훅
     │   └── query-keys.ts              # ★ queryKey factory 레지스트리 (2026-07-13) — cross-feature key import 금지 (eslint no-restricted-imports)
     ├── store/                         # Zustand 전역 상태
     │   └── ui.ts
@@ -111,7 +111,7 @@ apps/web/
 ```
 apps/api/
 └── src/
-    ├── auth/                          # Clerk JWT 검증 + lazy seed + RBAC + User/Member cache (Sprint 28)
+    ├── auth/                          # Bearer JWT 검증 + lazy seed + RBAC + User/Member cache (Sprint 28)
     ├── inbox/                         # Inbox 적재 + 분류
     ├── projects/                      # 프로젝트 CRUD + MeetingProjectLink + ProjectMember + visibility (Sprint 6 ADR-014)
     ├── meetings/                      # 회의 인제스트, STT, AI 파이프라인 (pipeline_service)

@@ -27,7 +27,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | Server State    | React Query (`@tanstack/react-query`) |
 | Client State    | Zustand                               |
 | Form            | `react-hook-form` + `zod v4`          |
-| Auth            | Clerk (`@clerk/nextjs`)               |
+| Auth            | Better Auth (`better-auth`, ADR-031)  |
 | 배포            | **Oracle Cloud A1 + Cloudflare Tunnel** (ADR-028 — Vercel 철거 완료) |
 
 ## 2. Next.js 16 필수 패턴
@@ -48,24 +48,46 @@ export default async function Page({
 }
 ```
 
-### Clerk (Next.js 16)
+### Better Auth (Next.js 16) — ADR-031
 
-- 인증 보호: **`proxy.ts`** 에서 `clerkMiddleware()` 처리
-- 서버 컴포넌트: `auth()` 또는 `currentUser()`
-- 클라이언트 컴포넌트: `useAuth()`, `useUser()`
-- 직접 JWT 파싱 금지
+이 앱은 **인증 서버이면서 동시에 클라이언트**다. `app/api/auth/[...all]` 이 Better Auth
+핸들러를 마운트하고, 같은 앱의 컴포넌트가 그걸 소비한다. 정본 설정은 `src/lib/auth.ts`.
+
+| 위치 | 쓰는 것 |
+|---|---|
+| 서버 컴포넌트 / route handler | `auth.api.getSession({ headers: await headers() })` |
+| 클라이언트 컴포넌트 | `authClient.useSession()` — 단 **앱 도메인 식별자는 `useMe()`** (아래) |
+| API 호출 토큰 | `useApiClient()` seam 하나뿐. 직접 `fetch("/api/auth/token")` 금지 |
+
+★**`session.user.id` 를 앱 도메인 식별자로 쓰지 마라.** 그건 `auth_user.id`(외부 인증 ID)이고,
+멤버십·소유권 비교의 축은 `users.id`(내부 UUID)다. `@/features/auth/hooks` 의 `useMe()` 를 쓴다.
+Clerk 시절 `member.clerkId === user.id` 문자열 매칭이 벤더 ID 에 묶여 있던 것이 전환에서
+가장 크게 터진 지점이다 (ADR-031 D11).
+
+★**`proxy.ts` 는 인가가 아니라 UX 리다이렉트다.** `getSessionCookie()` 는 쿠키 존재만 보고
+서명도 만료도 검증하지 않는다. 진짜 방어선은 FastAPI 의 Bearer JWT 검증이다.
+여기서 `auth.api.getSession()` 을 부르면 페이지 이동마다 DB 왕복이 생긴다.
+
+★**`export const config = { matcher }` 를 반드시 명시한다.** Clerk 시절에는 SDK 기본 매처에
+얹혀 이 선언이 아예 없었다. 없으면 `_next/static` 자산까지 proxy 를 타면서 조용히 느려진다.
+
+★토큰 캐시 — `authClient.token()` 은 네트워크 왕복이다. `use-api-client.ts` 가 메모리 캐시 +
+single-flight 로 감싼다. 로그아웃 시 `clearAuthTokenCache()` 를 부르지 않으면 죽은 토큰이
+최대 15분간 헤더에 붙는다.
 
 ```typescript
-// proxy.ts
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+// proxy.ts (요지)
+import { getSessionCookie } from "better-auth/cookies";
 
-const isPublicRoute = createRouteMatcher(["/", "/sign-in(.*)", "/sign-up(.*)"]);
+export function proxy(request: NextRequest) {
+  if (isPublic(request.nextUrl.pathname)) return NextResponse.next();
+  if (!getSessionCookie(request)) return NextResponse.redirect(signInUrl);
+  return NextResponse.next();
+}
 
-export default clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) {
-    await auth.protect();
-  }
-});
+export const config = {
+  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico|...).*)"],
+};
 ```
 
 ## 3. Zod v4

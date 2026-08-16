@@ -35,8 +35,8 @@ test("Phase A 스모크 — 라우트별 console.error 0 + emoji-free + 스크�
     const onConsole = (msg: ConsoleMessage) => {
       if (msg.type() !== "error") return;
       const text = msg.text();
-      // Clerk SDK 의 외부 environment PATCH 400 은 dev 인스턴스 노이즈(앱 코드 무관) — 제외.
-      if (text.includes("clerk.accounts.dev") || text.includes("status of 400"))
+      // 외부 리소스 400 은 앱 코드 무관 노이즈 — 제외.
+      if (text.includes("status of 400"))
         return;
       errors.push(text);
     };
@@ -72,7 +72,7 @@ test("Phase A 스모크 — 라우트별 console.error 0 + emoji-free + 스크�
     JSON.stringify(report, null, 2),
   );
 
-  // 검증: 라우트별 (Clerk 노이즈 제외) console.error 0.
+  // 검증: 라우트별 (외부 노이즈 제외) console.error 0.
   for (const route of ROUTES) {
     if (route === "/meetings") continue; // /meetings 는 동적 라우트(/meetings/[id])만 존재 → 404, 스킵
     expect(report[route].errors, `${route} console errors`).toEqual([]);

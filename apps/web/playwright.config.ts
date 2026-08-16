@@ -5,7 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
  *
  * - 기본 타겟: 로컬 dev 서버(3003) + 프로덕 BE
  * - CI에서는 재시도 2회, 실패 시 trace 업로드
- * - Clerk 세션은 storageState로 재사용해 매 테스트 재로그인 비용 절감
+ * - 세션은 storageState로 재사용해 매 테스트 재로그인 비용 절감
  *
  * 사용법:
  *   pnpm dev -p 3003                    # 다른 터미널
@@ -68,7 +68,7 @@ export default defineConfig({
       dependencies: ["setup"],
     },
     // Sprint 27e Round 2 BUG-S27e-TEST-r2-1 — public-only project: storageState/setup 의존 없음.
-    // FE 보안 헤더 회귀 가드 (security-headers.spec.ts) 의 CI 게이트 운영화 — Clerk creds 불요.
+    // FE 보안 헤더 회귀 가드 (security-headers.spec.ts) 의 CI 게이트 운영화 — 로그인 불요.
     // CI chromium 의 ERR_NAME_NOT_RESOLVED (localhost 도 127.0.0.1 도 fail) 회피:
     // --no-sandbox + --host-resolver-rules 로 internal DNS 강제 매핑.
     {

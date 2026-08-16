@@ -2,22 +2,24 @@
 
 // Sprint 15 R7 — Founder admin recall-metrics 페이지
 import { useQuery } from "@tanstack/react-query";
-import { useUser } from "@clerk/nextjs";
+import { useMe } from "@/features/auth/hooks";
 import { useApiClient } from "@/lib/use-api-client";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import type { components } from "@/types/api.gen";
 
-const FOUNDER_CLERK_ID = process.env.NEXT_PUBLIC_FOUNDER_CLERK_ID;
+// ADR-031: 값이 외부 인증 ID → 내부 UUID(users.id) 로 바뀌었다.
+// 내부 UUID 는 인증 공급자가 또 바뀌어도 불변이라, 이 빌드 인자를 다시 갱신할 일이 없다.
+const FOUNDER_USER_ID = process.env.NEXT_PUBLIC_FOUNDER_USER_ID;
 
 // ADR-027 D2 — wire 타입은 계약 생성물에서 import (수기 정의 금지)
 type MemoryMetrics = components["schemas"]["MemoryMetricsOut"];
 
 export default function RecallMetricsPage() {
-  const { user, isLoaded } = useUser();
+  const { data: me, isPending: isMeLoading } = useMe();
   const api = useApiClient();
   const workspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
 
-  const isFounder = !!FOUNDER_CLERK_ID && user?.id === FOUNDER_CLERK_ID;
+  const isFounder = !!FOUNDER_USER_ID && me?.id === FOUNDER_USER_ID;
 
   const metrics = useQuery({
     queryKey: ["memory", "metrics", workspaceId],
@@ -34,13 +36,13 @@ export default function RecallMetricsPage() {
 
   // F-2C v2 (Sprint 25 polish, agy 3차 발견): panel-layout 의 <main id="main-content"> 안에
   // 자체 <main> nest → HTML5 spec 위반 (페이지당 main 1개). section 으로 교체.
-  if (!isLoaded) return <section className="p-8">불러오는 중...</section>;
+  if (isMeLoading) return <section className="p-8">불러오는 중...</section>;
   if (!isFounder) {
     return (
       <section className="p-8 max-w-2xl">
         <h1 className="text-2xl font-semibold mb-2">접근 권한 없음</h1>
         <p className="text-sm text-muted-foreground">
-          이 페이지는 founder 전용입니다. `NEXT_PUBLIC_FOUNDER_CLERK_ID`로 식별되는 사용자만 진입할 수 있어요.
+          이 페이지는 founder 전용입니다. `NEXT_PUBLIC_FOUNDER_USER_ID`로 식별되는 사용자만 진입할 수 있어요.
         </p>
       </section>
     );

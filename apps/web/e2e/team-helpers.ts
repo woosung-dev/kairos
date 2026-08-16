@@ -42,28 +42,52 @@ export const PRIVATE_NOTE_TEXT = `${TOKEN_PRIVATE} 비공개 프로젝트 기밀
 export type ApiMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
 
-// Clerk SDK 는 window 에 globals 주입 — any 금지용 로컬 shim.
-interface ClerkWindow {
-  Clerk?: { session?: { getToken: () => Promise<string | null> } };
+/**
+ * 계정이 존재함을 보장한다 (ADR-031).
+ *
+ * ★Clerk 시절에는 필요 없던 단계다. 계정이 외부 SaaS 에 영속해 있었기 때문에 e2e 는
+ *   "로그인만" 하면 됐다. 이제 계정은 우리 Postgres 에 있고 **CI 는 매 실행 새 DB** 를
+ *   띄운다 — 로그인만 하면 첫 실행부터 실패한다.
+ *
+ * 이미 있으면 Better Auth 가 4xx 를 주므로 그대로 무시한다 (idempotent).
+ */
+export async function ensureAccount(
+  page: Page,
+  email: string,
+  password: string,
+  name: string,
+): Promise<void> {
+  // origin 확보 — page.url() 이 about:blank 면 절대 URL 을 만들 수 없다.
+  if (!page.url().startsWith("http")) await page.goto("/sign-in");
+  await page.request.post(
+    new URL("/api/auth/sign-up/email", page.url()).toString(),
+    {
+      data: { email, password, name },
+      failOnStatusCode: false,
+    },
+  );
+  // 가입은 세션 쿠키까지 세팅한다. 아래 login() 이 폼 경로를 다시 관통하므로
+  // 여기서 얻은 세션에 의존하지 않는다 — 폼 자체가 회귀 대상이기 때문이다.
 }
 
-/** Clerk dev 로그인 (locale-proof: input[name="identifier"], BL-021). */
-export async function clerkLogin(
+/** 이메일/비밀번호 로그인 (ADR-031 — 셀렉터는 우리 폼의 data-testid 계약). */
+export async function login(
   page: Page,
   email: string,
   password: string,
 ): Promise<void> {
   await page.goto("/sign-in");
-  await page.locator('input[name="identifier"]').fill(email);
-  await page.getByRole("button", { name: /continue|계속/i }).click();
-  await page.locator('input[type="password"]').fill(password);
-  await page.getByRole("button", { name: /continue|sign in|로그인|계속/i }).click();
+  await page.getByTestId("auth-email").fill(email);
+  await page.getByTestId("auth-password").fill(password);
+  await page.getByTestId("auth-submit").click();
   await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
 }
 
 export interface MeInfo {
+  /** 내부 UUID (users.id). 멤버십·소유권 매칭의 유일한 축. */
   id: string;
-  clerkId: string | null;
+  /** 외부 인증 ID (Better Auth auth_user.id). 디버깅용 — 매칭에 쓰지 않는다. */
+  authUserId: string | null;
   email: string | null;
   displayName: string | null;
 }
@@ -75,23 +99,22 @@ export async function getMe(page: Page): Promise<MeInfo> {
   return (await res.json()) as MeInfo;
 }
 
-/** 매 호출 fresh JWT (60s 만료 — hoist 금지). Clerk SDK 비동기 hydrate 대기 후 발급. */
+/** JWT 발급 (ADR-031).
+ *
+ * 예전에는 `window.Clerk.session` 이 비동기 hydrate 되기를 기다린 뒤 SDK 로 뽑았고,
+ * 토큰 수명이 60초라 "hoist 금지" 주석이 붙어 있었다. 이제는 서버 라우트를 직접 부르므로
+ * hydrate 대기가 필요 없고, 기본 만료도 15분이라 호출 타이밍에 예민하지 않다.
+ */
 export async function getToken(page: Page): Promise<string> {
-  // storageState 로 연 페이지는 Clerk SDK 가 비동기 초기화 — session 준비까지 대기.
-  await page
-    .waitForFunction(
-      () => {
-        const w = window as unknown as ClerkWindow;
-        return !!w.Clerk?.session;
-      },
-      { timeout: 20_000 },
-    )
-    .catch(() => {});
-  const token = await page.evaluate(async () => {
-    const w = window as unknown as ClerkWindow;
-    return (await w.Clerk?.session?.getToken()) ?? null;
-  });
-  if (!token) throw new Error("Clerk JWT 갱신 실패 — 세션 만료(60s). 즉시 재요청 필요.");
+  // ★상대 경로를 쓰지 않는다. team 프로젝트의 컨텍스트는 `browser.newContext()` 로 직접
+  //   만들어져 config 의 `use.baseURL` 상속이 보장되지 않는다. 페이지가 실제로 열려 있는
+  //   origin 에서 절대 URL 을 만들면 프로젝트 구성과 무관하게 성립한다.
+  const res = await page.request.get(new URL("/api/auth/token", page.url()).toString());
+  if (!res.ok()) {
+    throw new Error(`GET /api/auth/token → ${res.status()} (세션 쿠키 확인 필요)`);
+  }
+  const { token } = (await res.json()) as { token?: string };
+  if (!token) throw new Error("토큰 응답에 token 필드가 없습니다.");
   return token;
 }
 
@@ -116,19 +139,22 @@ export async function api(
 }
 
 /**
- * console.error + pageerror 수집기. 외부 노이즈(Clerk accounts.dev CSP·favicon·
- * 네트워크 abort·의도적 음성 프로브 4xx/5xx)는 앱 결함이 아니므로 필터.
+ * console.error + pageerror 수집기. 외부 노이즈(favicon · 네트워크 abort ·
+ * 의도적 음성 프로브 4xx/5xx)는 앱 결함이 아니므로 필터.
  * 반환된 getter 로 테스트 종료 시 잔존 에러 단언.
+ *
+ * ADR-031: 외부 인증 SaaS 도메인(accounts.dev / clerk.com)이 사라져 필터가 좁아졌다.
+ * 필터가 넓을수록 진짜 앱 에러를 삼킬 위험이 커지므로, 좁아진 것은 순이득이다.
  */
 export function collectConsoleErrors(page: Page): () => string[] {
   const errors: string[] = [];
   // 메시지 텍스트 노이즈(앱 console.error/pageerror 용).
-  const NOISE_MSG = /accounts\.dev|clerk|content security policy|csp|favicon/i;
+  const NOISE_MSG = /content security policy|csp|favicon/i;
   // 브라우저 generic 네트워크 실패 메시지 — URL 미포함이라 텍스트로 구분 불가. 네트워크 실패는
-  // response 리스너에서 URL 기반으로 판정하므로 console 레이어에선 제외(Clerk accounts.dev 400 등).
+  // response 리스너에서 URL 기반으로 판정하므로 console 레이어에선 제외.
   const NETWORK_MSG = /failed to load resource|net::err|err_aborted|the user aborted|the server responded with a status/i;
   // 외부 서비스 URL(앱 BE 아님) — 구체 도메인만(앱 경로의 부분문자열 오탐 방지: 옛 broad google|sentry 제거).
-  const NOISE_URL = /accounts\.dev|\.clerk\.|clerk\.com|sentry\.io|\.ingest\.sentry|google-analytics|googletagmanager|doubleclick|vercel\.live|\/favicon/i;
+  const NOISE_URL = /sentry\.io|\.ingest\.sentry|google-analytics|googletagmanager|doubleclick|\/favicon/i;
   page.on("console", (msg) => {
     if (msg.type() !== "error") return;
     const text = msg.text();
@@ -158,23 +184,26 @@ export function buildTiptapDoc(text: string): Record<string, unknown> {
 }
 
 /**
- * localStorage.kairos-workspace 에 activeWorkspaceId + ownerUserId(clerkId) 주입.
- * ownerUserId 를 함께 넣어야 panel-layout 의 ensureOwner(clerkId) 가 user 불일치로
+ * localStorage.kairos-workspace 에 activeWorkspaceId + ownerUserId 주입.
+ * ownerUserId 를 함께 넣어야 panel-layout 의 ensureOwner 가 user 불일치로
  * activeWorkspaceId 를 null 리셋(→ 첫 ws self-heal)하지 않는다 (BL-S27c-12 가드).
+ *
+ * ADR-031: owner 축이 외부 인증 ID → 내부 UUID(users.id)로 바뀌었다.
+ * version 도 store.ts 의 persist version 과 맞춰야 한다 — 낮으면 migrate 가 값을 버린다.
  */
 export async function injectActiveWorkspace(
   page: Page,
   wsId: string,
-  clerkId: string,
+  userId: string,
 ): Promise<void> {
   await page.evaluate(
     ({ id, owner }) => {
       localStorage.setItem(
         "kairos-workspace",
-        JSON.stringify({ state: { activeWorkspaceId: id, ownerUserId: owner }, version: 0 }),
+        JSON.stringify({ state: { activeWorkspaceId: id, ownerUserId: owner }, version: 1 }),
       );
     },
-    { id: wsId, owner: clerkId },
+    { id: wsId, owner: userId },
   );
 }
 

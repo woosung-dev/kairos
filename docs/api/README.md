@@ -11,7 +11,7 @@
 | DB snake_case ↔ API camelCase 직렬화 | [`CONTEXT-MAP.md`](../../CONTEXT-MAP.md) **I-16** |
 | status code · 페이지네이션 · 리소스 명명 · 권한 dependency | [`apps/api/CONTEXT.md`](../../apps/api/CONTEXT.md) **§6** |
 | 에러 처리 (도메인 `exceptions.py` + 전역 핸들러) | [`apps/api/CONTEXT.md`](../../apps/api/CONTEXT.md) **B-12** |
-| 인증 (Clerk JWT 검증 · RBAC) | [`apps/api/src/auth/CONTEXT.md`](../../apps/api/src/auth/CONTEXT.md) |
+| 인증 (Bearer JWT 검증 · RBAC) | [`apps/api/src/auth/CONTEXT.md`](../../apps/api/src/auth/CONTEXT.md) |
 | 도메인별 엔드포인트 책임 | [`apps/api/src/<domain>/CONTEXT.md`](../product/domains/README.md) |
 | FE wire 타입 | `apps/web/src/types/api.gen.ts` — 생성물. 수기 작성 금지 (**I-22**) |
 | 장기 작업 규약 (202 Accepted + polling) | [`CONTEXT-MAP.md`](../../CONTEXT-MAP.md) **I-5** |

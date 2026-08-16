@@ -5,8 +5,12 @@ export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
 
 export interface Member {
   id: UUID;
+  /**
+   * 내부 사용자 UUID (users.id). 권한/소유권 판정의 유일한 축이다.
+   * ADR-031: 외부 인증 공급자 ID(구 `clerkId`)는 응답에서 제거했다 —
+   * FE 권한 판정이 벤더 ID 에 문자열 매칭으로 묶여 있던 것이 전환에서 터진 지점이다.
+   */
   userId: UUID;
-  clerkId: string | null;
   email: string | null;
   displayName: string | null;
   role: WorkspaceRole;

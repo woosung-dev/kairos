@@ -27,7 +27,7 @@
 | 서버 | `ssh truewords-oracle` (quantbridge · truewords 와 **공유**) |
 | 배포 디렉토리 | `~/kairos` (compose · `.env` · initdb) |
 | 오브젝트 스토리지 | Cloudflare R2 (유지) |
-| 인증 | Clerk (유지) |
+| 인증 | Better Auth 자체 호스팅 (web 컨테이너, ADR-031) |
 | AI | Gemini · OpenAI (유지) |
 
 **같은 호스트의 다른 프로젝트가 쓰는 포트**(건드리지 말 것): 3200 quantbridge-frontend ·
@@ -79,7 +79,7 @@ expand-then-contract 로만 한다.
 발급처와 전체 매트릭스는 [`secrets.md`](../development/secrets.md) 참조.
 
 > ⚠️ **`.env` 에 인라인 주석을 절대 붙이지 마라.** docker compose 의 env_file 파서는
-> `KEY=value  # 설명` 에서 주석을 값의 일부로 읽는다. 한글이 값에 섞이면 Clerk SDK 가 헤더
+> `KEY=value  # 설명` 에서 주석을 값의 일부로 읽는다. 한글이 값에 섞이면 헤더
 > ascii 인코딩에서 터져 401 이 아니라 **500** 이 나고, `CORS_ORIGINS` 오염은 조용한 CORS
 > 전면 차단으로 나타난다.
 >
@@ -115,7 +115,8 @@ just deploy-status
 ./scripts/verify-prod.sh https://kairos-api.woosung.dev
 ```
 
-> **`/health` 200 은 배포 검증이 아니다.** 플레이스홀더 Clerk 키로도 200 이 난다.
+> **`/health` 200 은 배포 검증이 아니다.** 플레이스홀더 키로도 200 이 난다.
+> 인증까지 살아 있는지는 `curl -s https://kairos.woosung.dev/api/auth/jwks` 가 키를 돌려주는지로 본다.
 > 검증은 반드시 **브라우저 로그인 후 데이터 화면까지** 확인한다.
 
 ---
@@ -129,7 +130,7 @@ just deploy-status
   curl/브라우저만 실패하면 `sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder`.
 - **원격 명령은 `ssh host 'bash -lc "..."'`** — 비로그인 셸의 PATH 에 docker compose 가 없다.
 - **API 호스트명에 Cloudflare Access 를 걸지 마라.** XHR·SSR 이 Access 리다이렉트를 따라가지
-  못한다. API 의 문은 Clerk JWT 다.
+  못한다. API 의 문은 Better Auth 가 발급한 JWT 다 (ADR-031).
 
 ---
 

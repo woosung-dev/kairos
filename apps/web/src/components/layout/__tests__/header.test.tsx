@@ -9,8 +9,19 @@ interface UIState {
   toggleRagOverlay: () => void;
 }
 
-const { signOut, setActiveWorkspaceId, useIsValidWorkspaceId, useMembers } = vi.hoisted(() => ({
+const {
+  signOut,
+  clearAuthTokenCache,
+  routerPush,
+  routerRefresh,
+  setActiveWorkspaceId,
+  useIsValidWorkspaceId,
+  useMembers,
+} = vi.hoisted(() => ({
   signOut: vi.fn(),
+  clearAuthTokenCache: vi.fn(),
+  routerPush: vi.fn(),
+  routerRefresh: vi.fn(),
   setActiveWorkspaceId: vi.fn(),
   useIsValidWorkspaceId: vi.fn(),
   useMembers: vi.fn(),
@@ -21,19 +32,27 @@ const workspaceState = {
   setActiveWorkspaceId,
 };
 
-vi.mock("@clerk/nextjs", () => ({
-  useClerk: () => ({ signOut }),
-  useUser: () => ({
-    user: {
-      fullName: "테스트 사용자",
-      firstName: "테",
-      primaryEmailAddress: { emailAddress: "test@example.com" },
+vi.mock("@/lib/auth-client", () => ({
+  authClient: { signOut },
+}));
+
+vi.mock("@/lib/use-api-client", () => ({
+  useApiClient: () => ({}),
+  clearAuthTokenCache,
+}));
+
+vi.mock("@/features/auth/hooks", () => ({
+  useMe: () => ({
+    data: {
+      id: "00000000-0000-0000-0000-0000000000aa",
+      displayName: "테스트 사용자",
+      email: "test@example.com",
     },
   }),
 }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: routerPush, refresh: routerRefresh }),
 }));
 
 vi.mock("@/store/ui", () => {
@@ -86,7 +105,7 @@ beforeEach(() => {
 });
 
 describe("Header 로그아웃", () => {
-  it("query cache를 비우고 signOut하며 activeWorkspaceId를 직접 초기화하지 않는다", async () => {
+  it("query cache + 토큰 캐시를 비우고 signOut 하며 activeWorkspaceId 는 직접 건드리지 않는다", async () => {
     const queryClient = new QueryClient();
     const clear = vi.spyOn(queryClient, "clear");
 
@@ -98,8 +117,11 @@ describe("Header 로그아웃", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
 
-    await vi.waitFor(() => expect(signOut).toHaveBeenCalledWith({ redirectUrl: "/" }));
+    await vi.waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
     expect(clear).toHaveBeenCalledTimes(1);
+    // ADR-031: 토큰 캐시를 안 비우면 로그아웃 후에도 메모리의 JWT 가 최대 15분간 유효하다.
+    expect(clearAuthTokenCache).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(routerPush).toHaveBeenCalledWith("/"));
     expect(setActiveWorkspaceId).not.toHaveBeenCalled();
   });
 });

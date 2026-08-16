@@ -55,16 +55,16 @@ async def _seed_team_ws_and_invite(engine) -> tuple[uuid.UUID, uuid.UUID, str]:
     invite_id = uuid.uuid4()
     code = "concurrentcode"
     async with sm() as session:
-        for uid, clerk in [(owner_id, "owner"), (acceptor_id, "acceptor")]:
+        for uid, ba in [(owner_id, "owner"), (acceptor_id, "acceptor")]:
             await session.execute(
                 text(
-                    "INSERT INTO users (id, clerk_id, display_name, email, created_at, updated_at) "
-                    "VALUES (:id, :clerk, :name, :email, now(), now())"
+                    "INSERT INTO users (id, auth_user_id, display_name, email, created_at, updated_at) "
+                    "VALUES (:id, :ba, :name, :email, now(), now())"
                 ),
                 {
                     "id": str(uid),
-                    "clerk": f"clerk_{clerk}_{uid}",
-                    "name": clerk,
+                    "ba": f"ba_{ba}_{uid}",
+                    "name": ba,
                     "email": f"{uid}@concurrent.test",
                 },
             )

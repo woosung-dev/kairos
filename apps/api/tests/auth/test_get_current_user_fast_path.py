@@ -24,7 +24,7 @@ async def test_get_current_user_fast_path_skips_lazy_seed_when_onboarded():
     # Mock: existing user with onboarding_step >= 1
     existing_user = MagicMock(spec=User)
     existing_user.id = uuid.uuid4()
-    existing_user.clerk_id = "user_abc"
+    existing_user.auth_user_id = "user_abc"
     existing_user.onboarding_step = 1
     existing_user.display_name = "Test"
 
@@ -36,7 +36,7 @@ async def test_get_current_user_fast_path_skips_lazy_seed_when_onboarded():
 
     with patch("src.auth.dependencies.UserRepository") as MockRepo:
         repo = AsyncMock()
-        repo.find_by_clerk_id = AsyncMock(return_value=existing_user)
+        repo.find_by_auth_user_id = AsyncMock(return_value=existing_user)
         MockRepo.return_value = repo
 
         result = await get_current_user(claims=claims, session=mock_session)
@@ -50,8 +50,8 @@ async def test_get_current_user_fast_path_skips_lazy_seed_when_onboarded():
     assert mock_session.commit.call_count == 0
     # 동일 user 반환
     assert result is existing_user
-    # find_by_clerk_id 는 1번만 호출 (re-fetch 없음)
-    assert repo.find_by_clerk_id.call_count == 1
+    # find_by_auth_user_id 는 1번만 호출 (re-fetch 없음)
+    assert repo.find_by_auth_user_id.call_count == 1
 
 
 @pytest.mark.asyncio
@@ -63,7 +63,7 @@ async def test_get_current_user_falls_through_when_onboarding_step_zero():
 
     existing_user = MagicMock(spec=User)
     existing_user.id = uuid.uuid4()
-    existing_user.clerk_id = "user_xyz"
+    existing_user.auth_user_id = "user_xyz"
     existing_user.onboarding_step = 0  # lazy seed 미완료
     existing_user.display_name = "New"
 
@@ -76,7 +76,7 @@ async def test_get_current_user_falls_through_when_onboarding_step_zero():
     with patch("src.auth.dependencies.UserRepository") as MockRepo, \
          patch("src.onboarding.service.OnboardingService"):
         repo = AsyncMock()
-        repo.find_by_clerk_id = AsyncMock(return_value=existing_user)
+        repo.find_by_auth_user_id = AsyncMock(return_value=existing_user)
         MockRepo.return_value = repo
 
         await get_current_user(claims=claims, session=mock_session)
@@ -96,7 +96,7 @@ async def test_get_current_user_new_user_full_seed_path():
 
     created_user = MagicMock(spec=User)
     created_user.id = uuid.uuid4()
-    created_user.clerk_id = "user_new"
+    created_user.auth_user_id = "user_new"
     created_user.onboarding_step = 0
     created_user.display_name = "Brand New"
 
@@ -110,13 +110,13 @@ async def test_get_current_user_new_user_full_seed_path():
          patch("src.onboarding.service.OnboardingService"):
         repo = AsyncMock()
         # 첫 find = None, INSERT 후 re-fetch = created_user
-        repo.find_by_clerk_id = AsyncMock(side_effect=[None, created_user])
+        repo.find_by_auth_user_id = AsyncMock(side_effect=[None, created_user])
         MockRepo.return_value = repo
 
         result = await get_current_user(claims=claims, session=mock_session)
 
     # User INSERT + workspace + member = 3건 이상
     assert mock_session.execute.call_count >= 3
-    # find_by_clerk_id 2번 (initial + re-fetch)
-    assert repo.find_by_clerk_id.call_count == 2
+    # find_by_auth_user_id 2번 (initial + re-fetch)
+    assert repo.find_by_auth_user_id.call_count == 2
     assert result is created_user

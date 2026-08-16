@@ -415,12 +415,12 @@ async def _seed_private_document_cache(
         expire_on_commit=False,
     )
     owner = User(
-        clerk_id=f"b5-owner-{uuid.uuid4().hex}",
+        auth_user_id=f"b5-owner-{uuid.uuid4().hex}",
         display_name="B5 Owner",
         email=f"b5-owner-{uuid.uuid4().hex}@kairos.test",
     )
     non_member = User(
-        clerk_id=f"b5-non-member-{uuid.uuid4().hex}",
+        auth_user_id=f"b5-non-member-{uuid.uuid4().hex}",
         display_name="B5 Non-member",
         email=f"b5-non-member-{uuid.uuid4().hex}@kairos.test",
     )
@@ -1208,12 +1208,12 @@ async def test_external_document_resync_invalidates_workspace_cache_before_chunk
         expire_on_commit=False,
     )
     user = User(
-        clerk_id=f"drive-cache-user-{uuid.uuid4().hex}",
+        auth_user_id=f"drive-cache-user-{uuid.uuid4().hex}",
         display_name="Drive Cache Tester",
         email=f"drive-cache-{uuid.uuid4().hex}@kairos.test",
     )
     non_member = User(
-        clerk_id=f"drive-cache-non-member-{uuid.uuid4().hex}",
+        auth_user_id=f"drive-cache-non-member-{uuid.uuid4().hex}",
         display_name="Drive Cache Non-member",
         email=f"drive-cache-non-member-{uuid.uuid4().hex}@kairos.test",
     )
@@ -1442,12 +1442,12 @@ async def test_unpublish_invalidates_workspace_cache_and_prevents_nonmember_cach
         expire_on_commit=False,
     )
     owner = User(
-        clerk_id=f"unpublish-cache-owner-{uuid.uuid4().hex}",
+        auth_user_id=f"unpublish-cache-owner-{uuid.uuid4().hex}",
         display_name="Unpublish Cache Owner",
         email=f"unpublish-cache-owner-{uuid.uuid4().hex}@kairos.test",
     )
     non_member = User(
-        clerk_id=f"unpublish-cache-non-member-{uuid.uuid4().hex}",
+        auth_user_id=f"unpublish-cache-non-member-{uuid.uuid4().hex}",
         display_name="Unpublish Cache Non-member",
         email=f"unpublish-cache-non-member-{uuid.uuid4().hex}@kairos.test",
     )

@@ -25,8 +25,6 @@ from pathlib import Path
 # in-process app.openapi() 호출과는 무관하다.
 _FAKE_ENV = {
     "DATABASE_URL": "postgresql://fake:fake@localhost:5432/fake",
-    "CLERK_SECRET_KEY": "sk_test_fake",
-    "CLERK_WEBHOOK_SECRET": "whsec_fake",
     "R2_ACCOUNT_ID": "fake",
     "R2_ACCESS_KEY_ID": "fake",
     "R2_SECRET_ACCESS_KEY": "fake",

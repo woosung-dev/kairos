@@ -26,7 +26,7 @@ def _make_service(session) -> InviteService:
 async def test_list_members_email_wired_from_user(integration_session):
     """멤버 목록의 email/displayName 이 User row 에서 정확히 채워진다."""
     user = User(
-        clerk_id=f"clerk_{uuid.uuid4()}",
+        auth_user_id=f"ba_{uuid.uuid4()}",
         display_name="홍길동",
         email="gildong@kairos.test",
     )
@@ -58,12 +58,12 @@ async def test_list_members_email_wired_from_user(integration_session):
 async def test_list_members_email_is_real_user_email_not_blank(integration_session):
     """User.email 이 채워진 경우 응답 email 도 동일 값 (빈 문자열로 떨어지지 않음)."""
     user = User(
-        clerk_id=f"clerk_{uuid.uuid4()}",
+        auth_user_id=f"ba_{uuid.uuid4()}",
         display_name="Acceptor",
         email="acceptor@kairos.test",
     )
     owner = User(
-        clerk_id=f"clerk_{uuid.uuid4()}",
+        auth_user_id=f"ba_{uuid.uuid4()}",
         display_name="Owner",
         email="owner@kairos.test",
     )

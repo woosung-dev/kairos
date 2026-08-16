@@ -19,7 +19,7 @@
 | Validation      | Pydantic V2 + `pydantic-settings`                                     |
 | Package Manager | `uv`                                                                  |
 | Database        | PostgreSQL 17 + pgvector 0.8 (HNSW + halfvec, ADR-020)                |
-| Auth            | Clerk JWT 검증                                                        |
+| Auth            | Better Auth 발급 JWT 를 JWKS 로 검증 (ADR-031)                        |
 | Storage         | Cloudflare R2 (`aioboto3`)                                            |
 | AI              | Gemini `gemini-3.1-flash-lite` (`google-genai` SDK, ADR-019 Phase B)  |
 | 배포            | **Oracle Cloud A1 단일 VM + Cloudflare Tunnel** (ADR-028)             |
@@ -373,7 +373,7 @@ PYTHONUNBUFFERED=1 uv run python -u scripts/bench_vector_search.py | tee /tmp/be
 ```
 apps/api/src/
 ├── [domain]/       # 도메인별 모듈 (router/service/repository/schemas/models)
-├── auth/           # Clerk JWT 검증 + RBAC
+├── auth/           # Bearer JWT 검증 + RBAC
 ├── common/
 │   ├── database.py      # init_engine / get_session_factory
 │   ├── exceptions.py

@@ -12,17 +12,16 @@ class UserRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def find_by_clerk_id(self, clerk_id: str) -> User | None:
-        """Clerk ID로 사용자 조회."""
+    async def find_by_auth_user_id(self, auth_user_id: str) -> User | None:
+        """외부 인증 ID(JWT sub)로 사용자 조회."""
         return (await self.session.exec(
-            select(User).where(User.clerk_id == clerk_id)
+            select(User).where(User.auth_user_id == auth_user_id)
         )).one_or_none()
 
-    async def find_by_email(self, email: str) -> User | None:
-        """이메일로 사용자 조회."""
-        return (await self.session.exec(
-            select(User).where(User.email == email)
-        )).one_or_none()
+    # find_by_email 은 ADR-031 에서 삭제했다. 호출자가 0건인 dead code 였고,
+    # `users.email` 에 UNIQUE 가 없는데 `.one_or_none()` 이라 컷오버 후
+    # (레거시 행 + 재가입 행이 같은 이메일을 갖는 순간) MultipleResultsFound 500 이 된다.
+    # 이메일로 사용자를 찾을 일이 생기면 정렬 기준을 명시한 `.first()` 로 새로 만든다.
 
     async def find_by_id(self, user_id: uuid.UUID) -> User | None:
         """ID로 사용자 조회."""

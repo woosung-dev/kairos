@@ -7,13 +7,13 @@
 #
 # 기본 base-url: https://kairos-api.woosung.dev
 # 환경변수 (optional):
-#   CLERK_JWT   — 인증 필요 endpoint 검증용 토큰. 미설정 시 health 만.
-#   WORKSPACE_ID — workspace endpoints 검증용 UUID (CLERK_JWT 와 같이).
+#   KAIROS_JWT  — 인증 필요 endpoint 검증용 토큰. 미설정 시 health 만.
+#   WORKSPACE_ID — workspace endpoints 검증용 UUID (KAIROS_JWT 와 같이).
 
 set -euo pipefail
 
 BASE_URL="${1:-https://kairos-api.woosung.dev}"
-JWT="${CLERK_JWT:-}"
+JWT="${KAIROS_JWT:-}"
 WS_ID="${WORKSPACE_ID:-}"
 
 GREEN="\033[32m"
@@ -60,8 +60,8 @@ fi
 
 # ── 3. 인증 endpoint (JWT 있을 때만) ─────────────────────────────────
 if [ -z "$JWT" ]; then
-  info "CLERK_JWT 미설정 — 인증 endpoint 검증 skip."
-  info "  사용법: export CLERK_JWT='eyJ...' && ./scripts/verify-prod.sh"
+  info "KAIROS_JWT 미설정 — 인증 endpoint 검증 skip."
+  info "  사용법: export KAIROS_JWT='eyJ...' && ./scripts/verify-prod.sh"
   exit 0
 fi
 

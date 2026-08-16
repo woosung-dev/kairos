@@ -105,7 +105,7 @@ test.describe.serial("T22 노트 삭제 정책 (작성자 본인 + admin 이상)
     const errors = collectConsoleErrors(memberPage);
     try {
       await memberPage.goto("/");
-      await injectActiveWorkspace(memberPage, teamWsId, memberMe.clerkId ?? "");
+      await injectActiveWorkspace(memberPage, teamWsId, memberMe.id);
       await memberPage.goto(`/notes/${noteId}`);
 
       // 셀렉터는 태그를 가정하지 않는다 (aria-label 단독)
@@ -136,7 +136,7 @@ test.describe.serial("T22 노트 삭제 정책 (작성자 본인 + admin 이상)
 
     try {
       await memberPage.goto("/");
-      await injectActiveWorkspace(memberPage, teamWsId, memberMe.clerkId ?? "");
+      await injectActiveWorkspace(memberPage, teamWsId, memberMe.id);
       await memberPage.goto(`/notes/${noteId}`);
 
       await expect(

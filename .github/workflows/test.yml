@@ -67,8 +67,6 @@ jobs:
         run: uv run pytest --ignore=tests/services/test_transcription.py --ignore=tests/test_r2_cors_regression.py -v
         env:
           DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
-          CLERK_SECRET_KEY: "sk_test_fake"
-          CLERK_WEBHOOK_SECRET: "whsec_fake"
           R2_ACCOUNT_ID: "fake"
           R2_ACCESS_KEY_ID: "fake"
           R2_SECRET_ACCESS_KEY: "fake"
@@ -105,9 +103,8 @@ jobs:
       - name: Build (includes type check)
         run: pnpm build
         env:
-          # Clerk 7.4.1 publishable key 검증 통과 형식 — pk_test_ + base64(host$).
-          # `clerk.example.com$` → Y2xlcmsuZXhhbXBsZS5jb20k. 실제 fake 라 API 호출 X.
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZXhhbXBsZS5jb20k"
+          # ADR-031: Better Auth 는 빌드타임 공개키가 없다 (위 frontend-build 주석 참조).
+          BETTER_AUTH_SECRET: "ci-fake-secret-at-least-32-bytes-long"
           NEXT_PUBLIC_API_URL: "http://localhost:8000"
 
       # Sprint 27e Round 2 BUG-S27e-TEST-r2-1 — FE 보안 헤더 회귀 가드 CI 게이트.
@@ -124,12 +121,11 @@ jobs:
       - name: Security headers gate (build artifact, public route)
         working-directory: ${{ github.workspace }}
         env:
-          # Clerk 7.4.1 publishable key 검증 통과 형식 — pk_test_ + base64(host$).
-          # `clerk.example.com$` → Y2xlcmsuZXhhbXBsZS5jb20k. 실제 fake 라 API 호출 X.
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZXhhbXBsZS5jb20k"
-          # Sprint 27e Round 2 r2-1 — Next.js 16 + Clerk 7.4.1 runtime 가 server-side
-          # secretKey 필요 (build 시점만 아니라 next start 도). fake 값으로 부팅 OK.
-          CLERK_SECRET_KEY: "sk_test_fake"
+          # ADR-031: Better Auth 는 빌드타임 공개키가 없다. `next build` 의 page data 수집이
+          # auth.ts 를 평가하므로 기본 secret 경고만 없애는 더미를 준다 (DB 접속은 없다).
+          # ★`just fe-security-headers` 의 기본값과 문자 그대로 같은 값이어야 한다
+          #   (justfile 상단 "문자 동일" 규약). 한쪽만 바꾸면 로컬과 CI 가 갈라진다.
+          BETTER_AUTH_SECRET: "ci-fake-secret-at-least-32-bytes-long"
           NEXT_PUBLIC_API_URL: "http://localhost:8000"
         run: just fe-security-headers 3000
 
@@ -146,8 +142,6 @@ jobs:
     if: needs.changes.outputs.contracts == 'true'
     env:
       DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
-      CLERK_SECRET_KEY: "sk_test_fake"
-      CLERK_WEBHOOK_SECRET: "whsec_fake"
       R2_ACCOUNT_ID: "fake"
       R2_ACCESS_KEY_ID: "fake"
       R2_SECRET_ACCESS_KEY: "fake"
@@ -188,13 +182,13 @@ jobs:
   # 1. Repository Settings → Secrets and variables → Variables 탭
   #    E2E_ENABLED = 'true' 추가
   # 2. Secrets 탭에서 아래 시크릿 등록:
-  #    E2E_CLERK_PUBLISHABLE_KEY, E2E_CLERK_SECRET_KEY
+  #    (인증 관련 secret 은 ADR-031 로 불필요 — E2E 계정 email/password 만 쓴다)
   #    E2E_API_URL, E2E_USER_EMAIL, E2E_USER_PASSWORD
   # ─────────────────────────────────────────────────────────────────────────────
   e2e:
     runs-on: ubuntu-latest
     # !failure()/!cancelled() — frontend-build 가 skipped 여도 실행 가능하되 failed 면 차단.
-    # Clerk testing credentials 설정된 환경에서만 실행 (secrets 등록 이후 활성화).
+    # E2E 계정 credentials 설정된 환경에서만 실행 (secrets 등록 이후 활성화).
     needs: [changes, frontend-build]
     if: >-
       ${{ !failure() && !cancelled() && vars.E2E_ENABLED == 'true' &&
@@ -221,6 +215,13 @@ jobs:
       # local BE URL — Playwright + Next.js build 모두 사용
       LOCAL_API_URL: http://localhost:8000
       LOCAL_DATABASE_URL: postgresql+asyncpg://kairos:kairos@localhost:5432/kairos_e2e
+      # ADR-031: web 이 Better Auth 서버라 DB 에 직접 붙는다.
+      # ★node-postgres 형식이다 — BE 의 +asyncpg DSN 을 재사용하면 안 된다.
+      LOCAL_AUTH_DATABASE_URL: postgresql://kairos:kairos@localhost:5432/kairos_e2e
+      # Next 가 이 포트로 뜨므로 issuer/audience 도 여기에 맞춰야 한다.
+      # 기본값(localhost:3000)으로 두면 BE 가 issuer 불일치로 전 요청 401 을 낸다.
+      LOCAL_AUTH_URL: http://localhost:3003
+      E2E_AUTH_SECRET: e2e-ci-better-auth-secret-32-bytes-min
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -244,12 +245,10 @@ jobs:
       - name: Run alembic upgrade head
         working-directory: apps/api
         # alembic env.py 가 src.core.config.get_settings 호출 → pydantic Settings 의
-        # 모든 SecretStr 필드 (Clerk/AI/R2) 필요. DATABASE_URL 만으론 ValidationError.
+        # 모든 SecretStr 필드 (AI/R2) 필요. DATABASE_URL 만으론 ValidationError.
         env:
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
           APP_ENV: test
-          CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
-          CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
@@ -263,8 +262,6 @@ jobs:
         env:
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
           APP_ENV: test
-          CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
-          CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
@@ -273,6 +270,10 @@ jobs:
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
           CORS_ORIGINS: http://localhost:3003
           FRONTEND_URL: http://localhost:3003
+          # 토큰 발급자는 로컬 Next — 기본값(:3000)을 그대로 두면 issuer 불일치 401 이다.
+          AUTH_JWT_ISSUER: ${{ env.LOCAL_AUTH_URL }}
+          AUTH_JWT_AUDIENCE: ${{ env.LOCAL_AUTH_URL }}
+          AUTH_JWKS_URL: ${{ env.LOCAL_AUTH_URL }}/api/auth/jwks
         run: |
           uv run uvicorn src.main:app --host 0.0.0.0 --port 8000 > /tmp/backend.log 2>&1 &
           echo "Backend PID $!"
@@ -315,17 +316,20 @@ jobs:
       - name: Build Next.js app
         working-directory: apps/web
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_API_URL: ${{ env.LOCAL_API_URL }}
-          CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+          # 빌드 중 page data 수집이 auth.ts 를 평가한다 (DB 접속은 없다).
+          BETTER_AUTH_SECRET: ${{ env.E2E_AUTH_SECRET }}
         run: pnpm build
 
       - name: Start Next.js app
         working-directory: apps/web
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_API_URL: ${{ env.LOCAL_API_URL }}
-          CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+          # ★런타임에는 DB 가 필요하다. 랜딩(`/`)이 서버에서 세션을 조회하므로
+          #   이게 없으면 `/` 가 500 이고 wait-on 이 타임아웃한다.
+          BETTER_AUTH_SECRET: ${{ env.E2E_AUTH_SECRET }}
+          BETTER_AUTH_URL: ${{ env.LOCAL_AUTH_URL }}
+          BETTER_AUTH_DATABASE_URL: ${{ env.LOCAL_AUTH_DATABASE_URL }}
         run: pnpm start -p 3003 &
 
       - name: Wait for Next.js app

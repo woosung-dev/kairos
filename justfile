@@ -34,7 +34,10 @@ fe-lint:
     cd apps/web && pnpm lint
 
 fe-build:
-    cd apps/web && pnpm build
+    # ADR-031: `next build` 의 page data 수집이 auth.ts 를 평가한다. secret 이 없으면
+    # BetterAuthError 로그가 찍힌다(빌드는 통과). CI frontend-build 스텝의 env 와
+    # **문자 그대로 같은 값**을 기본값으로 둬서 로컬과 CI 출력이 갈라지지 않게 한다.
+    cd apps/web && BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-ci-fake-secret-at-least-32-bytes-long}" pnpm build
 
 e2e:
     cd apps/web && pnpm e2e
@@ -80,7 +83,7 @@ fe-security-headers PORT="3005":
       echo "  정리: lsof -ti:{{PORT}} | xargs kill" >&2
       exit 1
     fi
-    CLERK_SECRET_KEY="${CLERK_SECRET_KEY:-sk_test_fake}" pnpm start -p {{PORT}} -H 0.0.0.0 > /tmp/kairos-next-headers.log 2>&1 &
+    BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-ci-fake-secret-at-least-32-bytes-long}" pnpm start -p {{PORT}} -H 0.0.0.0 > /tmp/kairos-next-headers.log 2>&1 &
     _pid=$!
     # pnpm 이 SIGTERM 을 자식(next start)에 전달하지 못하는 경우가 있어 프로세스 그룹까지 정리한다.
     trap 'pkill -P "$_pid" 2>/dev/null || true; kill "$_pid" 2>/dev/null || true' EXIT
@@ -125,9 +128,8 @@ deploy-build TAG:
     set -a && source deploy/oci/build.env && set +a && \
       docker buildx build --platform linux/arm64 -t kairos-web:{{TAG}} --load \
         --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
-        --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" \
         --build-arg NEXT_PUBLIC_RECALL_ENABLED="$NEXT_PUBLIC_RECALL_ENABLED" \
-        --build-arg NEXT_PUBLIC_FOUNDER_CLERK_ID="$NEXT_PUBLIC_FOUNDER_CLERK_ID" \
+        --build-arg NEXT_PUBLIC_FOUNDER_USER_ID="$NEXT_PUBLIC_FOUNDER_USER_ID" \
         --build-arg NEXT_PUBLIC_APP_ENV="$NEXT_PUBLIC_APP_ENV" \
         apps/web
 

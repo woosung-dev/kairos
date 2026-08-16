@@ -28,7 +28,7 @@ async def client():
 def mock_user():
     user = MagicMock(spec=User)
     user.id = uuid.uuid4()
-    user.clerk_id = "user_test123"
+    user.auth_user_id = "user_test123"
     user.display_name = "테스트"
     user.email = "test@example.com"
     user.avatar_url = None

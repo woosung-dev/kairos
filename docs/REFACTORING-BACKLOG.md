@@ -12,7 +12,7 @@
 
 **Sprint 26 (glittery-tulip) 부터 sprint-별 handoff/closeout/verification/kickoff/final-summary 파일을 작성하지 않는다.** 지속 정보는 (1) git log + 머지된 PR body, (2) 이 백로그의 BL 항목, (3) `.claude/projects/.../memory/MEMORY.md` (선택). 다음 sprint 첫 commit 의도는 마지막 머지된 PR 의 "다음 sprint 진입점" 섹션에 1-3줄로 남긴다.
 
-**현재 다음 픽업** (2026-05-23, Sprint 27a 진행 중): Sprint 26 머지 완료 (PR #104 → main `1be5beb`) → Sprint 27a luminous-anchor (D-6 grill + BL-S26-1 토큰컷, 본 PR) → Sprint 27b GA launch (Clerk Production + Svix + 외부 5명 dogfooding) → Sprint 28 paid customer 1명 (PMF signal).
+**현재 다음 픽업** (2026-05-23, Sprint 27a 진행 중): Sprint 26 머지 완료 (PR #104 → main `1be5beb`) → Sprint 27a luminous-anchor (D-6 grill + BL-S26-1 토큰컷, 본 PR) → ~~Sprint 27b GA launch (Clerk Production + Svix)~~ **ADR-031 로 인증 부분 무효** — 외부 5명 dogfooding 기준만 승계 → Sprint 28 paid customer 1명 (PMF signal).
 
 **종료 기준** (3 도구 합의): GA launch 는 milestone, **paid customer 1명** 이 진짜 종료 신호.
 
@@ -40,11 +40,11 @@
 
 ## BL-S27c-1 — `get_current_user` lazy seed race condition fix ★★★ (P0)
 
-**현 상태**: `apps/api/src/auth/dependencies.py:160-169` 의 User INSERT 가 race-unsafe. Dashboard 첫 진입 시 FE 가 5+ API 동시 호출 → 각 transaction 이 `find_by_clerk_id`=None → 동시 INSERT → 1개 성공 + 나머지 IntegrityError `duplicate key value violates unique constraint "ix_users_clerk_id"` → 500.
+**현 상태**: `apps/api/src/auth/dependencies.py:160-169` 의 User INSERT 가 race-unsafe. Dashboard 첫 진입 시 FE 가 5+ API 동시 호출 → 각 transaction 이 사용자 조회=None → 동시 INSERT → 1개 성공 + 나머지 IntegrityError `duplicate key value violates unique constraint` → 500. (컬럼은 ADR-031 로 `auth_user_id` 로 이동)
 
 **증상 verified** (Sprint 27c audit, Account #3 c@e.com localhost 재현): `GET /workspaces` 500 + `/workspaces/{id}/members` 500 + `/workspaces/{id}/projects` 500 + `/workspaces/{id}/inbox` 403 (lazy fallback). production 의 동일 증상도 같은 race condition 추정 (deploy stale 가설 무효).
 
-**목표**: User INSERT 에 `ON CONFLICT (clerk_id) DO NOTHING` 추가 (같은 file line 175-184 의 workspace INSERT 패턴 정합). 또는 try/except IntegrityError + retry find_by_clerk_id fallback.
+**목표**: User INSERT 에 `ON CONFLICT (auth_user_id) DO NOTHING` 추가 (같은 file line 175-184 의 workspace INSERT 패턴 정합). 또는 try/except IntegrityError + retry 조회 fallback.
 
 **근거**: Sprint 27c audit, `git history`.
 
@@ -132,9 +132,9 @@
 
 ## BL-S27e-3 — CSP 정책 도입 (Sprint 27d carry) ★ (P3)
 
-**현 상태**: Sprint 27d 보안 헤더 fix (BUG-S27d-4) 에서 X-Frame-Options / X-Content-Type-Options / Referrer-Policy / Permissions-Policy 4종은 추가됐으나 CSP 는 의도적 SKIP. Next.js + Clerk + R2 + Sentry 등 다수 도메인의 정책 정리 미완.
+**현 상태**: Sprint 27d 보안 헤더 fix (BUG-S27d-4) 에서 X-Frame-Options / X-Content-Type-Options / Referrer-Policy / Permissions-Policy 4종은 추가됐으나 CSP 는 의도적 SKIP. **ADR-031 로 Clerk 도메인이, ADR-028 로 Sentry 가 사라져 정리 대상 도메인이 크게 줄었다** — 진입 장벽이 낮아진 상태다.
 
-**목표**: 외부 도메인 inventory 정리 → `strict-dynamic` + nonce 기반 CSP 적용. Clerk SDK 의 inline script 정책 호환 확인.
+**목표**: 외부 도메인 inventory 정리 → `strict-dynamic` + nonce 기반 CSP 적용. 남은 외부 도메인은 폰트(fontshare/jsdelivr)와 R2 정도다.
 
 **근거**: Sprint 27d opus audit BUG-S27d-4 fix 시 CSP 분리. agent-3 CTO 권고.
 
@@ -1022,7 +1022,7 @@ production scale (>1만 row 또는 동시 트래픽) 진입 시 다음 패턴 �
 
 > **CO-5** = BL-050 의 "잔여 3 entity (memory_items / memory_ai_calls / promotion_audit)" 로 흡수. BL-050 §"잔여" 섹션 참조.
 > **CO-6** = ADR-019 Phase B (Gemini 3.1-flash-lite 6 spots swap, 2026-05-28 EOL) — TODO.md Sprint 24+ Next Actions 명시. BL 신설 없음.
-> **CO-7** = BUG-AUTH-WH (Clerk webhook Svix 서명 + event allowlist + idempotency) — Sprint 19 PR #3 carry. BL 신설 없음.
+> ~~**CO-7** = BUG-AUTH-WH (Clerk webhook Svix 서명 + event allowlist + idempotency)~~ — **ADR-031 로 무효.** Better Auth 에는 webhook 개념 자체가 없다.
 > **CO-13** = `test_config.py` pyright +3 baseline (본 sprint 무관) — micro fix, BL 신설 가치 적음. Sprint 24+ 자율 cleanup.
 
 ---
@@ -1109,15 +1109,15 @@ production scale (>1만 row 또는 동시 트래픽) 진입 시 다음 패턴 �
 
 ## BL-068 — D1 WorkspaceSwitcher Playwright/manual reproduce (Sprint 24 BL-066 carry)
 
-**현 상태:** Sprint 24 BL-066 정적 분석 결과 Sprint 23 `9e2eee2` D1 fix 가 현 코드에 정합 반영됨 (`queryClient.invalidateQueries(predicate)` + `router.refresh()` 제거 + ws list 보존). Playwright reproduce 는 Clerk OAuth (Google) 자동화 한계 + 실 user data (다중 ws account) 의존으로 carry-over.
+**현 상태:** Sprint 24 BL-066 정적 분석 결과 Sprint 23 `9e2eee2` D1 fix 가 현 코드에 정합 반영됨 (`queryClient.invalidateQueries(predicate)` + `router.refresh()` 제거 + ws list 보존). Playwright reproduce 는 Google OAuth 자동화 한계 + 실 user data (다중 ws account) 의존으로 carry-over. **ADR-031 이후 email/password 계정은 `/sign-up` 으로 스크립트 생성이 가능하므로 진입 장벽이 낮아졌다** (Google 경로는 여전히 자동화 대상 아님).
 
-**목표:** Playwright `storageState` 캡쳐 (사용자 manual 1회 로그인 후 cookie state 저장) 또는 Clerk dev mode test user API (Sprint 22 OBN-01 패턴) 활용한 e2e spec. D1 시나리오: ws switcher 클릭 → 다른 ws 전환 → dashboard data 갱신 + ws list 보존.
+**목표:** Playwright `storageState` 캡쳐 또는 `auth.api.signUpEmail` 시드 스크립트로 생성한 계정 활용한 e2e spec. D1 시나리오: ws switcher 클릭 → 다른 ws 전환 → dashboard data 갱신 + ws list 보존.
 
-**Risk:** 🟢 낮음 — verify 작업. Clerk infrastructure 의존.
+**Risk:** 🟢 낮음 — verify 작업.
 
 **우선순위:** ★★☆☆☆ (P3 — manual dogfood 가능 시 P2 승격).
 
-**Sprint 묶음 권고:** Sprint 25+ e2e Clerk infrastructure.
+**Sprint 묶음 권고:** e2e 계정 인프라 정비.
 
 **근거:** Sprint 24 BL-066 carry-over (Playwright reproduce 환경 의존).
 
@@ -1133,7 +1133,7 @@ production scale (>1만 row 또는 동시 트래픽) 진입 시 다음 패턴 �
 
 **우선순위:** ★★☆☆☆ (P3).
 
-**Sprint 묶음 권고:** Sprint 25+ e2e Clerk infrastructure (BL-068 동반).
+**Sprint 묶음 권고:** e2e 계정 인프라 정비 (BL-068 동반).
 
 **근거:** Sprint 24 BL-066 carry-over.
 
@@ -1409,7 +1409,7 @@ agy F9 sub-3 — `/api/v1/users/sync` endpoint 재도입 시 Svix 서명 검증 
 - 또는 ADR-022 §"회수 옵션" 5단계 를 git commit message template 으로 강제 (작성자 의식 유도)
 
 ### 진입 조건
-- GA launch 가 가시화되어 Clerk Production 발급 + sync 재도입이 실 작업이 될 때
+- ~~GA launch 가 가시화되어 Clerk Production 발급 + sync 재도입이 실 작업이 될 때~~ → **ADR-031 로 영구 도달 불가. 본 BL 은 무효.** Better Auth 에 webhook 개념이 없어 `/users/sync` 재도입 시나리오 자체가 사라졌다.
 
 ---
 
