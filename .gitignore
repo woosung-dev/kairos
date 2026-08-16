@@ -3,8 +3,11 @@ node_modules/
 .pnpm-store/
 
 # Next.js
-apps/web/.next/
-apps/web/out/
+# ★경로에 앵커하지 않는다. 2026-08-16 에 `apps/web/.next/` 만 있던 탓에
+# 레포 루트의 `frontend/.next/`(ADR-027 이전 경로에 생긴 dev 산출물)가 ignore 를
+# 빠져나가 `git add -A` 로 22파일 7.7MB 가 커밋됐다. 어디서 생기든 잡는다.
+.next/
+out/
 
 # Environment
 .env
