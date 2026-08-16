@@ -14,7 +14,7 @@
 # ⚠️ Claude Code 의 EnterWorktree / `claude --worktree` 기능이지 git 기능이 아니다.
 #    `git worktree add` 나 herdr 로 만든 워크트리에는 적용되지 않는다 — 그때는 메인에서 직접 복사한다.
 #
-# ⚠️ 여기 나열된 파일에는 시크릿(Clerk·R2·Gemini·OpenAI 키, E2E 계정 암호)이 들어 있다.
+# ⚠️ 여기 나열된 파일에는 시크릿(BETTER_AUTH_SECRET·R2·Gemini·OpenAI 키, E2E 계정 암호)이 들어 있다.
 #    워크트리는 `.claude/worktrees/` 안(= gitignore)이므로 커밋 경로에 노출되지 않지만,
 #    워크트리 디렉터리를 레포 밖으로 옮기지 마라.
 #
@@ -33,10 +33,10 @@
 # 워크트리 세션의 권한 allow 목록. 없으면 매 명령마다 권한 프롬프트가 뜬다.
 .claude/settings.local.json
 
-# 백엔드 시크릿 — DATABASE_URL(Neon dev)·Clerk·R2·Gemini·OpenAI.
+# 백엔드 시크릿 — DATABASE_URL·R2·Gemini·OpenAI (인증은 JWKS URL/issuer 뿐 — 시크릿 아님).
 # ⚠️ 메인과 같은 Neon dev DB 를 가리킨다. 워크트리에서 alembic upgrade/downgrade 를 돌리면
 #    메인과 다른 워크트리에 그대로 영향이 간다 (2026-07-30 dev DB 전삭제 사고 참조).
 apps/api/.env
 
-# 프론트 Clerk 키 + E2E/QA 계정. 없으면 dev 서버가 부팅 단계에서 죽고 e2e 가 전멸한다.
+# 프론트 BETTER_AUTH_SECRET·DB URL·Google OAuth + E2E/QA 계정. 없으면 로그인이 죽고 e2e 가 전멸한다.
 apps/web/.env.local

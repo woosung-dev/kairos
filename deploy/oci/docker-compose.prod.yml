@@ -91,18 +91,35 @@ services:
       start_period: 40s
     logging: *default-logging
 
-  # ── Next.js (standalone) ─────────────────────────────────────────────────
+  # ── Next.js (standalone) + Better Auth ───────────────────────────────────
   # NEXT_PUBLIC_* 는 이미지 빌드타임에 인라인된다 — 여기서 바꿔도 반영되지 않는다.
-  # 런타임에 필요한 것은 CLERK_SECRET_KEY 뿐 (Next 16 + Clerk 7.4.1 은 서버 사이드에서 요구).
+  #
+  # ★ADR-031 로 이 서비스가 처음으로 DB 클라이언트가 됐다. 이전에는 CLERK_SECRET_KEY 하나만
+  #   받고 DB 를 몰랐다. 따라오는 것들:
+  #     - migrate 완료 대기 필수. 먼저 뜨면 첫 로그인이 relation "auth_user" does not exist 다.
+  #     - 커넥션 예산. db 는 max_connections=50, api 가 최대 15(pool 5 + overflow 10)를 쓴다.
+  #       auth.ts 의 Pool 은 max 를 명시해 무제한 기본값을 막는다.
+  #     - 장애 모드 확장. 이제 DB 가 죽으면 로그인도 안 된다 (전에는 로그인 페이지는 떴다).
   web:
     image: kairos-web:${KAIROS_WEB_TAG}
     container_name: kairos-web
     restart: unless-stopped
     environment:
-      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      BETTER_AUTH_DATABASE_URL: ${BETTER_AUTH_DATABASE_URL}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:3100:3000"
-    mem_limit: 512m
+    # 512m → 768m. Node standalone 에 pg pool + scrypt 비밀번호 해싱이 추가됐다.
+    # 해싱은 의도적으로 메모리를 쓰는 연산이라 여유를 둔다. 배포 후 `docker stats` 로 실측.
+    mem_limit: 768m
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/"]
       interval: 30s

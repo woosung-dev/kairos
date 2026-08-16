@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 // BUG-S27d-4 fix (Sprint 27d opus follow-up): clickjacking / MIME sniffing / referer leak 차단.
-// CSP 는 의도적 SKIP — Clerk/R2/Next domain 정리 후 strict-dynamic 도입 (BL-S27e-3).
+// CSP 는 아직 SKIP (BL-S27e-3). ADR-031 로 Clerk 도메인이, ADR-028 로 Sentry 가 사라져
+// 정리 대상 외부 도메인은 폰트(fontshare/jsdelivr)와 R2 정도로 줄었다 — 진입 장벽이 낮아진 상태.
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
