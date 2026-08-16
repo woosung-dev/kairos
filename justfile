@@ -66,6 +66,14 @@ contracts-check: contracts
 fe-security-headers PORT="3005":
     #!/usr/bin/env bash
     set -euo pipefail
+    # ★인자는 **값만** 넘긴다: `just fe-security-headers 3000`.
+    #   `PORT=3000` 형태로 주면 just 가 그 문자열을 값으로 넘겨 `next start -p PORT=3000` 이 된다
+    #   (2026-08-16 CI 실측 — 내가 test.yml 에 그렇게 써서 frontend-build 가 깨졌다).
+    #   기본값 경로만 로컬 테스트하고 인자 경로를 안 돌려본 게 원인이라 여기서 즉시 거른다.
+    case "{{PORT}}" in ''|*[!0-9]*)
+      echo "PORT 는 숫자만 받는다 (받은 값: '{{PORT}}'). 사용법: just fe-security-headers 3000" >&2
+      exit 1 ;;
+    esac
     cd apps/web
     if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:{{PORT}} -sTCP:LISTEN >/dev/null 2>&1; then
       echo "포트 {{PORT}} 가 이미 사용 중이다. 그 서버를 검증하게 되므로 중단한다." >&2
