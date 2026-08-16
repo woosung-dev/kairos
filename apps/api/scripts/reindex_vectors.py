@@ -10,7 +10,7 @@ REINDEX CONCURRENTLY로 무중단 인덱스 재빌드.
     uv run python apps/api/scripts/reindex_vectors.py             # bloat >= 30%만 reindex
     uv run python apps/api/scripts/reindex_vectors.py --force     # 강제 reindex
 
-운영 가이드: docs/guides/pgvector-reindex.md.
+운영 가이드: docs/operations/pgvector-reindex.md.
 """
 from __future__ import annotations
 

@@ -33,7 +33,7 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 ```
 
 각 파일을 열어 실제 값을 입력합니다.
-**발급처 및 CI/프로덕션 설정 방법** → [`docs/guides/secrets.md`](docs/guides/secrets.md)
+**발급처 및 CI/프로덕션 설정 방법** → [`docs/development/secrets.md`](docs/development/secrets.md)
 
 ### 2. 백엔드 실행
 
@@ -84,7 +84,7 @@ just deploy-ship $TAG
 just deploy-status
 ```
 
-배포 상세 절차 → [`docs/guides/deployment.md`](docs/guides/deployment.md)
+배포 상세 절차 → [`docs/operations/deployment.md`](docs/operations/deployment.md)
 서버 운영 런북 → [`deploy/oci/README.md`](deploy/oci/README.md)
 
 ---
@@ -94,8 +94,8 @@ just deploy-status
 | 문서 | 내용 |
 |---|---|
 | [`docs/requirements/prd.md`](docs/requirements/prd.md) | PRD + Phase 로드맵 |
-| [`docs/guides/secrets.md`](docs/guides/secrets.md) | **환경변수 전체 매트릭스** (로컬/CI/프로덕션) |
-| [`docs/guides/deployment.md`](docs/guides/deployment.md) | 배포 절차 (오라클 셀프호스팅) |
+| [`docs/development/secrets.md`](docs/development/secrets.md) | **환경변수 전체 매트릭스** (로컬/CI/프로덕션) |
+| [`docs/operations/deployment.md`](docs/operations/deployment.md) | 배포 절차 (오라클 셀프호스팅) |
 | [`deploy/oci/README.md`](deploy/oci/README.md) | 서버 운영 런북 (배포·롤백·함정) |
 | [`docs/architecture/ai-pipeline.md`](docs/architecture/ai-pipeline.md) | AI 파이프라인 설계 |
 | [`docs/architecture/rag-pipeline.md`](docs/architecture/rag-pipeline.md) | RAG 6-Layer 설계 |

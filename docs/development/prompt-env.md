@@ -21,7 +21,7 @@
 
 ## 목표
 
-1. `docs/guides/secrets.md` 신규 생성 — 전체 환경변수 매트릭스
+1. `docs/development/secrets.md` 신규 생성 — 전체 환경변수 매트릭스
 2. 루트 `README.md` 업데이트 (없으면 신규) — Quick Start 섹션에 env 설정 진입점 추가
 
 ---
@@ -73,7 +73,7 @@ GCP Secret Manager 또는 다른 시크릿 저장소를 사용하는 경우, 등
 cp [백엔드경로]/.env.example [백엔드경로]/.env.local   # 있는 경우
 cp [프론트엔드경로]/.env.example [프론트엔드경로]/.env.local   # 있는 경우
 \`\`\`
-발급처 및 CI/프로덕션 설정 방법 → `docs/guides/secrets.md`
+발급처 및 CI/프로덕션 설정 방법 → `docs/development/secrets.md`
 
 ### 2. 실행 방법
 [프로젝트에 맞는 실행 명령어]

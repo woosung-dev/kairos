@@ -29,7 +29,7 @@ Sprint 22 외부 1명 dogfooding spec 미실행 + Clerk Production 의도적 SKI
 ### Wave 2 — Onboarding fixture
 
 1. `frontend/src/features/onboarding/` 컴포넌트 dogfooding 5명 대응 (이미 OBN-01~04 구현됨)
-2. `docs/guides/onboarding-5-dogfooders.md` 신설 — 5명 1:1 미팅 sheet 템플릿 (CODE 흐름 walkthrough 12분)
+2. `docs/development/onboarding-5-dogfooders.md` 신설 — 5명 1:1 미팅 sheet 템플릿 (CODE 흐름 walkthrough 12분)
 3. Sentry FE/BE error tracking 활성화 확인 (이미 Sprint 22 ADR-021 구현)
 
 ### Wave 3 — 측정 + paid customer 시도

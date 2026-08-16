@@ -720,7 +720,7 @@
 
 ### 진행 중 (ADR-008 DevEx 후속)
 
-- [ ] **GCP WIF 초기 설정 + Secret Manager 9개 이관** (사용자 작업) — `docs/guides/deployment.md` §2.5.1 참조
+- [ ] **GCP WIF 초기 설정 + Secret Manager 9개 이관** (사용자 작업) — `docs/operations/deployment.md` §2.5.1 참조
 - [ ] Clerk testing mode 계정 생성 + GitHub `E2E_*` Secrets 등록 (E2E 활성화)
 - [x] **FE ↔ BE 오디오 파이프라인 E2E 검증** (업로드 → STT → Inbox — Sprint 9/10 완료, 2026-05-12)
 - [ ] FE ↔ BE 전체 E2E 시나리오 (신규 계정 → 템플릿 프로젝트 3개 → RAG → `[1]` → Source Viewer 풀콘텐츠 렌더) — ADR-008 후속

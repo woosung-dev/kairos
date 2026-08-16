@@ -76,7 +76,7 @@ expand-then-contract 로만 한다.
 ## 환경변수
 
 서버 `~/kairos/.env` (0600) 가 **프로덕션 SoT** 다. 템플릿은 `deploy/oci/.env.example`.
-발급처와 전체 매트릭스는 [`secrets.md`](secrets.md) 참조.
+발급처와 전체 매트릭스는 [`secrets.md`](../development/secrets.md) 참조.
 
 > ⚠️ **`.env` 에 인라인 주석을 절대 붙이지 마라.** docker compose 의 env_file 파서는
 > `KEY=value  # 설명` 에서 주석을 값의 일부로 읽는다. 한글이 값에 섞이면 Clerk SDK 가 헤더

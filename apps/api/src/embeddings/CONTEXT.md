@@ -66,7 +66,7 @@
 | E-9 | **embedding_chunks 직접 SQL 사용 외부 도메인**도 `_apply_hnsw_session_params` 호출 강제 (Sprint 16). 본 도메인이 export하는 module-level 헬퍼를 import 후 진입 시 호출 — 캡슐화 우회의 최소 비용 약속. 현 외부 사용처: `memory/repository.py:33` (1 hit, 의도된 예외). **Sprint 24 Wave 2 BL-006 closure decision**: `memory/service.py` 의 `EmbeddingRepository.save_chunk` lazy import 는 `MemoryPipelineService.save_memory_chunk` 로 흡수 완료 (헌법 §4.2 준수). `memory/repository.py:vector_search` 의 `_apply_hnsw_session_params` 직접 호출은 capsule 우회 최소 비용 약속으로 유지 (vector_search 흡수는 후속 sprint). architecture gate `tests/architecture/test_memory_repository_apply_hnsw_helper_keep` 가 본 import 1 hit 유지를 강제. | `memory/repository.py:33` |
 | E-10 | **운영 정책** (Sprint 16 ADR-020 §AD-59) — `semantic_caches` fillfactor 80 + autovacuum_analyze_scale_factor 0.02 (hit_count 빈번 UPDATE 대응). `embedding_chunks` + `memory_query_embedding_cache` autovacuum_analyze_scale_factor 0.05 (HNSW 통계 빈번 갱신). alembic `ALTER TABLE ... SET (...)` 명시. | `apps/api/alembic/versions/b2c3d4e5f6a7_pgvector_hnsw_halfvec.py` step 6 |
 
-> REINDEX CONCURRENTLY 운영 정책은 헌법 불변식이 아니라 운영 가이드 — `docs/guides/pgvector-reindex.md` + `apps/api/scripts/reindex_vectors.py` (Sprint 16 신설).
+> REINDEX CONCURRENTLY 운영 정책은 헌법 불변식이 아니라 운영 가이드 — `docs/operations/pgvector-reindex.md` + `apps/api/scripts/reindex_vectors.py` (Sprint 16 신설).
 
 ---
 
