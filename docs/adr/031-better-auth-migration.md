@@ -26,6 +26,24 @@ Kairos 는 인증만 외부 SaaS(Clerk)에 남아 있었고, 그 상태가 세 �
 **★Google OAuth 클라이언트는 Drive 연동(ADR-026)의 것과 반드시 분리한다.**
 Drive 스코프는 Google 의 restricted scope 라 앱 검증 대상이다. 로그인을 같은 클라이언트에 얹으면 **로그인 자체가 그 검증 블라스트 반경에 들어가고**, 시크릿 로테이션이 로그인과 Drive 를 동시에 끊는다. 같은 GCP 프로젝트 안에 클라이언트를 따로 만든다.
 
+> **2026-08-17 발급 시 실측 — 이 절의 전제가 틀렸다.**
+> "Drive 클라이언트가 이미 어딘가 존재한다" 를 가정했으나 **어느 GCP 프로젝트에도 없었다.**
+> Clerk dev 인스턴스가 Clerk 소유의 공용 Google 클라이언트를 쓰고 있었기 때문에 Kairos 는
+> Google 콘솔에 OAuth 클라이언트를 한 번도 만든 적이 없다.
+>
+> 따라서 로그인 클라이언트는 **신규 GCP 프로젝트 `Kairos`** 에 만들었고(클라이언트 이름
+> `Kairos Login`), 앞으로 이 프로젝트가 위 문장이 말하는 "같은 GCP 프로젝트" 의 기준점이 된다.
+> Drive 를 실제로 붙일 때 이 프로젝트 안에 별도 클라이언트로 추가하면 D1 이 그대로 성립한다.
+>
+> 기존 `gcp-project-504004` 를 쓰지 않은 이유: cookmark · nexus-core 와 공유하는 배포용
+> 프로젝트인데 **동의 화면은 프로젝트당 싱글톤**이라 거기에 "Kairos" 브랜딩을 박으면 그 프로젝트의
+> 유일한 OAuth 정체성이 Kairos 로 고정된다. ADR-028 이 남긴 WIF 결합도 `deploy.yml` 철거로
+> 이미 끊겨 있어(현재 워크플로 3종에 `gcloud`/`workload_identity` 참조 0건) 재사용할 실익이 없었다.
+>
+> ★남는 미세 구멍: 시크릿 로테이션은 클라이언트 단위지만 **앱 검증은 동의 화면 = 프로젝트 단위**다.
+> Drive 를 같은 프로젝트에 붙이면 restricted scope 검증 반경은 여전히 공유된다. 도그푸딩 규모에서는
+> 동의 화면을 `테스트 중` 으로 두어 검증 자체가 발생하지 않으므로 무해하고, 외부 사용자 확대 시 재검토한다.
+
 | 용도 | env | redirect URI |
 |---|---|---|
 | 로그인 (web 컨테이너) | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | `{BETTER_AUTH_URL}/api/auth/callback/google` |
