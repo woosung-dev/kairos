@@ -26,7 +26,7 @@
 
 ## 결정
 
-### D1. `justfile` 을 폐기하고 `mise.toml` 로 전면 이관한다 (25 task)
+### D1. `justfile` 을 폐기하고 `mise.toml` 로 전면 이관한다 (28 task)
 
 툴 버전 관리만 도입하고 just 를 남기는 안도 검토했으나, **명령의 출처가 둘이 되면 문서 27개가 두 도구를 동시에 가리킨다.** 전환 비용의 대부분이 mise.toml 작성(30분)이 아니라 문서 스윕이므로, 나눠서 하면 그 비용을 두 번 낸다.
 
@@ -56,7 +56,25 @@ uv = "0.10.4"      # apps/api/Dockerfile:10
 - `contracts` — `openapi-export` 산출물을 `types-gen` 이 먹는다
 - `ci-local` — `contracts-check` 가 `fe-test`/`fe-build` **앞**이어야 한다 (`api.gen.ts` 재생성 순서, 2026-08-16 코드리뷰 지적). `fe-security-headers` 는 `fe-build` 의 `.next` 산출물에도 의존한다
 
-`--jobs 1` 로도 순차가 되지만 **호출자가 플래그를 기억해야 하는 계약은 계약이 아니다.** 본문에 `mise run` 을 나열해 순서를 파일에 박는다.
+`--jobs 1` 로도 순차가 되지만 **호출자가 플래그를 기억해야 하는 계약은 계약이 아니다.** 순서를 파일에 박는다.
+
+> **2026-08-17 정정 — 진단은 맞았고 처방이 차선이었다.**
+> 초판은 "본문에 `mise run` 을 나열한다" 로 갔는데, 공식 문서를 다시 읽고 나니
+> `run` 배열의 **`{ task = "..." }` 항목**이 정확히 "순서 있는 의존" 을 표현한다.
+> 실측: `run = [{task="s1"},{task="s2"},{task="s3"}]` → 선언 순서대로 완료.
+> (`{ tasks = [...] }` 는 반대로 병렬이다 — 실측 확인.)
+>
+> 셸 중첩 대비 이득 세 가지 (전부 실측):
+> ① **구조가 도구에 드러난다.** `mise tasks info ci-local` 이 `Run:` 아래 `task:` 항목을
+>    나열하고, `mise run --dry-run ci-local` 이 실행 계획을 선언 순서대로 출력한다.
+>    셸 문자열이면 둘 다 본문 한 덩어리로만 보인다.
+>    ★단 `mise tasks deps` 에는 안 나온다 — 그건 `depends` 전용이다.
+> ② 실패 전파를 `set -e` 가 아니라 mise 가 한다 (중간 실패 시 이후 항목 미실행 확인).
+> ③ 배열에 순수 문자열 항목을 섞을 수 있어 `contracts-check` 처럼
+>    "task 실행 후 셸 한 줄" 이 자연스럽다.
+>
+> `contracts` · `contracts-check` · `ci-local` 을 이 형태로 교체했다.
+> `deploy-ship` 만 셸 중첩을 유지한다 — 2026-08-24 까지 롤백 경로라 손대지 않는다.
 
 ### D5. `[task_config] shell` 로 `pipefail` 을 되찾는다 ★
 
@@ -96,6 +114,20 @@ run = 'docker buildx build -t "kairos-api:$usage_tag" ...'
 
 `mise run toolchain-check` 가 `[tools]` 의 세 값을 Dockerfile 의 실제 핀과 대조한다. `contracts-check` 가 API 계약에 하는 일을 툴체인에 그대로 한다. `ci-local` 첫 단계이자 CI `contract-check` 잡의 스텝이다.
 
+### D9. 디렉터리는 `dir` 로 선언한다 — 셸 `cd` 로 관리하지 않는다
+
+초판은 11개 task 가 `run = "cd apps/api && ..."` 형태였다. justfile 은 recipe 줄마다 새 셸이라 `cd` 가 서로 독립이었지만 **mise 는 본문 전체를 한 셸에서 돌린다.** 그 차이가 `install` 에서 실제로 터졌다 — `cd apps/api && ...` 다음 줄의 `cd ../web` 이 앞줄 착지점에 의존했다. 서브셸(`( ... )`)로 감싸는 건 증상 치료였다.
+
+`dir = "apps/api"` 는 그 버그 클래스를 구조적으로 없앤다. 줄 순서를 바꾸거나 중간에 한 줄을 끼워도 착지점이 변하지 않는다. `install` 은 `install-api` / `install-web` 로 쪼개고 `run = [{task=...}]` 로 묶었다.
+
+### D10. `contracts` 재생성에 `sources` / `outputs` 를 붙인다
+
+소스가 안 바뀌면 통째로 스킵된다 (실측: `sources up-to-date, skipping`). `ci-local` 반복 실행에서 uv 부팅 + FastAPI import + openapi-typescript 왕복이 사라진다.
+
+★**락파일이 `sources` 에 반드시 들어간다.** `openapi.json` 은 우리 소스뿐 아니라 **설치된 FastAPI/Pydantic 버전**에도 의존한다. 소스만 넣으면 의존성 범프 때 stale 스킵이 난다.
+
+★**`contracts-check` 에는 붙이지 않는다.** 게이트는 항상 실행돼야 한다 — 스킵되는 게이트는 게이트가 아니다. 재생성만 증분화하고 `git diff` 는 매번 돈다. 실측으로 확인했다: `contracts` 가 스킵된 상태에서도 `api.gen.ts` 에 드리프트를 주입하면 게이트가 잡는다.
+
 ---
 
 ## 기각한 대안
@@ -108,7 +140,7 @@ run = 'docker buildx build -t "kairos-api:$usage_tag" ...'
 
 ## 검증 (전부 프로덕션/실행 기반)
 
-- `mise tasks validate` → 25 task 전부 통과
+- `mise tasks validate` → 28 task 전부 통과
 - 프로덕션 실행: `deploy-preflight`(회의 0 + 인코딩 게이트) · `deploy-verify-env`(3종 주입 OK) · `deploy-sync-config`(compose 문법 OK) · `deploy-status`(ready 200)
 - **`deploy-rollback 9e7dcf8`** — 현재 태그로 실행해 전체 경로 실증. 직후 `api_ready=200` / `web=200`
 - 인자 가드: `fe-security-headers abc` 거부 · `deploy-build`(인자 누락) 거부 · 기본값 3005 적용
@@ -144,3 +176,7 @@ ADR-027 D3 의 **"단일 명령 진입점" 원칙과 "CI invocation 과 문자 �
 2. ~~Node 22 첫 run~~ — **통과 확인.** e2e 포함 6개 잡 전부 green.
 3. **`node = "22"` 는 major 핀이다** (pnpm/uv 는 exact). `apps/web/Dockerfile` 의 `node:22-alpine` 도 같은 방식이라 `toolchain-check` 는 "선언이 서로 같은가" 까지만 보장하고 "해석된 patch 가 같은가" 는 보장하지 않는다. 양쪽을 exact 로 올리려면 Dockerfile 재빌드가 동반되므로 별건.
 4. `docs-check`(BL-S29-1) 는 여전히 미구현. 이름만 `mise run docs-check` 로 갱신했다.
+5. **배포 task 의 관용구 정리는 2026-08-24 이후로 미룬다.** `deploy-*` 는 그때까지 유일한 롤백 경로(`deploy-rollback d761615`)라 손대지 않는다. 미룬 항목 2개:
+   - `deploy-ship` 의 셸 중첩 `mise run` → `run = [{task=...}]` (D4 정정과 동일한 이유)
+   - `deploy-ship` 에 `confirm = "..."` — 프로덕션 태그 교체 전 확인 프롬프트. ★실측상 **비대화형에서는 abort** 되므로, BL-OCI-3(CI 자동 배포)이 착지하면 반드시 걷어내야 한다. `deploy-rollback` 에는 **붙이지 않는다** — 장애 중 키 입력 하나가 RTO 다.
+6. **콜론 네임스페이스**(`deploy:ship`) 미적용. 더 mise 답지만 27개 문서의 모든 명령이 또 바뀐다. 전환 직후 두 번째 대규모 리네임은 이득 대비 비용이 크다.

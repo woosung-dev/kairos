@@ -34,16 +34,27 @@ oci_compose = "docker compose -f docker-compose.prod.yml"
 
 # ══ 개발 ══════════════════════════════════════════════════════════════
 
-# ★각 줄을 서브셸로 감싼다. 구 justfile 은 recipe 줄마다 새 셸이라 두 `cd` 가 서로
-#   독립이었는데, mise 는 한 셸에서 본문 전체를 돌린다. `cd apps/api && ... ; cd ../web`
-#   으로 옮기면 두 번째 `cd` 가 첫 번째의 착지점에 의존하게 되고, 줄 순서를 바꾸거나
-#   중간에 한 줄을 끼우는 순간 조용히 레포 밖을 가리킨다.
+# ★디렉터리는 `dir` 로 **선언**한다. 셸 `cd` 로 관리하지 않는다.
+#   구 justfile 은 recipe 줄마다 새 셸이라 두 `cd` 가 독립이었는데 mise 는 한 셸이다.
+#   그래서 `cd apps/api && ... ; cd ../web` 은 두 번째가 첫 번째 착지점에 의존하고,
+#   줄 순서를 바꾸거나 중간에 한 줄 끼우는 순간 조용히 레포 밖을 가리킨다.
+#   서브셸로 감싸는 건 증상 치료였고, `dir` 이 그 버그 클래스 자체를 없앤다.
+[tasks.install-api]
+description = "백엔드 의존성 설치 (uv, lockfile 고정)"
+dir = "apps/api"
+run = "uv sync --frozen"
+
+[tasks.install-web]
+description = "프론트 의존성 설치 (pnpm, lockfile 고정)"
+dir = "apps/web"
+run = "pnpm install --frozen-lockfile"
+
 [tasks.install]
 description = "BE/FE 의존성 설치 (lockfile 고정)"
-run = '''
-(cd apps/api && uv sync --frozen)
-(cd apps/web && pnpm install --frozen-lockfile)
-'''
+run = [
+  { task = "install-api" },
+  { task = "install-web" },
+]
 
 # 툴체인 드리프트 게이트 — `[tools]` 와 Dockerfile 의 핀이 갈라지면 실패한다.
 #
@@ -76,71 +87,100 @@ exit $fail
 
 [tasks.be-dev]
 description = "백엔드 개발 서버 (:8000)"
-run = "cd apps/api && uv run uvicorn src.main:app --reload --port 8000"
+dir = "apps/api"
+run = "uv run uvicorn src.main:app --reload --port 8000"
 
 # CI 와 동일 (README 의 `uv run pytest -v` 아님 — transcription/r2-cors 2개 제외가 정본)
 [tasks.be-test]
 description = "백엔드 테스트 (CI 와 동일한 제외 목록)"
-run = "cd apps/api && uv run pytest --ignore=tests/services/test_transcription.py --ignore=tests/test_r2_cors_regression.py -v"
+dir = "apps/api"
+run = "uv run pytest --ignore=tests/services/test_transcription.py --ignore=tests/test_r2_cors_regression.py -v"
 
 [tasks.be-migrate]
 description = "alembic upgrade head"
-run = "cd apps/api && uv run alembic upgrade head"
+dir = "apps/api"
+run = "uv run alembic upgrade head"
 
 [tasks.fe-dev]
 description = "프론트 개발 서버 (:3000)"
-run = "cd apps/web && pnpm dev"
+dir = "apps/web"
+run = "pnpm dev"
 
 [tasks.fe-test]
 description = "프론트 유닛 테스트"
-run = "cd apps/web && pnpm test"
+dir = "apps/web"
+run = "pnpm test"
 
 [tasks.fe-typecheck]
 description = "프론트 타입 검사"
-run = "cd apps/web && pnpm typecheck"
+dir = "apps/web"
+run = "pnpm typecheck"
 
 [tasks.fe-lint]
 description = "프론트 린트"
-run = "cd apps/web && pnpm lint"
+dir = "apps/web"
+run = "pnpm lint"
 
 # ADR-031: `next build` 의 page data 수집이 auth.ts 를 평가한다. secret 이 없으면
 # BetterAuthError 로그가 찍힌다(빌드는 통과). CI frontend-build 스텝의 env 와
 # **문자 그대로 같은 값**을 기본값으로 둬서 로컬과 CI 출력이 갈라지지 않게 한다.
 [tasks.fe-build]
 description = "프론트 프로덕션 빌드"
-run = 'cd apps/web && BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-ci-fake-secret-at-least-32-bytes-long}" pnpm build'
+dir = "apps/web"
+run = 'BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-ci-fake-secret-at-least-32-bytes-long}" pnpm build'
 
 [tasks.e2e]
 description = "Playwright e2e"
-run = "cd apps/web && pnpm e2e"
+dir = "apps/web"
+run = "pnpm e2e"
 
 # ══ API 계약 (ADR-027 D2) ═════════════════════════════════════════════
 
 [tasks.openapi-export]
 description = "OpenAPI 스펙 추출"
-run = "cd apps/api && uv run python -m scripts.export_openapi"
+dir = "apps/api"
+run = "uv run python -m scripts.export_openapi"
 
 [tasks.types-gen]
 description = "api.gen.ts 재생성"
-run = "cd apps/web && pnpm gen:api"
+dir = "apps/web"
+run = "pnpm gen:api"
 
-# ★`depends` 를 쓰지 않는다. mise 의 depends 는 **병렬 실행**이라
+# ★`depends` 를 쓰지 않는다 — mise 의 `depends` 는 **병렬 실행**이라
 #   types-gen 이 openapi-export 산출물을 먹기 전에 시작될 수 있다 (2026-08-17 실측).
-#   순서가 계약인 곳은 본문에 순서를 적는다.
+#   대신 `run` 배열의 `{ task = ... }` 항목을 쓴다: 이건 **순차**가 보장되고
+#   (실측: 선언 순서대로 완료), 셸에서 `mise run` 을 중첩하는 것과 달리
+#   `mise tasks deps` 에 그래프로 드러나며 실패 전파를 mise 가 직접 한다.
+#
+# ★sources/outputs — 소스가 안 바뀌면 통째로 스킵된다 (실측: "sources up-to-date, skipping").
+#   ★락파일이 sources 에 **반드시** 들어가야 한다. openapi.json 은 우리 소스뿐 아니라
+#   설치된 FastAPI/Pydantic 버전에도 의존해서, 소스만 넣으면 의존성 범프 때 stale 스킵이 난다.
 [tasks.contracts]
 description = "계약 재생성 (openapi-export → types-gen 순서 고정)"
-run = '''
-mise run openapi-export
-mise run types-gen
-'''
+sources = [
+  "apps/api/src/**/*.py",
+  "apps/api/scripts/export_openapi.py",
+  "apps/api/uv.lock",
+  "apps/web/pnpm-lock.yaml",
+]
+outputs = [
+  "contracts/openapi/v1/openapi.json",
+  "apps/web/src/types/api.gen.ts",
+]
+run = [
+  { task = "openapi-export" },
+  { task = "types-gen" },
+]
 
-# CI contract-check job 과 동일한 drift 게이트
+# CI contract-check job 과 동일한 drift 게이트.
+# ★여기에는 sources/outputs 를 **붙이지 않는다.** 게이트는 항상 실행돼야 한다 —
+#   스킵되는 게이트는 게이트가 아니다. 재생성(`contracts`)만 증분 스킵된다.
 [tasks.contracts-check]
 description = "계약 drift 게이트 (CI contract-check 와 동일)"
-run = '''
-mise run contracts
-git diff --exit-code -- contracts/ apps/web/src/types/api.gen.ts
-'''
+run = [
+  { task = "contracts" },
+  "git diff --exit-code -- contracts/ apps/web/src/types/api.gen.ts",
+]
 
 # ══ 로컬 머지 게이트 (ADR-027 D3 연장) ════════════════════════════════
 
@@ -155,6 +195,7 @@ git diff --exit-code -- contracts/ apps/web/src/types/api.gen.ts
 #   사본이 갈라지는 게 정확히 이 게이트가 잡으려는 버그 클래스다 (2026-08-16 코드리뷰 지적).
 [tasks.fe-security-headers]
 description = "보안 헤더 e2e (public route, secrets·BE 불요)"
+dir = "apps/web"
 usage = 'arg "<port>" default="3005" help="검증할 포트"'
 run = '''
 # ★인자는 **값만** 넘긴다: `mise run fe-security-headers 3000`.
@@ -164,7 +205,6 @@ case "$usage_port" in ''|*[!0-9]*)
   echo "PORT 는 숫자만 받는다 (받은 값: '$usage_port'). 사용법: mise run fe-security-headers 3000" >&2
   exit 1 ;;
 esac
-cd apps/web
 if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"$usage_port" -sTCP:LISTEN >/dev/null 2>&1; then
   echo "포트 $usage_port 가 이미 사용 중이다. 그 서버를 검증하게 되므로 중단한다." >&2
   echo "  정리: lsof -ti:$usage_port | xargs kill" >&2
@@ -190,14 +230,14 @@ E2E_PORT="$usage_port" E2E_BASE_URL="http://localhost:$usage_port" pnpm exec pla
 #   fe-security-headers 는 fe-build 의 `.next` 산출물에도 의존한다.
 [tasks.ci-local]
 description = "머지 게이트 — CI 의 backend-test + frontend-build + contract-check 로컬 미러"
-run = '''
-mise run toolchain-check
-mise run be-test
-mise run contracts-check
-mise run fe-test
-mise run fe-build
-mise run fe-security-headers
-'''
+run = [
+  { task = "toolchain-check" },
+  { task = "be-test" },
+  { task = "contracts-check" },
+  { task = "fe-test" },
+  { task = "fe-build" },
+  { task = "fe-security-headers" },
+]
 
 # ★인자는 **선택**이다. `scripts/verify-prod.sh:15` 가
 #   `BASE_URL="${1:-https://kairos-api.woosung.dev}"` 로 무인자 기본값을 갖는다.
