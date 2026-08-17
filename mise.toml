@@ -1,0 +1,355 @@
+# Kairos 단일 명령 진입점 + 툴체인 정본 (ADR-027 D3 승계, ADR-032).
+#
+# ⚠️ 테스트/빌드 task 는 CI(.github/workflows/test.yml)와 invocation 을
+#    문자 그대로 동일하게 유지한다 — 여기를 바꾸면 test.yml 도 같이 바꾼다.
+#
+# 목록: `mise tasks`   실행: `mise run <task>`   인자: `mise run deploy-build 9e7dcf8`
+
+# ── 툴체인 ────────────────────────────────────────────────────────────
+# ★값의 정본은 **프로덕션 Dockerfile** 이다. CI 가 아니다.
+#   전환 전 실측(2026-08-17): prod Node 22 / pnpm 8.15.9 / uv 0.10.4 인데
+#   CI 는 Node 20 / pnpm 9 / uv latest 였다. 즉 CI 가 배포되는 것과 다른
+#   런타임에서 테스트하고 있었다. 이 블록이 그 드리프트의 단일 소유자다.
+#
+# ★python 은 일부러 넣지 않는다. `apps/api/.python-version`(3.12) + pyproject
+#   `requires-python` 으로 uv 가 이미 소유한다. 여기에 또 쓰면 소유자가 둘이 된다.
+[tools]
+node = "22"        # apps/web/Dockerfile:9  FROM node:22-alpine
+pnpm = "8.15.9"    # apps/web/Dockerfile:11 corepack prepare pnpm@8.15.9
+uv = "0.10.4"      # apps/api/Dockerfile:10 ghcr.io/astral-sh/uv:0.10.4
+
+# ── task 전역 설정 ────────────────────────────────────────────────────
+# ★`pipefail` 이 핵심이다. mise 의 기본 셸은 pipefail 이 **꺼져 있어서**
+#   `docker save ... | gzip | ssh ...` 에서 앞단이 죽어도 성공으로 통과한다
+#   (2026-08-17 실측). 구 justfile 의 `set shell := [...]` 와 동치다.
+[task_config]
+shell = "bash -euo pipefail -c"
+
+# ── 배포 대상 상수 ────────────────────────────────────────────────────
+# 원격 명령은 전부 `bash -lc` 로 감싼다 — 비로그인 ssh 셸의 PATH 에 docker compose 가 없다.
+[vars]
+oci_host = "truewords-oracle"
+oci_dir = "~/kairos"
+oci_compose = "docker compose -f docker-compose.prod.yml"
+
+# ══ 개발 ══════════════════════════════════════════════════════════════
+
+# ★디렉터리는 `dir` 로 **선언**한다. 셸 `cd` 로 관리하지 않는다.
+#   구 justfile 은 recipe 줄마다 새 셸이라 두 `cd` 가 독립이었는데 mise 는 한 셸이다.
+#   그래서 `cd apps/api && ... ; cd ../web` 은 두 번째가 첫 번째 착지점에 의존하고,
+#   줄 순서를 바꾸거나 중간에 한 줄 끼우는 순간 조용히 레포 밖을 가리킨다.
+#   서브셸로 감싸는 건 증상 치료였고, `dir` 이 그 버그 클래스 자체를 없앤다.
+[tasks.install-api]
+description = "백엔드 의존성 설치 (uv, lockfile 고정)"
+dir = "apps/api"
+run = "uv sync --frozen"
+
+[tasks.install-web]
+description = "프론트 의존성 설치 (pnpm, lockfile 고정)"
+dir = "apps/web"
+run = "pnpm install --frozen-lockfile"
+
+[tasks.install]
+description = "BE/FE 의존성 설치 (lockfile 고정)"
+run = [
+  { task = "install-api" },
+  { task = "install-web" },
+]
+
+# 툴체인 드리프트 게이트 — `[tools]` 와 Dockerfile 의 핀이 갈라지면 실패한다.
+#
+# ★ADR-032 초판은 `[tools]` 옆에 `# apps/web/Dockerfile:9` 같은 주석만 달아두고
+#   "단일 소유자" 라고 선언했는데, **주석은 아무도 검사하지 않는다.** 한쪽만 올리면
+#   CI 와 프로덕션이 다시 갈라지고, 그게 정확히 이 ADR 이 없애려던 상태다.
+#   `contracts-check` 가 계약에 하는 일을 툴체인에 그대로 한다.
+[tasks.toolchain-check]
+description = "mise.toml [tools] ↔ Dockerfile 핀 일치 게이트"
+run = '''
+fail=0
+check() {
+  name="$1"; expected="$2"; file="$3"; pattern="$4"
+  if ! grep -qE "$pattern" "$file"; then
+    echo "DRIFT: $name — mise.toml 은 '$expected' 인데 $file 이 다르다" >&2
+    grep -nE 'FROM node:|corepack prepare pnpm@|astral-sh/uv:' "$file" >&2 || true
+    fail=1
+  else
+    echo "OK: $name = $expected ($file)"
+  fi
+}
+node_v=$(grep -E '^node *=' mise.toml | sed -E 's/.*"([^"]+)".*/\1/')
+pnpm_v=$(grep -E '^pnpm *=' mise.toml | sed -E 's/.*"([^"]+)".*/\1/')
+uv_v=$(grep -E '^uv *=' mise.toml | sed -E 's/.*"([^"]+)".*/\1/')
+check node "$node_v" apps/web/Dockerfile "^FROM node:${node_v}-alpine"
+check pnpm "$pnpm_v" apps/web/Dockerfile "corepack prepare pnpm@${pnpm_v} "
+check uv   "$uv_v"   apps/api/Dockerfile "astral-sh/uv:${uv_v} "
+exit $fail
+'''
+
+[tasks.be-dev]
+description = "백엔드 개발 서버 (:8000)"
+dir = "apps/api"
+run = "uv run uvicorn src.main:app --reload --port 8000"
+
+# CI 와 동일 (README 의 `uv run pytest -v` 아님 — transcription/r2-cors 2개 제외가 정본)
+[tasks.be-test]
+description = "백엔드 테스트 (CI 와 동일한 제외 목록)"
+dir = "apps/api"
+run = "uv run pytest --ignore=tests/services/test_transcription.py --ignore=tests/test_r2_cors_regression.py -v"
+
+[tasks.be-migrate]
+description = "alembic upgrade head"
+dir = "apps/api"
+run = "uv run alembic upgrade head"
+
+[tasks.fe-dev]
+description = "프론트 개발 서버 (:3000)"
+dir = "apps/web"
+run = "pnpm dev"
+
+[tasks.fe-test]
+description = "프론트 유닛 테스트"
+dir = "apps/web"
+run = "pnpm test"
+
+[tasks.fe-typecheck]
+description = "프론트 타입 검사"
+dir = "apps/web"
+run = "pnpm typecheck"
+
+[tasks.fe-lint]
+description = "프론트 린트"
+dir = "apps/web"
+run = "pnpm lint"
+
+# ADR-031: `next build` 의 page data 수집이 auth.ts 를 평가한다. secret 이 없으면
+# BetterAuthError 로그가 찍힌다(빌드는 통과). CI frontend-build 스텝의 env 와
+# **문자 그대로 같은 값**을 기본값으로 둬서 로컬과 CI 출력이 갈라지지 않게 한다.
+[tasks.fe-build]
+description = "프론트 프로덕션 빌드"
+dir = "apps/web"
+run = 'BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-ci-fake-secret-at-least-32-bytes-long}" pnpm build'
+
+[tasks.e2e]
+description = "Playwright e2e"
+dir = "apps/web"
+run = "pnpm e2e"
+
+# ══ API 계약 (ADR-027 D2) ═════════════════════════════════════════════
+
+[tasks.openapi-export]
+description = "OpenAPI 스펙 추출"
+dir = "apps/api"
+run = "uv run python -m scripts.export_openapi"
+
+[tasks.types-gen]
+description = "api.gen.ts 재생성"
+dir = "apps/web"
+run = "pnpm gen:api"
+
+# ★`depends` 를 쓰지 않는다 — mise 의 `depends` 는 **병렬 실행**이라
+#   types-gen 이 openapi-export 산출물을 먹기 전에 시작될 수 있다 (2026-08-17 실측).
+#   대신 `run` 배열의 `{ task = ... }` 항목을 쓴다: 이건 **순차**가 보장되고
+#   (실측: 선언 순서대로 완료), 셸에서 `mise run` 을 중첩하는 것과 달리
+#   `mise tasks deps` 에 그래프로 드러나며 실패 전파를 mise 가 직접 한다.
+#
+# ★sources/outputs — 소스가 안 바뀌면 통째로 스킵된다 (실측: "sources up-to-date, skipping").
+#   ★락파일이 sources 에 **반드시** 들어가야 한다. openapi.json 은 우리 소스뿐 아니라
+#   설치된 FastAPI/Pydantic 버전에도 의존해서, 소스만 넣으면 의존성 범프 때 stale 스킵이 난다.
+[tasks.contracts]
+description = "계약 재생성 (openapi-export → types-gen 순서 고정)"
+sources = [
+  "apps/api/src/**/*.py",
+  "apps/api/scripts/export_openapi.py",
+  "apps/api/uv.lock",
+  "apps/web/pnpm-lock.yaml",
+]
+outputs = [
+  "contracts/openapi/v1/openapi.json",
+  "apps/web/src/types/api.gen.ts",
+]
+run = [
+  { task = "openapi-export" },
+  { task = "types-gen" },
+]
+
+# CI contract-check job 과 동일한 drift 게이트.
+# ★여기에는 sources/outputs 를 **붙이지 않는다.** 게이트는 항상 실행돼야 한다 —
+#   스킵되는 게이트는 게이트가 아니다. 재생성(`contracts`)만 증분 스킵된다.
+[tasks.contracts-check]
+description = "계약 drift 게이트 (CI contract-check 와 동일)"
+run = [
+  { task = "contracts" },
+  "git diff --exit-code -- contracts/ apps/web/src/types/api.gen.ts",
+]
+
+# ══ 로컬 머지 게이트 (ADR-027 D3 연장) ════════════════════════════════
+
+# ★반드시 **빌드 산출물**(`pnpm start`)을 검증한다. `playwright.config.ts` 의 webServer 는
+#   비-CI 에서 `pnpm dev` 를 띄우는데 CI 는 `pnpm start` 를 검증한다 — 그대로 두면
+#   프로덕션에서만 나는 헤더/기동 회귀가 이 게이트를 통과해 버린다 (2026-08-16 codex 리뷰 P2).
+#   여기서 서버를 직접 띄우면 webServer 의 `reuseExistingServer: true` 가 그것을 재사용한다.
+# ★포트는 3005 고정 — dev(:3000)/playwright 기본(:3003)과 겹치지 않게. 이미 점유돼 있으면
+#   남의 서버를 검증하게 되므로 **중단**한다. 헤더 단언은 포트에 의존하지 않아 CI(:3000)와 동치다.
+#   `.next` 가 최신이어야 한다 — `ci-local` 이 `fe-build` 를 먼저 돌려 그 순서를 보장한다.
+# ★CI 도 이 task 를 호출한다 (`test.yml` frontend-build, 3000). 사본을 두지 않는다 —
+#   사본이 갈라지는 게 정확히 이 게이트가 잡으려는 버그 클래스다 (2026-08-16 코드리뷰 지적).
+[tasks.fe-security-headers]
+description = "보안 헤더 e2e (public route, secrets·BE 불요)"
+dir = "apps/web"
+usage = 'arg "<port>" default="3005" help="검증할 포트"'
+run = '''
+# ★인자는 **값만** 넘긴다: `mise run fe-security-headers 3000`.
+#   구 justfile 시절 `PORT=3000` 형태로 주면 그 문자열이 값으로 넘어가
+#   `next start -p PORT=3000` 이 됐다 (2026-08-16 CI 실측). 여기서 즉시 거른다.
+case "$usage_port" in ''|*[!0-9]*)
+  echo "PORT 는 숫자만 받는다 (받은 값: '$usage_port'). 사용법: mise run fe-security-headers 3000" >&2
+  exit 1 ;;
+esac
+if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"$usage_port" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "포트 $usage_port 가 이미 사용 중이다. 그 서버를 검증하게 되므로 중단한다." >&2
+  echo "  정리: lsof -ti:$usage_port | xargs kill" >&2
+  exit 1
+fi
+BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-ci-fake-secret-at-least-32-bytes-long}" pnpm start -p "$usage_port" -H 0.0.0.0 > /tmp/kairos-next-headers.log 2>&1 &
+_pid=$!
+# pnpm 이 SIGTERM 을 자식(next start)에 전달하지 못하는 경우가 있어 프로세스 그룹까지 정리한다.
+trap 'pkill -P "$_pid" 2>/dev/null || true; kill "$_pid" 2>/dev/null || true' EXIT
+pnpm exec wait-on "http://127.0.0.1:$usage_port/sign-in" -t 180000 -v || { echo "--- next start 로그 ---"; cat /tmp/kairos-next-headers.log; exit 1; }
+E2E_PORT="$usage_port" E2E_BASE_URL="http://localhost:$usage_port" pnpm exec playwright test --project=public-only
+'''
+
+# ★새 명령을 정의하지 않고 기존 task 를 조합만 한다 — "로컬 = CI 문자 동일" 불변 보존.
+# 푸쉬 전 사전 확인용이다. 최종 판정은 CI 의 `ci-required` 가 한다 (docs/development/testing.md).
+#   - 실패가 환경 문제로 의심되면 `mise run install` 을 먼저 돌린다.
+#   - ★clean tree 에서 실행한다. contracts-check 는 `git diff --exit-code` 라
+#     작업 트리가 더러우면 계약과 무관한 변경까지 drift 로 잡는다(오탐).
+# ★contracts-check 를 fe-test/fe-build **앞**에 둔다. 이게 api.gen.ts 를 재생성하므로,
+#   뒤에 두면 fe-build(=타입 검사)가 **낡은 생성 타입**으로 통과한 뒤에야 drift 가 잡힌다 —
+#   그때 PR 에 붙일 빌드 결과는 새 계약을 검증한 적이 없다 (2026-08-16 코드리뷰 지적).
+# ★★그래서 `depends` 를 쓸 수 없다 — mise 의 depends 는 병렬이라 이 순서가 무너진다.
+#   fe-security-headers 는 fe-build 의 `.next` 산출물에도 의존한다.
+[tasks.ci-local]
+description = "머지 게이트 — CI 의 backend-test + frontend-build + contract-check 로컬 미러"
+run = [
+  { task = "toolchain-check" },
+  { task = "be-test" },
+  { task = "contracts-check" },
+  { task = "fe-test" },
+  { task = "fe-build" },
+  { task = "fe-security-headers" },
+]
+
+# ★인자는 **선택**이다. `scripts/verify-prod.sh:15` 가
+#   `BASE_URL="${1:-https://kairos-api.woosung.dev}"` 로 무인자 기본값을 갖는다.
+#   `<args>...` (필수)로 쓰면 구 `just verify-prod` 의 기본 경로가 통째로 막힌다.
+[tasks.verify-prod]
+description = "프로덕션 스모크 스크립트 (무인자면 prod 기본 URL)"
+usage = 'arg "[args]..." help="verify-prod.sh 에 그대로 전달 (생략 가능)"'
+# ★`${usage_args:-}` 의 `:-` 가 필수다. 선택 인자를 생략하면 mise 는 변수를 아예
+#   설정하지 않는데, `[task_config] shell` 의 `-u` 가 그걸 unbound 로 잡아 죽인다.
+# ★인용하지 않는 것도 의도다 — 스크립트에 개별 인자로 분리 전달해야 한다.
+run = './scripts/verify-prod.sh ${usage_args:-}'
+
+# ══ OCI 배포 (ADR-028) ════════════════════════════════════════════════
+
+# 배포 전 필수 확인. BackgroundTasks 는 재시도가 없어서 처리 중인 회의가 있는 상태로
+# 컨테이너를 교체하면 그 회의는 transcribing 상태로 영구 정지한다.
+[tasks.deploy-preflight]
+description = "배포 전 게이트 — 진행 중 회의 0 + .env 인코딩"
+quiet = true
+run = '''
+echo "── 진행 중인 회의 처리 (0 이어야 배포 가능) ──"
+# SQL 은 stdin 으로 넘긴다. 인라인 -c 는 shell/ssh 이스케이프를 타면서 작은따옴표가
+# 깨지고 `$$` 는 shell PID 로 치환된다 (2026-08-14 실측).
+# 최근 2시간 내 갱신된 것만 센다. 최장 작업이 ~15분이므로 그보다 오래된 것은
+# 이미 죽은 좀비이고(2026-05 에 멈춘 6건 실재), 그걸로 배포를 막으면 게이트가 무의미해진다.
+printf "SELECT count(*) FROM meetings WHERE status IN ('transcribing','analyzing') AND updated_at > now() - interval '2 hours';" | ssh {{vars.oci_host}} 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -tA"'
+echo "── .env 인코딩 게이트 (출력 0줄이어야 정상) ──"
+ssh {{vars.oci_host}} 'bash -lc "LC_ALL=C grep -n \"[^[:print:][:space:]]\" {{vars.oci_dir}}/.env || true"'
+'''
+
+# 이미지 2종 arm64 빌드. FE 는 NEXT_PUBLIC_* 이 빌드타임 인라인이라 build.env 가 필요하다.
+[tasks.deploy-build]
+description = "이미지 2종 arm64 빌드"
+usage = 'arg "<tag>" help="이미지 태그 (보통 git short SHA)"'
+run = '''
+docker buildx build --platform linux/arm64 -t "kairos-api:$usage_tag" --load apps/api
+set -a && source deploy/oci/build.env && set +a && \
+  docker buildx build --platform linux/arm64 -t "kairos-web:$usage_tag" --load \
+    --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
+    --build-arg NEXT_PUBLIC_RECALL_ENABLED="$NEXT_PUBLIC_RECALL_ENABLED" \
+    --build-arg NEXT_PUBLIC_FOUNDER_USER_ID="$NEXT_PUBLIC_FOUNDER_USER_ID" \
+    --build-arg NEXT_PUBLIC_APP_ENV="$NEXT_PUBLIC_APP_ENV" \
+    apps/web
+'''
+
+# 서버의 compose 파일을 레포 정본으로 동기화한다.
+#
+# ★2026-08-17 Better Auth 컷오버 사고의 재발 방지 task 다.
+#   그날까지 배포는 이미지와 .env 태그만 옮겼고 compose 파일은 "최초 부트스트랩" 때 한 번
+#   복사한 게 전부였다(서버 파일 mtime 8/14). ADR-031 이 web 서비스에 새로 추가한
+#   environment 5줄(BETTER_AUTH_*, GOOGLE_CLIENT_*)이 서버에 도달하지 못했고,
+#   그 결과 BETTER_AUTH_SECRET 이 빈 값으로 주입돼 web 이 전면 500 이었다
+#   (BetterAuthError: You are using the default secret).
+#
+#   교훈: 배포 단위는 "이미지"가 아니라 "이미지 + 그 이미지를 띄우는 방법"이다.
+[tasks.deploy-sync-config]
+description = "서버 compose 파일을 레포 정본으로 동기화 + 문법 검증"
+run = '''
+ssh {{vars.oci_host}} 'bash -lc "cd {{vars.oci_dir}} && cp docker-compose.prod.yml docker-compose.prod.yml.bak"'
+scp deploy/oci/docker-compose.prod.yml {{vars.oci_host}}:{{vars.oci_dir}}/docker-compose.prod.yml
+# 문법 검증 — .env 참조가 깨졌으면 여기서 죽는다 (up -d 이후가 아니라)
+ssh {{vars.oci_host}} 'bash -lc "cd {{vars.oci_dir}} && {{vars.oci_compose}} config -q && echo \"compose 문법 OK\""'
+'''
+
+# 레지스트리 없이 SSH 파이프로 전송 후 태그 교체 + 기동.
+# ★compose 동기화가 **먼저**다 — 순서를 바꾸면 위 사고가 그대로 재현된다.
+#   `depends` 를 쓰지 않는 이유: 병렬 실행이라 순서 보장이 안 된다.
+[tasks.deploy-ship]
+description = "이미지 전송 + 태그 교체 + 기동 (compose 동기화 선행)"
+usage = 'arg "<tag>" help="배포할 이미지 태그"'
+run = '''
+mise run deploy-sync-config
+docker save "kairos-api:$usage_tag" | gzip -1 | ssh {{vars.oci_host}} 'gunzip | docker load'
+docker save "kairos-web:$usage_tag" | gzip -1 | ssh {{vars.oci_host}} 'gunzip | docker load'
+ssh {{vars.oci_host}} "bash -lc 'cd {{vars.oci_dir}} && \
+  sed -i \"s/^KAIROS_API_TAG=.*/KAIROS_API_TAG=$usage_tag/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=$usage_tag/\" .env && \
+  {{vars.oci_compose}} up -d'"
+mise run deploy-verify-env
+'''
+
+# 컨테이너에 런타임 env 가 실제로 주입됐는지 확인한다.
+# compose 의 `environment:` 치환은 변수가 없어도 빈 문자열로 조용히 통과하므로
+# (env_file 과 달리 에러가 안 난다) 이 게이트가 없으면 첫 로그인에서야 드러난다.
+[tasks.deploy-verify-env]
+description = "컨테이너 런타임 env 주입 확인"
+run = '''
+ssh {{vars.oci_host}} 'bash -lc "docker exec kairos-web env | grep -q \"^BETTER_AUTH_SECRET=.\" && echo \"web: BETTER_AUTH_SECRET 주입 OK\""'
+ssh {{vars.oci_host}} 'bash -lc "docker exec kairos-web env | grep -q \"^GOOGLE_CLIENT_SECRET=.\" && echo \"web: GOOGLE_CLIENT_SECRET 주입 OK\""'
+ssh {{vars.oci_host}} 'bash -lc "docker exec kairos-api env | grep -q \"^AUTH_JWKS_URL=.\" && echo \"api: AUTH_JWKS_URL 주입 OK\""'
+'''
+
+[tasks.deploy-status]
+description = "컨테이너 상태 + /ready + 호스트 자원"
+run = '''
+ssh {{vars.oci_host}} 'bash -lc "cd {{vars.oci_dir}} && {{vars.oci_compose}} ps"'
+ssh {{vars.oci_host}} 'bash -lc "curl -sf 127.0.0.1:8200/api/v1/ready; echo; uptime; free -h"'
+'''
+
+[tasks.deploy-logs]
+description = "컨테이너 로그 follow"
+usage = 'arg "<service>" default="api" help="compose 서비스명"'
+run = '''
+ssh {{vars.oci_host}} "bash -lc 'cd {{vars.oci_dir}} && {{vars.oci_compose}} logs --tail=100 -f $usage_service'"
+'''
+
+# 롤백 — 이전 태그로 되돌린다. 마이그레이션은 자동 롤백되지 않는다.
+# ★스키마가 가산/완화형이라 구 이미지가 새 스키마 위에서 그대로 동작한다 (ADR-031 D7, 실측).
+[tasks.deploy-rollback]
+description = "이미지 태그를 이전 값으로 되돌린다 (RTO 약 2분)"
+usage = 'arg "<tag>" help="되돌릴 이미지 태그"'
+run = '''
+ssh {{vars.oci_host}} "bash -lc 'cd {{vars.oci_dir}} && \
+  sed -i \"s/^KAIROS_API_TAG=.*/KAIROS_API_TAG=$usage_tag/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=$usage_tag/\" .env && \
+  {{vars.oci_compose}} up -d'"
+'''

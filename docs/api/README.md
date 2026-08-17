@@ -6,7 +6,7 @@
 | 알고 싶은 것 | 정본 |
 |---|---|
 | **실제 엔드포인트·스키마** | [`contracts/openapi/v1/openapi.json`](../../contracts/openapi/v1/openapi.json) — 생성물. 수정 금지 |
-| 계약 재생성 / drift 게이트 | `just contracts` · `just contracts-check` → [`contracts/README.md`](../../contracts/README.md) ([ADR-027](../adr/027-apps-monorepo-and-contract-governance.md) D2) |
+| 계약 재생성 / drift 게이트 | `mise run contracts` · `mise run contracts-check` → [`contracts/README.md`](../../contracts/README.md) ([ADR-027](../adr/027-apps-monorepo-and-contract-governance.md) D2) |
 | URL prefix 규칙 (`/api/v1/workspaces/{workspace_id}/…`) 과 그 예외 | [`CONTEXT-MAP.md`](../../CONTEXT-MAP.md) **I-13** |
 | DB snake_case ↔ API camelCase 직렬화 | [`CONTEXT-MAP.md`](../../CONTEXT-MAP.md) **I-16** |
 | status code · 페이지네이션 · 리소스 명명 · 권한 dependency | [`apps/api/CONTEXT.md`](../../apps/api/CONTEXT.md) **§6** |

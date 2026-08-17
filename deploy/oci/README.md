@@ -67,7 +67,7 @@ docker buildx build --platform linux/arm64 -t kairos-web:$TAG --load \
 #   2026-08-17 Better Auth 컷오버에서 이 단계가 없어 web 이 전면 500 이었다.
 #   서버 파일이 최초 부트스트랩 버전이라 ADR-031 이 추가한 web.environment 5줄이 없었고
 #   BETTER_AUTH_SECRET 이 빈 문자열로 주입됐다(environment: 치환은 미설정도 조용히 통과한다).
-#   `just deploy-ship` 은 이걸 선행 의존으로 자동 수행한다.
+#   `mise run deploy-ship` 은 이걸 선행 의존으로 자동 수행한다.
 scp deploy/oci/docker-compose.prod.yml truewords-oracle:~/kairos/docker-compose.prod.yml
 ssh truewords-oracle 'bash -lc "cd ~/kairos && docker compose -f docker-compose.prod.yml config -q"'
 

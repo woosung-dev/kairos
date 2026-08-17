@@ -94,7 +94,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 | I-19 | Personal workspace = 1인 격리. `Workspace.type='personal'` → 1 owner, `WorkspaceInvite` 발급 금지, ProjectMember 1명 (R5) | `workspaces/service.py` + `projects/service.py` |
 | I-20 | 벡터 컬럼 `halfvec(1536)` 고정 (ADR-020). `EmbeddingChunk.embedding` + `SemanticCache.question_embedding`. `Vector(1536)` 금지. 인덱스 = HNSW (m=16, ef_construction=64), ivfflat 금지. cosine `<=>` 유지 | `embeddings/models.py` + alembic |
 | I-21 | 벡터 검색 세션 변수 강제 (ADR-020): `hnsw.ef_search=40 + iterative_scan='relaxed_order' + max_scan_tuples=20000` 을 트랜잭션 로컬로(단일 왕복) 강제 — `_apply_hnsw_session_params(session)` 헬퍼. pgvector ≥0.8 서버 + Python ≥0.4.2 | `embeddings/repository.py:_apply_hnsw_session_params` |
-| I-22 | FE wire 타입 SSOT = 계약 생성물 `apps/web/src/types/api.gen.ts` (openapi-typescript ← `contracts/openapi/v1/openapi.json`). 수기 wire interface 신규 작성 금지, 재생성 = `just contracts` (ADR-027 D2) | CI `contract-check` (`.github/workflows/test.yml`) |
+| I-22 | FE wire 타입 SSOT = 계약 생성물 `apps/web/src/types/api.gen.ts` (openapi-typescript ← `contracts/openapi/v1/openapi.json`). 수기 wire interface 신규 작성 금지, 재생성 = `mise run contracts` (ADR-027 D2) | CI `contract-check` (`.github/workflows/test.yml`) |
 
 > **2026-08-16 ID 정정**: `I-20` 이 두 행에 부여돼 있었다 (AGENTS.md §5 "부여된 ID 는 변경·재사용 금지" 위반).
 > 원 부여인 halfvec(ADR-020, 2026-05, 외부 인용 14곳)을 **보존**하고, 후발로 번호를 재사용한

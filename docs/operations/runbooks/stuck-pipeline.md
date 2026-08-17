@@ -30,7 +30,7 @@ AND updated_at < now() - interval '2 hours' ORDER BY updated_at;" \
 ```
 
 2시간 **이내**인 것은 정상 진행 중일 수 있으니 건드리지 않는다.
-(같은 임계값을 `just deploy-preflight` 가 배포 게이트로 쓴다.)
+(같은 임계값을 `mise run deploy-preflight` 가 배포 게이트로 쓴다.)
 
 ## 2. 로그 확인
 
@@ -56,7 +56,7 @@ ssh truewords-oracle 'bash -lc "docker logs --tail 300 kairos-api"'
 
 ## 4. 예방
 
-- **배포 전 `just deploy-preflight` 를 반드시 실행한다.** 진행 중 작업이 0 이어야 배포한다
+- **배포 전 `mise run deploy-preflight` 를 반드시 실행한다.** 진행 중 작업이 0 이어야 배포한다
 - `deploy/oci/docker-compose.prod.yml` 의 `stop_grace_period: 900s` 는 진행 중 작업이
   끝날 시간을 주기 위한 값이다. 줄이면 이 장애가 늘어난다
 - uvicorn `--workers` 를 1 에서 늘리지 않는다 — circuit breaker 와 auth 캐시가 in-process

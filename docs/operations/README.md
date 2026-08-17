@@ -20,8 +20,8 @@
 
 ```bash
 ssh truewords-oracle 'bash -lc "docker logs --tail 300 kairos-api"'
-just deploy-status
-just deploy-logs
+mise run deploy-status
+mise run deploy-logs
 ```
 
 ## 아직 없는 것

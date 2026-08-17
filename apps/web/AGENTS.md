@@ -130,7 +130,7 @@ const handleSubmit = (data: FormData) => {
 - `any` 가 불가피하면 **`unknown` + Type Guard** 로 좁힌다
 - 상수는 `UPPER_SNAKE_CASE`
 - ★**API wire 타입은 손으로 쓰지 않는다.** `apps/web/src/types/api.gen.ts` 생성물에서 import 하고,
-  재생성은 `just contracts` (ADR-027, I-22). 구 `typescript.md` 의 「모든 API 응답 타입을 명시적으로 정의」는
+  재생성은 `mise run contracts` (ADR-027, I-22). 구 `typescript.md` 의 「모든 API 응답 타입을 명시적으로 정의」는
   ADR-027 이전의 규칙이라 **폐기됐다**
 - **파일명은 kebab-case** (`note-editor.tsx`, `use-media-query.ts`). 실측 98 vs 7 로 kebab 이 사실상의 표준이다.
   ★구 `typescript.md` 의 「컴포넌트 PascalCase / 훅 camelCase」는 코드와 맞지 않아 폐기.

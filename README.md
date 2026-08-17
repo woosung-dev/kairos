@@ -8,7 +8,7 @@
 **현재 상태 (2026-08-16):** 오라클 셀프호스팅 컷오버 완료 (ADR-028) · AI 규칙을 `apps/*/AGENTS.md` 로 이전 (ADR-029) · `apps/backend` → `apps/api` 개명 + docs 재구성 (ADR-030).
 진행 상세는 `git log` + [`docs/REFACTORING-BACKLOG.md`](docs/REFACTORING-BACKLOG.md) "다음 Sprint 진입점".
 
-> 머지 판정은 CI(`ci-required`)가 한다. `just ci-local` 은 **푸쉬 전 사전 확인**용으로 같은 게이트를 로컬에서 돌린다 ([`docs/development/testing.md`](docs/development/testing.md)).
+> 머지 판정은 CI(`ci-required`)가 한다. `mise run ci-local` 은 **푸쉬 전 사전 확인**용으로 같은 게이트를 로컬에서 돌린다 ([`docs/development/testing.md`](docs/development/testing.md)).
 
 ---
 
@@ -61,18 +61,19 @@ pnpm dev -p 3000
 
 ## 테스트
 
-루트 `justfile` 이 단일 진입점 (`brew install just`, ADR-027):
+루트 `mise.toml` 이 단일 진입점 (`brew install mise`, ADR-032):
 
 ```bash
-just ci-local         # ★ 머지 게이트 전체 (be-test + fe-test + fe-build + 보안헤더 + contracts-check)
-just install          # BE uv sync --frozen + FE pnpm install
-just be-test          # 백엔드 pytest — CI 와 동일 호출 (transcription/r2-cors 2개 제외)
-just fe-build         # 프론트엔드 빌드 (타입 검사 포함)
-just e2e              # Playwright — 로컬 .env.local에 E2E_USER_EMAIL/PASSWORD 필요
-just contracts-check  # OpenAPI 계약 drift 게이트 (재생성 + git diff)
+mise run ci-local         # ★ 머지 게이트 전체 (toolchain + be-test + contracts + fe-test/build + 보안헤더)
+mise run install          # BE uv sync --frozen + FE pnpm install
+mise run be-test          # 백엔드 pytest — CI 와 동일 호출 (transcription/r2-cors 2개 제외)
+mise run fe-build         # 프론트엔드 빌드 (타입 검사 포함)
+mise run e2e              # Playwright — 로컬 .env.local에 E2E_USER_EMAIL/PASSWORD 필요
+mise run contracts-check  # OpenAPI 계약 drift 게이트 (재생성 + git diff)
 ```
 
-전체 recipe 는 `just --list`. `just` 없이는 각 recipe 안의 원 명령을 직접 실행해도 된다.
+전체 task 는 `mise tasks`. `mise` 없이는 각 task 안의 원 명령을 직접 실행해도 된다.
+`mise install` 이 Node 22 / pnpm 8.15.9 / uv 0.10.4 를 프로덕션과 같은 버전으로 깔아준다.
 
 ---
 
@@ -82,10 +83,10 @@ just contracts-check  # OpenAPI 계약 drift 게이트 (재생성 + git diff)
 
 ```bash
 TAG=$(git rev-parse --short HEAD)
-just deploy-preflight     # 진행 중 작업 0 확인 + .env 인코딩 게이트
-just deploy-build $TAG
-just deploy-ship $TAG
-just deploy-status
+mise run deploy-preflight     # 진행 중 작업 0 확인 + .env 인코딩 게이트
+mise run deploy-build $TAG
+mise run deploy-ship $TAG
+mise run deploy-status
 ```
 
 배포 상세 절차 → [`docs/operations/deployment.md`](docs/operations/deployment.md)
