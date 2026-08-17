@@ -30,7 +30,7 @@ mise run ci-local
 | `mise run be-test` | `backend-test` "Run tests" | pytest. `transcription` / `r2-cors` 2개 제외가 **정본** (외부 API·실 R2 의존) |
 | `mise run fe-test` | `frontend-build` "Unit tests (vitest)" | 코드 옆 `__tests__/` 단위 테스트 |
 | `mise run fe-build` | `frontend-build` "Build (includes type check)" | Next 빌드 = TS strict 타입 검사 |
-| `mise run fe-security-headers` | `frontend-build` "Run security-headers spec only" | 보안 헤더 회귀 (public route, secrets 불요). **빌드 산출물(`pnpm start`)을 검증한다** — ↓ §2.1 |
+| `mise run fe-security-headers` | `frontend-build` "Security headers gate (build artifact, public route)" | 보안 헤더 회귀 (public route, secrets 불요). **빌드 산출물(`pnpm start`)을 검증한다** — ↓ §2.1 |
 | `mise run contracts-check` | `contract-check` | OpenAPI 재생성 + `git diff --exit-code` drift 차단 (ADR-027 D2) |
 | `mise run e2e` | `e2e` job (`vars.E2E_ENABLED`, **현재 미활성**) | Playwright |
 

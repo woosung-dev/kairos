@@ -88,7 +88,7 @@ GCP 프로젝트 Kairos + OAuth 클라이언트 발급, 서버 ~/kairos/.env 10�
 > #### ⚠️ `mise run deploy-ship` 을 D-1 에 쓰면 안 된다 (2026-08-17 정정)
 >
 > 이 절의 이전 판은 `deploy-ship <TAG-A>` 를 D-1 명령으로 적었는데, 그 레시피는
-> **이미지 전송 + `.env` 태그 교체 + `up -d` 를 한 덩어리로** 수행한다(`mise.toml:137-142`).
+> **이미지 전송 + `.env` 태그 교체 + `up -d` 를 한 덩어리로** 수행한다(`mise.toml` 의 `[tasks.deploy-ship]`).
 > 실행하는 순간 web/api 가 교체돼 Better Auth 가 서비스에 뜨고 Clerk 로그인이 끝난다 —
 > "Clerk 는 살아 있고 사용자 영향 0" 이 성립하지 않는다. TAG-A 와 TAG-B 를 나눈 것도
 > 같은 코드에서 나온 두 태그라 의미가 없었다.

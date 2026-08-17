@@ -2,7 +2,7 @@
 
 사용:
     cd apps/api && uv run python -m scripts.export_openapi
-    (루트에서는 `just openapi-export`)
+    (루트에서는 `mise run openapi-export`)
 
 CI:
     test.yml `contract-check` job 이 재생성 후 `git diff --exit-code` 로 drift 를 차단한다.
