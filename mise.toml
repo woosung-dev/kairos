@@ -90,7 +90,7 @@ description = "백엔드 개발 서버 (:8000)"
 dir = "apps/api"
 run = "uv run uvicorn src.main:app --reload --port 8000"
 
-# CI 와 동일 (README 의 `uv run pytest -v` 아님 — transcription/r2-cors 2개 제외가 정본)
+# CI 와 문자 동일 — transcription/r2-cors 2개 제외가 정본 (외부 자격증명 필요)
 [tasks.be-test]
 description = "백엔드 테스트 (CI 와 동일한 제외 목록)"
 dir = "apps/api"
