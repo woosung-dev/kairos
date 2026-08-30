@@ -350,8 +350,8 @@ mise run contracts-check   # OpenAPI 계약 drift 게이트
 TAG=$(git rev-parse --short HEAD)
 mise run deploy-preflight    # 진행 중 작업 0 확인 + .env 인코딩 게이트
 mise run deploy-build $TAG   # arm64 이미지 2종
-mise run deploy-ship $TAG    # 전송 + 태그 교체 + 기동
-mise run deploy-status       # 컨테이너 상태 + /ready + 호스트 자원
+mise run deploy-ship $TAG    # 전송 + 태그 교체 + 기동 + 구버전 이미지 GC
+mise run deploy-status       # 컨테이너 상태 + /ready + 호스트 자원 (디스크 포함)
 mise run deploy-rollback     # 문제 시 — 이미지 태그 되돌리기 (RTO 약 2분)
 ```
 
