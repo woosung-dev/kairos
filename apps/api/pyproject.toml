@@ -13,12 +13,12 @@ dependencies = [
     "httpx>=0.28.1",
     "openai>=2.30.0",
     "pydantic-settings>=2.13.1",
-    "pyjwt[crypto]>=2.12.1",
+    "pyjwt[crypto]>=2.13.0",
     "sqlmodel>=0.0.37",
     "uvicorn[standard]>=0.42.0",
     "pgvector>=0.4.2,<1.0.0",  # Sprint 16 ADR-020 — sqlalchemy.HALFVEC import 보장 (0.4.2+). 서버 확장은 0.8+ 별도 요구 (iterative_scan).
     "sse-starlette>=2.0.0",
-    "python-multipart>=0.0.28",
+    "python-multipart>=0.0.31",
 ]
 
 [dependency-groups]
