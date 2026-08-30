@@ -310,12 +310,15 @@ description = "이미지 전송 + 태그 교체 + 기동 (compose 동기화 선�
 usage = 'arg "<tag>" help="배포할 이미지 태그"'
 run = '''
 mise run deploy-sync-config
+# GC 가 보존할 "직전 태그" 다. .env 를 새 태그로 덮어쓰기 **전에** 읽어야 한다.
+prev_tag=$(ssh {{vars.oci_host}} 'bash -lc "grep -m1 ^KAIROS_API_TAG= {{vars.oci_dir}}/.env | cut -d= -f2"')
 docker save "kairos-api:$usage_tag" | gzip -1 | ssh {{vars.oci_host}} 'gunzip | docker load'
 docker save "kairos-web:$usage_tag" | gzip -1 | ssh {{vars.oci_host}} 'gunzip | docker load'
 ssh {{vars.oci_host}} "bash -lc 'cd {{vars.oci_dir}} && \
   sed -i \"s/^KAIROS_API_TAG=.*/KAIROS_API_TAG=$usage_tag/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=$usage_tag/\" .env && \
   {{vars.oci_compose}} up -d'"
 mise run deploy-verify-env
+mise run deploy-gc "${prev_tag:-__none__}"
 '''
 
 # 컨테이너에 런타임 env 가 실제로 주입됐는지 확인한다.
@@ -329,11 +332,60 @@ ssh {{vars.oci_host}} 'bash -lc "docker exec kairos-web env | grep -q \"^GOOGLE_
 ssh {{vars.oci_host}} 'bash -lc "docker exec kairos-api env | grep -q \"^AUTH_JWKS_URL=.\" && echo \"api: AUTH_JWKS_URL 주입 OK\""'
 '''
 
+# 배포마다 이미지 2개가 서버에 쌓이는데 지우는 코드가 어디에도 없었다
+# (2026-08-30 실측: kairos 태그가 api·web 각 5개 + rc1 누적, 회수 가능 3.7GB).
+# 문서는 "직전 2개를 남긴다" 고 서술했지만 그걸 수행하는 명령이 없는 상태였다.
+#
+# ★이 호스트는 quantbridge·truewords 와 공유한다.
+#   `docker system prune -a` / `docker image prune -a` 는 남의 프로젝트 이미지를 지운다.
+#   반드시 kairos-api / kairos-web 리포지토리로 한정한다.
+#
+# ★정렬에 의존하지 않는다. 이 서버는 Docker 29 + containerd 이미지 스토어라
+#   `docker images` 가 생성일순이 아니라 **태그 알파벳순**으로 나온다 (2026-08-30 실측:
+#   7107a95 → 9e6d72b → 9e7dcf8 → a7c0b98 → d761615 → rc1). "최신 N개만 남긴다" 류의
+#   head/tail 컷은 운영 중인 태그를 삭제 대상에 넣는다. 그래서 **보존할 태그를 명시**하고
+#   나머지를 지운다 — 보존 = 서버 `.env` 의 현재 태그 + 인자로 준 롤백용 태그.
+#
+# repo:tag 로 지운다(이미지 ID 아님). 한 이미지에 태그가 여럿이면(예: rc1 == 7107a95)
+# docker 는 마지막 태그가 아닌 한 untag 만 하므로 보존 태그가 같이 날아가지 않는다.
+[tasks.deploy-gc]
+description = "서버 구버전 kairos 이미지 정리 (.env 현재 태그 + 인자 태그만 보존)"
+usage = 'arg "<keep>" help="추가 보존 태그 (롤백 대상. 없으면 __none__)"'
+run = '''
+ssh {{vars.oci_host}} "bash -ls -- '$usage_keep'" <<'REMOTE'
+set -uo pipefail
+keep_extra="${1:-__none__}"
+for repo in kairos-api kairos-web; do
+  # ★리포마다 자기 태그를 읽는다. API 태그 하나로 web 보존을 판정하면
+  #   두 값이 갈라진 상태(수동 롤백 등)에서 운영중인 web 이미지가 삭제 대상이 된다.
+  case "$repo" in
+    kairos-api) var=KAIROS_API_TAG ;;
+    kairos-web) var=KAIROS_WEB_TAG ;;
+  esac
+  cur=$(grep -m1 "^$var=" {{vars.oci_dir}}/.env | cut -d= -f2)
+  # ★빈 값 가드. cur 이 비면 아래 grep -vx 필터가 무력화돼 운영중 태그까지
+  #   삭제 대상이 된다. 지우지 않고 멈추는 쪽이 항상 옳다.
+  if [ -z "$cur" ]; then
+    echo "ERROR: .env 에서 $var 를 읽지 못했다 — GC 를 중단한다 (이미지는 그대로)" >&2
+    exit 1
+  fi
+  echo "$repo 보존: $cur (운영중), $keep_extra (롤백용)"
+  docker images "$repo" | tail -n +2 | cut -d' ' -f1 \
+    | grep -vx -e "$repo:$cur" -e "$repo:$keep_extra" \
+    | xargs -r -n1 docker rmi || true
+done
+echo "── 잔여 kairos 이미지 ──"
+docker images | grep '^kairos-' || true
+echo "── 서버 디스크 ──"
+df -h / | tail -1
+REMOTE
+'''
+
 [tasks.deploy-status]
 description = "컨테이너 상태 + /ready + 호스트 자원"
 run = '''
 ssh {{vars.oci_host}} 'bash -lc "cd {{vars.oci_dir}} && {{vars.oci_compose}} ps"'
-ssh {{vars.oci_host}} 'bash -lc "curl -sf 127.0.0.1:8200/api/v1/ready; echo; uptime; free -h"'
+ssh {{vars.oci_host}} 'bash -lc "curl -sf 127.0.0.1:8200/api/v1/ready; echo; uptime; free -h; df -h /"'
 '''
 
 [tasks.deploy-logs]
