@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 갱신: **2026-08-16** (레포 public 전환 → Actions 복구. ADR-030 라운드 후속)
+> 마지막 갱신: **2026-08-30** (Docker 디스크 GC — ADR-028 D9)
 > 4 섹션 운영: Completed / Blocked / Questions / Next Actions (`AGENTS.md` §5)
 > 완료 이력 정본 = `git log` + `docs/REFACTORING-BACKLOG.md`. 분할 직전 원본 = [`archive/todo-2026h1.md`](archive/todo-2026h1.md)
 >
@@ -12,6 +12,15 @@
 ## Completed
 
 현행 sprint 완료분만 여기 적는다. 지난 sprint 이력은 `git log` 와 아카이브를 본다.
+
+- [x] **Docker 디스크 GC + API 이미지 슬림화** (2026-08-30, ADR-028 D9) —
+  배포마다 이미지가 쌓이는데 지우는 코드가 0건이었다(문서 서술만 존재). `[tasks.deploy-gc]`
+  신설 → `deploy-ship` 에 연결, 보존 = 운영중 + 직전 1개. `deploy-status` 에 `df -h /` 추가.
+  `apps/api/Dockerfile` multi-stage 전환(chown -R 206MB + uv 45.5MB + uv 캐시 제거),
+  `.dockerignore` `**/` 누락 버그 수정. 실측: 서버 43G→39G(4GB 회수, 여유 59G),
+  이미지 약 1,030MB→735MB, 로컬 맥 23.6GB 회수.
+  ⚠함정: 이 서버(Docker 29 + containerd)의 `docker images` 는 생성일순이 아니라 태그 알파벳순 —
+  `tail -n +3` 컷은 운영중 태그를 지운다. 보존 태그를 명시해야 한다.
 
 - [x] **ADR-030 `apps/backend` → `apps/api` rename + docs 재구성** (2026-08-16) —
   경로 참조 168 파일, docs 3분할(development/operations/product), TODO/백로그 아카이브 분할,

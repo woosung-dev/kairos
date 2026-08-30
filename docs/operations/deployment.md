@@ -43,9 +43,13 @@ TAG=$(git rev-parse --short HEAD)
 
 mise run deploy-preflight      # 진행 중인 회의 처리가 0 인지 + .env 인코딩 게이트
 mise run deploy-build $TAG     # 맥에서 arm64 네이티브 빌드 (BE + FE)
-mise run deploy-ship $TAG      # docker save | ssh | docker load → 태그 교체 → up -d
-mise run deploy-status         # 컨테이너 상태 + /ready + 서버 자원
+mise run deploy-ship $TAG      # docker save | ssh | docker load → 태그 교체 → up -d → GC
+mise run deploy-status         # 컨테이너 상태 + /ready + 서버 자원 (디스크 포함)
 ```
+
+`deploy-ship` 은 마지막에 `deploy-gc` 를 부른다 — 서버에 **운영중 태그 + 직전 태그**만 남기고
+나머지 `kairos-api` / `kairos-web` 이미지를 지운다. 이 서버는 quantbridge·truewords 와
+공유하므로 **`docker system prune` 계열을 쓰지 않는다** (남의 프로젝트 이미지가 지워진다).
 
 레지스트리를 쓰지 않는다. 맥(darwin/arm64)과 서버(aarch64)가 같은 아키텍처라
 `--platform linux/arm64` 가 에뮬레이션 없이 돈다.
@@ -68,8 +72,11 @@ mise run deploy-status         # 컨테이너 상태 + /ready + 서버 자원
 mise run deploy-rollback <이전TAG>
 ```
 
-서버에 직전 2개 태그를 남겨 둔다. **마이그레이션은 자동 롤백되지 않으므로** 스키마 변경은
-expand-then-contract 로만 한다.
+서버에 **운영중 + 직전 1개** 태그를 남긴다 (`deploy-gc` 가 매 배포마다 강제한다 —
+직전 태그는 `deploy-ship` 이 `.env` 를 덮어쓰기 전에 읽어 GC 에 넘긴다).
+그보다 오래된 태그로 되돌리려면 이미지를 다시 빌드해 보내야 한다.
+
+**마이그레이션은 자동 롤백되지 않으므로** 스키마 변경은 expand-then-contract 로만 한다.
 
 ---
 

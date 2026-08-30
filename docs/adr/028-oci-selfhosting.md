@@ -28,8 +28,10 @@ quantbridge · truewords 를 돌리는 오라클 서버가 있으므로 **개인
 
 - **오라클 A1 무료 한도가 2026-06-15 부로 4 OCPU/24GB → 2 OCPU/12GB 로 반감**됐다(무공지). 기존
   `truewords-oracle` 이 정확히 그만큼 쓰고 있어 **신규 인스턴스는 PAYG 과금 대상**이다.
-- 그 서버 실측: `load average 0.19`(2코어), 메모리 available **7.7GB**, 디스크 여유 **63GB**,
-  컨테이너 13개의 CPU 합계 2% 미만. → 공유 여력이 있다.
+- 그 서버 실측: `load average 0.19`(2코어), 메모리 available **7.7GB**,
+  디스크 **총 97GB 중 여유 63GB**, 컨테이너 13개의 CPU 합계 2% 미만. → 공유 여력이 있다.
+  (총량은 2026-08-30 추가 기록. 여유 값만 있으면 증가율을 판단할 수 없었다 — 실제로
+  16일 뒤 여유가 54GB 로 줄었고, 원인은 배포마다 쌓이는 이미지였다. 아래 D9 참조.)
 - 런타임에 로컬 ML 추론이 **0건**이다. STT=OpenAI Whisper API, LLM=Gemini API, 임베딩=OpenAI API.
   `uv.lock` 79 패키지가 전부 aarch64 또는 pure 휠(예외 `pywin32` 는 win32 마커 + dev 그룹).
   시스템 의존성은 ffmpeg 하나. → ARM 이전 리스크가 없다.
@@ -147,6 +149,32 @@ D+7 무사고 후 삭제.
 
 `NEXT_PUBLIC_*` 6종은 `ARG` 로 받아 **빌드타임 인라인**된다(`src/lib/api-client.ts:2`).
 도메인이 바뀌면 반드시 재빌드해야 하며 런타임 env 로는 바뀌지 않는다.
+
+
+### D9. 이미지 GC 는 `deploy-gc` 가 소유한다 — 보존 = 운영중 + 직전 1개 (2026-08-30 추가)
+
+D7 의 `docker save | ssh | docker load` 는 배포마다 서버에 이미지 2개를 **추가**하는데,
+지우는 코드가 어디에도 없었다. 문서에는 "직전 2개를 남긴다" 고 적혀 있었지만 그걸 수행하는
+명령이 없었다 — 서술만 있고 구현이 없는 상태였다. 실측(2026-08-30): `kairos-api`/`kairos-web`
+각 5개 + `rc1` 누적, `/var/lib/containerd` 25GB, 16일에 디스크 9GB 감소.
+
+`[tasks.deploy-gc]` 를 신설해 `deploy-ship` 끝에 연결했다. 설계 제약 둘:
+
+1. **정렬에 의존하지 않는다.** 이 서버는 Docker 29 + containerd 이미지 스토어라
+   `docker images` 가 생성일순이 아니라 **태그 알파벳순**으로 나온다. "최신 N개만 남긴다" 류의
+   `tail -n +3` 은 운영중 태그(`a7c0b98`)를 삭제 대상에 넣었다. 그래서 **보존 태그를 명시**한다 —
+   서버 `.env` 의 현재 태그 + `deploy-ship` 이 `.env` 를 덮어쓰기 전에 읽어 넘긴 직전 태그.
+2. **`docker system prune` 계열 금지.** D1 대로 이 호스트는 quantbridge·truewords 와 공유한다.
+   `kairos-api` / `kairos-web` 리포지토리로 한정하고, `repo:tag` 로 지운다(이미지 ID 아님 —
+   한 이미지에 태그가 여럿이면 docker 가 untag 만 하므로 보존 태그가 함께 사라지지 않는다).
+
+부수 작업으로 `apps/api/Dockerfile` 을 multi-stage 로 바꿨다. 단일 스테이지라
+`chown -R /app`(overlayfs copy-up 으로 venv 재복제, 206MB) · uv 바이너리(45.5MB) ·
+uv 캐시가 최종 이미지에 남아 있었다. 이미지는 **약 1,030MB → 735MB**. 레지스트리 없이
+이미지를 통째로 SSH 전송하는 구조라 이미지 크기가 곧 배포 시간이다.
+
+`deploy-status` 에 `df -h /` 를 추가했다 — 그전에는 `uptime`/`free -h` 만 봐서 디스크가
+관측 밖이었다.
 
 ## 3. 기각한 대안
 
