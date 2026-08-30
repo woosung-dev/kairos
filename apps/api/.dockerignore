@@ -1,8 +1,15 @@
+# ★`**/` 가 핵심이다. .dockerignore 는 gitignore 가 아니라 Go filepath.Match 라
+#   `__pycache__/` 는 컨텍스트 루트만 매칭한다. 이게 빠져 있어서 src/·alembic/ 하위
+#   __pycache__ 20개(1.4MB)가 이미지에 굽히고, 테스트를 돌릴 때마다 .pyc mtime 이
+#   바뀌어 COPY src/ 레이어 캐시를 깼다 (2026-08-30).
 .venv/
-__pycache__/
+**/__pycache__/
+**/*.pyc
 tests/
 .pytest_cache/
-*.pyc
+.uv-cache/
+.coverage
+.DS_Store
 .env
 .env.*
 .git/
