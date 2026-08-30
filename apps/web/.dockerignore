@@ -9,3 +9,8 @@ test-results
 *.log
 Dockerfile
 .dockerignore
+# Dockerfile 의 `COPY . .` 가 빌드와 무관한 파일까지 담는다 — 하나만 바뀌어도
+# 레이어 해시가 깨져 pnpm build 가 매번 재실행된다 (tsbuildinfo 는 로컬 typecheck 마다 변경).
+tsconfig.tsbuildinfo
+e2e
+.DS_Store

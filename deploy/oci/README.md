@@ -94,7 +94,9 @@ SELECT count(*) FROM meetings WHERE status IN ('transcribing','analyzing');
 
 ## 롤백
 
-`.env` 의 태그 두 줄을 이전 값으로 되돌리고 `up -d`. 서버에 직전 2개 태그를 남겨 둔다.
+`.env` 의 태그 두 줄을 이전 값으로 되돌리고 `up -d`.
+서버에 남는 것은 **운영중 + 직전 1개** 뿐이다 (`mise run deploy-gc` 가 매 배포마다 강제).
+그보다 오래된 태그는 서버에 없으므로 재빌드 후 재전송해야 한다.
 
 ```bash
 ssh truewords-oracle "bash -lc 'cd ~/kairos && \
@@ -117,7 +119,10 @@ curl -sf 127.0.0.1:8200/api/v1/ready         # readiness (SELECT 1)
 
 # 같은 호스트의 다른 프로젝트 영향 확인
 docker ps --format 'table {{.Names}}\t{{.Status}}'
-uptime && free -h
+uptime && free -h && df -h /
+
+# 이미지 정리 (배포 시 자동 실행됨. 수동은 보존할 롤백 태그를 인자로)
+mise run deploy-gc <롤백용_태그>
 ```
 
 ## 함정
@@ -129,6 +134,11 @@ uptime && free -h
   `CORS_ORIGINS` 오염은 조용한 CORS 전면 차단으로 나타난다.
 - **원격 실행은 `bash -lc`.** 비로그인 셸의 PATH 문제.
 - **`docker compose down -v` 금지.** `-v` 는 `db-data` 볼륨을 지운다. 백업이 아직 없다.
+- **`docker system prune` / `docker image prune -a` 금지.** 이 호스트는 quantbridge·truewords 와
+  공유한다. 정리는 `mise run deploy-gc` 로만 — `kairos-api` / `kairos-web` 리포지토리로 한정한다.
+- **`docker images` 는 생성일순이 아니다.** 이 서버는 Docker 29 + containerd 이미지 스토어라
+  **태그 알파벳순**으로 나온다 (2026-08-30 실측). "최신 N개만 남긴다" 류의 `head`/`tail` 컷은
+  운영중 태그를 삭제 대상에 넣는다 — 보존할 태그를 **명시**해야 한다.
 - **Cloudflare 413 은 CORS 오류처럼 보인다.** 엣지가 반환하는 413 에는 CORS 헤더가 없다.
   업로드 실패 시 파일 크기부터 확인할 것 (`MAX_UPLOAD_BYTES` 90MB).
 
