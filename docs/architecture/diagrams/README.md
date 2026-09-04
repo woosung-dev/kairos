@@ -18,6 +18,10 @@
 - HTML 은 의존성 없는 단일 파일이다 (폰트만 Google Fonts 에서 받는다). **클론 후 브라우저로 열면** 패닝·줌, 노드 검색,
   가이드 뷰(우상단 01~04 — 요청 경로 · 인증 · AI 파이프라인 등), 관계 추적, 다크/라이트, PNG/SVG export 가 동작한다.
 - GitHub 는 HTML 을 렌더하지 않으므로 루트 README 에는 PNG(라이트/다크 `<picture>`)를 싣는다.
+- 클론 없이 보려면 raw.githack CDN 경유 (머지된 `main` 기준, 캐시 없음):
+  [system-architecture](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/system-architecture.html) ·
+  [data-model](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/data-model.html) ·
+  [repo-structure](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/repo-structure.html)
 - Viewer 의 고정 UI(버튼 · 범례 기본 문구 · `<html lang>`)는 **영어**다 — archify 가 `ko` 로케일을 지원하지 않아
   authored 텍스트(제목 · 노드 · 라벨 · 카드)만 한국어다.
 

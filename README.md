@@ -99,8 +99,9 @@ PaaS 3곳(Vercel · Cloud Run · Neon)에 흩어져 있던 배포를 **오라클
 OpenAI(Whisper STT · `text-embedding-3-small`) · Google(로그인 OAuth 와 Drive API 는 **별도 클라이언트**).
 런타임 로컬 ML 추론은 0건이라 ARM 이전에 리스크가 없었다.
 
-> **인터랙티브 버전** — [`docs/architecture/diagrams/system-architecture.html`](docs/architecture/diagrams/system-architecture.html)
-> (클론 후 브라우저로 열기 — 패닝 · 검색 · 가이드 뷰 4개 · 노드별 소스 파일 근거). 사양은 같은 폴더의 `*.archify.json`,
+> **인터랙티브 버전** — [브라우저에서 바로 열기](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/system-architecture.html) (raw.githack CDN 경유) 또는
+> [`docs/architecture/diagrams/system-architecture.html`](docs/architecture/diagrams/system-architecture.html) 을 클론 후 열기 —
+> 패닝 · 검색 · 가이드 뷰 4개 · 노드별 소스 파일 근거. 사양은 같은 폴더의 `*.archify.json`,
 > 다이어그램 3종의 갱신 절차는 [`docs/architecture/diagrams/README.md`](docs/architecture/diagrams/README.md).
 
 컨테이너별 자원 캡·포트 배정 근거는 [ADR-028](docs/adr/028-oci-selfhosting.md),
@@ -172,7 +173,7 @@ Repository 의 WHERE 와 composite FK `(workspace_id, secondary_id)` 가 테넌�
 | 감사 | `promotion_audit` `item_promotion_audit` | promote = 복제 + tombstone (I-18) |
 
 컬럼 단위 ERD 는 [`docs/architecture/erd.md`](docs/architecture/erd.md), 인터랙티브 버전은
-[`docs/architecture/diagrams/data-model.html`](docs/architecture/diagrams/data-model.html).
+[브라우저에서 바로 열기](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/data-model.html) / [`docs/architecture/diagrams/data-model.html`](docs/architecture/diagrams/data-model.html).
 
 ---
 
@@ -304,7 +305,7 @@ admin/owner 전용 promote 감사 조회)가 맡는다. `packages/` 도 없다 �
 - 백엔드 상세 → [`apps/api/README.md`](apps/api/README.md)
 - 프론트엔드 상세 → [`apps/web/README.md`](apps/web/README.md)
 - 전체 트리 → [`docs/architecture/directory-map.md`](docs/architecture/directory-map.md)
-- 인터랙티브 다이어그램 3종 (사양 · HTML · PNG) → [`docs/architecture/diagrams/README.md`](docs/architecture/diagrams/README.md)
+- 인터랙티브 다이어그램 3종 (사양 · HTML · PNG) → [`docs/architecture/diagrams/README.md`](docs/architecture/diagrams/README.md) · 이 다이어그램 [브라우저에서 바로 열기](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/repo-structure.html)
 
 ---
 
