@@ -41,6 +41,7 @@
 ## architecture/
 
 - [디렉터리 구조 맵](architecture/directory-map.md)
+- [**아키텍처 다이어그램 (archify)**](architecture/diagrams/README.md) — 시스템 · 데이터 모델 · 모노레포 3종. 인터랙티브 HTML + PNG + 사양 JSON, 노드마다 레포 근거(`SRC`)
 - [데이터 모델 관계도 (ERD)](architecture/erd.md)
 - [AI 파이프라인 명세](architecture/ai-pipeline.md)
 - [RAG 파이프라인 설계](architecture/rag-pipeline.md) — 6-Layer

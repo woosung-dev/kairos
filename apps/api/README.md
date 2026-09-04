@@ -58,13 +58,20 @@ flowchart TD
 ## 구조
 
 ```
-src/
-├── main.py            FastAPI app + 라우터 조립
-├── core/              config(get_settings) · lifespan
-├── common/            visibility · pagination · prompts · r2 · fk_guard · audit/promote
-├── services/          외부 API wrapper (transcription · ai_processing · ai_resilience)
-└── <domain>/          router · service · repository · schemas · models · dependencies · exceptions
-                       (+ cross-domain 이 필요한 도메인만 pipeline_service.py)
+apps/api/
+├── src/
+│   ├── main.py            FastAPI app + 라우터 조립 + /health · /ready 프로브
+│   ├── core/              config(get_settings) · lifespan
+│   ├── common/            visibility · pagination · prompts · r2 · fk_guard · audit/promote (audit_router 포함)
+│   ├── services/          외부 API wrapper (transcription · chunked_transcription · ai_processing · ai_resilience)
+│   └── <domain>/          router · service · repository · schemas · models · dependencies · exceptions
+│                          (+ cross-domain 오케스트레이터가 필요한 5 도메인만 pipeline_service.py —
+│                           meetings · notes · rag · memory · integrations)
+├── alembic/               마이그레이션 26 리비전. Better Auth `auth_*` 5 테이블 DDL 도 여기서 적용 (ADR-031 D4)
+├── scripts/               export_openapi.py(계약 생성) · reindex_vectors.py · r2_cleanup.py · 벤치/시드 스크립트
+├── tests/                 pytest 124 파일 — integration(testcontainers 실 PostgreSQL) · architecture(규칙 게이트)
+├── Dockerfile             multi-stage — uv 0.10.4 builder → python:3.12-slim + ffmpeg 런타임 (약 735MB, ADR-028 D9)
+└── docker-entrypoint.sh   role 분기 — migrate(one-shot) / api
 ```
 
 ### 도메인 모듈 (14)
@@ -88,6 +95,17 @@ src/
 
 전체 트리는 [`docs/architecture/directory-map.md`](../../docs/architecture/directory-map.md),
 모듈별 상세 책임은 [`CONTEXT.md`](CONTEXT.md) §4.
+배포 토폴로지 안에서 이 앱이 차지하는 자리(컨테이너 · 포트 · 외부 API)와 테이블 31개의 그룹 지도는
+[`docs/architecture/diagrams/`](../../docs/architecture/diagrams/README.md) 의 인터랙티브 다이어그램.
+
+### admin 엔드포인트 — 별도 admin 앱은 없다
+
+| 경로 | 인증 | 용도 |
+|---|---|---|
+| `POST /api/v1/admin/memory/r2-cleanup` | `CRON_SECRET_TOKEN` (`verify_cron_token`) | 음성 메모 R2 객체 30일 정리 (`memory/admin_router.py`). 정기 호출 주체는 레포 안에 없다 — GitHub Actions `r2-cleanup.yml` 은 `uploads/` 정리용 `scripts/r2_cleanup.py` 를 직접 실행한다 |
+| `GET /api/v1/workspaces/{workspace_id}/audit/promotions` | workspace admin/owner (`require_admin`) | promote 감사 trail 조회 — Settings 의 Audit 탭 (`common/audit_router.py`) |
+
+FE 관리 화면은 `apps/web` 의 `(app)/admin/recall-metrics` 한 페이지(founder 계정 전용, `GET .../memory/metrics` 폴링)뿐이다.
 
 ## 환경변수
 
