@@ -139,20 +139,21 @@ flowchart LR
   L1 -->|HIT ~50ms| OUT["답변"]
   L1 -->|MISS| L2["L2<br/>Query<br/>Processing"]
   L2 --> L3["L3<br/>Hybrid Search<br/>pg_trgm + pgvector"]
-  L3 --> L4["L4<br/>Re-ranking"]
+  L3 --> L4["L4<br/>Rank Fusion<br/>RRF · k=60"]
   L4 --> L5["L5<br/>Generation<br/>Gemini"]
   L5 --> L6["L6<br/>Cache Store"]
   L6 --> OUT
 ```
 
-하이브리드 검색·계층적 청킹·Semantic Cache 설계는
+현재 구현의 정본은 [`apps/api/src/rag/CONTEXT.md`](apps/api/src/rag/CONTEXT.md), 하이브리드 검색·계층적 청킹·
+Semantic Cache와 미구현 Phase 4 후보까지 포함한 고도화 설계는
 [`docs/architecture/rag-pipeline.md`](docs/architecture/rag-pipeline.md).
 
 ### 데이터 모델
 
 DB 는 하나지만 **소유자가 둘**이다 — alembic 이 관리하는 SQLModel 26 테이블과, Better Auth 런타임(web)이 읽고 쓰는
-`auth_*` 5 테이블(DDL 만 alembic 이 CLI 산출물 원문으로 적용, ADR-031). 콘텐츠 테이블은 전부 `workspace_id` 를 갖고
-Repository 의 WHERE 와 composite FK `(workspace_id, secondary_id)` 가 테넌트 격리를 강제한다 (불변식 I-9).
+`auth_*` 5 테이블(DDL 만 alembic 이 CLI 산출물 원문으로 적용, ADR-031). 워크스페이스 소속 콘텐츠는 `workspace_id` 를 갖고,
+Repository WHERE와 cross-workspace 참조의 composite FK `(workspace_id, secondary_id)`가 테넌트 격리를 강제한다 (불변식 I-9).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/architecture/diagrams/data-model.dark.png">
@@ -295,9 +296,11 @@ kairos/
 └── mise.toml                툴체인 핀 + task 29개 (단일 진입점)
 ```
 
-**admin 앱은 없다.** 관리 화면은 `apps/web` 의 `(app)/admin/recall-metrics` 한 페이지(founder 계정 전용)이고,
-BE 쪽은 `memory/admin_router.py`(`CRON_SECRET_TOKEN` 인증, 음성 메모 R2 30일 정리) · `common/audit_router.py`(workspace
-admin/owner 전용 promote 감사 조회)가 맡는다. `packages/` 도 없다 — 같은 언어 소비자가 둘이 될 때만 만든다 (ADR-027 D5).
+**admin 앱은 없다.** `apps/web` 의 `(app)/admin/recall-metrics` 한 페이지가
+`NEXT_PUBLIC_FOUNDER_USER_ID`로 founder 표시 게이트를 둔다. 이 값은 클라이언트 공개 빌드 인자이므로 인가 경계가 아니다 —
+데이터 API `GET .../memory/metrics`의 실제 권한은 workspace `viewer+`다. 별도 관리 표면은
+`memory/admin_router.py`(`CRON_SECRET_TOKEN`, R2 30일 정리)와 `common/audit_router.py`(workspace admin/owner,
+promote 감사 조회)다. `packages/`도 없다 — 같은 언어 소비자가 둘이 될 때만 만든다 (ADR-027 D5).
 
 계약은 한 방향으로만 흐른다: `app.openapi()` → `contracts/openapi/v1/openapi.json` → openapi-typescript →
 `apps/web/src/types/api.gen.ts`. 게이트는 CI(`ci-required`)와 로컬(`mise run ci-local`)이 같은 명령을 돈다.

@@ -32,7 +32,7 @@ src/
 │   ├── (auth)/    sign-in / sign-up (Better Auth, ADR-031)
 │   ├── (app)/     인증 영역 — dashboard · projects · meetings · notes · inbox
 │   │              · memory · search · actions · new · settings
-│   │              · admin/recall-metrics — founder 계정 전용, **유일한 admin 화면 (별도 admin 앱 없음)**
+│   │              · admin/recall-metrics — founder 표시 게이트, **유일한 admin 화면 (별도 admin 앱 없음)**
 │   ├── api/auth/[...all]/route.ts   Better Auth 핸들러 — 이 앱의 유일한 route handler. JWKS(`/api/auth/jwks`)도 여기서 서빙
 │   └── invite/    초대 수락 (그룹 밖 public 라우트)
 ├── components/
@@ -52,6 +52,9 @@ src/
 **barrel `index.ts` 를 두지 않는다** (현재 0개, 예외 없음). Next.js 는 barrel import 를 빌드 비용으로
 취급하고, feature 경계는 F-9 + eslint `no-restricted-imports` 가 이미 강제한다.
 **`server/` 폴더도 없다** — 데이터 페칭은 100% 클라이언트 TanStack Query 다.
+
+`admin/recall-metrics`의 founder 판정은 `NEXT_PUBLIC_FOUNDER_USER_ID`를 비교하는 **FE 표시 게이트**다.
+클라이언트 공개 값이므로 인가 경계가 아니며, 실제 `GET .../memory/metrics` API는 workspace `viewer+`를 허용한다.
 
 ### features ↔ BE 도메인 매핑
 

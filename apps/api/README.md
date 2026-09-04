@@ -19,7 +19,7 @@ mise run contracts    # OpenAPI 계약 + FE 타입 재생성
 [`docs/development/secrets.md`](../../docs/development/secrets.md), 셋업 전체는
 [`docs/development/getting-started.md`](../../docs/development/getting-started.md).
 
-API 문서는 개발 서버 기동 후 `http://localhost:8000/docs` (Swagger UI).
+API 문서는 개발 서버 기동 후 `http://localhost:8000/api/v1/docs` (Swagger UI).
 
 ## 레이어
 
@@ -98,14 +98,13 @@ apps/api/
 배포 토폴로지 안에서 이 앱이 차지하는 자리(컨테이너 · 포트 · 외부 API)와 테이블 31개의 그룹 지도는
 [`docs/architecture/diagrams/`](../../docs/architecture/diagrams/README.md) 의 인터랙티브 다이어그램.
 
-### admin 엔드포인트 — 별도 admin 앱은 없다
+### 관리 표면 — 별도 admin 앱은 없다
 
 | 경로 | 인증 | 용도 |
 |---|---|---|
+| `GET /api/v1/workspaces/{workspace_id}/memory/metrics` | workspace viewer 이상 (`require_viewer`) | FE `admin/recall-metrics` 데이터. founder 제한은 `NEXT_PUBLIC_FOUNDER_USER_ID`를 비교하는 FE 표시 게이트이며 API 인가 경계가 아니다 |
 | `POST /api/v1/admin/memory/r2-cleanup` | `CRON_SECRET_TOKEN` (`verify_cron_token`) | 음성 메모 R2 객체 30일 정리 (`memory/admin_router.py`). 정기 호출 주체는 레포 안에 없다 — GitHub Actions `r2-cleanup.yml` 은 `uploads/` 정리용 `scripts/r2_cleanup.py` 를 직접 실행한다 |
 | `GET /api/v1/workspaces/{workspace_id}/audit/promotions` | workspace admin/owner (`require_admin`) | promote 감사 trail 조회 — Settings 의 Audit 탭 (`common/audit_router.py`) |
-
-FE 관리 화면은 `apps/web` 의 `(app)/admin/recall-metrics` 한 페이지(founder 계정 전용, `GET .../memory/metrics` 폴링)뿐이다.
 
 ## 환경변수
 
