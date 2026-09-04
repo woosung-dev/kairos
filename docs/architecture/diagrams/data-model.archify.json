@@ -1,0 +1,551 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Kairos 데이터 모델 (31 테이블)",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/woosung-dev/kairos",
+      "revision": "278d4be248b6383ee18344912d9eb41d270e150a"
+    },
+    "legend": {
+      "entries": {
+        "database": {
+          "label": "테이블 그룹 (대표 테이블 + 위성 테이블)"
+        }
+      }
+    },
+    "views": [
+      {
+        "id": "tenant",
+        "label": "테넌트 격리",
+        "focus": [
+          "auth_tables",
+          "users",
+          "workspaces",
+          "projects",
+          "meetings"
+        ],
+        "note": "auth_user → users → workspaces 가 격리 루트. 이후 모든 콘텐츠는 workspace_id 를 가진다 (I-9)."
+      },
+      {
+        "id": "content",
+        "label": "콘텐츠",
+        "focus": [
+          "projects",
+          "meetings",
+          "notes",
+          "action_items",
+          "inbox_items"
+        ],
+        "note": "Meeting ↔ Project 는 N:M, ActionItem 의 부모는 nullable, Inbox 는 폴리모픽 source."
+      },
+      {
+        "id": "vector",
+        "label": "벡터 검색",
+        "focus": [
+          "meetings",
+          "notes",
+          "integrations",
+          "embeddings"
+        ],
+        "note": "embedding_chunks 는 source_type · source_id 로 meeting · note · action · inbox · memory · external_document 를 폴리모픽 참조. halfvec(1536) + HNSW."
+      },
+      {
+        "id": "audit",
+        "label": "감사 · promote",
+        "focus": [
+          "users",
+          "memory",
+          "audit"
+        ],
+        "note": "promote = 복제 + tombstone. memory 는 promotion_audit, meeting·note·inbox·action 은 item_promotion_audit (I-18)."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "auth_tables",
+      "type": "database",
+      "label": "auth_* (Better Auth)",
+      "sublabel": "user · session · account · verification · jwks",
+      "tag": "web 소유 · 5",
+      "pos": [
+        30,
+        70
+      ],
+      "size": [
+        260,
+        60
+      ],
+      "sources": [
+        {
+          "path": "apps/api/alembic/versions/c1a7e0b5d3f2_add_better_auth_tables.py",
+          "label": "CLI 산출물 DDL"
+        },
+        {
+          "path": "apps/web/src/lib/auth.ts",
+          "line": 15,
+          "label": "modelName 오버라이드"
+        }
+      ]
+    },
+    {
+      "id": "inbox_items",
+      "type": "database",
+      "label": "inbox_items",
+      "sublabel": "source_type · source_id 폴리모픽",
+      "tag": "ai_confidence · 1",
+      "pos": [
+        380,
+        70
+      ],
+      "size": [
+        200,
+        60
+      ],
+      "sources": [
+        {
+          "path": "apps/api/src/inbox/models.py",
+          "line": 10,
+          "label": "InboxItem"
+        }
+      ]
+    },
+    {
+      "id": "notes",
+      "type": "database",
+      "label": "notes",
+      "sublabel": "Tiptap JSON · project_id nullable",
+      "tag": "1",
+      "pos": [
+        1060,
+        70
+      ],
+      "size": [
+        200,
+        60
+      ],
+      "sources": [
+        {
+          "path": "apps/api/src/notes/models.py",
+          "line": 10,
+          "label": "Note"
+        }
+      ]
+    },
+    {
+      "id": "users",
+      "type": "database",
+      "label": "users",
+      "sublabel": "auth_user_id · onboarding_step 0~4",
+      "tag": "+ feedback_entries · 2",
+      "pos": [
+        60,
+        210
+      ],
+      "size": [
+        200,
+        60
+      ],
+      "sources": [
+        {
+          "path": "apps/api/src/auth/models.py",
+          "line": 10,
+          "label": "User"
+        },
+        {
+          "path": "apps/api/src/feedback/models.py",
+          "line": 9,
+          "label": "FeedbackEntry"
+        }
+      ]
+    },
+    {
+      "id": "workspaces",
+      "type": "database",
+      "label": "workspaces",
+      "sublabel": "+ workspace_members",
+      "tag": "+ workspace_invites · personal|team",
+      "pos": [
+        380,
+        210
+      ],
+      "size": [
+        200,
+        60
+      ],
+      "sources": [
+        {
+          "path": "apps/api/src/workspaces/models.py",
+          "line": 11,
+          "label": "Workspace"
+        }
+      ]
+    },
+    {
+      "id": "projects",
+      "type": "database",
+      "label": "projects",
+      "sublabel": "+ meeting_project_links (N:M)",
+      "tag": "+ project_members · visibility 3종",
+      "pos": [
+        700,
+        210
+      ],
+      "size": [
+        200,
+        60
+      ],
+      "sources": [
+        {
+          "path": "apps/api/src/projects/models.py",
+          "line": 10,
+          "label": "Project"
+        }
+      ]
+    },
+    {
+      "id": "audit",
+      "type": "database",
+      "label": "promotion_audit",
+      "sublabel": "+ item_promotion_audit (4 도메인)",
+      "tag": "I-18 · 2",
+      "pos": [
+        60,
+        350
+      ],
+      "size": [
+        200,
+        60
+      ],
+      "sources": [
+        {
+          "path": "apps/api/src/memory/models.py",
+          "line": 102,
+          "label": "PromotionAudit"
+        },
+        {
+          "path": "apps/api/src/common/promote_models.py",
+          "line": 32,
+          "label": "ItemPromotionAudit"
+        }
+      ]
+    },
+    {
+      "id": "memory",
+      "type": "database",
+      "label": "memory_items",
+      "sublabel": "+ memory_ai_calls · memory_events",
+      "tag": "+ query_embedding_cache · 4",
+      "pos": [
+        380,
+        350
+      ],
+      "size": [
+        200,
+        60
+      ],
+      "sources": [
+        {
+          "path": "apps/api/src/memory/models.py",
+          "line": 28,
+          "label": "MemoryItem"
+        }
+      ]
+    },
+    {
+      "id": "meetings",
+      "type": "database",
+      "label": "meetings",
+      "sublabel": "+ transcript_segments",
+      "tag": "+ meeting_summaries · status 5",
+      "pos": [
+        700,
+        350
+      ],
+      "size": [
+        200,
+        60
+      ],
+      "sources": [
+        {
+          "path": "apps/api/src/meetings/models.py",
+          "line": 10,
+          "label": "Meeting"
+        }
+      ]
+    },
+    {
+      "id": "embeddings",
+      "type": "database",
+      "label": "embedding_chunks",
+      "sublabel": "halfvec(1536) · HNSW · chunk_level",
+      "tag": "+ semantic_caches · pgvector",
+      "pos": [
+        1060,
+        350
+      ],
+      "size": [
+        200,
+        60
+      ],
+      "sources": [
+        {
+          "path": "apps/api/src/embeddings/models.py",
+          "line": 18,
+          "label": "EmbeddingChunk"
+        }
+      ]
+    },
+    {
+      "id": "action_items",
+      "type": "database",
+      "label": "action_items",
+      "sublabel": "meeting_id · project_id nullable",
+      "tag": "1",
+      "pos": [
+        700,
+        490
+      ],
+      "size": [
+        200,
+        60
+      ],
+      "sources": [
+        {
+          "path": "apps/api/src/actions/models.py",
+          "line": 10,
+          "label": "ActionItem"
+        }
+      ]
+    },
+    {
+      "id": "integrations",
+      "type": "database",
+      "label": "integration_connections",
+      "sublabel": "+ external_documents · sync_runs",
+      "tag": "+ oauth_states · ADR-026 · 4",
+      "pos": [
+        1060,
+        490
+      ],
+      "size": [
+        200,
+        60
+      ],
+      "sources": [
+        {
+          "path": "apps/api/src/integrations/models.py",
+          "line": 11,
+          "label": "IntegrationConnection"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "kairos-db · PostgreSQL 17 + pgvector 0.8 — alembic 26 테이블 + Better Auth 5 테이블",
+      "wraps": [
+        "auth_tables",
+        "inbox_items",
+        "notes",
+        "users",
+        "workspaces",
+        "projects",
+        "audit",
+        "memory",
+        "meetings",
+        "embeddings",
+        "action_items",
+        "integrations"
+      ],
+      "pad": 22
+    },
+    {
+      "kind": "security-group",
+      "label": "workspace_id 격리 (I-9) — Repository WHERE 강제 + composite FK (workspace_id, secondary_id)",
+      "wraps": [
+        "inbox_items",
+        "notes",
+        "workspaces",
+        "projects",
+        "memory",
+        "meetings",
+        "embeddings",
+        "action_items",
+        "integrations"
+      ],
+      "pad": 14
+    }
+  ],
+  "connections": [
+    {
+      "id": "auth-users",
+      "from": "auth_tables",
+      "to": "users",
+      "label": "auth_user_id 매핑 (FK 없음)",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        160,
+        170
+      ]
+    },
+    {
+      "id": "users-workspaces",
+      "from": "users",
+      "to": "workspaces",
+      "label": "owner · members",
+      "variant": "emphasis"
+    },
+    {
+      "id": "users-audit",
+      "from": "users",
+      "to": "audit",
+      "label": "promoted_by_user_id",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        160,
+        310
+      ]
+    },
+    {
+      "id": "ws-inbox",
+      "from": "workspaces",
+      "to": "inbox_items",
+      "label": "workspace_id",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "ws-memory",
+      "from": "workspaces",
+      "to": "memory",
+      "label": "workspace_id · user_id",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        480,
+        310
+      ]
+    },
+    {
+      "id": "ws-projects",
+      "from": "workspaces",
+      "to": "projects",
+      "label": "workspace_id",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ws-meetings",
+      "from": "workspaces",
+      "to": "meetings",
+      "label": "workspace_id",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelSegment": 1
+    },
+    {
+      "id": "projects-meetings",
+      "from": "projects",
+      "to": "meetings",
+      "label": "meeting_project_links N:M",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        800,
+        310
+      ]
+    },
+    {
+      "id": "projects-notes",
+      "from": "projects",
+      "to": "notes",
+      "label": "project_id",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelSegment": 1
+    },
+    {
+      "id": "meetings-actions",
+      "from": "meetings",
+      "to": "action_items",
+      "label": "meeting_id",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        800,
+        450
+      ]
+    },
+    {
+      "id": "meetings-embeddings",
+      "from": "meetings",
+      "to": "embeddings",
+      "label": "source_type=meeting",
+      "variant": "emphasis"
+    },
+    {
+      "id": "notes-embeddings",
+      "from": "notes",
+      "to": "embeddings",
+      "label": "source_type=note",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        1160,
+        240
+      ]
+    },
+    {
+      "id": "integrations-embeddings",
+      "from": "integrations",
+      "to": "embeddings",
+      "label": "source_type=external_document",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "memory-audit",
+      "from": "memory",
+      "to": "audit",
+      "label": "memory_id",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "격리",
+      "items": [
+        "콘텐츠 테이블은 모두 workspace_id 를 갖고 Repository WHERE 가 강제한다 (I-9)",
+        "cross-workspace 참조는 composite FK (workspace_id, secondary_id) 로 DB 단에서 차단",
+        "visibility(public/draft/private) 판정은 common/visibility.py 단일 SSOT — arch gate 강제"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "벡터",
+      "items": [
+        "embedding_chunks.embedding = halfvec(1536) + HNSW — Vector(1536) · ivfflat 금지 (I-20)",
+        "source_type ∈ meeting · note · action · inbox · memory · external_document — 검색은 chunk_level=2 만",
+        "semantic_caches TTL 7일 · 유사도 ≥0.93 (I-8) · memory_query_embedding_cache 는 exact-match"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "소유권 · 감사",
+      "items": [
+        "auth_* 5 테이블은 web 의 Better Auth 가 읽고 쓴다 — DDL 만 alembic 이 적용 (ADR-031 D4)",
+        "users.auth_user_id ↔ auth_user.id 는 문자열 매핑 (DB FK 없음) — JWT sub 와 조인되는 키",
+        "promote = 복제 + tombstone (I-18) — memory 는 promotion_audit, 4 도메인은 item_promotion_audit"
+      ]
+    }
+  ]
+}

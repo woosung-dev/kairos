@@ -82,24 +82,27 @@ PaaS 3곳(Vercel · Cloud Run · Neon)에 흩어져 있던 배포를 **오라클
 호스트에 열린 인바운드 포트는 **SSH 22 하나뿐**이고, 모든 트래픽은 Cloudflare Tunnel 의 아웃바운드
 커넥션을 타고 들어온다.
 
-```mermaid
-graph LR
-  U["사용자"] -->|HTTPS| CF["Cloudflare<br/>Tunnel"]
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture/diagrams/system-architecture.dark.png">
+  <img src="docs/architecture/diagrams/system-architecture.light.png" alt="Kairos 시스템 아키텍처 — Oracle A1 단일 VM 위 컨테이너 5종과 외부 API 4곳" width="900">
+</picture>
 
-  subgraph OCI["Oracle Cloud A1 · 단일 VM (arm64)"]
-    CFD["cloudflared"] --> WEB["web :3100<br/>Next.js 16 standalone"]
-    CFD --> API["api :8200<br/>FastAPI · uvicorn"]
-    WEB -->|"JWKS (내부망)"| API
-    API --> DB[("db :5434<br/>PG17 + pgvector 0.8")]
-    MIG["migrate<br/>one-shot alembic"] -.->|"기동 전 1회"| DB
-  end
+| 컨테이너 | 역할 | 호스트 포트 | 자원 캡 |
+|---|---|---|---|
+| `kairos-cloudflared` | Cloudflare Tunnel 커넥터 — 아웃바운드 연결만, `network_mode: host` | — | 128m |
+| `kairos-web` | Next.js 16 standalone + **Better Auth**(토큰 발급 · `auth_*` 테이블 소유) | 127.0.0.1:3100 | 768m |
+| `kairos-api` | FastAPI · uvicorn 워커 1 — 내부망 JWKS 로 EdDSA 서명만 검증, 세션 저장소 없음 | 127.0.0.1:8200 | 1536m · cpus 1.5 |
+| `kairos-db` | PostgreSQL 17 + pgvector 0.8 — 31 테이블 (alembic 26 + Better Auth 5) | 127.0.0.1:5434 | 1g |
+| `kairos-migrate` | alembic one-shot — 실패하면 api/web 이 기동되지 않는다 (crash-loop 방지) | — | 512m |
 
-  CF --> CFD
+외부 의존은 넷이다 — Cloudflare R2(오디오 원본) · Gemini `gemini-3.1-flash-lite`(요약 · 분류 · RAG 생성) ·
+OpenAI(Whisper STT · `text-embedding-3-small`) · Google(로그인 OAuth 와 Drive API 는 **별도 클라이언트**).
+런타임 로컬 ML 추론은 0건이라 ARM 이전에 리스크가 없었다.
 
-  API --> R2[("Cloudflare R2<br/>오디오 원본")]
-  API --> GEM["Gemini<br/>3.1-flash-lite"]
-  API --> WSP["Whisper STT<br/>+ Embedding"]
-```
+> **인터랙티브 버전** — [브라우저에서 바로 열기](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/system-architecture.html) (raw.githack CDN 경유) 또는
+> [`docs/architecture/diagrams/system-architecture.html`](docs/architecture/diagrams/system-architecture.html) 을 클론 후 열기 —
+> 패닝 · 검색 · 가이드 뷰 4개 · 노드별 소스 파일 근거. 사양은 같은 폴더의 `*.archify.json`,
+> 다이어그램 3종의 갱신 절차는 [`docs/architecture/diagrams/README.md`](docs/architecture/diagrams/README.md).
 
 컨테이너별 자원 캡·포트 배정 근거는 [ADR-028](docs/adr/028-oci-selfhosting.md),
 운영 런북은 [`deploy/oci/README.md`](deploy/oci/README.md).
@@ -136,14 +139,42 @@ flowchart LR
   L1 -->|HIT ~50ms| OUT["답변"]
   L1 -->|MISS| L2["L2<br/>Query<br/>Processing"]
   L2 --> L3["L3<br/>Hybrid Search<br/>pg_trgm + pgvector"]
-  L3 --> L4["L4<br/>Re-ranking"]
+  L3 --> L4["L4<br/>Rank Fusion<br/>RRF · k=60"]
   L4 --> L5["L5<br/>Generation<br/>Gemini"]
   L5 --> L6["L6<br/>Cache Store"]
   L6 --> OUT
 ```
 
-하이브리드 검색·계층적 청킹·Semantic Cache 설계는
+현재 구현의 정본은 [`apps/api/src/rag/CONTEXT.md`](apps/api/src/rag/CONTEXT.md), 하이브리드 검색·계층적 청킹·
+Semantic Cache와 미구현 Phase 4 후보까지 포함한 고도화 설계는
 [`docs/architecture/rag-pipeline.md`](docs/architecture/rag-pipeline.md).
+
+### 데이터 모델
+
+DB 는 하나지만 **소유자가 둘**이다 — alembic 이 관리하는 SQLModel 26 테이블과, Better Auth 런타임(web)이 읽고 쓰는
+`auth_*` 5 테이블(DDL 만 alembic 이 CLI 산출물 원문으로 적용, ADR-031). 워크스페이스 소속 콘텐츠는 `workspace_id` 를 갖고,
+Repository WHERE와 cross-workspace 참조의 composite FK `(workspace_id, secondary_id)`가 테넌트 격리를 강제한다 (불변식 I-9).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture/diagrams/data-model.dark.png">
+  <img src="docs/architecture/diagrams/data-model.light.png" alt="Kairos 데이터 모델 — 31 테이블을 12 그룹으로, workspace_id 격리 경계 표시" width="900">
+</picture>
+
+| 그룹 | 테이블 | 비고 |
+|---|---|---|
+| 인증 (Better Auth) | `auth_user` `auth_session` `auth_account` `auth_verification` `auth_jwks` | web 소유 · `users.auth_user_id` 와 문자열 매핑 (DB FK 없음) |
+| 사용자 | `users` `feedback_entries` | `onboarding_step` 0~4 · 피드백은 user-level (workspace nullable) |
+| 워크스페이스 — 격리 루트 | `workspaces` `workspace_members` `workspace_invites` | personal / team · role owner · admin · member · viewer |
+| 프로젝트 | `projects` `project_members` `meeting_project_links` | visibility public / draft / private · Meeting 과 N:M |
+| 회의 | `meetings` `transcript_segments` `meeting_summaries` | status uploading → transcribing → summarizing → completed / failed |
+| 노트 · 액션 · Inbox | `notes` `action_items` `inbox_items` | 부모 FK nullable · Inbox 는 폴리모픽 `source_type` |
+| 메모리 (Recall wedge) | `memory_items` `memory_ai_calls` `memory_events` `memory_query_embedding_cache` | text / voice capture → distill → promote |
+| 벡터 | `embedding_chunks` `semantic_caches` | `halfvec(1536)` + HNSW · 폴리모픽 source 6종 · 캐시 TTL 7일 (I-7 · I-8 · I-20) |
+| 외부 소스 (ADR-026) | `integration_connections` `external_documents` `integration_sync_runs` `integration_oauth_states` | Google Drive OAuth · composite FK 로 workspace 고정 |
+| 감사 | `promotion_audit` `item_promotion_audit` | promote = 복제 + tombstone (I-18) |
+
+컬럼 단위 ERD 는 [`docs/architecture/erd.md`](docs/architecture/erd.md), 인터랙티브 버전은
+[브라우저에서 바로 열기](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/data-model.html) / [`docs/architecture/diagrams/data-model.html`](docs/architecture/diagrams/data-model.html).
 
 ---
 
@@ -158,7 +189,7 @@ flowchart LR
 | **AI** | Gemini `gemini-3.1-flash-lite` (요약·생성) · OpenAI Whisper (STT) · `text-embedding-3-small` 1536d |
 | **Storage** | Cloudflare R2 (presigned URL · aioboto3) |
 | **Infra** | Oracle Cloud A1 단일 VM (arm64) · Docker Compose · Cloudflare Tunnel |
-| **Toolchain** | mise (툴체인 핀 + 28 task) · uv 0.10.4 · pnpm 8.15.9 · Node 22 |
+| **Toolchain** | mise (툴체인 핀 + 29 task) · uv 0.10.4 · pnpm 8.15.9 · Node 22 |
 | **Test** | pytest + testcontainers(실 PostgreSQL) · vitest · Playwright (chromium / public-only / team) |
 
 ---
@@ -166,7 +197,7 @@ flowchart LR
 ## 5. 기술적 의사결정
 
 이 프로젝트에서 실제로 판단이 갈렸던 지점들이다. 전체 결정 기록은
-[`docs/adr/`](docs/adr/) 에 ADR 30건으로 남아 있다.
+[`docs/adr/`](docs/adr/) 에 ADR 28건으로 남아 있다 (번호 갭의 사유는 [`000-adr-gap-log.md`](docs/adr/000-adr-gap-log.md)).
 
 ### ① PaaS 3곳 → 단일 VM 셀프호스팅 · [ADR-028](docs/adr/028-oci-selfhosting.md)
 
@@ -239,28 +270,45 @@ CI 의 `contract-check` job 이 이 게이트를 그대로 돌린다. 스키마�
 
 ## 6. 모노레포 구조
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture/diagrams/repo-structure.dark.png">
+  <img src="docs/architecture/diagrams/repo-structure.light.png" alt="Kairos 모노레포 — 앱 2개, 계약 파이프라인, mise 게이트, 배포 경로" width="900">
+</picture>
+
 ```
 kairos/
-├── apps/
-│   ├── api/          FastAPI — 도메인 14 + common/core/services  → README.md
-│   └── web/          Next.js 16 — FSD features 17               → README.md
-├── contracts/        OpenAPI 계약 (SSOT — api.gen.ts 의 원본)
-├── deploy/oci/       docker-compose.prod.yml + 서버 운영 런북
+├── apps/                    ★ 배포 단위 — Dockerfile 을 가진 둘 (ADR-027 D1). 각 앱이 AGENTS.md + CONTEXT.md 를 동봉 (ADR-029)
+│   ├── api/                 FastAPI — src/<domain> 14 + common · core · services / alembic 26 리비전 / pytest 124 파일 → README.md
+│   └── web/                 Next.js 16 — FSD features 17 / Better Auth 핸들러 + proxy.ts / vitest 31 · e2e 44 → README.md
+├── contracts/openapi/v1/    OpenAPI 계약 — 생성물 (api.gen.ts 의 원본, 수정 금지)
+├── deploy/oci/              docker-compose.prod.yml + initdb + 서버 운영 런북
 ├── docs/
-│   ├── adr/          아키텍처 결정 기록 30건
-│   ├── architecture/ 파이프라인 · ERD · 디렉터리 맵
-│   ├── development/  셋업 · 테스트 · 시크릿 · 마이그레이션
-│   ├── operations/   배포 · 런북
-│   └── requirements/ PRD · 페르소나 · 경쟁 분석
-├── CONTEXT-MAP.md    도메인 헌법 — 엔티티 · 경계 · 불변식 I-1~I-22
-├── AGENTS.md         개발 원칙 (AI 에이전트 + 사람 공통)
-├── DESIGN.md         디자인 시스템 정본
-└── mise.toml         툴체인 핀 + task 28개 (단일 진입점)
+│   ├── adr/                 아키텍처 결정 기록 28건 (번호 갭 사유는 000-adr-gap-log.md)
+│   ├── architecture/        파이프라인 · ERD · 디렉터리 맵 · diagrams/ (archify 인터랙티브 다이어그램 3종)
+│   ├── development/         셋업 · 테스트 · 시크릿 · 마이그레이션
+│   ├── operations/          배포 · 런북
+│   └── requirements/        PRD · 페르소나 · 경쟁 분석
+├── scripts/                 verify-prod.sh
+├── .github/workflows/       test.yml (ci-required 게이트) · nightly-e2e · r2-cleanup — 배포 워크플로는 없다
+├── CONTEXT-MAP.md           도메인 헌법 — 엔티티 · 경계 · 불변식 I-1~I-22
+├── AGENTS.md                개발 원칙 (AI 에이전트 + 사람 공통)
+├── DESIGN.md                디자인 시스템 정본
+└── mise.toml                툴체인 핀 + task 29개 (단일 진입점)
 ```
+
+**admin 앱은 없다.** `apps/web` 의 `(app)/admin/recall-metrics` 한 페이지가
+`NEXT_PUBLIC_FOUNDER_USER_ID`로 founder 표시 게이트를 둔다. 이 값은 클라이언트 공개 빌드 인자이므로 인가 경계가 아니다 —
+데이터 API `GET .../memory/metrics`의 실제 권한은 workspace `viewer+`다. 별도 관리 표면은
+`memory/admin_router.py`(`CRON_SECRET_TOKEN`, R2 30일 정리)와 `common/audit_router.py`(workspace admin/owner,
+promote 감사 조회)다. `packages/`도 없다 — 같은 언어 소비자가 둘이 될 때만 만든다 (ADR-027 D5).
+
+계약은 한 방향으로만 흐른다: `app.openapi()` → `contracts/openapi/v1/openapi.json` → openapi-typescript →
+`apps/web/src/types/api.gen.ts`. 게이트는 CI(`ci-required`)와 로컬(`mise run ci-local`)이 같은 명령을 돈다.
 
 - 백엔드 상세 → [`apps/api/README.md`](apps/api/README.md)
 - 프론트엔드 상세 → [`apps/web/README.md`](apps/web/README.md)
 - 전체 트리 → [`docs/architecture/directory-map.md`](docs/architecture/directory-map.md)
+- 인터랙티브 다이어그램 3종 (사양 · HTML · PNG) → [`docs/architecture/diagrams/README.md`](docs/architecture/diagrams/README.md) · 이 다이어그램 [브라우저에서 바로 열기](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/repo-structure.html)
 
 ---
 
@@ -368,11 +416,12 @@ mise run deploy-rollback     # 문제 시 — 이미지 태그 되돌리기 (RTO
 | [`CONTEXT-MAP.md`](CONTEXT-MAP.md) | 도메인 헌법 — 엔티티 · 경계 · 불변식 I-1~I-22 |
 | [`AGENTS.md`](AGENTS.md) | 개발 원칙 + Atomic Update 라우팅 |
 | [`DESIGN.md`](DESIGN.md) | 디자인 시스템 정본 (타이포 · 컬러 · 모션) |
-| [`docs/adr/`](docs/adr/) | 아키텍처 결정 기록 30건 |
+| [`docs/adr/`](docs/adr/) | 아키텍처 결정 기록 28건 |
 | [`docs/requirements/prd.md`](docs/requirements/prd.md) | PRD + Phase 로드맵 |
 | [`docs/architecture/ai-pipeline.md`](docs/architecture/ai-pipeline.md) | STT + Gemini 파이프라인 |
 | [`docs/architecture/rag-pipeline.md`](docs/architecture/rag-pipeline.md) | RAG 6-Layer 설계 |
 | [`docs/architecture/erd.md`](docs/architecture/erd.md) | 데이터 모델 (ERD) |
+| [`docs/architecture/diagrams/README.md`](docs/architecture/diagrams/README.md) | archify 인터랙티브 다이어그램 3종 — 시스템 · 데이터 모델 · 모노레포 (사양 JSON + HTML + PNG) |
 | [`docs/development/getting-started.md`](docs/development/getting-started.md) | 로컬 셋업 정본 |
 | [`docs/development/secrets.md`](docs/development/secrets.md) | 환경변수 전체 매트릭스 |
 | [`docs/development/testing.md`](docs/development/testing.md) | 테스트 게이트 ↔ CI job 대응표 |

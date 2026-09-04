@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Kairos 시스템 아키텍처",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/woosung-dev/kairos",
+      "revision": "278d4be248b6383ee18344912d9eb41d270e150a"
+    },
+    "legend": {
+      "entries": {
+        "frontend": { "label": "프론트엔드" },
+        "backend": { "label": "백엔드" },
+        "database": { "label": "데이터베이스" },
+        "security": { "label": "터널 커넥터" },
+        "external": { "label": "외부 API · 사용자" }
+      }
+    },
+    "views": [
+      { "id": "request-path", "label": "요청 경로", "focus": ["user", "cloudflared", "web", "api"], "note": "브라우저 → Cloudflare 엣지 → cloudflared(아웃바운드 터널) → web :3100 / api :8200. 호스트 인바운드 포트는 SSH 22 하나다." },
+      { "id": "auth", "label": "인증 (ADR-031)", "focus": ["web", "api", "db", "google_login"], "note": "토큰 발급은 web 의 Better Auth. api 는 compose 내부망 JWKS 로 EdDSA 서명만 검증하고 세션 저장소를 갖지 않는다." },
+      { "id": "ai-pipeline", "label": "AI 파이프라인", "focus": ["api", "r2", "gemini", "openai", "gdrive"], "note": "런타임 로컬 추론 0건 — STT·요약·임베딩은 전부 외부 API. 장기 작업은 BackgroundTasks + 202 + polling." },
+      { "id": "migrate", "label": "마이그레이션 · 상태", "focus": ["migrate", "db", "api", "web"], "note": "alembic 은 one-shot 컨테이너. 실패하면 api/web 이 기동되지 않아 crash-loop 대신 배포 실패로 드러난다 (ADR-028 D6)." }
+    ]
+  },
+  "components": [
+    { "id": "user", "type": "external", "label": "사용자 (브라우저)", "sublabel": "kairos.woosung.dev", "pos": [60, 70], "size": [200, 60] },
+    { "id": "google_login", "type": "external", "label": "Google OAuth", "sublabel": "로그인 OAuth 클라이언트", "tag": "Drive 와 분리", "pos": [700, 70], "size": [200, 60],
+      "sources": [{ "path": "apps/web/src/lib/auth.ts", "line": 15, "label": "socialProviders" }] },
+    { "id": "cloudflared", "type": "security", "label": "kairos-cloudflared", "sublabel": "터널 커넥터 · 아웃바운드만", "tag": "host 네트워크 · 128m", "pos": [60, 230], "size": [200, 60],
+      "sources": [{ "path": "deploy/oci/docker-compose.prod.yml", "line": 135, "label": "compose service" }] },
+    { "id": "web", "type": "frontend", "label": "kairos-web", "sublabel": "Next.js 16 · :3100 → 3000", "tag": "768m", "pos": [380, 230], "size": [200, 60],
+      "sources": [
+        { "path": "deploy/oci/docker-compose.prod.yml", "line": 103, "label": "compose service" },
+        { "path": "apps/web/Dockerfile", "label": "multi-stage build" },
+        { "path": "apps/web/src/lib/auth.ts", "line": 15, "label": "Better Auth 서버" }
+      ] },
+    { "id": "api", "type": "backend", "label": "kairos-api", "sublabel": "FastAPI · :8200 → 8000", "tag": "1536m · cpus 1.5 · 워커 1", "pos": [380, 360], "size": [200, 60],
+      "sources": [
+        { "path": "deploy/oci/docker-compose.prod.yml", "line": 66, "label": "compose service" },
+        { "path": "apps/api/src/main.py", "line": 76, "label": "FastAPI app" },
+        { "path": "apps/api/src/auth/dependencies.py", "line": 155, "label": "JWKS 검증" }
+      ] },
+    { "id": "db", "type": "database", "label": "kairos-db", "sublabel": "PG17 + pgvector 0.8 · :5434", "tag": "1g · 31 테이블", "pos": [700, 360], "size": [200, 60],
+      "sources": [
+        { "path": "deploy/oci/docker-compose.prod.yml", "line": 22, "label": "compose service" },
+        { "path": "deploy/oci/initdb/01-extensions.sql", "label": "vector · pg_trgm" }
+      ] },
+    { "id": "migrate", "type": "backend", "label": "kairos-migrate", "sublabel": "alembic one-shot", "tag": "restart: no · 기동 전 1회", "pos": [1020, 360], "size": [200, 60],
+      "sources": [
+        { "path": "deploy/oci/docker-compose.prod.yml", "line": 53, "label": "compose service" },
+        { "path": "apps/api/docker-entrypoint.sh", "line": 12, "label": "migrate role" }
+      ] },
+    { "id": "r2", "type": "external", "label": "Cloudflare R2", "sublabel": "오디오 원본 · presigned URL", "pos": [60, 540], "size": [200, 60],
+      "sources": [{ "path": "apps/api/src/common/r2.py", "line": 12, "label": "aioboto3 client" }] },
+    { "id": "gemini", "type": "external", "label": "Gemini", "sublabel": "gemini-3.1-flash-lite 고정", "tag": "ADR-019", "pos": [380, 540], "size": [200, 60],
+      "sources": [{ "path": "apps/api/src/services/ai_processing.py", "line": 70, "label": "genai client" }] },
+    { "id": "openai", "type": "external", "label": "OpenAI", "sublabel": "Whisper STT · 임베딩 1536d", "pos": [700, 540], "size": [200, 60],
+      "sources": [
+        { "path": "apps/api/src/services/transcription.py", "line": 137, "label": "whisper-1" },
+        { "path": "apps/api/src/embeddings/service.py", "line": 107, "label": "embedding batch" }
+      ] },
+    { "id": "gdrive", "type": "external", "label": "Google Drive API", "sublabel": "외부 문서 인제스트", "tag": "ADR-026", "pos": [1020, 540], "size": [200, 60],
+      "sources": [{ "path": "apps/api/src/integrations/drive_client.py", "line": 27, "label": "Drive v3 files" }] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Oracle Cloud A1 · truewords-oracle (arm64 · 공유 호스트 · 인바운드 SSH 22 만)", "wraps": ["cloudflared", "web", "api", "db", "migrate"], "pad": 22 },
+    { "kind": "security-group", "label": "docker compose `kairos` bridge 내부망 — publish 는 127.0.0.1 만", "wraps": ["web", "api", "db", "migrate"], "pad": 14 }
+  ],
+  "connections": [
+    { "id": "user-cloudflared", "from": "user", "to": "cloudflared", "label": "HTTPS · Cloudflare 엣지 경유", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "labelAt": [160, 152] },
+    { "id": "cloudflared-web", "from": "cloudflared", "to": "web", "label": "127.0.0.1:3100", "variant": "emphasis" },
+    { "id": "cloudflared-api", "from": "cloudflared", "to": "api", "label": "127.0.0.1:8200", "variant": "emphasis", "fromSide": "right", "toSide": "left", "labelSegment": 1 },
+    { "id": "api-jwks", "from": "api", "to": "web", "label": "JWKS 조회 (EdDSA)", "variant": "security", "fromSide": "top", "toSide": "bottom" },
+    { "id": "web-google", "from": "web", "to": "google_login", "label": "Google 로그인", "variant": "dashed", "fromSide": "right", "toSide": "left", "labelSegment": 1 },
+    { "id": "web-db", "from": "web", "to": "db", "label": "Better Auth · pg pool 5", "fromSide": "right", "toSide": "top", "labelAt": [740, 268] },
+    { "id": "api-db", "from": "api", "to": "db", "label": "asyncpg pool 15" },
+    { "id": "migrate-db", "from": "migrate", "to": "db", "label": "alembic upgrade", "variant": "dashed" },
+    { "id": "api-r2", "from": "api", "to": "r2", "label": "업로드 · 원본 보관", "fromSide": "bottom", "toSide": "top", "labelSegment": 2 },
+    { "id": "api-gemini", "from": "api", "to": "gemini", "label": "요약 · 분류 · RAG 생성", "fromSide": "bottom", "toSide": "top", "labelAt": [480, 515] },
+    { "id": "api-openai", "from": "api", "to": "openai", "label": "STT · 임베딩", "fromSide": "bottom", "toSide": "top", "labelSegment": 2 },
+    { "id": "api-gdrive", "from": "api", "to": "gdrive", "label": "Drive OAuth (별도 클라이언트)", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "labelSegment": 2 }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "경계", "items": [
+      "호스트 인바운드는 SSH 22 하나 — 트래픽은 cloudflared 의 아웃바운드 터널로 들어온다",
+      "cloudflared 만 host 네트워크 — iptables 가 22 외 INPUT 을 막아 브리지→loopback 경로가 없다",
+      "공유 호스트 — 포트 3100/8200/5434 · cpus 1.5 · mem_limit 로 격리 (ADR-028 D1)"
+    ] },
+    { "dot": "emerald", "title": "상태와 소유", "items": [
+      "DB 하나에 소유자 둘 — alembic 26 테이블 + Better Auth(web) 의 auth_* 5 테이블",
+      "migrate 는 one-shot — 실패하면 api/web 이 뜨지 않는다 (crash-loop 방지, ADR-028 D6)",
+      "uvicorn 워커 1 고정 — circuit breaker · JWT 캐시가 in-process 싱글턴"
+    ] },
+    { "dot": "amber", "title": "외부 의존", "items": [
+      "런타임 로컬 ML 추론 0건 — STT·LLM·임베딩 전부 외부 API (ARM 이전 근거)",
+      "Gemini gemini-3.1-flash-lite 고정 (ADR-019) · OpenAI Whisper + text-embedding-3-small",
+      "로그인 Google OAuth 와 Drive 클라이언트 분리 — restricted scope 검증 반경 격리"
+    ] }
+  ]
+}

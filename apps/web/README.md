@@ -31,7 +31,9 @@ src/
 │   ├── (landing)/ 랜딩 + pricing
 │   ├── (auth)/    sign-in / sign-up (Better Auth, ADR-031)
 │   ├── (app)/     인증 영역 — dashboard · projects · meetings · notes · inbox
-│   │              · memory · search · actions · settings
+│   │              · memory · search · actions · new · settings
+│   │              · admin/recall-metrics — founder 표시 게이트, **유일한 admin 화면 (별도 admin 앱 없음)**
+│   ├── api/auth/[...all]/route.ts   Better Auth 핸들러 — 이 앱의 유일한 route handler. JWKS(`/api/auth/jwks`)도 여기서 서빙
 │   └── invite/    초대 수락 (그룹 밖 public 라우트)
 ├── components/
 │   ├── ui/        shadcn v4 — 수정 금지 (F-1)
@@ -40,6 +42,7 @@ src/
 │   ├── shared/    도메인 횡단 공통 (ItemPromoteModal · ExportButton)
 │   └── onboarding/
 ├── features/      도메인별 비즈니스 레이어 — 각 feature = api.ts + hooks.ts + types.ts + components/
+│                  (+ 선택 schemas.ts · store.ts · CONTEXT.md). 17 feature ↔ BE 도메인 매핑은 아래 표
 ├── hooks/         앱 전역 유틸 훅
 ├── lib/           api-client · query-client · query-keys · visibility · utils
 ├── store/         Zustand (전역 UI 상태만)
@@ -49,6 +52,9 @@ src/
 **barrel `index.ts` 를 두지 않는다** (현재 0개, 예외 없음). Next.js 는 barrel import 를 빌드 비용으로
 취급하고, feature 경계는 F-9 + eslint `no-restricted-imports` 가 이미 강제한다.
 **`server/` 폴더도 없다** — 데이터 페칭은 100% 클라이언트 TanStack Query 다.
+
+`admin/recall-metrics`의 founder 판정은 `NEXT_PUBLIC_FOUNDER_USER_ID`를 비교하는 **FE 표시 게이트**다.
+클라이언트 공개 값이므로 인가 경계가 아니며, 실제 `GET .../memory/metrics` API는 workspace `viewer+`를 허용한다.
 
 ### features ↔ BE 도메인 매핑
 
@@ -74,6 +80,8 @@ src/
 
 정본: [`CONTEXT.md`](CONTEXT.md) §3 · §5 · 전체 트리는
 [`docs/architecture/directory-map.md`](../../docs/architecture/directory-map.md).
+레포 전체에서 이 앱이 차지하는 자리(계약 파이프라인 · CI 게이트 · 배포 경로)는
+[`docs/architecture/diagrams/repo-structure.html`](../../docs/architecture/diagrams/repo-structure.html) 인터랙티브 다이어그램.
 
 ## 상태 관리 3층
 

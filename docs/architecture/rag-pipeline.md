@@ -1,6 +1,10 @@
 # RAG 파이프라인 설계 및 고도화 방향
 
 > **관련 문서:** [AI 파이프라인 명세](ai-pipeline.md) (인제스트 파이프라인), [데이터 흐름 예시](data-flow-example.md), [ERD](erd.md)
+>
+> **구현 상태 (2026-09-04):** 현재 런타임 정본은 [`apps/api/src/rag/CONTEXT.md`](../../apps/api/src/rag/CONTEXT.md)와
+> `apps/api/src/rag/service.py`다. 현재는 Hybrid Search 결과를 **RRF(k=60)** 로 융합하며 cross-encoder Re-ranking은
+> 구현하지 않았다. 아래 Re-ranking/Query Expansion 절은 Phase 4 후보 설계다.
 
 ---
 

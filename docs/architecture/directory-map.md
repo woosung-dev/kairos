@@ -1,4 +1,4 @@
-<!-- Kairos 디렉토리 구조 맵. BE 17 모듈(14 도메인 + common/core/services, 2026-07-30 문서 기준) + FE features 정합 (2026-07-31 기준 16). -->
+<!-- Kairos 디렉토리 구조 맵. BE 17 모듈(14 도메인 + common/core/services, 2026-07-30 문서 기준) + FE features 정합 (2026-09-04 기준 17). -->
 
 # 디렉토리 구조 맵
 
@@ -17,6 +17,11 @@
 > 2026-08-16: ADR-030 — `apps/backend/` → `apps/api/`. 같은 라운드에서 `docs/guides/` 를
 > `docs/development/` + `docs/operations/` 로 해체하고 `docs/product/` · `docs/archive/` 를 신설했다.
 > **2026-08-16 이전 문서의 `apps/backend/` 는 `apps/api/` 로 읽는다** (ADR-030 D2).
+>
+> 2026-09-04: 시각 개요 3종을 `docs/architecture/diagrams/` 에 추가했다 (archify — 시스템 · 데이터 모델 · 모노레포,
+> [README](diagrams/README.md)). 같은 라운드에서 ADR-031 로 신설된 `features/auth/` + `app/api/auth/[...all]/route.ts` 를
+> FE 트리에 반영해 features 를 17 로 정합했고, `proxy.ts` 위치를 `apps/web/src/proxy.ts` 로 정정했다(트리가 `apps/web/proxy.ts` 로 잘못 적혀 있었다).
+> BE 오케스트레이터에 `integrations/pipeline_service.py`(ADR-026 W3) 를 추가해 5 도메인으로 갱신했다.
 
 ## 최상위 레이아웃 (2026-08-16, ADR-030)
 
@@ -28,6 +33,7 @@ kairos/
 ├── contracts/                         # OpenAPI 계약 생성물 (ADR-027 D2) — `mise run contracts` 재생성, 수정 금지
 ├── deploy/oci/                        # ★ 서버 운영 정본 — compose + build.env + README(런북)
 ├── docs/                              # canonical docs (development, operations, architecture, adr, product)
+│   └── architecture/diagrams/         # archify 다이어그램 3종 — *.archify.json(사양) + .html(인터랙티브) + .png(README 미리보기)
 ├── scripts/                           # 레포 공통 스크립트 (verify-prod.sh)
 ├── mise.toml                           # 단일 명령 진입점 (ADR-027 D3). `mise run ci-local` = 로컬 머지 게이트
 ├── AGENTS.md · CONTEXT-MAP.md · DESIGN.md   # 규칙 / 헌법 / 디자인 (ADR-029)
@@ -43,13 +49,13 @@ kairos/
 규칙: 독립 실행·배포되면 `apps/`, 언어를 넘는 계약이면 `contracts/`, 라이브러리 공유 패키지(`packages/`)는
 동일 언어 소비자 2개가 생길 때만 신설 (ADR-027 D5).
 
-## 프론트엔드 (FSD 기반, FE features — 2026-07-31 기준 16)
+## 프론트엔드 (FSD 기반, FE features — 2026-09-04 기준 17)
 
 ```
 apps/web/
-├── proxy.ts                           # 세션 쿠키 리다이렉트 (Next.js 16 명칭). 인가는 BE 몫
 └── src/
-    ├── app/                           # 라우트 진입점 (Thin Component). route group 3개
+    ├── proxy.ts                       # 세션 쿠키 리다이렉트 (Next.js 16 명칭, middleware.ts 아님). 인가는 BE 몫
+    ├── app/                           # 라우트 진입점 (Thin Component). route group 3개 + api/auth
     │   ├── (landing)/                 # 랜딩
     │   │   ├── page.tsx               #   "/"
     │   │   └── pricing/
@@ -61,6 +67,7 @@ apps/web/
     │   │   ├── projects/   projects/[id]/  meetings/[id]/
     │   │   ├── memory/  search/  actions/  new/  settings/
     │   │   └── admin/recall-metrics/  # 유일한 admin 화면 (별도 앱 아님)
+    │   ├── api/auth/[...all]/route.ts # Better Auth 핸들러 — 이 앱의 유일한 route handler (JWKS 서빙 포함, ADR-031)
     │   └── invite/[code]/             # 그룹 밖 public 라우트
     │
     ├── components/                    # 도메인 무관 공통 UI
@@ -71,9 +78,10 @@ apps/web/
     │   └── shared/                    # 도메인 횡단 공통 (Sprint 23 D4)
     │       └── ItemPromoteModal.tsx   # 5 도메인 generic promote modal
     │
-    ├── features/                      # FE 도메인 features (FSD, 2026-07-31 기준 16)
+    ├── features/                      # FE 도메인 features (FSD, 2026-09-04 기준 17)
     │   ├── actions/                   # 액션 아이템 list / detail
     │   ├── audit/                     # AdminAccessAudit / role 변경 trail (Sprint 25)
+    │   ├── auth/                      # Better Auth 클라이언트 훅 (useMe 등) + sign-in / sign-up 폼 (ADR-031)
     │   ├── feedback/                  # dogfooding 피드백 위젯 (user-level, BE feedback 도메인 대응)
     │   ├── home/                      # 대시보드 + ActivityFeed + RecommendedQuestions
     │   ├── inbox/                     # Inbox 적재 + 분류 dialog
@@ -159,7 +167,8 @@ apps/api/
 
 **오케스트레이터 (Sprint 6 ADR-014 옵션 A 적용)**: cross-domain 호출 또는 권한 검증 일원화가
 필요한 도메인은 추가로 `pipeline_service.py`를 가짐 — 현재 `meetings` / `notes` / `rag` /
-`memory` 4 도메인 (Sprint 24 Wave 2 BL-006 으로 `memory/pipeline_service.py` 신설).
+`memory` / `integrations` 5 도메인 (Sprint 24 Wave 2 BL-006 으로 `memory/pipeline_service.py`,
+ADR-026 W3 로 `integrations/pipeline_service.py` 신설).
 진입은 router → pipeline_service → service 위임.
 
 **common 의 audit / promote 도메인 분리 권고**: `common/audit_*.py` + `common/promote_*.py`

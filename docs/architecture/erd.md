@@ -1,5 +1,11 @@
 # 데이터 모델 관계도 (ERD)
 
+> **개요 먼저 보려면** — 테이블 그룹 단위(31 테이블 · 소유권 · `workspace_id` 격리 경계) 다이어그램은
+> [`diagrams/data-model.html`](diagrams/data-model.html) (인터랙티브) / [`diagrams/data-model.light.png`](diagrams/data-model.light.png).
+> 본 문서는 **컬럼 단위 정본**이다. Better Auth 의 `auth_*` 5 테이블(`auth_user` · `auth_session` · `auth_account` ·
+> `auth_verification` · `auth_jwks`)은 SQLModel 이 아니라(web 의 Better Auth 런타임 소유, DDL 은 alembic `c1a7e0b5d3f2` 가
+> CLI 산출물 원문으로 적용 — ADR-031 D4) 아래 ERD 에 없다. `users.auth_user_id` 는 `auth_user.id` 와의 문자열 매핑이며 DB FK 가 아니다.
+
 ## 핵심 엔티티 관계
 
 ```mermaid
