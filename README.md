@@ -102,7 +102,7 @@ OpenAI(Whisper STT · `text-embedding-3-small`) · Google(로그인 OAuth 와 Dr
 > **인터랙티브 버전** — [브라우저에서 바로 열기](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/system-architecture.html) (raw.githack CDN 경유) 또는
 > [`docs/architecture/diagrams/system-architecture.html`](docs/architecture/diagrams/system-architecture.html) 을 클론 후 열기 —
 > 패닝 · 검색 · 가이드 뷰 4개 · 노드별 소스 파일 근거. 사양은 같은 폴더의 `*.archify.json`,
-> 다이어그램 3종의 갱신 절차는 [`docs/architecture/diagrams/README.md`](docs/architecture/diagrams/README.md).
+> 다이어그램 7종(아키텍처 3 + 데이터 흐름 · 시퀀스 · 상태 전이 · 워크플로우)의 갱신 절차는 [`docs/architecture/diagrams/README.md`](docs/architecture/diagrams/README.md).
 
 컨테이너별 자원 캡·포트 배정 근거는 [ADR-028](docs/adr/028-oci-selfhosting.md),
 운영 런북은 [`deploy/oci/README.md`](deploy/oci/README.md).
@@ -128,6 +128,15 @@ flowchart TD
 장기 작업(STT·요약)은 **`BackgroundTasks` + 202 Accepted + 폴링**으로 처리한다. 상세는
 [`docs/architecture/ai-pipeline.md`](docs/architecture/ai-pipeline.md).
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture/diagrams/ai-distillation-dataflow.dark.png">
+  <img src="docs/architecture/diagrams/ai-distillation-dataflow.light.png" alt="Kairos AI Distillation 데이터 흐름 — 오디오·텍스트·Drive 문서가 STT · Gemini · 임베딩을 거쳐 kairos-db 에 저장되고 RAG 가 읽는다" width="900">
+</picture>
+
+위 데이터 흐름의 인터랙티브 버전은 [브라우저에서 바로 열기](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/ai-distillation-dataflow.html) /
+[`ai-distillation-dataflow.html`](docs/architecture/diagrams/ai-distillation-dataflow.html). 회의 한 건이 거치는 `meetings.status` 전이는
+[`meeting-status-lifecycle.html`](docs/architecture/diagrams/meeting-status-lifecycle.html) ([바로 열기](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/meeting-status-lifecycle.html)).
+
 ### RAG 6-Layer
 
 검색은 벡터 유사도 한 방이 아니라 6단계 파이프라인이다. **권한 검증(Layer 0)이 SSE 스트리밍
@@ -147,7 +156,9 @@ flowchart LR
 
 현재 구현의 정본은 [`apps/api/src/rag/CONTEXT.md`](apps/api/src/rag/CONTEXT.md), 하이브리드 검색·계층적 청킹·
 Semantic Cache와 미구현 Phase 4 후보까지 포함한 고도화 설계는
-[`docs/architecture/rag-pipeline.md`](docs/architecture/rag-pipeline.md).
+[`docs/architecture/rag-pipeline.md`](docs/architecture/rag-pipeline.md). `POST /rag/ask` 한 요청이 web → api → 인가 → OpenAI → kairos-db → Gemini 를
+오가는 순서는 시퀀스 다이어그램 [`rag-ask-sequence.html`](docs/architecture/diagrams/rag-ask-sequence.html)
+([바로 열기](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/rag-ask-sequence.html)).
 
 ### 데이터 모델
 
@@ -284,7 +295,7 @@ kairos/
 ├── deploy/oci/              docker-compose.prod.yml + initdb + 서버 운영 런북
 ├── docs/
 │   ├── adr/                 아키텍처 결정 기록 28건 (번호 갭 사유는 000-adr-gap-log.md)
-│   ├── architecture/        파이프라인 · ERD · 디렉터리 맵 · diagrams/ (archify 인터랙티브 다이어그램 3종)
+│   ├── architecture/        파이프라인 · ERD · 디렉터리 맵 · diagrams/ (archify 인터랙티브 다이어그램 7종)
 │   ├── development/         셋업 · 테스트 · 시크릿 · 마이그레이션
 │   ├── operations/          배포 · 런북
 │   └── requirements/        PRD · 페르소나 · 경쟁 분석
@@ -308,7 +319,7 @@ promote 감사 조회)다. `packages/`도 없다 — 같은 언어 소비자가 
 - 백엔드 상세 → [`apps/api/README.md`](apps/api/README.md)
 - 프론트엔드 상세 → [`apps/web/README.md`](apps/web/README.md)
 - 전체 트리 → [`docs/architecture/directory-map.md`](docs/architecture/directory-map.md)
-- 인터랙티브 다이어그램 3종 (사양 · HTML · PNG) → [`docs/architecture/diagrams/README.md`](docs/architecture/diagrams/README.md) · 이 다이어그램 [브라우저에서 바로 열기](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/repo-structure.html)
+- 인터랙티브 다이어그램 7종 (사양 · HTML · PNG) → [`docs/architecture/diagrams/README.md`](docs/architecture/diagrams/README.md) · 이 다이어그램 [브라우저에서 바로 열기](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/repo-structure.html) · 배포 경로만 따로 그린 워크플로우 [`deploy-workflow.html`](docs/architecture/diagrams/deploy-workflow.html) ([바로 열기](https://raw.githack.com/woosung-dev/kairos/main/docs/architecture/diagrams/deploy-workflow.html))
 
 ---
 
@@ -421,7 +432,7 @@ mise run deploy-rollback     # 문제 시 — 이미지 태그 되돌리기 (RTO
 | [`docs/architecture/ai-pipeline.md`](docs/architecture/ai-pipeline.md) | STT + Gemini 파이프라인 |
 | [`docs/architecture/rag-pipeline.md`](docs/architecture/rag-pipeline.md) | RAG 6-Layer 설계 |
 | [`docs/architecture/erd.md`](docs/architecture/erd.md) | 데이터 모델 (ERD) |
-| [`docs/architecture/diagrams/README.md`](docs/architecture/diagrams/README.md) | archify 인터랙티브 다이어그램 3종 — 시스템 · 데이터 모델 · 모노레포 (사양 JSON + HTML + PNG) |
+| [`docs/architecture/diagrams/README.md`](docs/architecture/diagrams/README.md) | archify 인터랙티브 다이어그램 7종 — 시스템 · 데이터 모델 · 모노레포 · AI 데이터 흐름 · RAG 시퀀스 · 회의 상태 전이 · 배포 워크플로우 (사양 JSON + HTML + PNG) |
 | [`docs/development/getting-started.md`](docs/development/getting-started.md) | 로컬 셋업 정본 |
 | [`docs/development/secrets.md`](docs/development/secrets.md) | 환경변수 전체 매트릭스 |
 | [`docs/development/testing.md`](docs/development/testing.md) | 테스트 게이트 ↔ CI job 대응표 |

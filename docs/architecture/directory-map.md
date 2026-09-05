@@ -22,6 +22,9 @@
 > [README](diagrams/README.md)). 같은 라운드에서 ADR-031 로 신설된 `features/auth/` + `app/api/auth/[...all]/route.ts` 를
 > FE 트리에 반영해 features 를 17 로 정합했고, `proxy.ts` 위치를 `apps/web/src/proxy.ts` 로 정정했다(트리가 `apps/web/proxy.ts` 로 잘못 적혀 있었다).
 > BE 오케스트레이터에 `integrations/pipeline_service.py`(ADR-026 W3) 를 추가해 5 도메인으로 갱신했다.
+>
+> 2026-09-05: 흐름 다이어그램 4종(AI 데이터 흐름 · RAG `/ask` 시퀀스 · `meetings.status` 상태 전이 · 배포 워크플로우)을 같은 폴더에 추가해 7종이 됐다.
+> README 미리보기 PNG 는 `diagrams/capture-png.mjs` 로 재생성한다.
 
 ## 최상위 레이아웃 (2026-08-16, ADR-030)
 
@@ -33,7 +36,7 @@ kairos/
 ├── contracts/                         # OpenAPI 계약 생성물 (ADR-027 D2) — `mise run contracts` 재생성, 수정 금지
 ├── deploy/oci/                        # ★ 서버 운영 정본 — compose + build.env + README(런북)
 ├── docs/                              # canonical docs (development, operations, architecture, adr, product)
-│   └── architecture/diagrams/         # archify 다이어그램 3종 — *.archify.json(사양) + .html(인터랙티브) + .png(README 미리보기)
+│   └── architecture/diagrams/         # archify 다이어그램 7종 — *.archify.json(사양) + .html(인터랙티브) + .png(README 미리보기) + capture-png.mjs
 ├── scripts/                           # 레포 공통 스크립트 (verify-prod.sh)
 ├── mise.toml                           # 단일 명령 진입점 (ADR-027 D3). `mise run ci-local` = 로컬 머지 게이트
 ├── AGENTS.md · CONTEXT-MAP.md · DESIGN.md   # 규칙 / 헌법 / 디자인 (ADR-029)
