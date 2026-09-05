@@ -48,7 +48,7 @@ export default function MemoryPage() {
   const hasResults = !!data && data.sources.length > 0;
 
   return (
-    <div className="relative mx-auto min-h-screen max-w-3xl px-4 py-8">
+    <div className="relative mx-auto min-h-full max-w-3xl px-4 py-8">
       <header className="mb-6">
         <h1 className="mb-1 text-2xl font-semibold">메모 검색</h1>
         <p className="text-sm text-muted-foreground">
@@ -118,15 +118,18 @@ export default function MemoryPage() {
         Sprint 22 BL-017 + OBN-04: mobile bottom-nav 충돌 회피.
         - 데스크톱: bottom-8 (32px) — bottom-nav 없음.
         - 모바일: bottom-nav (56px) 위로 16px 띄움 → 72px (~bottom-18).
+        2026-09-06: 우하단에는 앱 공용 피드백 FAB(feedback-button, right-4 · 44px)가 이미 있어
+        같은 자리에 겹쳤다(실측). 피드백 FAB 왼쪽으로 비켜 세운다. 상시 animate-pulse 는 시선을
+        계속 끌어 DESIGN.md Motion(상태 전환만) 원칙에 어긋나 제거.
       */}
       <Button
         type="button"
         size="icon"
-        className="fixed right-6 md:right-8 h-14 w-14 animate-pulse rounded-full shadow-xl"
+        className="fixed right-[4.75rem] md:right-20 h-14 w-14 rounded-full shadow-xl"
         style={{
           bottom: isMobile
             ? "calc(var(--bottom-nav-height) + 16px)"
-            : "2rem",
+            : "1.5rem",
         }}
         onClick={() => setIsCaptureOpen(true)}
         aria-label="새 메모 추가"

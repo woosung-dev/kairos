@@ -18,6 +18,25 @@
 
 ---
 
+## 2026-09-06 UI/UX 전수 sweep 잔여 (BL-UX-N)
+
+> MCP Playwright 실측 sweep 에서 발견했으나 이번 PR 범위 밖으로 둔 항목. 수정한 22건은 PR body 와 `docs/TODO.md` 에 있다.
+
+### BL-UX-1 — 대시보드 검색 버튼의 role=button 중첩 (P3, a11y)
+`OnboardingTooltip` 의 `PopoverTrigger nativeButton={false}` 가 `<div role="button">` 래퍼를 만들고 그 안에 실제 `<button>` 이 들어간다
+(대시보드 검색 버튼, ⌘K 팔레트). 접근성 트리에 중첩 인터랙티브가 남는다. 툴팁을 트리거 래핑 대신 anchor 참조(`anchor` prop)로 붙이면 해소.
+
+### BL-UX-2 — AI 추출 액션 제목의 담당자 접두 ("장우성: …") (P3, 프롬프트)
+`common/prompts.py` DELTA-3 규칙이 담당자 이름을 `title` 에 넣도록 강제해 액션 보드에서 제목과 담당자가 중복 노출된다.
+`assigneeName` 필드로 분리하고 BE 가 워크스페이스 멤버와 매칭해 `assignee_id` 를 채우는 방향. ADR-019 Phase B 프롬프트 계약 변경이라 별건.
+
+### BL-UX-3 — `features/rag/components/rag-home.tsx` importer 0 (P4, dead code)
+`RagHome` 은 아무 라우트도 렌더하지 않는다(대시보드 페이지가 같은 레이아웃을 자체 구현). 삭제 대상 — Simplicity First 정책상 별 PR.
+
+### BL-UX-4 — 회의 삭제 경로 부재 (P2, 기능)
+회의 상세에 삭제가 없고 BE `DELETE /meetings/{id}` 도 없다(Sprint 28 P3 carry). 잘못 올린 회의를 사용자가 정리할 수 없다.
+R2 원본 정리(BL-OCI-5)와 함께 설계.
+
 ## BL-S29-1 — `mise run docs-check` 게이트 신설 (규칙 재중복 방지) ⏳ **미착수**
 
 **배경**: [ADR-029](adr/029-ai-rules-relocation.md) §2.2 가 「`apps/*/AGENTS.md` 는 `B-NN`·`F-NN`·`I-NN` 불변식을

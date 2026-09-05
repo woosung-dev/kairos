@@ -50,7 +50,9 @@ async def update_workspace_settings(
     member: WorkspaceMember = Depends(require_owner),
     service: WorkspaceService = Depends(get_workspace_service),
 ):
-    return await service.update_settings(workspace_id, data.inbox_threshold)
+    return await service.update_settings(
+        workspace_id, inbox_threshold=data.inbox_threshold, name=data.name
+    )
 
 
 @router.delete("/{workspace_id}", status_code=204)

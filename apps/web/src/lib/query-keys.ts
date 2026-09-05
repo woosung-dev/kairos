@@ -3,6 +3,7 @@
 // invalidate 가 깨지므로 __tests__/query-keys.test.ts 스냅샷으로 회귀를 가드한다.
 // param 타입은 feature 소유를 유지 — import type 은 컴파일 시 제거되어 런타임 순환 없음.
 
+import type { FetchActionItemsParams } from "@/features/actions/api";
 import type { FetchInboxParams } from "@/features/inbox/api";
 import type { FetchProjectsParams } from "@/features/projects/api";
 
@@ -42,7 +43,11 @@ export const meetingKeys = {
 
 export const actionKeys = {
   all: ["actions"] as const,
-  list: (wid: string) => [...actionKeys.all, "list", wid] as const,
+  // params(projectId/status 등) 를 키에 포함 — 없으면 프로젝트 대시보드(필터)와 회의 액션 뷰(전체)가
+  // 같은 캐시를 공유해 교차오염. invalidate 는 byWorkspace(wid) prefix 로 모든 변형 매칭.
+  byWorkspace: (wid: string) => [...actionKeys.all, "list", wid] as const,
+  list: (wid: string, params?: FetchActionItemsParams) =>
+    [...actionKeys.byWorkspace(wid), params ?? {}] as const,
 };
 
 export const projectKeys = {

@@ -104,15 +104,28 @@ class WorkspaceService:
         }
 
     async def update_settings(
-        self, workspace_id: uuid.UUID, inbox_threshold: float
+        self,
+        workspace_id: uuid.UUID,
+        *,
+        inbox_threshold: float | None = None,
+        name: str | None = None,
     ) -> dict:
-        """워크스페이스 설정 업데이트 (임계값 등)."""
+        """워크스페이스 설정 부분 갱신 (임계값 · 이름). 전달된 필드만 반영하고 갱신 후 상태를 돌려준다."""
         workspace = await self.repo.find_by_id(workspace_id)
         if workspace is None:
             raise WorkspaceNotFoundError()
-        await self.repo.update_threshold(workspace_id, inbox_threshold)
+        await self.repo.update_settings(
+            workspace_id, inbox_threshold=inbox_threshold, name=name
+        )
+        # 응답은 입력 + 기존 row 로 조립 — UPDATE 뒤 ORM 객체 재조회 없이 확정값을 준다.
+        result = {
+            "inboxThreshold": (
+                workspace.inbox_threshold if inbox_threshold is None else inbox_threshold
+            ),
+            "name": workspace.name if name is None else name,
+        }
         await self.repo.commit()
-        return {"inboxThreshold": inbox_threshold}
+        return result
 
     async def delete_workspace(self, workspace_id: uuid.UUID) -> None:
         """워크스페이스 삭제 (owner 전용은 라우터 require_owner 가 강제).

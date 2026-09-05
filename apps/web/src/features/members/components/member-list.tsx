@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useMe } from "@/features/auth/hooks";
 import { useMembers, useUpdateMemberRole, useRemoveMember } from "../hooks";
 import type { Member, WorkspaceRole } from "../types";
 
@@ -56,6 +57,7 @@ interface MemberListProps {
 
 export function MemberList({ workspaceId, currentUserRole }: MemberListProps) {
   const { data: members, isLoading, isError, refetch } = useMembers(workspaceId);
+  const { data: me } = useMe();
   const updateRole = useUpdateMemberRole(workspaceId);
   const removeMember = useRemoveMember(workspaceId);
 
@@ -113,6 +115,7 @@ export function MemberList({ workspaceId, currentUserRole }: MemberListProps) {
           const config = ROLE_CONFIG[member.role];
           const RoleIcon = config.icon;
           const isCurrentOwner = member.role === "owner";
+          const isMe = !!me && member.userId === me.id;
 
           return (
             <div
@@ -134,10 +137,19 @@ export function MemberList({ workspaceId, currentUserRole }: MemberListProps) {
                 </div>
                 <div className="min-w-0">
                   <p
-                    className="text-sm font-medium truncate"
+                    className="text-sm font-medium truncate flex items-center gap-1.5"
                     style={{ color: "var(--text-primary)" }}
                   >
-                    {member.displayName ?? "이름 없음"}
+                    <span className="truncate">{member.displayName ?? "이름 없음"}</span>
+                    {isMe && (
+                      <span
+                        className="shrink-0 px-1.5 py-0.5 rounded-full text-micro font-medium"
+                        style={{ background: "var(--accent-subtle)", color: "var(--accent)" }}
+                        data-testid="member-me-badge"
+                      >
+                        나
+                      </span>
+                    )}
                   </p>
                   <p
                     className="text-xs truncate"

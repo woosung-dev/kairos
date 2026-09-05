@@ -2,9 +2,11 @@
 
 // Sprint 23 D2 Variant C — 워크스페이스 설정 페이지 (Compact Header + Geist Mono + ?tab=*)
 
-import { Suspense } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import { Settings, Users, Link2, Building2, PlugZap, ShieldCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MemberList } from "@/features/members/components/member-list";
 import { InviteManager } from "@/features/members/components/invite-manager";
@@ -135,13 +137,14 @@ function SettingsContent() {
 
       {/* 탭 구조 — ?tab=* deep-link 동기화 + count badge */}
       <Tabs value={activeTab} onValueChange={handleTabChange}>
+        {/* overflow-x-auto + shrink-0: 모바일(390px)에서 탭 5개가 잘리던 것(Audit 미노출) → 가로 스크롤 */}
         <TabsList
-          className="w-full justify-start gap-1 rounded-lg p-1 mb-6"
+          className="w-full justify-start gap-1 rounded-lg p-1 mb-6 overflow-x-auto"
           style={{ background: "var(--surface)" }}
         >
           <TabsTrigger
             value="members"
-            className="gap-1.5 cursor-pointer text-sm"
+            className="gap-1.5 cursor-pointer text-sm shrink-0"
           >
             <Users className="w-4 h-4" aria-hidden />
             멤버
@@ -159,25 +162,28 @@ function SettingsContent() {
           </TabsTrigger>
           <TabsTrigger
             value="invites"
-            className="gap-1.5 cursor-pointer text-sm"
+            className="gap-1.5 cursor-pointer text-sm shrink-0"
           >
             <Link2 className="w-4 h-4" aria-hidden />
             초대
-            <span
-              aria-label={`활성 초대 ${activeInviteCount ?? "로딩 중"}`}
-              style={{
-                ...MONO_STYLE,
-                fontSize: 11,
-                color: "var(--text-muted)",
-                marginLeft: 2,
-              }}
-            >
-              {activeInviteCount ?? "—"}
-            </span>
+            {/* member/viewer 는 초대 목록을 못 조회하므로(BE admin+) 카운트가 영원히 "—" 였다 → 숨김 */}
+            {isAdminOrOwner && (
+              <span
+                aria-label={`활성 초대 ${activeInviteCount ?? "로딩 중"}`}
+                style={{
+                  ...MONO_STYLE,
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  marginLeft: 2,
+                }}
+              >
+                {activeInviteCount ?? "—"}
+              </span>
+            )}
           </TabsTrigger>
           <TabsTrigger
             value="general"
-            className="gap-1.5 cursor-pointer text-sm"
+            className="gap-1.5 cursor-pointer text-sm shrink-0"
           >
             <Building2 className="w-4 h-4" aria-hidden />
             일반
@@ -185,7 +191,7 @@ function SettingsContent() {
           {isOwner && IS_GOOGLE_DRIVE_PROTOTYPE_ENABLED && (
             <TabsTrigger
               value="integrations"
-              className="gap-1.5 cursor-pointer text-sm"
+              className="gap-1.5 cursor-pointer text-sm shrink-0"
             >
               <PlugZap className="w-4 h-4" aria-hidden />
               연동
@@ -207,7 +213,7 @@ function SettingsContent() {
             <TabsTrigger
               value="audit"
               data-testid="audit-tab-trigger"
-              className="gap-1.5 cursor-pointer text-sm"
+              className="gap-1.5 cursor-pointer text-sm shrink-0"
             >
               <ShieldCheck className="w-4 h-4" aria-hidden />
               Audit
@@ -269,6 +275,31 @@ function SettingsContent() {
                   className="text-sm font-medium"
                   style={{ color: "var(--text-primary)" }}
                 >
+                  워크스페이스 이름
+                </h2>
+                <p
+                  className="text-sm leading-relaxed"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  사이드바와 전환 메뉴에 표시되는 이름입니다. 최대 60자.
+                </p>
+                {/* key 에 서버 이름을 포함해 저장 성공·워크스페이스 전환 시 리마운트로 재시드
+                    — effect 안 setState 없이 로컬 draft 를 서버 값에 맞춘다. */}
+                <WorkspaceNameForm
+                  key={`${activeWorkspaceId}:${workspace?.name ?? ""}`}
+                  initialName={workspace?.name ?? ""}
+                  isPending={updateSettings.isPending}
+                  onSave={(name) => updateSettings.mutate({ name })}
+                />
+              </div>
+            )}
+
+            {isOwner && (
+              <div className="space-y-4">
+                <h2
+                  className="text-sm font-medium"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   AI 자동 확정 임계값
                 </h2>
                 <p
@@ -289,7 +320,7 @@ function SettingsContent() {
                         type="button"
                         disabled={updateSettings.isPending}
                         onClick={() =>
-                          updateSettings.mutate({ inbox_threshold: preset })
+                          updateSettings.mutate({ inboxThreshold: preset })
                         }
                         className="px-4 py-2 rounded-md text-sm font-medium cursor-pointer transition-colors duration-150"
                         style={{
@@ -384,5 +415,52 @@ function SettingsContent() {
         )}
       </Tabs>
     </div>
+  );
+}
+
+const WORKSPACE_NAME_MAX_LENGTH = 60;
+
+// 워크스페이스 이름 변경 폼 — 부모가 key 로 리마운트해 initialName 을 다시 시드한다.
+function WorkspaceNameForm({
+  initialName,
+  isPending,
+  onSave,
+}: {
+  initialName: string;
+  isPending: boolean;
+  onSave: (name: string) => void;
+}) {
+  const [name, setName] = useState(initialName);
+  const trimmedName = name.trim();
+  const isUnchanged = trimmedName === initialName;
+  const canSave = trimmedName.length > 0 && !isUnchanged && !isPending;
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canSave) return;
+    onSave(trimmedName);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex items-center gap-2">
+      <Input
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        maxLength={WORKSPACE_NAME_MAX_LENGTH}
+        disabled={isPending}
+        aria-label="워크스페이스 이름"
+        data-testid="ws-name-input"
+        className="max-w-xs"
+        style={{ color: "var(--text-primary)" }}
+      />
+      <Button
+        type="submit"
+        size="sm"
+        disabled={!canSave}
+        data-testid="ws-name-save"
+      >
+        {isPending ? "저장 중..." : "저장"}
+      </Button>
+    </form>
   );
 }

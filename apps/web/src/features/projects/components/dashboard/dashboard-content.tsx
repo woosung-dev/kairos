@@ -14,12 +14,9 @@ import { OnboardingView } from "./onboarding-view";
 export function DashboardContent({
   wid,
   projectId,
-  children,
 }: {
   wid: string | undefined;
   projectId: string;
-  /** 콘텐츠 로딩 중이거나 콘텐츠가 하나 이상일 때 렌더되는 하위 섹션 — 멤버 패널. */
-  children?: React.ReactNode;
 }) {
   /* 회의: projectId 필터 지원 */
   const { data: meetingsData, isLoading: meetingsLoading } = useMeetings(wid, 1, projectId);
@@ -43,7 +40,7 @@ export function DashboardContent({
 
   const isContentLoading = actionsLoading || meetingsLoading || notesLoading;
 
-  /* 콘텐츠가 없으면 온보딩 뷰 — 멤버 패널(children)은 렌더하지 않는다. */
+  /* 콘텐츠가 없으면 온보딩 뷰. (멤버 패널은 project-dashboard 가 이 게이트 밖에서 렌더한다.) */
   if (!isContentLoading && recentItems.length === 0) {
     return <OnboardingView />;
   }
@@ -97,8 +94,6 @@ export function DashboardContent({
           <ActionsSection wid={wid} projectId={projectId} />
         </div>
       )}
-
-      {children}
     </>
   );
 }

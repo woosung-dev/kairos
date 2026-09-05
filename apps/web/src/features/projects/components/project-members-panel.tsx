@@ -3,7 +3,18 @@
 
 import { Trash2, UserPlus } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -61,6 +72,8 @@ function PrivateProjectMembersPanel({
   const addMember = useAddProjectMember(workspaceId, projectId);
   const removeMember = useRemoveProjectMember(workspaceId, projectId);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  // 제거 확인 대상 — native confirm() 대신 앱 공용 AlertDialog (다른 삭제 흐름과 동일한 패턴)
+  const [removeTargetUserId, setRemoveTargetUserId] = useState<string | null>(null);
 
   const isPrivate = visibility === "private";
 
@@ -75,22 +88,32 @@ function PrivateProjectMembersPanel({
     addMember.mutate(
       { userId: selectedUserId, role: "member" },
       {
-        onSuccess: () => setSelectedUserId(null),
+        onSuccess: () => {
+          setSelectedUserId(null);
+          toast.success("프로젝트 멤버를 추가했습니다");
+        },
         onError: (err) => {
-          alert(err instanceof Error ? err.message : "멤버 추가 실패");
+          toast.error(err instanceof Error ? err.message : "멤버 추가에 실패했습니다");
         },
       }
     );
   };
 
-  const handleRemove = (userId: string) => {
-    if (!confirm("이 멤버를 프로젝트에서 제거하시겠습니까?")) return;
-    removeMember.mutate(userId, {
+  const handleConfirmRemove = () => {
+    if (!removeTargetUserId) return;
+    removeMember.mutate(removeTargetUserId, {
+      onSuccess: () => toast.success("프로젝트 멤버를 제거했습니다"),
       onError: (err) => {
-        alert(err instanceof Error ? err.message : "멤버 제거 실패");
+        toast.error(err instanceof Error ? err.message : "멤버 제거에 실패했습니다");
       },
     });
+    setRemoveTargetUserId(null);
   };
+
+  const removeTarget = projectMembers?.find((pm) => pm.userId === removeTargetUserId);
+  const removeTargetName =
+    workspaceMembers?.find((m) => m.userId === removeTarget?.userId)?.displayName ??
+    "이 멤버";
 
   return (
     <div
@@ -109,7 +132,7 @@ function PrivateProjectMembersPanel({
             fontFamily: "var(--font-display)",
           }}
         >
-          Project Members
+          프로젝트 멤버
           {projectMembers && (
             <span
               className="ml-2 text-xs"
@@ -119,12 +142,9 @@ function PrivateProjectMembersPanel({
             </span>
           )}
         </h3>
-        {!isPrivate && (
-          <span
-            className="text-caption"
-            style={{ color: "var(--text-muted)" }}
-          >
-            visibility=Private 시에만 명시 멤버 매핑 의미 있음
+        {isPrivate && (
+          <span className="text-caption" style={{ color: "var(--text-muted)" }}>
+            비공개 프로젝트는 여기 있는 멤버와 admin/owner 만 볼 수 있습니다
           </span>
         )}
       </div>
@@ -219,11 +239,14 @@ function PrivateProjectMembersPanel({
                   </span>
                 </div>
                 {canManage && (
+                  // 이전 `opacity-0 group-hover:opacity-100` 은 부모에 `group` 이 없어 항상 투명 →
+                  // 제거 버튼이 존재하는데 보이지 않았다. 항상 노출 + aria-label.
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 opacity-0 group-hover:opacity-100 hover:opacity-100"
-                    onClick={() => handleRemove(pm.userId)}
+                    className="h-8 w-8 cursor-pointer"
+                    aria-label={`${ws?.displayName ?? "멤버"} 프로젝트에서 제거`}
+                    onClick={() => setRemoveTargetUserId(pm.userId)}
                     disabled={removeMember.isPending}
                   >
                     <Trash2
@@ -238,10 +261,36 @@ function PrivateProjectMembersPanel({
         </ul>
       ) : (
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          명시적 멤버 없음
-          {isPrivate && " — 위에서 멤버를 추가하세요"}
+          아직 추가된 멤버가 없습니다
+          {isPrivate && canManage && ". 위에서 워크스페이스 멤버를 선택해 추가하세요"}
         </p>
       )}
+
+      <AlertDialog
+        open={removeTargetUserId !== null}
+        onOpenChange={(open) => {
+          if (!open) setRemoveTargetUserId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>프로젝트에서 제거하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {removeTargetName}님은 이 비공개 프로젝트의 회의·노트를 더 이상 볼 수 없게 됩니다.
+              워크스페이스 멤버십은 유지됩니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleConfirmRemove}
+            >
+              제거
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

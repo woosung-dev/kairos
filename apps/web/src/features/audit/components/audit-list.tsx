@@ -2,6 +2,7 @@
 
 // Sprint 24 Wave 2 T-AUDIT-VIEW — Audit 목록 + item_type 필터 + 더 보기
 import { useMemo, useState } from "react";
+import { formatDateTime } from "@/lib/format-date";
 import { useAuditPromotions } from "../hooks";
 import type { AuditItemType } from "../types";
 
@@ -25,9 +26,9 @@ const ITEM_TYPES: ("all" | AuditItemType)[] = [
   "action",
 ];
 
+// F-10: 폰트는 DESIGN.md 토큰(--font-mono)만 — 하드코딩 패밀리 목록은 토큰 교체 시 드리프트.
 const MONO_STYLE = {
-  fontFamily:
-    '"Geist Mono", ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Code", monospace',
+  fontFamily: "var(--font-mono)",
   fontVariantNumeric: "tabular-nums" as const,
 };
 
@@ -197,7 +198,7 @@ export function AuditList({ workspaceId }: AuditListProps) {
                       fontSize: 11,
                     }}
                   >
-                    {new Date(row.createdAt).toLocaleString("ko-KR")}
+                    {formatDateTime(row.createdAt)}
                   </td>
                 </tr>
               ))}

@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, StickyNote } from "lucide-react";
 import { toast } from "sonner";
+import { formatDate } from "@/lib/format-date";
 import { useNotes, useCreateNote } from "../hooks";
 import { useProjects } from "@/features/projects/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
@@ -91,8 +92,10 @@ export function QuickMemo() {
           >
             빠른 메모
           </h1>
+          {/* 이전 카피 "마크다운 문법을 지원합니다" 는 사실이 아니었다 — 입력은 단락 텍스트로 저장된다.
+              서식 편집은 상세 화면(Tiptap)에서 한다. */}
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            아이디어를 빠르게 기록하세요. 마크다운 문법을 지원합니다.
+            아이디어를 빠르게 기록하세요. 프로젝트를 지정하면 그 프로젝트에 정리됩니다.
           </p>
         </div>
         {canWrite && !isComposing && (
@@ -135,7 +138,7 @@ export function QuickMemo() {
           />
 
           <textarea
-            placeholder="내용을 입력하세요... (마크다운 지원)"
+            placeholder="내용을 입력하세요..."
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={6}
@@ -259,7 +262,7 @@ function MemoCard({
   workspaceId: string | null;
 }) {
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
-  const createdDate = memo.createdAt?.slice(0, 10) ?? "";
+  const createdDate = formatDate(memo.createdAt);
   const preview = memo.plainText?.slice(0, 200) ?? "";
 
   return (
@@ -305,26 +308,27 @@ function MemoCard({
         </div>
       </Link>
 
+      {/* Promote 는 retention 기능 — DESIGN.md Promote 1-Button 스펙대로 ghost(테두리 없음, 13px,
+          text-secondary → hover accent). 카드마다 테두리 버튼이 있어 목록이 소음스러웠다. */}
       {workspaceId && (
-        <div className="mt-2 flex justify-end">
+        <div className="mt-1 flex justify-end">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               setIsPromoteOpen(true);
             }}
-            className="flex items-center gap-1 px-2 py-1 rounded text-caption font-medium transition-colors border"
+            className="inline-flex items-center gap-1 px-2 h-7 rounded text-xs font-medium transition-colors cursor-pointer hover:underline"
             style={{
-              borderColor: "var(--border)",
-              color: "var(--text-muted)",
+              color: "var(--text-secondary)",
               borderRadius: "var(--radius-sm)",
-              cursor: "pointer",
-              minHeight: "28px",
             }}
-            aria-label="워크스페이스 이동"
+            onMouseOver={(e) => (e.currentTarget.style.color = "var(--accent)")}
+            onMouseOut={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
+            aria-label="팀으로 올리기"
           >
-            <ArrowUpRight className="h-3 w-3" />
-            워크스페이스 이동
+            <ArrowUpRight className="h-3.5 w-3.5" />
+            팀으로 올리기
           </button>
         </div>
       )}

@@ -1,18 +1,9 @@
 // 대시보드 우측 '이번 주 액션' 섹션 — 액션 조회/토글 mutation 소유 (BL-AV-1 분해)
 "use client";
 
-import { useActionItems, useUpdateActionItem } from "@/features/actions/hooks";
+import { useActionItems, useAssigneeNames, useUpdateActionItem } from "@/features/actions/hooks";
 import type { ActionItem, ActionStatus } from "@/features/actions/types";
-
-/* ── 날짜 오버듀 확인 ── */
-
-function isOverdue(dateStr: string | null): boolean {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return d < today;
-}
+import { formatDate, isOverdue } from "@/lib/format-date";
 
 export function ActionsSection({
   wid,
@@ -29,6 +20,7 @@ export function ActionsSection({
     pageSize: 20,
   });
   const updateAction = useUpdateActionItem(wid);
+  const assigneeNames = useAssigneeNames(wid);
 
   const actions = actionsData?.items ?? [];
 
@@ -58,6 +50,7 @@ export function ActionsSection({
             <ActionRow
               key={action.id}
               action={action}
+              assigneeName={action.assigneeId ? assigneeNames.get(action.assigneeId) : undefined}
               onToggle={() => handleToggleAction(action)}
             />
           ))}
@@ -67,7 +60,15 @@ export function ActionsSection({
   );
 }
 
-function ActionRow({ action, onToggle }: { action: ActionItem; onToggle: () => void }) {
+function ActionRow({
+  action,
+  assigneeName,
+  onToggle,
+}: {
+  action: ActionItem;
+  assigneeName?: string;
+  onToggle: () => void;
+}) {
   const isDone = action.status === "done";
 
   return (
@@ -97,7 +98,7 @@ function ActionRow({ action, onToggle }: { action: ActionItem; onToggle: () => v
           {action.title}
         </p>
         <div className="flex items-center gap-2 text-micro" style={{ color: "var(--text-muted)" }}>
-          {action.assignee && <span>{action.assignee.displayName}</span>}
+          {assigneeName && <span>{assigneeName}</span>}
           {action.dueDate && (
             <>
               <span>&middot;</span>
@@ -106,7 +107,7 @@ function ActionRow({ action, onToggle }: { action: ActionItem; onToggle: () => v
                   color: isOverdue(action.dueDate) && !isDone ? "var(--error)" : "var(--text-muted)",
                 }}
               >
-                {action.dueDate}
+                {formatDate(action.dueDate)}
               </span>
             </>
           )}

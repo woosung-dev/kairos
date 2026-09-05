@@ -10,6 +10,7 @@ import {
   fetchWorkspace,
   updateWorkspaceSettings,
   deleteWorkspace,
+  type UpdateWorkspaceSettingsInput,
 } from "./api";
 import type { Workspace } from "./types";
 
@@ -120,14 +121,21 @@ export function useUpdateWorkspaceSettings(wid: string | undefined) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { inbox_threshold: number }) => updateWorkspaceSettings(api, wid!, data),
-    onSuccess: (result) => {
-      toast.success(
-        `임계값이 ${Math.round(result.inboxThreshold * 100)}%로 변경되었습니다`
-      );
+    mutationFn: (data: UpdateWorkspaceSettingsInput) =>
+      updateWorkspaceSettings(api, wid!, data),
+    onSuccess: (result, variables) => {
+      if (variables.name !== undefined) {
+        toast.success("워크스페이스 이름이 변경되었습니다");
+      } else {
+        toast.success(
+          `임계값이 ${Math.round(result.inboxThreshold * 100)}%로 변경되었습니다`
+        );
+      }
       if (wid) {
         queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(wid) });
       }
+      // 헤더 WorkspaceSwitcher 는 목록 쿼리를 읽는다 — 이름 변경이 거기에도 바로 보여야 한다.
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.list() });
     },
     onError: (error: Error) => {
       toast.error(error.message || "설정 변경에 실패했습니다");

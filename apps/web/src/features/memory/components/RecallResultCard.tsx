@@ -2,6 +2,7 @@
 "use client";
 
 import { Clock, Hash, Search } from "lucide-react";
+import { formatDate } from "@/lib/format-date";
 import type { MemoryRecallSource } from "../types";
 
 interface RecallResultCardProps {
@@ -34,7 +35,7 @@ export function RecallResultCard({
       <footer className="flex items-center justify-between text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1">
           <Clock className="h-3 w-3" />
-          {new Date(source.created_at).toLocaleDateString("ko-KR")}
+          {formatDate(source.created_at)}
         </span>
         {onPromote && (
           <button

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
-import { Search, MessageSquare, Inbox, Folder, StickyNote, Plus } from "lucide-react";
+import { Search, MessageSquare, Inbox, Folder, StickyNote, Plus, ListChecks } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { useRagStream } from "@/features/rag/hooks";
 import { OnboardingTooltip } from "@/components/onboarding/onboarding-tooltip";
@@ -27,7 +27,9 @@ const CMD_GROUPS: { label: string; items: CmdItem[] }[] = [
     label: "이동",
     items: [
       { icon: Inbox, label: "Inbox", shortcut: "G I", action: "navigate:/inbox" },
-      { icon: Folder, label: "프로젝트", shortcut: "G P", action: "navigate:/" },
+      // 2026-09-06: "/" 는 랜딩(→ /dashboard 리다이렉트)이었다 — 프로젝트 목록은 /projects.
+      { icon: Folder, label: "프로젝트", shortcut: "G P", action: "navigate:/projects" },
+      { icon: ListChecks, label: "액션", shortcut: "G A", action: "navigate:/actions" },
       { icon: StickyNote, label: "노트", shortcut: "G N", action: "navigate:/notes" },
       { icon: Search, label: "검색 페이지", shortcut: "G S", action: "navigate:/search" },
     ],
@@ -39,6 +41,28 @@ const CMD_GROUPS: { label: string; items: CmdItem[] }[] = [
     ],
   },
 ];
+
+// 팔레트에 표시되는 단축키의 실제 구현 — 이전엔 라벨만 있고 키 핸들러가 없었다 (BUG-CASUAL CMD-K-SEQ).
+// "G" 를 누른 뒤 1초 안에 두 번째 키를 누르면 이동. "C" 는 단독. 입력 필드/contentEditable 안에서는 무시.
+const SEQUENCE_TIMEOUT_MS = 1000;
+const GO_TARGETS: Record<string, string> = {
+  i: "/inbox",
+  p: "/projects",
+  a: "/actions",
+  n: "/notes",
+  s: "/search",
+};
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    target.isContentEditable
+  );
+}
 
 export function CmdK() {
   const {
@@ -56,20 +80,52 @@ export function CmdK() {
   const router = useRouter();
 
   useEffect(() => {
+    let pendingGo: number | null = null;
+    const clearPending = () => {
+      if (pendingGo !== null) {
+        window.clearTimeout(pendingGo);
+        pendingGo = null;
+      }
+    };
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         toggleCmdK();
+        return;
       }
       if (e.key === "Escape" && cmdKOpen) {
         toggleCmdK();
         setSearch("");
         setIsRagMode(false);
+        return;
+      }
+      // 이하 단축키 시퀀스 — 팔레트가 열려 있거나 입력 중이거나 수정키가 눌린 상태면 무시
+      if (cmdKOpen || e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
+      const key = e.key.toLowerCase();
+      if (pendingGo !== null) {
+        clearPending();
+        const target = GO_TARGETS[key];
+        if (target) {
+          e.preventDefault();
+          router.push(target);
+        }
+        return;
+      }
+      if (key === "g") {
+        pendingGo = window.setTimeout(clearPending, SEQUENCE_TIMEOUT_MS);
+        return;
+      }
+      if (key === "c") {
+        e.preventDefault();
+        router.push("/new");
       }
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [cmdKOpen, toggleCmdK]);
+    return () => {
+      clearPending();
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [cmdKOpen, toggleCmdK, router]);
 
   // Sprint 24 Wave 2 T-CMD-K-FIX: openCmdKWithQuery 로 진입한 경우 query 자동 입력 + RAG 모드.
   // store 의 cmdKInitialQuery 가 set 되면 palette 도 열려있어야 함 (openCmdKWithQuery 가 함께 set).

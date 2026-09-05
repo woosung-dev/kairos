@@ -41,9 +41,11 @@ export async function fetchActionItems(
   const searchParams = new URLSearchParams();
   if (params?.status) searchParams.set("status", params.status);
   if (params?.priority) searchParams.set("priority", params.priority);
-  if (params?.projectId) searchParams.set("project_id", params.projectId);
+  // BE 는 camelCase alias(`projectId`/`pageSize`)만 받는다 — snake_case 는 무시돼 필터가 통째로 빠졌다
+  // (프로젝트 대시보드 "이번 주 액션" 이 워크스페이스 전체 액션을 보여주던 원인).
+  if (params?.projectId) searchParams.set("projectId", params.projectId);
   if (params?.page) searchParams.set("page", String(params.page));
-  if (params?.pageSize) searchParams.set("page_size", String(params.pageSize));
+  if (params?.pageSize) searchParams.set("pageSize", String(params.pageSize));
 
   const query = searchParams.toString();
   const path = `/workspaces/${wid}/action-items${query ? `?${query}` : ""}`;

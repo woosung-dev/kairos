@@ -1,6 +1,7 @@
 "use client";
 
 // Sprint 15 R7 — Founder admin recall-metrics 페이지
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useMe } from "@/features/auth/hooks";
 import { useApiClient } from "@/lib/use-api-client";
@@ -42,8 +43,15 @@ export default function RecallMetricsPage() {
       <section className="p-8 max-w-2xl">
         <h1 className="text-2xl font-semibold mb-2">접근 권한 없음</h1>
         <p className="text-sm text-muted-foreground">
-          이 페이지는 founder 전용입니다. `NEXT_PUBLIC_FOUNDER_USER_ID`로 식별되는 사용자만 진입할 수 있어요.
+          이 페이지는 운영자 전용 메트릭 화면입니다. 일반 사용자에게는 제공되지 않습니다.
         </p>
+        <Link
+          href="/dashboard"
+          className="mt-4 inline-flex items-center gap-1 text-sm underline"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          홈으로 돌아가기
+        </Link>
       </section>
     );
   }

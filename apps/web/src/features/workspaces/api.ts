@@ -38,11 +38,17 @@ export async function deleteWorkspace(
   });
 }
 
+// PATCH settings 는 부분 갱신 — 바꾸려는 필드만 보낸다 (BE alias 가 camelCase).
+export interface UpdateWorkspaceSettingsInput {
+  inboxThreshold?: number;
+  name?: string;
+}
+
 export async function updateWorkspaceSettings(
   api: ApiClient,
   wid: string,
-  data: { inbox_threshold: number }
-): Promise<{ inboxThreshold: number }> {
+  data: UpdateWorkspaceSettingsInput
+): Promise<{ inboxThreshold: number; name: string }> {
   return api.fetch(`/workspaces/${wid}/settings`, {
     method: "PATCH",
     body: JSON.stringify(data),

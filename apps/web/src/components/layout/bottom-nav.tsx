@@ -15,7 +15,8 @@ interface NavItem {
 // Sprint 14 T-11: "검색" 자리에 "빠른 메모" 진입점 (모바일 사용 빈도 높음).
 // 검색은 ⌘K + 헤더 검색바로 접근 (데스크톱과 동일 IA).
 const NAV_ITEMS: NavItem[] = [
-  { href: "/", icon: Home, label: "홈" },
+  // 홈은 "/dashboard" 직행 — "/" 는 서버 리다이렉트 왕복 + active 판정 불가 (sidebar 와 동일).
+  { href: "/dashboard", icon: Home, label: "홈" },
   { href: "/projects", icon: FolderOpen, label: "프로젝트" },
   { href: "/new", icon: Plus, label: "추가", isAccent: true },
   { href: "/inbox", icon: Inbox, label: "Inbox" },

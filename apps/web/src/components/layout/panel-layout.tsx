@@ -170,34 +170,10 @@ export function PanelLayout({ children }: { children: React.ReactNode }) {
               borderLeft: "1px solid var(--border-subtle)",
             }}
           >
-            {/* 오버레이 헤더 (닫기 버튼) */}
-            <div
-              className="flex items-center justify-between px-4 py-3 border-b shrink-0"
-              style={{ borderColor: "var(--border-subtle)" }}
-            >
-              <span
-                className="text-sm font-semibold"
-                style={{
-                  fontFamily: "var(--font-display)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                지식 검색
-              </span>
-              <button
-                onClick={toggleRagOverlay}
-                className="p-1 rounded transition-colors hover:opacity-80"
-                style={{ color: "var(--text-muted)" }}
-                aria-label="AI 검색 패널 닫기"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <path d="M1 1l12 12M13 1L1 13" />
-                </svg>
-              </button>
-            </div>
-            {/* RagPanel 재사용 (헤더 중복되나, RagPanel 내부 헤더는 필터/초기화 역할) */}
+            {/* 헤더(제목·초기화·닫기)는 RagPanel 이 한 번만 그린다 — 예전엔 여기서 같은 제목을
+                한 번 더 그려 "지식 검색" 이 두 줄로 겹쳤다 */}
             <div className="flex-1 overflow-hidden">
-              <RagPanel />
+              <RagPanel onClose={toggleRagOverlay} />
             </div>
           </div>
         </>
