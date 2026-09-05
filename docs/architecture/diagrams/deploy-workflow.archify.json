@@ -1,0 +1,302 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Kairos 배포 워크플로우 (mise → OCI)",
+    "quality_profile": "showcase",
+    "legend": {
+      "entries": {
+        "frontend": {
+          "label": "개발자 액션"
+        },
+        "security": {
+          "label": "게이트"
+        },
+        "backend": {
+          "label": "mise task (맥)"
+        },
+        "cloud": {
+          "label": "서버 compose"
+        },
+        "messagebus": {
+          "label": "롤백"
+        }
+      }
+    },
+    "views": [
+      {
+        "id": "gate",
+        "label": "머지 게이트",
+        "focus": [
+          "pr",
+          "ci",
+          "stop",
+          "preflight"
+        ],
+        "note": "PR 마다 test.yml — backend-test(pytest) · frontend-build(vitest+build+보안헤더) · contract-check(계약 drift) · e2e. 로컬 미러는 mise run ci-local."
+      },
+      {
+        "id": "ship",
+        "label": "빌드 · 전송",
+        "focus": [
+          "preflight",
+          "build",
+          "ship",
+          "up"
+        ],
+        "note": "레지스트리 없음 — 맥에서 arm64 네이티브 빌드 후 docker save | gzip | ssh | docker load. compose 파일 동기화가 이미지보다 먼저다 (2026-08-17 사고)."
+      },
+      {
+        "id": "verify",
+        "label": "검증 · GC · 롤백",
+        "focus": [
+          "up",
+          "post",
+          "rollback"
+        ],
+        "note": "env 주입 확인 → 구 이미지 GC(운영 + 직전 태그만 보존) → /ready. 실패 시 deploy-rollback 이 .env 태그만 되돌린다 — 스키마는 가산형이라 구 이미지가 그대로 동작."
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "ci",
+      "label": "GitHub Actions — test.yml"
+    },
+    {
+      "id": "dev",
+      "label": "개발자 · 맥 (mise run deploy-*)"
+    },
+    {
+      "id": "server",
+      "label": "OCI truewords-oracle (docker compose)"
+    },
+    {
+      "id": "exceptions",
+      "label": "차단 · 롤백",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "change",
+      "label": "변경 · 머지 게이트",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "shipping",
+      "label": "빌드 · 전송 · 기동",
+      "fromCol": 1,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "verification",
+      "label": "검증 · GC",
+      "fromCol": 4,
+      "toCol": 4,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "pr",
+    "ci",
+    "preflight",
+    "build",
+    "ship",
+    "up",
+    "post"
+  ],
+  "nodes": [
+    {
+      "id": "pr",
+      "lane": "dev",
+      "col": 0,
+      "type": "frontend",
+      "label": "PR → main",
+      "sublabel": "squash merge",
+      "width": 104
+    },
+    {
+      "id": "ci",
+      "lane": "ci",
+      "col": 0,
+      "type": "security",
+      "label": "CI 게이트 4종",
+      "sublabel": "pytest · build · contract · e2e",
+      "tag": "blocking",
+      "width": 200
+    },
+    {
+      "id": "preflight",
+      "lane": "dev",
+      "col": 1,
+      "type": "backend",
+      "label": "deploy-preflight",
+      "sublabel": "회의 처리 0 · .env 인코딩",
+      "tag": "gate",
+      "width": 144
+    },
+    {
+      "id": "build",
+      "lane": "dev",
+      "col": 2,
+      "type": "backend",
+      "label": "deploy-build <tag>",
+      "sublabel": "arm64 buildx · api + web",
+      "width": 136
+    },
+    {
+      "id": "ship",
+      "lane": "dev",
+      "col": 3,
+      "type": "backend",
+      "label": "deploy-ship <tag>",
+      "sublabel": "compose sync → save | ssh",
+      "width": 150
+    },
+    {
+      "id": "up",
+      "lane": "server",
+      "col": 3,
+      "type": "cloud",
+      "label": "compose up -d",
+      "sublabel": ".env 태그 → migrate → 기동",
+      "tag": "migrate one-shot",
+      "width": 150
+    },
+    {
+      "id": "post",
+      "lane": "dev",
+      "col": 4,
+      "type": "backend",
+      "label": "검증 · GC",
+      "sublabel": "verify-env · deploy-gc · /ready",
+      "width": 170
+    },
+    {
+      "id": "stop",
+      "lane": "exceptions",
+      "col": 0,
+      "type": "security",
+      "label": "머지 차단",
+      "sublabel": "게이트 red",
+      "width": 104
+    },
+    {
+      "id": "rollback",
+      "lane": "exceptions",
+      "col": 4,
+      "type": "messagebus",
+      "label": "deploy-rollback",
+      "sublabel": "이전 태그 · RTO ≈ 2분",
+      "tag": "마이그레이션은 유지",
+      "width": 136
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-push",
+      "from": "pr",
+      "to": "ci",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "e-green",
+      "from": "ci",
+      "to": "preflight",
+      "label": "green → merge",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "top"
+    },
+    {
+      "id": "e-preflight",
+      "from": "preflight",
+      "to": "build",
+      "label": "tag = git short SHA",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "e-build",
+      "from": "build",
+      "to": "ship",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "e-ship",
+      "from": "ship",
+      "to": "up",
+      "label": "scp compose · docker load",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-up",
+      "from": "up",
+      "to": "post",
+      "label": "컨테이너 기동",
+      "fromSide": "right",
+      "toSide": "bottom"
+    },
+    {
+      "id": "e-red",
+      "from": "ci",
+      "to": "stop",
+      "label": "red",
+      "variant": "security",
+      "role": "error",
+      "fromSide": "left",
+      "toSide": "left"
+    },
+    {
+      "id": "e-fail",
+      "from": "post",
+      "to": "rollback",
+      "label": "/ready 실패",
+      "variant": "security",
+      "role": "error",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "e-restore",
+      "from": "rollback",
+      "to": "up",
+      "label": "이전 태그로 up -d",
+      "variant": "dashed",
+      "role": "return",
+      "fromSide": "left",
+      "toSide": "bottom"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "한 번의 배포",
+      "items": [
+        "PR → CI green → squash merge → preflight → build → ship, 태그 하나 = git short SHA",
+        "레지스트리 없음 — 맥 arm64 와 서버 aarch64 가 같아 docker save | ssh | load 로 충분"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "게이트와 정지 조건",
+      "items": [
+        "CI 4 잡 중 하나라도 red 면 머지 없음 — 로컬 미러는 mise run ci-local",
+        "preflight: 최근 2h 내 transcribing/analyzing 회의 0 — BackgroundTasks 는 재시도가 없다"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "롤백과 GC",
+      "items": [
+        "deploy-rollback 은 .env 태그만 되돌림 — 스키마는 가산형이라 구 이미지가 동작 (ADR-031 D7)",
+        "deploy-gc 는 운영 + 직전 태그만 보존 — 공유 호스트라 system prune 금지 (ADR-028 D9)"
+      ]
+    }
+  ]
+}

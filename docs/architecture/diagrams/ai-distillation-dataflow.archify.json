@@ -1,0 +1,352 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Kairos AI Distillation 데이터 흐름",
+    "quality_profile": "showcase",
+    "legend": {
+      "entries": {
+        "emphasis": {
+          "label": "주 경로 (회의 오디오)"
+        },
+        "default": {
+          "label": "보조 입력 · 분기"
+        },
+        "dashed": {
+          "label": "비치명적 · 실패해도 완료"
+        },
+        "database": {
+          "label": "kairos-db 저장"
+        }
+      }
+    },
+    "views": [
+      {
+        "id": "capture",
+        "label": "Capture → STT",
+        "focus": [
+          "audio",
+          "r2",
+          "whisper"
+        ],
+        "note": "브라우저 → api 프록시 업로드 → R2 원본 보관. BackgroundTask 가 R2 에서 내려받아 ffmpeg WAV 변환 후 Whisper 로 보낸다 (1h 초과는 청크 병렬)."
+      },
+      {
+        "id": "distill",
+        "label": "Distill (Gemini)",
+        "focus": [
+          "whisper",
+          "text",
+          "gemini",
+          "records",
+          "inbox"
+        ],
+        "note": "요약 → 액션 추출 → 프로젝트 추천 순서 고정. confidence ≥ inbox_threshold(0.9) 면 자동 연결, 미달이면 InboxItem 으로 사람이 분류한다."
+      },
+      {
+        "id": "embed",
+        "label": "임베딩 · Express",
+        "focus": [
+          "whisper",
+          "drive",
+          "embed",
+          "chunks",
+          "rag"
+        ],
+        "note": "세그먼트·노트·외부 문서는 모두 L1(부모)/L2(검색) 청크로 halfvec(1536) 에 저장된다. RAG 검색은 L2 만 읽는다 (I-7)."
+      }
+    ],
+    "viewBox": [
+      1068,
+      560
+    ]
+  },
+  "stages": [
+    {
+      "label": "Capture"
+    },
+    {
+      "label": "수집 · STT"
+    },
+    {
+      "label": "Distill (AI)"
+    },
+    {
+      "label": "저장 (kairos-db)"
+    },
+    {
+      "label": "Express"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "audio",
+      "type": "frontend",
+      "label": "회의 오디오",
+      "sublabel": "POST /meetings · 202",
+      "stage": 0,
+      "row": 1,
+      "tag": "L0 원본",
+      "yOffset": -14
+    },
+    {
+      "id": "text",
+      "type": "frontend",
+      "label": "텍스트 캡처",
+      "sublabel": "capture · 노트",
+      "stage": 0,
+      "row": 3,
+      "yOffset": -42
+    },
+    {
+      "id": "drive",
+      "type": "external",
+      "label": "Google Drive 문서",
+      "sublabel": "외부 문서 · ADR-026",
+      "stage": 0,
+      "row": 0
+    },
+    {
+      "id": "r2",
+      "type": "cloud",
+      "label": "Cloudflare R2",
+      "sublabel": "원본 보관 · presigned",
+      "stage": 1,
+      "row": 1,
+      "yOffset": -14
+    },
+    {
+      "id": "whisper",
+      "type": "external",
+      "label": "Whisper STT",
+      "sublabel": "whisper-1 · 1h 청크 병렬",
+      "stage": 1,
+      "row": 2,
+      "tag": "L1 트랜스크립트",
+      "yOffset": -28
+    },
+    {
+      "id": "gemini",
+      "type": "external",
+      "label": "Gemini",
+      "sublabel": "gemini-3.1-flash-lite",
+      "stage": 2,
+      "row": 3,
+      "tag": "프롬프트 3종 · ADR-019",
+      "width": 132,
+      "yOffset": -42
+    },
+    {
+      "id": "embed",
+      "type": "external",
+      "label": "OpenAI 임베딩",
+      "sublabel": "text-embedding-3-small",
+      "stage": 2,
+      "row": 1,
+      "tag": "1536d · L1/L2 계층 청킹",
+      "width": 132,
+      "yOffset": -14
+    },
+    {
+      "id": "records",
+      "type": "database",
+      "label": "회의 · 요약 · 액션",
+      "sublabel": "summaries · actions",
+      "stage": 3,
+      "row": 2,
+      "tag": "L2 결정·액션",
+      "yOffset": -28
+    },
+    {
+      "id": "inbox",
+      "type": "database",
+      "label": "InboxItem",
+      "sublabel": "미달 시 사람이 분류",
+      "stage": 3,
+      "row": 3,
+      "yOffset": -42
+    },
+    {
+      "id": "chunks",
+      "type": "database",
+      "label": "embedding_chunks",
+      "sublabel": "halfvec(1536) · HNSW",
+      "stage": 3,
+      "row": 0,
+      "tag": "ADR-020"
+    },
+    {
+      "id": "rag",
+      "type": "backend",
+      "label": "RAG /ask",
+      "sublabel": "RRF → Gemini SSE",
+      "stage": 4,
+      "row": 1,
+      "tag": "L2 청크만 검색",
+      "yOffset": -14
+    }
+  ],
+  "flows": [
+    {
+      "id": "audio-r2",
+      "from": "audio",
+      "to": "r2",
+      "label": "프록시 업로드",
+      "classification": "오디오 바이트",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "r2-whisper",
+      "from": "r2",
+      "to": "whisper",
+      "label": "다운로드 → ffmpeg WAV",
+      "classification": "16kHz mono",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        315,
+        307
+      ]
+    },
+    {
+      "id": "whisper-gemini",
+      "from": "whisper",
+      "to": "gemini",
+      "label": "TranscriptSegment[]",
+      "classification": "verbose_json",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "whisper-embed",
+      "from": "whisper",
+      "to": "embed",
+      "label": "세그먼트 텍스트",
+      "classification": "청킹 입력",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "text-gemini",
+      "from": "text",
+      "to": "gemini",
+      "label": "STT 생략 · 바로 분석",
+      "classification": "plain text",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "left",
+      "route": "straight"
+    },
+    {
+      "id": "drive-embed",
+      "from": "drive",
+      "to": "embed",
+      "label": "본문 추출 (L1 ≤ 2000자)",
+      "classification": "external_document",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "top",
+      "labelSegment": 0,
+      "via": [
+        [
+          530,
+          157
+        ]
+      ]
+    },
+    {
+      "id": "gemini-records",
+      "from": "gemini",
+      "to": "records",
+      "label": "요약 · 결정 · 액션 항목",
+      "classification": "JSON 구조화",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "left",
+      "labelSegment": 1,
+      "via": [
+        [
+          530,
+          357
+        ]
+      ]
+    },
+    {
+      "id": "gemini-inbox",
+      "from": "gemini",
+      "to": "inbox",
+      "label": "추천 + 신뢰도",
+      "classification": "I-10 임계값",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "left",
+      "route": "straight"
+    },
+    {
+      "id": "embed-chunks",
+      "from": "embed",
+      "to": "chunks",
+      "label": "L1 부모 + L2 검색 벡터",
+      "classification": "비치명적",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelSegment": 1
+    },
+    {
+      "id": "chunks-rag",
+      "from": "chunks",
+      "to": "rag",
+      "label": "HNSW cosine + pg_trgm",
+      "classification": "chunk_level = 2",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        853,
+        210
+      ]
+    },
+    {
+      "id": "records-rag",
+      "from": "records",
+      "to": "rag",
+      "label": "출처 메타 (회의명 · 날짜)",
+      "classification": "citation",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelSegment": 1
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "주 경로 — 회의 한 건",
+      "items": [
+        "업로드는 api 프록시 → R2. 처리는 BackgroundTasks + 202 + GET /status polling (I-5)",
+        "Whisper → 요약 → 액션 추출 → 프로젝트 추천 순서 고정 — 추천이 요약을 입력으로 쓴다"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "분기와 임계값",
+      "items": [
+        "confidence ≥ inbox_threshold(기본 0.9) 면 자동 연결, 미달이면 InboxItem 으로 사람이 분류",
+        "텍스트 캡처·노트는 STT 생략, Drive 문서는 요약 없이 임베딩만 (L1 입력 2000자 상한)"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "벡터 저장 규칙",
+      "items": [
+        "halfvec(1536) + HNSW(m=16, ef_construction=64) 고정 — Vector·ivfflat 금지 (I-20)",
+        "검색은 chunk_level=2 만, L1 은 문맥용 (I-7). 임베딩 실패는 비치명적 — 회의는 completed"
+      ]
+    }
+  ]
+}

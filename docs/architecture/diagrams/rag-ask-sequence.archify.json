@@ -1,0 +1,303 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Kairos RAG /ask 요청 시퀀스",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1290,
+      656
+    ],
+    "legend": {
+      "entries": {
+        "emphasis": {
+          "label": "주 경로"
+        },
+        "security": {
+          "label": "인가 검증"
+        },
+        "dashed": {
+          "label": "SSE 부수 이벤트 · 비치명적"
+        },
+        "return": {
+          "label": "응답 · 반환"
+        }
+      }
+    },
+    "views": [
+      {
+        "id": "authz",
+        "label": "인가 (SSE 시작 전)",
+        "focus": [
+          "web",
+          "api",
+          "authz"
+        ],
+        "note": "JWKS EdDSA 검증(60s 캐시) → require_viewer → project visibility. 거부는 error + done 두 이벤트로 끝나고 스트리밍은 시작되지 않는다 (C-6)."
+      },
+      {
+        "id": "search",
+        "label": "캐시 → 하이브리드 검색",
+        "focus": [
+          "api",
+          "openai",
+          "db"
+        ],
+        "note": "질문 임베딩 1회 → SemanticCache(≥0.93, visibility 포함) → MISS 면 HNSW vector + pg_trgm text 각 top50 → RRF(k=60) top10 → 부모 청크 enrich."
+      },
+      {
+        "id": "generate",
+        "label": "생성 · 스트리밍 · 캐시",
+        "focus": [
+          "api",
+          "gemini",
+          "web",
+          "db"
+        ],
+        "note": "Gemini 스트리밍 전에 검색 트랜잭션을 commit 해 커넥션을 반납한다 (pool 15). 답변은 TTL 7일 SemanticCache 로 저장 — time_range 필터 질의는 저장하지 않는다."
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "사용자"
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "kairos-web"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "kairos-api"
+    },
+    {
+      "id": "authz",
+      "type": "security",
+      "label": "인가"
+    },
+    {
+      "id": "openai",
+      "type": "external",
+      "label": "OpenAI"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "kairos-db"
+    },
+    {
+      "id": "gemini",
+      "type": "external",
+      "label": "Gemini"
+    }
+  ],
+  "segments": [
+    {
+      "from": 170,
+      "to": 288,
+      "label": "요청 · 인가"
+    },
+    {
+      "from": 296,
+      "to": 404,
+      "label": "검색 (캐시 MISS 경로)"
+    },
+    {
+      "from": 434,
+      "to": 578,
+      "label": "생성 · 스트리밍 · 캐시"
+    }
+  ],
+  "messages": [
+    {
+      "id": "ask-input",
+      "from": "user",
+      "to": "web",
+      "y": 186,
+      "label": "질문 입력 · 프로젝트 범위",
+      "variant": "default"
+    },
+    {
+      "id": "post-ask",
+      "from": "web",
+      "to": "api",
+      "y": 215,
+      "label": "POST /rag/ask · Bearer JWT",
+      "variant": "emphasis"
+    },
+    {
+      "id": "verify",
+      "from": "api",
+      "to": "authz",
+      "y": 244,
+      "label": "JWKS 검증 · require_viewer · visibility",
+      "variant": "security"
+    },
+    {
+      "id": "verify-ok",
+      "from": "authz",
+      "to": "api",
+      "y": 273,
+      "label": "허용 (거부 시 error + done 으로 종료)",
+      "variant": "return"
+    },
+    {
+      "id": "embed-q",
+      "from": "api",
+      "to": "openai",
+      "y": 302,
+      "label": "질문 임베딩 → 1536d 벡터",
+      "variant": "default"
+    },
+    {
+      "id": "cache-lookup",
+      "from": "api",
+      "to": "db",
+      "y": 331,
+      "label": "SemanticCache 조회 · cosine ≥ 0.93 → MISS",
+      "variant": "default"
+    },
+    {
+      "id": "hybrid",
+      "from": "api",
+      "to": "db",
+      "y": 360,
+      "label": "vector_search HNSW + text_search pg_trgm · 각 top50",
+      "variant": "emphasis"
+    },
+    {
+      "id": "candidates",
+      "from": "db",
+      "to": "api",
+      "y": 389,
+      "label": "후보 → RRF(k=60) top10 · 부모 청크 enrich",
+      "variant": "return"
+    },
+    {
+      "id": "sse-sources",
+      "from": "api",
+      "to": "web",
+      "y": 418,
+      "label": "SSE search_results (출처)",
+      "variant": "dashed"
+    },
+    {
+      "id": "generate",
+      "from": "api",
+      "to": "gemini",
+      "y": 447,
+      "label": "RAG_ANSWER_SYSTEM_PROMPT + top10 문맥 + 질문",
+      "variant": "emphasis"
+    },
+    {
+      "id": "tokens",
+      "from": "gemini",
+      "to": "api",
+      "y": 476,
+      "label": "token 스트림",
+      "variant": "return"
+    },
+    {
+      "id": "sse-answer",
+      "from": "api",
+      "to": "web",
+      "y": 505,
+      "label": "SSE answer token* → done {cached, sourceCount}",
+      "variant": "emphasis"
+    },
+    {
+      "id": "cache-store",
+      "from": "api",
+      "to": "db",
+      "y": 534,
+      "label": "SemanticCache 저장 · TTL 7d · max_visibility",
+      "variant": "dashed"
+    },
+    {
+      "id": "render",
+      "from": "web",
+      "to": "user",
+      "y": 563,
+      "label": "답변 + 출처 인용 렌더",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "web",
+      "from": 210,
+      "to": 569,
+      "type": "frontend"
+    },
+    {
+      "participant": "api",
+      "from": 215,
+      "to": 545,
+      "type": "backend"
+    },
+    {
+      "participant": "authz",
+      "from": 239,
+      "to": 279,
+      "type": "security"
+    },
+    {
+      "participant": "openai",
+      "from": 296,
+      "to": 309,
+      "type": "external"
+    },
+    {
+      "participant": "db",
+      "from": 325,
+      "to": 395,
+      "type": "database"
+    },
+    {
+      "participant": "gemini",
+      "from": 441,
+      "to": 481,
+      "type": "external"
+    },
+    {
+      "participant": "db",
+      "from": 528,
+      "to": 540,
+      "type": "database"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "인가는 스트리밍 전에 끝난다",
+      "items": [
+        "JWT 는 Better Auth JWKS(EdDSA) 로 검증 — claims 60s in-process 캐시, 워커 1 이므로 싱글턴",
+        "require_viewer(RBAC) 뒤 project visibility — draft 는 작성자, private 은 ProjectMember, admin/owner 우회",
+        "거부는 SSE error + done 두 이벤트로 종료 — 스트리밍 자체가 시작되지 않는다 (ADR-014 C-6)"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "검색은 PostgreSQL 안에서",
+      "items": [
+        "임베딩 1회 → SemanticCache(≥0.93) → MISS 면 HNSW cosine + pg_trgm 을 각 top50 → RRF k=60 → top10",
+        "검색은 chunk_level=2 만, 부모(L1) 텍스트는 enrich 단계에서 문맥으로 합친다 (I-7)",
+        "HNSW 세션 변수는 트랜잭션 로컬 SET LOCAL — ef_search 40 · iterative_scan relaxed_order (I-21)"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "스트리밍과 캐시",
+      "items": [
+        "Gemini 호출 전에 검색 트랜잭션 commit — 스트리밍 수 초 동안 커넥션(pool 15)을 잡지 않는다",
+        "Gemini 실패는 5xx 가 아니라 SSE error(retryAfter 3) + done — 캐시 저장은 건너뛴다",
+        "time_range 필터 질의는 캐시 조회·저장 모두 건너뛴다 — 필터 없는 사용자에게 누수 방지"
+      ]
+    }
+  ]
+}
