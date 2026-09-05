@@ -1,25 +1,16 @@
 "use client";
 
 import { CheckCircle2 } from "lucide-react";
-import { useActionItems, useUpdateActionItem } from "@/features/actions/hooks";
+import { useActionItems, useAssigneeNames, useUpdateActionItem } from "@/features/actions/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ActionItem, ActionStatus } from "@/features/actions/types";
+import { formatDate, isOverdue } from "@/lib/format-date";
 
 /* ── Props ── */
 
 interface ActionViewProps {
   meetingId: string;
-}
-
-/* ── 날짜 오버듀 확인 ── */
-
-function isOverdue(dateStr: string | null): boolean {
-  if (!dateStr) return false;
-  const dueDate = new Date(dateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return dueDate < today;
 }
 
 /* ── 컴포넌트 ── */
@@ -31,6 +22,7 @@ export function ActionView({ meetingId }: ActionViewProps) {
   /* meetingId 필터로 해당 회의의 액션만 조회 */
   const { data, isLoading, error } = useActionItems(wid, { page: 1, pageSize: 100 });
   const updateAction = useUpdateActionItem(wid);
+  const assigneeNames = useAssigneeNames(wid);
 
   /* 클라이언트 사이드 meetingId 필터 (BE fetchActionItems는 meetingId 필터 미지원) */
   const actions = data?.items.filter((a) => a.meetingId === meetingId) ?? [];
@@ -111,6 +103,7 @@ export function ActionView({ meetingId }: ActionViewProps) {
           <ActionRow
             key={action.id}
             action={action}
+            assigneeName={action.assigneeId ? assigneeNames.get(action.assigneeId) : undefined}
             onToggle={() => handleToggle(action)}
           />
         ))}
@@ -121,7 +114,15 @@ export function ActionView({ meetingId }: ActionViewProps) {
 
 /* ── 서브 컴포넌트 ── */
 
-function ActionRow({ action, onToggle }: { action: ActionItem; onToggle: () => void }) {
+function ActionRow({
+  action,
+  assigneeName,
+  onToggle,
+}: {
+  action: ActionItem;
+  assigneeName?: string;
+  onToggle: () => void;
+}) {
   const isDone = action.status === "done";
 
   return (
@@ -154,9 +155,9 @@ function ActionRow({ action, onToggle }: { action: ActionItem; onToggle: () => v
           {action.title}
         </p>
         <div className="flex items-center gap-3 mt-1">
-          {action.assignee && (
+          {assigneeName && (
             <span className="text-caption" style={{ color: "var(--text-muted)" }}>
-              {action.assignee.displayName}
+              {assigneeName}
             </span>
           )}
           {action.dueDate && (
@@ -169,7 +170,7 @@ function ActionRow({ action, onToggle }: { action: ActionItem; onToggle: () => v
                   fontFamily: "var(--font-mono)",
                 }}
               >
-                {action.dueDate}
+                {formatDate(action.dueDate)}
               </span>
             </>
           )}

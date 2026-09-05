@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 갱신: **2026-08-30** (Docker 디스크 GC — ADR-028 D9)
+> 마지막 갱신: **2026-09-06** (UI/UX 전수 sweep — 액션 보드 · 워크스페이스 이름 변경 · 결함 23건)
 > 4 섹션 운영: Completed / Blocked / Questions / Next Actions (`AGENTS.md` §5)
 > 완료 이력 정본 = `git log` + `docs/REFACTORING-BACKLOG.md`. 분할 직전 원본 = [`archive/todo-2026h1.md`](archive/todo-2026h1.md)
 >
@@ -12,6 +12,23 @@
 ## Completed
 
 현행 sprint 완료분만 여기 적는다. 지난 sprint 이력은 `git log` 와 아카이브를 본다.
+
+- [x] **UI/UX 전수 sweep (MCP Playwright 실측, 2026-09-06)** — 로컬 격리 DB(pgvector pg17, :5436)에
+  owner/member 2계정 + 팀 워크스페이스를 시드하고 18 라우트 × (데스크톱·모바일·라이트·member 역할) 을
+  스크린샷으로 순회. 결함 24건 등재 → 23건 수정, 1건 백로그(BL-UX-1).
+  **P1 동작 결함**: 액션 API 쿼리 파라미터 snake/camel 불일치로 프로젝트 대시보드 "이번 주 액션" 이
+  워크스페이스 전체 노출(실측 12 vs 2) + `actionKeys` params 미포함 캐시 충돌 · `/projects` 가 active 만
+  조회해 완료 프로젝트 소실 · 비공개 프로젝트 콘텐츠 0 이면 멤버 패널이 온보딩 뷰에 가려 owner 가 멤버 추가
+  불가 · 프로젝트 멤버 제거 버튼 `opacity-0` 로 비가시 · ⌘K 첫 오픈 시 온보딩 툴팁이 포커스를 가져가
+  앞 글자 손실 · 사이드바/하단탭 "홈" href="/" 로 active 불가 + 서버 왕복 · ⌘K "프로젝트" 가 "/" 로 이동 ·
+  /memory FAB 와 피드백 FAB 겹침 · Inbox AI 추천 라벨이 AI 가 지어낸 제목(실제 classify 대상과 다름) ·
+  ⌘K 단축키(G I/P/N/S, C) 라벨만 있고 미구현 · 액션 담당자가 어디에도 미표시(FE 타입 `assignee` 객체 vs wire `assigneeId`).
+  **덜 끝난 기능**: `/actions` 액션 보드 신설(이전 /inbox redirect) · 워크스페이스 이름 변경(BE PATCH
+  settings 부분 갱신 + 설정 일반 탭) · 회의 상세 뒤로가기/연결 프로젝트 칩 · RAG 오버레이 중복 헤더 ·
+  날짜 포맷 통일(`lib/format-date.ts`) · 404 구분 에러 · 모바일 설정 탭 오버플로 · dead-end UI 2건
+  ("선택한 소스" 탭, /new 자료 업로드 카드) 정리.
+  게이트: FE typecheck/vitest 34 files 184 pass · BE pytest(workspaces 53) · contracts 재생성 · Playwright 재검증
+  스크린샷 console.error 0. 브랜치 `feat/uiux-sweep-20260906`.
 
 - [x] **Docker 디스크 GC + API 이미지 슬림화** (2026-08-30, ADR-028 D9) —
   배포마다 이미지가 쌓이는데 지우는 코드가 0건이었다(문서 서술만 존재). `[tasks.deploy-gc]`

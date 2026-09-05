@@ -14,18 +14,23 @@ const CONTENT_TYPES = [
     icon: <Mic className="w-8 h-8" />,
     title: "회의 녹음",
     description: "오디오/영상 파일을 업로드하면 AI가 자동으로 요약합니다",
+    isAvailable: true,
   },
   {
     id: "note",
     icon: <StickyNote className="w-8 h-8" />,
     title: "노트 작성",
     description: "아이디어, 메모, 회의록을 자유롭게 작성하세요",
+    isAvailable: true,
   },
   {
+    // 2026-09-06: 선택하면 "곧 제공됩니다" 만 나오던 dead-end 카드. 미구현은 카드 단계에서
+    // 비활성으로 드러낸다 — 눌러본 뒤에야 알게 하지 않는다.
     id: "attachment",
     icon: <Paperclip className="w-8 h-8" />,
     title: "자료 업로드",
-    description: "문서, PDF, 이미지 등 프로젝트 관련 자료를 업로드하세요",
+    description: "문서·PDF·이미지 업로드는 준비 중입니다",
+    isAvailable: false,
   },
 ] as const;
 
@@ -145,15 +150,29 @@ export default function NewContentPage() {
         {CONTENT_TYPES.map((type) => (
           <button
             key={type.id}
-            onClick={() => setSelected(type.id)}
-            className="p-6 rounded border text-left transition-colors"
+            type="button"
+            onClick={() => type.isAvailable && setSelected(type.id)}
+            disabled={!type.isAvailable}
+            aria-disabled={!type.isAvailable}
+            className="p-6 rounded border text-left transition-colors disabled:cursor-not-allowed"
             style={{
               background: selected === type.id ? "var(--surface-hover)" : "var(--surface)",
               borderColor: selected === type.id ? "var(--accent)" : "var(--border-subtle)",
               borderRadius: "var(--radius-md)",
+              opacity: type.isAvailable ? 1 : 0.55,
             }}
           >
-            <span className="mb-3 block">{type.icon}</span>
+            <span className="mb-3 flex items-center justify-between">
+              {type.icon}
+              {!type.isAvailable && (
+                <span
+                  className="px-1.5 py-0.5 rounded-full text-micro font-medium uppercase tracking-wider"
+                  style={{ background: "var(--surface-active)", color: "var(--text-muted)" }}
+                >
+                  준비 중
+                </span>
+              )}
+            </span>
             <h3
               className="text-sm font-semibold mb-1"
               style={{ color: "var(--text-primary)", fontFamily: "var(--font-display)" }}
@@ -480,21 +499,6 @@ export default function NewContentPage() {
         </div>
       )}
 
-      {/* 자료 업로드 placeholder — 추후 SourceAddModal 또는 별도 페이지 통합 */}
-      {selected === "attachment" && (
-        <div
-          className="p-6 rounded border text-center"
-          style={{
-            background: "var(--surface)",
-            borderColor: "var(--border-subtle)",
-            borderRadius: "var(--radius-md)",
-          }}
-        >
-          <p style={{ color: "var(--text-muted)" }}>
-            자료 업로드는 곧 제공됩니다 (문서·PDF·이미지)
-          </p>
-        </div>
-      )}
     </div>
   );
 }

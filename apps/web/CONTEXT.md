@@ -47,7 +47,7 @@ apps/web/src/
 │   └── 각 feature: api.ts + hooks.ts + types.ts + components/
 │                   (+선택 schemas.ts / store.ts / CONTEXT.md)
 ├── hooks/         앱 전역 유틸 훅
-├── lib/           api-client, use-api-client, query-client, query-keys, visibility, utils
+├── lib/           api-client, use-api-client, query-client, query-keys, visibility, format-date, utils
 ├── store/         Zustand (전역 UI 상태만)
 └── types/         api.gen.ts (생성물, I-22) + 공통 유틸 타입
 ```

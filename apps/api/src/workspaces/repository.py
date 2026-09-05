@@ -47,13 +47,21 @@ class WorkspaceRepository:
             .where(WorkspaceMember.workspace_id == workspace_id)
         )).one()
 
-    async def update_threshold(
-        self, workspace_id: uuid.UUID, threshold: float
+    async def update_settings(
+        self,
+        workspace_id: uuid.UUID,
+        *,
+        inbox_threshold: float | None = None,
+        name: str | None = None,
     ) -> None:
+        """전달된 필드만 UPDATE (부분 갱신). 둘 다 None 인 요청은 schema 가 422 로 막는다."""
+        values: dict[str, object] = {"updated_at": datetime.utcnow()}
+        if inbox_threshold is not None:
+            values["inbox_threshold"] = inbox_threshold
+        if name is not None:
+            values["name"] = name
         await self.session.exec(
-            update(Workspace)
-            .where(Workspace.id == workspace_id)
-            .values(inbox_threshold=threshold, updated_at=datetime.utcnow())
+            update(Workspace).where(Workspace.id == workspace_id).values(**values)
         )
 
     # DB 에 ondelete CASCADE 가 없어 FK 자식 → 부모 순서로 앱 레벨 삭제.

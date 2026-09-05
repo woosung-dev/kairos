@@ -71,7 +71,7 @@
 POST   /                                   생성 (201, personal/team)
 GET    /                                   내 워크스페이스 목록
 GET    /{workspace_id}                     디테일
-PATCH  /{workspace_id}/settings            설정 변경 (inbox_threshold 등)
+PATCH  /{workspace_id}/settings            설정 부분 변경 (inbox_threshold · name ≤60자, owner 전용, 둘 다 없으면 422)
 DELETE /{workspace_id}                     영구 삭제 (204, owner 전용) — personal 차단 (W-2),
                                            산하 데이터 앱 레벨 cascade (단일 트랜잭션),
                                            R2 객체는 r2-cleanup cron 위임

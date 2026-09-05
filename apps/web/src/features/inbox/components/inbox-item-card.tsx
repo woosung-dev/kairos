@@ -51,6 +51,19 @@ function SmartInboxItemCardImpl({ item }: SmartInboxItemCardProps) {
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
     item.aiSuggestedProjectId ?? ""
   );
+  // 확정된(classify 요청을 보낸) 프로젝트 id — 확정 카드에 실제 대상 제목을 보여주기 위해 추적.
+  const [confirmedProjectId, setConfirmedProjectId] = useState<string | null>(null);
+
+  // AI 추천 라벨 — existingProjectId 가 있으면 그 프로젝트의 실제 제목을 쓴다.
+  // 파이프라인은 AI 가 지어낸 `newProjectTitle` 을 id 와 함께 저장하므로(실측: 라벨 "IR 투자 유치 전략",
+  // 실제 classify 대상은 "💡 아이디어") 그대로 노출하면 사용자가 다른 프로젝트로 확정하게 된다.
+  const suggestedProject = item.aiSuggestedProjectId
+    ? projects.find((p) => p.id === item.aiSuggestedProjectId)
+    : undefined;
+  const suggestedLabel = suggestedProject?.title ?? item.aiSuggestedProjectTitle;
+  const isNewProjectSuggestion = !item.aiSuggestedProjectId && !!item.aiSuggestedProjectTitle;
+  const confirmedLabel =
+    projects.find((p) => p.id === confirmedProjectId)?.title ?? suggestedLabel ?? "프로젝트";
 
   /* aiConfidence가 null일 때 0으로 폴백 */
   const confidencePercent = item.aiConfidence !== null
@@ -67,6 +80,7 @@ function SmartInboxItemCardImpl({ item }: SmartInboxItemCardProps) {
       return;
     }
     setStatus("confirmed");
+    setConfirmedProjectId(item.aiSuggestedProjectId);
     classifyMutation.mutate(
       { id: item.id, projectIds: [item.aiSuggestedProjectId] },
       { onError: () => setStatus("idle") }
@@ -94,6 +108,7 @@ function SmartInboxItemCardImpl({ item }: SmartInboxItemCardProps) {
   function handleClassifyToSelected() {
     if (!selectedProjectId) return;
     setStatus("confirmed");
+    setConfirmedProjectId(selectedProjectId);
     classifyMutation.mutate(
       { id: item.id, projectIds: [selectedProjectId] },
       { onError: () => setStatus("editing") }
@@ -116,7 +131,7 @@ function SmartInboxItemCardImpl({ item }: SmartInboxItemCardProps) {
         <span className="text-sm flex-1" style={{ color: "var(--text-secondary)" }}>
           {item.title} &rarr;{" "}
           <strong style={{ color: "var(--accent)" }}>
-            {item.aiSuggestedProjectTitle ?? "프로젝트"}
+            {confirmedLabel}
           </strong>
         </span>
         <button
@@ -255,8 +270,8 @@ function SmartInboxItemCardImpl({ item }: SmartInboxItemCardProps) {
         </div>
       )}
 
-      {/* AI 추천 프로젝트 */}
-      {item.aiSuggestedProjectTitle && (
+      {/* AI 추천 프로젝트 — id 미해석(새 프로젝트 제안)이면 라벨을 구분해 보여준다 */}
+      {suggestedLabel && (
         <div
           className="flex items-center gap-2 px-3 py-2 rounded mb-3"
           style={{
@@ -265,10 +280,10 @@ function SmartInboxItemCardImpl({ item }: SmartInboxItemCardProps) {
           }}
         >
           <span className="text-xs" style={{ color: "var(--accent)" }}>
-            AI 추천:
+            {isNewProjectSuggestion ? "새 프로젝트 제안:" : "AI 추천:"}
           </span>
           <span className="text-xs font-medium" style={{ color: "var(--accent)" }}>
-            {item.aiSuggestedProjectTitle}
+            {suggestedLabel}
           </span>
           {confidencePercent !== null && (
             <span

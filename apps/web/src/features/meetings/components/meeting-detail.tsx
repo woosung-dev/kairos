@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUpRight, Loader2, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, ArrowUpRight, Folder, Loader2, AlertTriangle } from "lucide-react";
+import { formatDate } from "@/lib/format-date";
 import { MeetingSummaryView } from "./meeting-summary-view";
 import { TranscriptView } from "./transcript-view";
 import { ActionView } from "./action-view";
@@ -17,6 +19,10 @@ import type { MeetingStatus } from "../types";
 
 const TABS = ["요약", "트랜스크립트", "액션"] as const;
 type TabType = (typeof TABS)[number];
+
+/* ── 텍스트 캡처 화자 플레이스홀더 (BE meetings/pipeline_service.py capture_text) ── */
+
+const PLACEHOLDER_SPEAKERS = new Set(["텍스트"]);
 
 /* ── 상태 라벨 ── */
 
@@ -96,7 +102,7 @@ function FailedMeetingView() {
       <p className="text-sm mb-4 max-w-md" style={{ color: "var(--text-muted)" }}>
         처리 중 오류가 발생했습니다. 파일 형식과 크기를 확인하고 다시 업로드해 주세요.
       </p>
-      <a
+      <Link
         href="/new"
         className="px-4 py-2 rounded text-sm font-medium"
         style={{
@@ -106,7 +112,7 @@ function FailedMeetingView() {
         }}
       >
         다시 업로드
-      </a>
+      </Link>
     </div>
   );
 }
@@ -150,14 +156,20 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
   const isProcessing = meeting.status !== "completed" && meeting.status !== "failed";
 
   /* 날짜 포맷 */
-  const displayDate = meeting.recordedAt
-    ? new Date(meeting.recordedAt).toLocaleDateString("ko-KR")
-    : new Date(meeting.createdAt).toLocaleDateString("ko-KR");
+  const displayDate = formatDate(meeting.recordedAt ?? meeting.createdAt);
 
-  /* 참석자: transcript에서 고유 화자 추출 */
+  /* 참석자: transcript에서 고유 화자 추출. 텍스트 캡처(pipeline capture_text)는 화자 자리에
+     "텍스트" 플레이스홀더를 넣으므로 참석자로 세지 않는다 (이전엔 "참석자 1명 · 텍스트" 로 표시). */
   const speakers = meeting.transcript
-    ? [...new Set(meeting.transcript.map((seg) => seg.speaker))]
+    ? [...new Set(meeting.transcript.map((seg) => seg.speaker))].filter(
+        (speaker) => !PLACEHOLDER_SPEAKERS.has(speaker),
+      )
     : [];
+
+  /* 연결된 프로젝트 — 뒤로가기 목적지 + 칩. 회의 목록 페이지가 없어 프로젝트가 자연스러운 상위다. */
+  const linkedProjects = meeting.projects ?? [];
+  const backHref = linkedProjects[0] ? `/projects/${linkedProjects[0].id}` : "/dashboard";
+  const backLabel = linkedProjects[0] ? linkedProjects[0].title : "홈";
 
   /* 소요시간 (초 → 분) */
   const durationMin = meeting.durationSec !== null
@@ -168,18 +180,29 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
 
   return (
     <div className="p-6">
-      {/* 회의 메타데이터 */}
+      {/* 뒤로가기 — 회의 목록 라우트가 없어 연결 프로젝트(없으면 홈)로 돌아간다 */}
+      <Link
+        href={backHref}
+        data-testid="meeting-detail-back-button"
+        className="inline-flex items-center gap-1 text-sm mb-3 transition-colors hover:opacity-80"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        <ArrowLeft size={14} />
+        <span className="truncate max-w-[16rem]">{backLabel}</span>
+      </Link>
+
+      {/* 회의 메타데이터 — 제목/상태는 줄바꿈 허용, 액션은 우측 묶음 (모바일에서 버튼이 세 줄로 갈라지던 것 방지) */}
       <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-2">
           <h1
-            className="text-2xl font-bold"
+            className="text-2xl font-bold min-w-0 break-words"
             style={{ fontFamily: "var(--font-display)", color: "var(--text-primary)" }}
           >
             {meeting.title}
           </h1>
           <span
             data-testid="meeting-status"
-            className="px-2 py-0.5 rounded-full text-xs font-medium"
+            className="shrink-0 px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
             style={{
               background: statusStyle.background,
               color: statusStyle.color,
@@ -187,27 +210,27 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
           >
             {STATUS_LABELS[meeting.status]}
           </span>
-          {/* S28b OBS-MEETING-ACTIONS: export 는 완료 상태에서만 (빈/실패 export 방지) */}
-          {meeting.status === "completed" && (
-            <ExportButton exportFn={exportMeeting} id={meetingId} title={meeting.title} />
-          )}
-          {/* Sprint 23 D4: 워크스페이스 이동 (promote 1-button) */}
-          <button
-            type="button"
-            onClick={() => setIsPromoteOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors border"
-            style={{
-              borderColor: "var(--border)",
-              color: "var(--text-secondary)",
-              borderRadius: "var(--radius-sm)",
-              cursor: "pointer",
-              minHeight: "32px",
-            }}
-            aria-label="워크스페이스 이동"
-          >
-            <ArrowUpRight className="h-3.5 w-3.5" />
-            워크스페이스 이동
-          </button>
+          <div className="flex items-center gap-2 ml-auto shrink-0">
+            {/* S28b OBS-MEETING-ACTIONS: export 는 완료 상태에서만 (빈/실패 export 방지) */}
+            {meeting.status === "completed" && (
+              <ExportButton exportFn={exportMeeting} id={meetingId} title={meeting.title} />
+            )}
+            {/* Sprint 23 D4: promote 1-button — 라벨은 DESIGN.md Promote 스펙("팀으로 올리기") 로 통일.
+                옛 "워크스페이스 이동" 은 복제(ADR-016)를 이동으로 오해하게 했다. */}
+            <button
+              type="button"
+              onClick={() => setIsPromoteOpen(true)}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-xs font-medium transition-colors border whitespace-nowrap cursor-pointer hover:bg-[var(--surface-active)]"
+              style={{
+                borderColor: "var(--border)",
+                color: "var(--text-secondary)",
+              }}
+              aria-label="팀으로 올리기"
+            >
+              <ArrowUpRight className="h-3.5 w-3.5" />
+              팀으로 올리기
+            </button>
+          </div>
         </div>
 
         {/* 메타 정보 */}
@@ -229,7 +252,7 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
 
         {/* 참석자 */}
         {speakers.length > 0 && (
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex flex-wrap items-center gap-2 mt-2">
             {speakers.map((speaker) => (
               <span
                 key={speaker}
@@ -241,6 +264,27 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
               >
                 {speaker}
               </span>
+            ))}
+          </div>
+        )}
+
+        {/* 연결 프로젝트 — API 가 이미 내려주던 `projects` 를 이전엔 렌더하지 않았다 */}
+        {linkedProjects.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 mt-3" data-testid="meeting-linked-projects">
+            {linkedProjects.map((project) => (
+              <Link
+                key={project.id}
+                href={`/projects/${project.id}`}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-micro font-medium transition-colors hover:opacity-80"
+                style={{
+                  background: "var(--accent-subtle)",
+                  color: "var(--accent)",
+                  borderRadius: "var(--radius-sm)",
+                }}
+              >
+                <Folder size={11} />
+                {project.title}
+              </Link>
             ))}
           </div>
         )}

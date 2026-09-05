@@ -1646,17 +1646,35 @@
         "type": "object"
       },
       "UpdateWorkspaceSettingsRequest": {
+        "description": "PATCH settings 본문 — 부분 갱신. 전달된 필드만 반영한다.",
         "properties": {
           "inboxThreshold": {
-            "maximum": 1.0,
-            "minimum": 0.5,
-            "title": "Inboxthreshold",
-            "type": "number"
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.5,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inboxthreshold"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
           }
         },
-        "required": [
-          "inboxThreshold"
-        ],
         "title": "UpdateWorkspaceSettingsRequest",
         "type": "object"
       },

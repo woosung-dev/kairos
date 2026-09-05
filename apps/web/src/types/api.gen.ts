@@ -1827,10 +1827,15 @@ export interface components {
             /** Visibility */
             visibility?: ("public" | "draft" | "private") | null;
         };
-        /** UpdateWorkspaceSettingsRequest */
+        /**
+         * UpdateWorkspaceSettingsRequest
+         * @description PATCH settings 본문 — 부분 갱신. 전달된 필드만 반영한다.
+         */
         UpdateWorkspaceSettingsRequest: {
             /** Inboxthreshold */
-            inboxThreshold: number;
+            inboxThreshold?: number | null;
+            /** Name */
+            name?: string | null;
         };
         /** ValidationError */
         ValidationError: {

@@ -4,9 +4,10 @@
 import Link from "next/link";
 import { StickyNote } from "lucide-react";
 import type { Note } from "@/features/notes/types";
+import { formatDate } from "@/lib/format-date";
 
 export function NoteCard({ note }: { note: Note }) {
-  const displayDate = new Date(note.createdAt).toLocaleDateString("ko-KR");
+  const displayDate = formatDate(note.createdAt);
 
   return (
     <Link

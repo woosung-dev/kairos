@@ -51,8 +51,15 @@ describe("query-keys 형태 스냅샷", () => {
     expect(meetingKeys.status(WID, ID)).toEqual(["meetings", "status", WID, ID]);
   });
 
-  it("actionKeys", () => {
-    expect(actionKeys.list(WID)).toEqual(["actions", "list", WID]);
+  it("actionKeys — params 없으면 {} sentinel, byWorkspace 는 invalidate prefix", () => {
+    expect(actionKeys.byWorkspace(WID)).toEqual(["actions", "list", WID]);
+    expect(actionKeys.list(WID)).toEqual(["actions", "list", WID, {}]);
+    expect(actionKeys.list(WID, { projectId: "p1" })).toEqual([
+      "actions",
+      "list",
+      WID,
+      { projectId: "p1" },
+    ]);
   });
 
   it("projectKeys — params 유무로 list 형태 분기 (S28b RQ-KEY-COLLISION)", () => {

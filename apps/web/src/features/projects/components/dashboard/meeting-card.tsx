@@ -4,11 +4,10 @@
 import Link from "next/link";
 import { Mic } from "lucide-react";
 import type { Meeting } from "@/features/meetings/types";
+import { formatDate } from "@/lib/format-date";
 
 export function MeetingCard({ meeting }: { meeting: Meeting }) {
-  const displayDate = meeting.recordedAt
-    ? new Date(meeting.recordedAt).toLocaleDateString("ko-KR")
-    : new Date(meeting.createdAt).toLocaleDateString("ko-KR");
+  const displayDate = formatDate(meeting.recordedAt ?? meeting.createdAt);
 
   return (
     <Link

@@ -3,13 +3,13 @@
 // RAG 검색 범위 + 필터 UI. Sprint 24 Wave 2 T-RAG-MOCK-REMOVE (BUG-POW-005)
 // 로 MOCK_SELECTABLE_SOURCES 제거 후 "선택한 소스" 탭을 empty state 로 변경 (실 API + selection state 는 BL-NEW-RAG-SOURCE-SELECT 진입 시 구현).
 
-import { useState } from "react";
 import { useRagStore } from "../store";
 import type { SearchFilter } from "../types";
 
 // "현재 프로젝트" 는 글로벌 /search 에 현재 프로젝트 컨텍스트가 없어 무동작(전체와 동일)이라 제거
 // (BUG-SEARCH-CURRENT-PROJECT-NOOP). searchFilter.projectId 인프라는 향후 in-project RAG 용으로 store 에 유지.
-type ScopeTab = "all" | "selected";
+// 2026-09-06: "선택한 소스" 탭도 제거 — 누르면 "준비 중" 안내만 나오는 dead-end 였다.
+// 소스 단위 선택은 BL-NEW-RAG-SOURCE-SELECT 진입 시 실 API 와 함께 되살린다.
 
 const TIME_OPTIONS = [
   { value: "", label: "전체 기간" },
@@ -30,45 +30,14 @@ const SOURCE_OPTIONS = [
 
 export function SearchScope() {
   const { searchFilter, setSearchFilter } = useRagStore();
-  const [scopeTab, setScopeTab] = useState<ScopeTab>("all");
 
   return (
     <div className="px-4 py-2 space-y-2">
-      {/* 스코프 탭 */}
-      <div className="flex items-center gap-1">
-        {(
-          [
-            { key: "all", label: "전체" },
-            { key: "selected", label: "선택한 소스" },
-          ] as const
-        ).map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setScopeTab(tab.key)}
-            className="px-2.5 py-1 rounded-full text-caption font-medium transition-colors cursor-pointer"
-            style={{
-              background:
-                scopeTab === tab.key
-                  ? "var(--accent-subtle)"
-                  : "transparent",
-              color:
-                scopeTab === tab.key
-                  ? "var(--accent)"
-                  : "var(--text-muted)",
-              border:
-                scopeTab === tab.key
-                  ? "1px solid var(--accent)"
-                  : "1px solid var(--border-subtle)",
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* 필터: 기간 + 유형 */}
+      {/* 필터: 기간 + 유형 — 검색 범위는 항상 현재 워크스페이스 전체 */}
       <div className="flex items-center gap-2">
+        <span className="text-caption" style={{ color: "var(--text-muted)" }}>
+          필터
+        </span>
         <select
           value={searchFilter.timeRange || ""}
           onChange={(e) =>
@@ -111,21 +80,6 @@ export function SearchScope() {
           ))}
         </select>
       </div>
-
-      {/* "선택한 소스" 탭 — Sprint 24 Wave 2: MOCK 제거 후 empty state (BL-NEW-RAG-SOURCE-SELECT 진입 시 실 API + selection state). */}
-      {scopeTab === "selected" && (
-        <div
-          className="mt-1 rounded border border-dashed px-3 py-3 text-caption leading-relaxed"
-          style={{
-            borderColor: "var(--border-subtle)",
-            borderRadius: "var(--radius-sm)",
-            color: "var(--text-muted)",
-            background: "var(--surface)",
-          }}
-        >
-          소스 선택 기능 준비 중 — 현재는 전체 워크스페이스에서 검색합니다.
-        </div>
-      )}
     </div>
   );
 }

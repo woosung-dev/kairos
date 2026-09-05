@@ -16,6 +16,7 @@ import {
   FileText,
   Home,
   Inbox,
+  ListChecks,
   MessageSquare,
   Paperclip,
   Plus,
@@ -35,10 +36,13 @@ interface NavItem {
 // Sprint 15 Recall-first wedge — true일 때만 Memory 네비 노출
 const IS_RECALL_ENABLED = process.env.NEXT_PUBLIC_RECALL_ENABLED === "true";
 
-/* 네비 순서: 홈 → Inbox(배지) → [Memory(NEW, flag)] → 구분선 → 빠른 메모 → + 추가 */
+/* 네비 순서: 홈 → Inbox(배지) → 액션 → [Memory(NEW, flag)] → 구분선 → 빠른 메모 → + 추가
+   ★홈은 "/dashboard" 로 직접 간다. 예전 "/" 는 서버에서 세션을 조회해 /dashboard 로 되돌리는
+   랜딩 라우트라 왕복이 하나 더 생기고, pathname 이 "/" 가 될 일이 없어 active 표시도 안 됐다. */
 const NAV_TOP: NavItem[] = [
-  { href: "/", label: "홈", icon: Home },
+  { href: "/dashboard", label: "홈", icon: Home },
   { href: "/inbox", label: "Inbox", icon: Inbox, hasBadge: true },
+  { href: "/actions", label: "액션", icon: ListChecks },
   ...(IS_RECALL_ENABLED
     ? [{ href: "/memory", label: "Memory", icon: Brain, hasNewPill: true }]
     : []),
@@ -388,7 +392,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
         }}
       >
         <Link
-          href="/"
+          href="/dashboard"
           className="text-lg font-bold"
           style={{
             fontFamily: "var(--font-display)",

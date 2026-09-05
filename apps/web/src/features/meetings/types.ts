@@ -38,7 +38,8 @@ export interface MeetingDetail extends Meeting {
   transcript: TranscriptSegment[] | null;
   summary: MeetingSummary | null;
   errorMessage: string | null; // S28b BUG-MEETING-FAILED-UI: 실패 사유 노출
-  projects: { id: UUID; title: string; category: string }[];
+  // BE get_meeting_detail 이 돌려주는 연결 프로젝트(MeetingProjectLink, 접근 가능한 것만)
+  projects: { id: UUID; title: string; status: string; visibility: string }[];
 }
 
 export interface MeetingStatusResponse {

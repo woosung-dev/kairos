@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class CreateWorkspaceRequest(BaseModel):
@@ -72,9 +72,26 @@ class InviteResponse(BaseModel):
 
 
 class UpdateWorkspaceSettingsRequest(BaseModel):
-    inbox_threshold: float = Field(ge=0.5, le=1.0, alias="inboxThreshold")
+    """PATCH settings 본문 — 부분 갱신. 전달된 필드만 반영한다."""
+    inbox_threshold: float | None = Field(
+        default=None, ge=0.5, le=1.0, alias="inboxThreshold"
+    )
+    name: str | None = Field(default=None, min_length=1, max_length=60)
 
     model_config = {"populate_by_name": True}
+
+    @model_validator(mode="after")
+    def _validate_partial_update(self) -> "UpdateWorkspaceSettingsRequest":
+        # 공백만 있는 이름은 min_length 를 통과하므로 strip 후 다시 검사한다.
+        if self.name is not None:
+            stripped = self.name.strip()
+            if not stripped:
+                raise ValueError("name must not be blank")
+            self.name = stripped
+        # 빈 PATCH 는 updated_at 만 건드리는 무의미한 쓰기라 422 로 막는다.
+        if self.inbox_threshold is None and self.name is None:
+            raise ValueError("at least one of inboxThreshold or name is required")
+        return self
 
 
 class InviteInfoResponse(BaseModel):

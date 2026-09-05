@@ -52,7 +52,7 @@ describe("ProjectMembersPanel visibility 게이트", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: /Project Members/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /프로젝트 멤버/ })).toBeInTheDocument();
     expect(screen.getByText("워크스페이스 멤버 선택...")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "추가" })).toBeInTheDocument();
     expect(useProjectMembers).toHaveBeenCalledWith("workspace-1", "project-1");
@@ -69,7 +69,7 @@ describe("ProjectMembersPanel visibility 게이트", () => {
       />,
     );
 
-    expect(screen.queryByRole("heading", { name: /Project Members/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /프로젝트 멤버/ })).not.toBeInTheDocument();
     expect(useProjectMembers).not.toHaveBeenCalled();
     expect(useMembers).not.toHaveBeenCalled();
   });
@@ -84,7 +84,7 @@ describe("ProjectMembersPanel visibility 게이트", () => {
       />,
     );
 
-    expect(screen.queryByRole("heading", { name: /Project Members/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /프로젝트 멤버/ })).not.toBeInTheDocument();
     expect(useProjectMembers).not.toHaveBeenCalled();
     expect(useMembers).not.toHaveBeenCalled();
   });

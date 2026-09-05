@@ -47,7 +47,7 @@ export function DangerZone({ workspaceId, workspaceName }: DangerZoneProps) {
         if (fallback) {
           setActiveWorkspaceId(fallback.id);
         }
-        router.push("/");
+        router.push("/dashboard");
       },
     });
   };

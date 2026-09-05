@@ -127,8 +127,13 @@ export function OnboardingTooltip({
           </div>
         )}
       />
+      {/* initialFocus/finalFocus=false — 안내 말풍선이 포커스를 가져가면 ⌘K 팔레트의 autoFocus
+          input 이 포커스를 잃어 첫 방문 사용자의 앞 글자가 사라진다 (실측: "?9월…" 에서 "?9" 소실).
+          툴팁은 읽기 전용이라 포커스를 가질 이유가 없다. */}
       <PopoverContent
         className="max-w-xs"
+        initialFocus={false}
+        finalFocus={false}
         data-testid={`onboarding-tooltip-${page}`}
         onKeyDown={(e) => {
           if (e.key === "Escape") handleDismiss();
