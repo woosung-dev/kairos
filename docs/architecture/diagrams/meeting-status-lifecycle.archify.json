@@ -1,0 +1,260 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Kairos 회의 상태 전이",
+    "quality_profile": "showcase",
+    "legend": {
+      "entries": {
+        "start": {
+          "label": "생성 (202 Accepted)"
+        },
+        "active": {
+          "label": "BackgroundTask 처리 중"
+        },
+        "decision": {
+          "label": "임계값 판정"
+        },
+        "waiting": {
+          "label": "사람 분류 대기"
+        },
+        "success": {
+          "label": "완료"
+        },
+        "failure": {
+          "label": "실패 (터미널)"
+        }
+      }
+    },
+    "views": [
+      {
+        "id": "rail",
+        "label": "정상 경로",
+        "focus": [
+          "uploading",
+          "transcribing",
+          "analyzing",
+          "classify",
+          "completed"
+        ],
+        "note": "status 는 uploading → transcribing → analyzing → completed 4 값. 전이마다 commit 하므로 클라이언트는 GET /meetings/{id}/status 로 진행을 본다."
+      },
+      {
+        "id": "capture",
+        "label": "텍스트 캡처 지름길",
+        "focus": [
+          "uploading",
+          "analyzing"
+        ],
+        "note": "POST /meetings/capture 는 STT 를 건너뛰고 analyzing 부터 시작한다 — 세그먼트 1개(speaker='텍스트')를 저장한 뒤 같은 분석 블록을 탄다."
+      },
+      {
+        "id": "inbox",
+        "label": "Inbox 임계값 분기",
+        "focus": [
+          "classify",
+          "inbox_wait",
+          "completed"
+        ],
+        "note": "InboxItem 은 항상 생성(별도 엔티티). confidence ≥ inbox_threshold(기본 0.9) + 기존 프로젝트 ID 면 자동 연결, 아니면 사람이 분류. 회의는 어느 쪽이든 completed."
+      },
+      {
+        "id": "failure",
+        "label": "실패와 배포 게이트",
+        "focus": [
+          "transcribing",
+          "analyzing",
+          "failed"
+        ],
+        "note": "예외는 rollback 후 failed + error_message. 재시도 없음 — 그래서 deploy-preflight 가 최근 2h 내 transcribing/analyzing 0건을 배포 조건으로 센다."
+      }
+    ],
+    "viewBox": [
+      1080,
+      632
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "meetings.status"
+    },
+    {
+      "id": "wait",
+      "label": "Inbox 대기"
+    },
+    {
+      "id": "terminal",
+      "label": "실패 — 재시도 없음"
+    }
+  ],
+  "states": [
+    {
+      "id": "uploading",
+      "type": "start",
+      "label": "uploading",
+      "sublabel": "202 Accepted",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "tag": "R2 file_key 저장"
+    },
+    {
+      "id": "transcribing",
+      "type": "active",
+      "label": "transcribing",
+      "sublabel": "Whisper STT",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "commit"
+    },
+    {
+      "id": "analyzing",
+      "type": "active",
+      "label": "analyzing",
+      "sublabel": "요약 → 액션 → 추천",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "commit"
+    },
+    {
+      "id": "classify",
+      "type": "decision",
+      "label": "프로젝트 판정",
+      "sublabel": "≥ 임계값 + 기존 프로젝트?",
+      "lane": "main",
+      "col": 3,
+      "step": "04",
+      "tag": "I-10 · 기본 0.9"
+    },
+    {
+      "id": "completed",
+      "type": "success",
+      "label": "completed",
+      "sublabel": "임베딩 · commit",
+      "lane": "main",
+      "col": 4,
+      "step": "05",
+      "tag": "commit"
+    },
+    {
+      "id": "failed",
+      "type": "failure",
+      "label": "failed",
+      "sublabel": "rollback + 사유 저장",
+      "lane": "terminal",
+      "col": 0,
+      "tag": "터미널"
+    },
+    {
+      "id": "inbox_wait",
+      "type": "waiting",
+      "label": "InboxItem 대기",
+      "sublabel": "별도 엔티티 · 사람이 분류",
+      "lane": "wait",
+      "col": 1,
+      "tag": "회의 상태와 무관"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "t-audio",
+      "from": "uploading",
+      "to": "transcribing"
+    },
+    {
+      "id": "t-capture",
+      "from": "uploading",
+      "to": "analyzing",
+      "label": "텍스트 캡처 · STT 생략",
+      "variant": "dashed",
+      "route": "top-channel",
+      "fromSide": "top",
+      "toSide": "top",
+      "channelY": 116,
+      "labelDy": 13
+    },
+    {
+      "id": "t-stt",
+      "from": "transcribing",
+      "to": "analyzing"
+    },
+    {
+      "id": "t-analyze",
+      "from": "analyzing",
+      "to": "classify"
+    },
+    {
+      "id": "t-auto",
+      "from": "classify",
+      "to": "completed",
+      "label": "자동 연결 여부와 무관하게 completed",
+      "variant": "emphasis",
+      "labelDy": -30
+    },
+    {
+      "id": "t-inbox",
+      "from": "classify",
+      "to": "inbox_wait",
+      "label": "미달 → 사람이 분류",
+      "route": "straight",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        556,
+        202
+      ]
+    },
+    {
+      "id": "t-fail-stt",
+      "from": "transcribing",
+      "to": "failed",
+      "label": "STT 예외",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "t-fail-ai",
+      "from": "analyzing",
+      "to": "failed",
+      "label": "분석 예외",
+      "variant": "security",
+      "route": "straight",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        402,
+        202
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "상태 값과 커밋",
+      "items": [
+        "status 4 값 + failed — 전이마다 commit",
+        "BackgroundTasks 1개 · 워커 1 · 재시도 없음 (I-5)"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Inbox 분기",
+      "items": [
+        "InboxItem 은 항상 생성 · 회의는 즉시 completed",
+        "≥ 0.9(기본) + 기존 프로젝트 ID → 자동 연결"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "실패는 터미널",
+      "items": [
+        "rollback → failed + error_message 저장",
+        "deploy-preflight: 처리 중 회의 0 이어야 배포"
+      ]
+    }
+  ]
+}
