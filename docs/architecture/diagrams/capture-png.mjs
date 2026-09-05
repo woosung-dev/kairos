@@ -31,7 +31,7 @@ for (const name of names) {
     await page.evaluate(() => document.fonts && document.fonts.ready);
     await page.waitForTimeout(600);
     // 뷰어 크롬(PATH/MAP/LENS 도크)은 빼고 svg(범례 포함)만 자른다 — 2026-09-04 PNG 와 같은 프레이밍.
-    await page.addStyleTag({ content: '[class*="dock"], .no-print { display: none !important; }' });
+    await page.addStyleTag({ content: '.no-print { display: none !important; }' });
     const box = await page.locator('.diagram-container svg').first().boundingBox();
     if (!box) throw new Error(`${name}.html 에서 .diagram-container svg 를 찾지 못했다 — archify deliver 산출물인지 확인`);
     const out = path.join(here, `${name}.${theme}.png`);

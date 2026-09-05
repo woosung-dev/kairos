@@ -56,7 +56,7 @@
           "inbox_wait",
           "completed"
         ],
-        "note": "confidence ≥ workspaces.inbox_threshold(기본 0.9) 면 프로젝트 자동 연결. 미달이면 InboxItem(is_processed=false) 로 남고 회의는 그대로 completed."
+        "note": "InboxItem 은 항상 생성(별도 엔티티). confidence ≥ inbox_threshold(기본 0.9) + 기존 프로젝트 ID 면 자동 연결, 아니면 사람이 분류. 회의는 어느 쪽이든 completed."
       },
       {
         "id": "failure",
@@ -81,7 +81,7 @@
     },
     {
       "id": "wait",
-      "label": "Inbox 대기 — InboxItem 은 별도 엔티티"
+      "label": "Inbox 대기"
     },
     {
       "id": "terminal",
@@ -123,7 +123,7 @@
       "id": "classify",
       "type": "decision",
       "label": "프로젝트 판정",
-      "sublabel": "신뢰도 ≥ 임계값?",
+      "sublabel": "≥ 임계값 + 기존 프로젝트?",
       "lane": "main",
       "col": 3,
       "step": "04",
@@ -152,10 +152,10 @@
       "id": "inbox_wait",
       "type": "waiting",
       "label": "InboxItem 대기",
-      "sublabel": "is_processed=false",
+      "sublabel": "별도 엔티티 · 사람이 분류",
       "lane": "wait",
       "col": 1,
-      "tag": "사람이 분류"
+      "tag": "회의 상태와 무관"
     }
   ],
   "transitions": [
@@ -190,7 +190,7 @@
       "id": "t-auto",
       "from": "classify",
       "to": "completed",
-      "label": "≥ 임계값 → 자동 연결",
+      "label": "자동 연결 여부와 무관하게 completed",
       "variant": "emphasis",
       "labelDy": -30
     },
@@ -198,7 +198,7 @@
       "id": "t-inbox",
       "from": "classify",
       "to": "inbox_wait",
-      "label": "미달 → InboxItem",
+      "label": "미달 → 사람이 분류",
       "route": "straight",
       "fromSide": "bottom",
       "toSide": "top",
@@ -206,15 +206,6 @@
         556,
         202
       ]
-    },
-    {
-      "id": "t-inbox-done",
-      "from": "inbox_wait",
-      "to": "completed",
-      "label": "회의는 completed",
-      "variant": "dashed",
-      "fromSide": "right",
-      "toSide": "bottom"
     },
     {
       "id": "t-fail-stt",
@@ -253,8 +244,8 @@
       "dot": "amber",
       "title": "Inbox 분기",
       "items": [
-        "confidence ≥ 0.9(기본) → 프로젝트 자동 연결",
-        "미달 → InboxItem 대기, 회의는 completed"
+        "InboxItem 은 항상 생성 · 회의는 즉시 completed",
+        "≥ 0.9(기본) + 기존 프로젝트 ID → 자동 연결"
       ]
     },
     {

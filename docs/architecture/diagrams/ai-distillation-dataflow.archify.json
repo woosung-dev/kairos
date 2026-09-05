@@ -29,7 +29,7 @@
           "r2",
           "whisper"
         ],
-        "note": "브라우저 → api 프록시 업로드 → R2 원본 보관. BackgroundTask 가 R2 에서 내려받아 ffmpeg WAV 변환 후 Whisper 로 보낸다 (1h 초과는 청크 병렬)."
+        "note": "브라우저 → api 프록시 업로드 → R2 원본 보관. BackgroundTask 가 R2 에서 내려받아 ffmpeg WAV 변환 후 Whisper 로 보낸다 (10분 초과는 10분 청크를 4개씩 병렬)."
       },
       {
         "id": "distill",
@@ -41,7 +41,7 @@
           "records",
           "inbox"
         ],
-        "note": "요약 → 액션 추출 → 프로젝트 추천 순서 고정. confidence ≥ inbox_threshold(0.9) 면 자동 연결, 미달이면 InboxItem 으로 사람이 분류한다."
+        "note": "요약 → 액션 추출 → 프로젝트 추천 순서 고정. InboxItem 은 항상 생성되고, confidence ≥ inbox_threshold(0.9) 이면서 기존 프로젝트 ID 가 있을 때만 자동 연결된다."
       },
       {
         "id": "embed",
@@ -53,7 +53,7 @@
           "chunks",
           "rag"
         ],
-        "note": "세그먼트·노트·외부 문서는 모두 L1(부모)/L2(검색) 청크로 halfvec(1536) 에 저장된다. RAG 검색은 L2 만 읽는다 (I-7)."
+        "note": "세그먼트·노트·외부 문서는 모두 L1(부모)/L2(검색) 청크로 halfvec(1536) 에 저장된다. 노트와 Drive 문서는 Gemini 요약 없이 임베딩만 한다. RAG 검색은 L2 만 읽는다 (I-7)."
       }
     ],
     "viewBox": [
@@ -93,7 +93,7 @@
       "id": "text",
       "type": "frontend",
       "label": "텍스트 캡처",
-      "sublabel": "capture · 노트",
+      "sublabel": "POST /meetings/capture",
       "stage": 0,
       "row": 3,
       "yOffset": -42
@@ -119,7 +119,7 @@
       "id": "whisper",
       "type": "external",
       "label": "Whisper STT",
-      "sublabel": "whisper-1 · 1h 청크 병렬",
+      "sublabel": "whisper-1 · 10분 청크 ×4",
       "stage": 1,
       "row": 2,
       "tag": "L1 트랜스크립트",
@@ -161,7 +161,7 @@
       "id": "inbox",
       "type": "database",
       "label": "InboxItem",
-      "sublabel": "미달 시 사람이 분류",
+      "sublabel": "항상 생성 · 미달 시 분류",
       "stage": 3,
       "row": 3,
       "yOffset": -42
@@ -238,8 +238,22 @@
       "classification": "plain text",
       "variant": "default",
       "fromSide": "right",
-      "toSide": "left",
-      "route": "straight"
+      "toSide": "bottom",
+      "via": [
+        [
+          290,
+          457
+        ],
+        [
+          290,
+          502
+        ],
+        [
+          530,
+          502
+        ]
+      ],
+      "labelSegment": 0
     },
     {
       "id": "drive-embed",
@@ -279,12 +293,16 @@
       "id": "gemini-inbox",
       "from": "gemini",
       "to": "inbox",
-      "label": "추천 + 신뢰도",
+      "label": "추천 + 신뢰도 (항상)",
       "classification": "I-10 임계값",
       "variant": "default",
       "fromSide": "right",
       "toSide": "left",
-      "route": "straight"
+      "route": "straight",
+      "labelAt": [
+        643,
+        500
+      ]
     },
     {
       "id": "embed-chunks",
@@ -310,17 +328,6 @@
         853,
         210
       ]
-    },
-    {
-      "id": "records-rag",
-      "from": "records",
-      "to": "rag",
-      "label": "출처 메타 (회의명 · 날짜)",
-      "classification": "citation",
-      "variant": "default",
-      "fromSide": "right",
-      "toSide": "left",
-      "labelSegment": 1
     }
   ],
   "cards": [
@@ -336,8 +343,8 @@
       "dot": "amber",
       "title": "분기와 임계값",
       "items": [
-        "confidence ≥ inbox_threshold(기본 0.9) 면 자동 연결, 미달이면 InboxItem 으로 사람이 분류",
-        "텍스트 캡처·노트는 STT 생략, Drive 문서는 요약 없이 임베딩만 (L1 입력 2000자 상한)"
+        "InboxItem 은 항상 생성. confidence ≥ inbox_threshold(기본 0.9) + 기존 프로젝트 ID 일 때만 자동 연결",
+        "텍스트 캡처는 STT 생략 · 노트와 Drive 문서는 요약 없이 임베딩만 (L1 입력 2000자 상한)"
       ]
     },
     {

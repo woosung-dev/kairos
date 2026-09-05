@@ -17,9 +17,6 @@
         },
         "cloud": {
           "label": "서버 compose"
-        },
-        "messagebus": {
-          "label": "롤백"
         }
       }
     },
@@ -188,7 +185,7 @@
       "id": "rollback",
       "lane": "exceptions",
       "col": 4,
-      "type": "messagebus",
+      "type": "backend",
       "label": "deploy-rollback",
       "sublabel": "이전 태그 · RTO ≈ 2분",
       "tag": "마이그레이션은 유지",

@@ -18,7 +18,7 @@
 | 다이어그램 (archify 타입) | 무엇을 그렸나 | 근거 코드 | 사양 · HTML |
 |---|---|---|---|
 | **AI Distillation 데이터 흐름** (`dataflow`) | 오디오 · 텍스트 · Drive 문서 → R2 · Whisper → Gemini · OpenAI 임베딩 → `kairos-db` 저장 → RAG. Capture / STT / Distill / 저장 / Express 5 스테이지 | `meetings/pipeline_service.py` · `services/transcription.py` · `services/ai_processing.py` · `embeddings/service.py` · `integrations/pipeline_service.py` | [`ai-distillation-dataflow.archify.json`](ai-distillation-dataflow.archify.json) · [`.html`](ai-distillation-dataflow.html) |
-| **RAG `/ask` 요청 시퀀스** (`sequence`) | web → api → 인가(JWKS · viewer · visibility) → OpenAI 임베딩 → SemanticCache → 하이브리드 검색(HNSW + pg_trgm → RRF) → Gemini SSE → 캐시 저장. 14 메시지 | `rag/router.py` · `rag/pipeline_service.py` · `rag/service.py:ask` · `auth/dependencies.py` | [`rag-ask-sequence.archify.json`](rag-ask-sequence.archify.json) · [`.html`](rag-ask-sequence.html) |
+| **RAG `/ask` 요청 시퀀스** (`sequence`) | web → api → 인가(JWKS · viewer · visibility) → OpenAI 임베딩 → SemanticCache → 하이브리드 검색(HNSW + pg_trgm → RRF) → Gemini SSE → 캐시 저장 → done. 15 메시지 | `rag/router.py` · `rag/pipeline_service.py` · `rag/service.py:ask` · `auth/dependencies.py` | [`rag-ask-sequence.archify.json`](rag-ask-sequence.archify.json) · [`.html`](rag-ask-sequence.html) |
 | **회의 상태 전이** (`lifecycle`) | `meetings.status` uploading → transcribing → analyzing → (임계값 판정) → completed, 텍스트 캡처 지름길, InboxItem 대기, failed 터미널 | `meetings/models.py:24` · `meetings/pipeline_service.py:process_meeting · capture_text · _analyze_and_store` · `mise.toml deploy-preflight` | [`meeting-status-lifecycle.archify.json`](meeting-status-lifecycle.archify.json) · [`.html`](meeting-status-lifecycle.html) |
 | **배포 워크플로우** (`workflow` v2) | PR → CI 4 잡 → `deploy-preflight` → `deploy-build` → `deploy-ship`(compose sync → save \| ssh \| load → up -d) → verify-env · gc · /ready, 머지 차단 · `deploy-rollback` 예외 레인 | `.github/workflows/test.yml` · `mise.toml [tasks.deploy-*]` · `deploy/oci/README.md` · ADR-028 D7/D9 | [`deploy-workflow.archify.json`](deploy-workflow.archify.json) · [`.html`](deploy-workflow.html) |
 
@@ -88,6 +88,8 @@ node docs/architecture/diagrams/capture-png.mjs $N          # README 용 light/d
 - 시스템 아키텍처의 `Cloudflare 엣지` 는 노드가 아니라 `사용자 → cloudflared` 간선 라벨이다 — 컨테이너로 존재하는 것은 `cloudflared` 만이다.
 - 모노레포 다이어그램에 `mise → apps/*` 간선(be-*/fe-* task)은 그리지 않았다 — 교차선이 늘어 오히려 읽기 어려워져 카드로 옮겼다.
 - 데이터 흐름에 `MeetingPipelineService` 오케스트레이터 노드는 없다 — 모든 간선의 허브가 돼 별 모양이 되므로, 호출 순서는 카드와 상태 전이 다이어그램이 맡는다.
-- 시퀀스에서 임베딩 반환 · 캐시 MISS 반환은 요청 화살표 하나에 접었다 (14 메시지가 첫 화면 한계). HIT 경로는 라벨 괄호와 카드로만 적었다.
+- 시퀀스에서 임베딩 반환 · 캐시 MISS 반환은 요청 화살표 하나에 접었다 (15 메시지 × 28px 가 첫 화면 한계). HIT 경로는 라벨 괄호와 카드로만 적었다.
+- 상태 전이에 `InboxItem 대기 → completed` 화살표는 없다 — InboxItem 은 항상 생성되고 회의는 같은 트랜잭션에서 completed 라, 대기가 회의 완료를 막는 것처럼 읽히는 간선을 뺐다.
+- 데이터 흐름에 `회의 · 요약 · 액션 → RAG /ask` 간선은 없다 — RAG 는 meetings 테이블을 읽지 않고 chunk `metadata_json.title` 을 인용한다.
 - 상태 전이의 `failed` 는 재시도 전이가 없다 — 코드에 없는 "재시도" 화살표를 그리지 않았다 (사용자 재업로드가 복구 경로).
 - 배포 워크플로우의 `deploy-status`(`/ready`) 는 `verify-env · deploy-gc` 와 한 노드로 접었다 — 같은 열의 별도 노드는 `compose up -d` → `검증` 간선과 교차했다.
