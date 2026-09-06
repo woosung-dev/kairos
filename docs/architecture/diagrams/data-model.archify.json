@@ -6,7 +6,7 @@
     "quality_profile": "showcase",
     "repository": {
       "url": "https://github.com/woosung-dev/kairos",
-      "revision": "278d4be248b6383ee18344912d9eb41d270e150a"
+      "revision": "884a1455c9325871524dae3a6738d35b77565300"
     },
     "legend": {
       "entries": {
@@ -85,7 +85,7 @@
         },
         {
           "path": "apps/web/src/lib/auth.ts",
-          "line": 15,
+          "line": 27,
           "label": "modelName 오버라이드"
         }
       ]

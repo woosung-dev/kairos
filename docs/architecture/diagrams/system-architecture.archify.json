@@ -6,7 +6,7 @@
     "quality_profile": "showcase",
     "repository": {
       "url": "https://github.com/woosung-dev/kairos",
-      "revision": "278d4be248b6383ee18344912d9eb41d270e150a"
+      "revision": "884a1455c9325871524dae3a6738d35b77565300"
     },
     "legend": {
       "entries": {
@@ -27,7 +27,7 @@
   "components": [
     { "id": "user", "type": "external", "label": "사용자 (브라우저)", "sublabel": "kairos.woosung.dev", "pos": [60, 70], "size": [200, 60] },
     { "id": "google_login", "type": "external", "label": "Google OAuth", "sublabel": "로그인 OAuth 클라이언트", "tag": "Drive 와 분리", "pos": [700, 70], "size": [200, 60],
-      "sources": [{ "path": "apps/web/src/lib/auth.ts", "line": 15, "label": "socialProviders" }] },
+      "sources": [{ "path": "apps/web/src/lib/auth.ts", "line": 32, "label": "socialProviders" }] },
     { "id": "cloudflared", "type": "security", "label": "kairos-cloudflared", "sublabel": "터널 커넥터 · 아웃바운드만", "tag": "host 네트워크 · 128m", "pos": [60, 230], "size": [200, 60],
       "sources": [{ "path": "deploy/oci/docker-compose.prod.yml", "line": 135, "label": "compose service" }] },
     { "id": "web", "type": "frontend", "label": "kairos-web", "sublabel": "Next.js 16 · :3100 → 3000", "tag": "768m", "pos": [380, 230], "size": [200, 60],
