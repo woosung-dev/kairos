@@ -105,7 +105,7 @@ wire 타입은 여기서 import 하고, 재생성은 루트에서 `mise run cont
 
 | 종류 | 위치 | 명령 |
 |---|---|---|
-| 단위 (31 파일) | 코드 옆 `__tests__/` | `mise run fe-test` |
+| 단위 (39 파일) | 코드 옆 `__tests__/` | `mise run fe-test` |
 | e2e (44 spec) | `e2e/` | `mise run e2e` |
 
 Playwright project 3종:

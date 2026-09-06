@@ -4,6 +4,12 @@
 > 사양의 `meta.repository.revision` 이 그 근거를 읽은 커밋이다. 흐름 4종(데이터 흐름 · 시퀀스 · 상태 전이 · 워크플로우)은
 > archify 가 해당 타입에 `sources` 를 지원하지 않아 근거를 카드·가이드 뷰 문장으로 적었다 (근거 코드 경로는 아래 표).
 > 사실이 바뀌면 사양(JSON)을 고치고 다시 렌더한다 — HTML/PNG 를 손으로 편집하지 않는다.
+>
+> **최근 점검 2026-09-06** — main `884a145` 기준 7종을 코드와 대조했다(소스 앵커 54개 · 컨테이너 한도 · 테이블 26+5 · Whisper 10분×4 · 캐시 0.93/7d · RRF k=60 등).
+> 고친 것: `repo-structure` 태그의 테스트 파일 수(pytest 124→125 · vitest 31→39), `auth.ts` 앵커 2개(15행 → `socialProviders` 32행 · `modelName` 27행), 아키텍처 3종 `revision`.
+> README 트리오의 같은 숫자도 동기했고, 그 과정에서 PR #187 부터 틀려 있던 "alembic 26 리비전"(실제 25 — 26은 테이블 수)을 정정했다. 흐름 4종은 변경 없음.
+> HTML 은 재 deliver(9/9 · visual-check 4 뷰포트 pass). README PNG 는 유지 — architecture `tag` 는 SVG 의 `data-detail="fine"` 텍스트라 기본 read 레벨(LOD)에서 숨겨지므로
+> 시각 변화가 없고, 재캡처는 Chromium 빌드 차이로 16px 프레이밍만 바뀌었다. tag 를 바꾼 뒤 PNG 재캡처가 필요한지는 이 LOD 규칙으로 판단한다.
 
 ## 아키텍처 3종 (2026-09-04)
 

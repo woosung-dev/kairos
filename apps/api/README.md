@@ -67,9 +67,9 @@ apps/api/
 │   └── <domain>/          router · service · repository · schemas · models · dependencies · exceptions
 │                          (+ cross-domain 오케스트레이터가 필요한 5 도메인만 pipeline_service.py —
 │                           meetings · notes · rag · memory · integrations)
-├── alembic/               마이그레이션 26 리비전. Better Auth `auth_*` 5 테이블 DDL 도 여기서 적용 (ADR-031 D4)
+├── alembic/               마이그레이션 25 리비전. Better Auth `auth_*` 5 테이블 DDL 도 여기서 적용 (ADR-031 D4)
 ├── scripts/               export_openapi.py(계약 생성) · reindex_vectors.py · r2_cleanup.py · 벤치/시드 스크립트
-├── tests/                 pytest 124 파일 — integration(testcontainers 실 PostgreSQL) · architecture(규칙 게이트)
+├── tests/                 pytest 125 파일 — integration(testcontainers 실 PostgreSQL) · architecture(규칙 게이트)
 ├── Dockerfile             multi-stage — uv 0.10.4 builder → python:3.12-slim + ffmpeg 런타임 (약 735MB, ADR-028 D9)
 └── docker-entrypoint.sh   role 분기 — migrate(one-shot) / api
 ```
@@ -129,7 +129,7 @@ apps/api/
 mise run be-test    # pytest -v (CI 와 문자 동일)
 ```
 
-- **테스트 파일 124개.** `asyncio_mode = auto` 라 `@pytest.mark.asyncio` 를 붙이지 않는다
+- **테스트 파일 125개.** `asyncio_mode = auto` 라 `@pytest.mark.asyncio` 를 붙이지 않는다
 - **`integration` 마커** — testcontainers 로 **실제 PostgreSQL** 을 띄운다. pgvector 동작은
   SQLite 로 대체 검증할 수 없기 때문에 목이 아니라 실 DB 를 쓴다
 - **아키텍처 테스트** (`tests/architecture/`) — 규칙을 문서가 아니라 테스트로 강제한다

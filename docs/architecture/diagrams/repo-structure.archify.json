@@ -6,7 +6,7 @@
     "quality_profile": "showcase",
     "repository": {
       "url": "https://github.com/woosung-dev/kairos",
-      "revision": "278d4be248b6383ee18344912d9eb41d270e150a"
+      "revision": "884a1455c9325871524dae3a6738d35b77565300"
     },
     "legend": {
       "entries": {
@@ -149,7 +149,7 @@
       "type": "backend",
       "label": "apps/api",
       "sublabel": "FastAPI · 도메인 모듈 14 + 공용 3",
-      "tag": "pytest 124 · Dockerfile",
+      "tag": "pytest 125 · Dockerfile",
       "row": 1,
       "col": 0,
       "size": [
@@ -204,7 +204,7 @@
       "type": "frontend",
       "label": "apps/web",
       "sublabel": "Next.js 16 · FSD features 17",
-      "tag": "vitest 31 · e2e 44 · Dockerfile",
+      "tag": "vitest 39 · e2e 44 · Dockerfile",
       "row": 1,
       "col": 2,
       "size": [

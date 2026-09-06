@@ -177,7 +177,7 @@ Repository WHERE와 cross-workspace 참조의 composite FK `(workspace_id, secon
 | 사용자 | `users` `feedback_entries` | `onboarding_step` 0~4 · 피드백은 user-level (workspace nullable) |
 | 워크스페이스 — 격리 루트 | `workspaces` `workspace_members` `workspace_invites` | personal / team · role owner · admin · member · viewer |
 | 프로젝트 | `projects` `project_members` `meeting_project_links` | visibility public / draft / private · Meeting 과 N:M |
-| 회의 | `meetings` `transcript_segments` `meeting_summaries` | status uploading → transcribing → summarizing → completed / failed |
+| 회의 | `meetings` `transcript_segments` `meeting_summaries` | status uploading → transcribing → analyzing → completed / failed |
 | 노트 · 액션 · Inbox | `notes` `action_items` `inbox_items` | 부모 FK nullable · Inbox 는 폴리모픽 `source_type` |
 | 메모리 (Recall wedge) | `memory_items` `memory_ai_calls` `memory_events` `memory_query_embedding_cache` | text / voice capture → distill → promote |
 | 벡터 | `embedding_chunks` `semantic_caches` | `halfvec(1536)` + HNSW · 폴리모픽 source 6종 · 캐시 TTL 7일 (I-7 · I-8 · I-20) |
@@ -289,8 +289,8 @@ CI 의 `contract-check` job 이 이 게이트를 그대로 돌린다. 스키마�
 ```
 kairos/
 ├── apps/                    ★ 배포 단위 — Dockerfile 을 가진 둘 (ADR-027 D1). 각 앱이 AGENTS.md + CONTEXT.md 를 동봉 (ADR-029)
-│   ├── api/                 FastAPI — src/<domain> 14 + common · core · services / alembic 26 리비전 / pytest 124 파일 → README.md
-│   └── web/                 Next.js 16 — FSD features 17 / Better Auth 핸들러 + proxy.ts / vitest 31 · e2e 44 → README.md
+│   ├── api/                 FastAPI — src/<domain> 14 + common · core · services / alembic 25 리비전 / pytest 125 파일 → README.md
+│   └── web/                 Next.js 16 — FSD features 17 / Better Auth 핸들러 + proxy.ts / vitest 39 · e2e 44 → README.md
 ├── contracts/openapi/v1/    OpenAPI 계약 — 생성물 (api.gen.ts 의 원본, 수정 금지)
 ├── deploy/oci/              docker-compose.prod.yml + initdb + 서버 운영 런북
 ├── docs/
