@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 갱신: **2026-09-06** (UI/UX 전수 sweep — 액션 보드 · 워크스페이스 이름 변경 · 결함 23건)
+> 마지막 갱신: **2026-09-06** (UI/UX sweep 후속 — 리뷰 잔여 13건 해소 · 회귀 테스트 +35)
 > 4 섹션 운영: Completed / Blocked / Questions / Next Actions (`AGENTS.md` §5)
 > 완료 이력 정본 = `git log` + `docs/REFACTORING-BACKLOG.md`. 분할 직전 원본 = [`archive/todo-2026h1.md`](archive/todo-2026h1.md)
 >
@@ -13,6 +13,14 @@
 
 현행 sprint 완료분만 여기 적는다. 지난 sprint 이력은 `git log` 와 아카이브를 본다.
 
+- [x] **UI/UX sweep 후속 — PR #189 독립 리뷰 잔여 13건 해소 (2026-09-06)** — A) `actions/api.ts`·`projects/api.ts`
+  쿼리 파라미터 camelCase 회귀 테스트(snake 변이 시 fail 확인). B) `useProjectTitleMap` 신설(상태 3종 × pageSize 100 병합 —
+  BE `list_projects` 가 status 미지정을 active 로 기본 처리하는 전제 오류를 실측으로 잡음) → 액션 보드 칩·필터
+  select(optgroup 완료/보관)·Inbox AI 추천 라벨 3갈래("(프로젝트 없음)" = visibility 밖) + 100건 초과 안내. C) ⌘K 단축키
+  `e.code` 매칭(한국어 IME) · 수정키 단독 무시 · dialog/menu/combobox 열림 시 무시 + 단위 9건 + e2e 1건. D) 상태 pill
+  tablist/aria-selected 통일 · "직접 추가한 액션" 카피 제거. E) `features/projects/CONTEXT.md` 정정 · 멤버 패널 게이트 밖 테스트 ·
+  format-date 9건 · /projects 상태 필터 테스트. F) BL-UX-5 등재. 디자인 게이트: design-shotgun 3 결정(D1-A/D2-A/D3-A) 승인.
+  게이트: typecheck · vitest 39 files 219 pass(+35) · fe-build · be-test 928 · contracts drift 0 · MCP Playwright owner/member console.error 0.
 - [x] **UI/UX 전수 sweep (MCP Playwright 실측, 2026-09-06)** — 로컬 격리 DB(pgvector pg17, :5436)에
   owner/member 2계정 + 팀 워크스페이스를 시드하고 18 라우트 × (데스크톱·모바일·라이트·member 역할) 을
   스크린샷으로 순회. 결함 24건 등재 → 23건 수정, 1건 백로그(BL-UX-1).
@@ -70,6 +78,10 @@
   - `.github/SECURITY.md` 는 형식적이 아니라 **실효**다. ★Settings → Security 에서
     **private vulnerability reporting 을 켜야** `ISSUE_TEMPLATE/config.yml` 의 advisories 링크가 동작한다
   - `ISSUE_TEMPLATE/` 3종도 존치 — 외부 제보 창구가 실제로 생겼다
+- [ ] **Inbox 확정 → 완료/보관 프로젝트 분류 허용 여부** `[신규 · 2026-09-06 /review F3]` AI 추천 id 가 완료·보관 프로젝트를 가리키면
+  이제 실제 제목으로 해석돼 "확정" 이 그 프로젝트로 classify 한다(BE `inbox/service.py classify` 는 workspace 만 검사). 반면
+  "다른 프로젝트" picker 는 진행 중만 나열한다 — 정책 불일치. A) 허용 + 라벨에 "(완료)" 접미 · B) 금지 → "(프로젝트 없음)" 과 같이 picker 로 우회.
+  현재 코드는 A 쪽(접미 없음). 결정 후 1줄 수정.
 - [ ] **LICENSE 선택** `[신규 · 2026-08-16]` public 레포에 라이선스가 없으면 법적으로
   "all rights reserved" 다. 공개 제품 의도와 다를 가능성이 크다. 상용화 계획과 함께 결정할 것.
 - [ ] **`apps/api/tests/` flat 잔여 9개 정리 시점** — 유일하게 코드를 움직이는 정리 작업이고,

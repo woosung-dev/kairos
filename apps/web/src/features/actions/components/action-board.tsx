@@ -1,10 +1,10 @@
 "use client";
 
-// 워크스페이스 전체 액션 보드 (/actions) — 회의에서 추출된 액션 + 직접 추가한 액션 통합 뷰.
+// 워크스페이스 전체 액션 보드 (/actions) — 회의에서 추출된 액션의 워크스페이스 통합 뷰.
 //
 // ★한 번에 전부 가져와 클라이언트에서 필터한다 — BE status 필터는 단일 값이라
 //   상태별 카운트(할 일/진행 중/완료)를 한 번에 낼 수 없고, 프로젝트 미배정(projectId=null)·
-//   "내 액션만" 도 BE 필터가 없다. 액션은 워크스페이스당 수십 건 규모라 pageSize=100 으로 충분하다.
+//   "내 액션만" 도 BE 필터가 없다. BE 상한(API_PAGE_SIZE_MAX=100)까지 받고, total 이 그보다 크면 잘림을 안내한다.
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -12,10 +12,11 @@ import { CheckCircle2, Mic } from "lucide-react";
 import { toast } from "sonner";
 import { useActionItems, useAssigneeNames, useUpdateActionItem } from "../hooks";
 import type { ActionItem, ActionStatus } from "../types";
-import { useProjects } from "@/features/projects/hooks";
+import { useProjectTitleMap } from "@/features/projects/hooks";
 import { useMe } from "@/features/auth/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { EmptyState } from "@/components/empty-state";
+import { API_PAGE_SIZE_MAX } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, isOverdue } from "@/lib/format-date";
 
@@ -71,8 +72,9 @@ export function ActionBoard() {
   const wid = activeWorkspaceId ?? undefined;
   const canWrite = hasRole("member");
 
-  const { data, isLoading, error } = useActionItems(wid, { page: 1, pageSize: 100 });
-  const { data: projectsPage } = useProjects(wid, { status: "active" });
+  const { data, isLoading, error } = useActionItems(wid, { page: 1, pageSize: API_PAGE_SIZE_MAX });
+  // 전 상태(완료·보관 포함) 프로젝트 — 칩 제목 해석 + 필터 옵션. active 20건만 보면 완료 프로젝트의 액션 칩이 "프로젝트" 로 퇴화한다.
+  const { byStatus: projectGroups, titleMap: projectTitleMap } = useProjectTitleMap(wid);
   const { data: me } = useMe();
   const updateAction = useUpdateActionItem(wid);
   const assigneeNames = useAssigneeNames(wid);
@@ -82,13 +84,8 @@ export function ActionBoard() {
   const [isMineOnly, setIsMineOnly] = useState(false);
 
   const allActions = useMemo(() => data?.items ?? [], [data]);
-  const projects = useMemo(() => projectsPage?.items ?? [], [projectsPage]);
-
-  const projectTitleMap = useMemo(() => {
-    const map = new Map<string, string>();
-    projects.forEach((p) => map.set(p.id, p.title));
-    return map;
-  }, [projects]);
+  // BE pageSize 상한(100)을 넘는 워크스페이스는 조용히 잘리므로 total 과 비교해 안내한다.
+  const hiddenCount = Math.max(0, (data?.total ?? 0) - allActions.length);
 
   const counts = useMemo(
     () => ({
@@ -133,7 +130,7 @@ export function ActionBoard() {
           액션
         </h1>
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-          회의에서 추출된 액션과 직접 추가한 액션을 한곳에서 관리합니다
+          회의에서 추출된 액션을 한곳에서 관리합니다
         </p>
         {data && (
           <p
@@ -141,6 +138,11 @@ export function ActionBoard() {
             style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}
           >
             할 일 {counts.todo} · 진행 중 {counts.inProgress} · 완료 {counts.done}
+            {hiddenCount > 0 && (
+              <span style={{ color: "var(--text-secondary)" }}>
+                {" "}· 최근 {allActions.length}건만 표시 · {hiddenCount}건 더 있음
+              </span>
+            )}
           </p>
         )}
       </div>
@@ -163,16 +165,26 @@ export function ActionBoard() {
         <>
           {/* 필터 */}
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            {STATUS_FILTERS.map((f) => (
-              <FilterPill
-                key={f.value}
-                isActive={statusFilter === f.value}
-                onClick={() => setStatusFilter(f.value)}
-                data-testid={`action-status-filter-${f.value}`}
-              >
-                {f.label}
-              </FilterPill>
-            ))}
+            {/* 상태 pill = 단일 선택 탭 — /projects 상태 필터와 같은 role=tablist/tab + aria-selected 패턴.
+                (아래 '내 액션만' 은 on/off 토글이라 aria-pressed 가 맞는 의미다.) */}
+            <div
+              role="tablist"
+              aria-label="액션 상태 필터"
+              className="flex flex-wrap items-center gap-2"
+            >
+              {STATUS_FILTERS.map((f) => (
+                <FilterPill
+                  key={f.value}
+                  role="tab"
+                  aria-selected={statusFilter === f.value}
+                  isActive={statusFilter === f.value}
+                  onClick={() => setStatusFilter(f.value)}
+                  data-testid={`action-status-filter-${f.value}`}
+                >
+                  {f.label}
+                </FilterPill>
+              ))}
+            </div>
 
             <select
               aria-label="프로젝트 필터"
@@ -187,11 +199,30 @@ export function ActionBoard() {
               }}
             >
               <option value="">모든 프로젝트</option>
-              {projects.map((p) => (
+              {projectGroups.active.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.title}
                 </option>
               ))}
+              {/* 완료·보관은 /projects 상태 탭과 같은 어휘의 그룹으로 구분 (2026-09-06 design-shotgun D1-A) */}
+              {projectGroups.completed.length > 0 && (
+                <optgroup label="완료">
+                  {projectGroups.completed.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {projectGroups.archived.length > 0 && (
+                <optgroup label="보관">
+                  {projectGroups.archived.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
               <option value={UNASSIGNED_PROJECT}>프로젝트 미배정</option>
             </select>
 

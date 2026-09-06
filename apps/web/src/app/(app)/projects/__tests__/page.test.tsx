@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { workspaceKeys } from "@/lib/query-keys";
@@ -149,5 +149,30 @@ describe("ProjectsPage workspace id 가드", () => {
 
     await waitFor(() => expect(screen.getByTestId("projects-empty-state")).toBeInTheDocument());
     expect(screen.queryByTestId("projects-grid")).not.toBeInTheDocument();
+  });
+});
+
+// PR #189 후속 E — 상태 필터 pill 은 이전에 테스트 0건이었다 (완료 프로젝트 소실 fix 가 무가드).
+describe("ProjectsPage 상태 필터", () => {
+  it("완료 탭을 누르면 status=completed 로 재조회하고 빈 상태에 생성 CTA 를 숨긴다", async () => {
+    fetchProjects.mockResolvedValue({ items: [] });
+
+    render(<ProjectsPage />, { wrapper: createWrapper([WORKSPACE]) });
+    await waitFor(() => expect(screen.getByTestId("projects-empty-state")).toBeInTheDocument());
+    expect(fetchProjects).toHaveBeenLastCalledWith(expect.anything(), "workspace-1", { status: "active" });
+    // 진행 중 빈 상태에는 생성 CTA 가 있다
+    expect(within(screen.getByTestId("projects-empty-state")).getByText("새 프로젝트")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("projects-status-completed"));
+
+    await waitFor(() =>
+      expect(fetchProjects).toHaveBeenLastCalledWith(expect.anything(), "workspace-1", {
+        status: "completed",
+      }),
+    );
+    expect(screen.getByRole("tab", { name: "완료" })).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(screen.getByText("완료된 프로젝트가 없습니다")).toBeInTheDocument());
+    // 완료 탭의 빈 상태에는 생성 CTA 가 없다 (헤더의 "새 프로젝트" 버튼과는 별개)
+    expect(within(screen.getByTestId("projects-empty-state")).queryByText("새 프로젝트")).not.toBeInTheDocument();
   });
 });

@@ -5,7 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import { ArrowUpRight, Mic, StickyNote, Paperclip, Pin, Check, Pencil, Trash2, Undo2 } from "lucide-react";
 import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
 import { useWorkspaceStore } from "@/features/workspaces/store";
-import { useProjects } from "@/features/projects/hooks";
+import { useProjectTitleMap } from "@/features/projects/hooks";
 import { useDismissInbox, useClassifyInbox } from "../hooks";
 import type { InboxItem } from "../types";
 
@@ -44,26 +44,59 @@ function SmartInboxItemCardImpl({ item }: SmartInboxItemCardProps) {
   // S28b 기능추가: inbox classify persistence + "다른 프로젝트" picker.
   // 기존 handleConfirm/editing 은 local state 만 변경(미persist) → classify mutation wire.
   const classifyMutation = useClassifyInbox(activeWorkspaceId ?? undefined);
-  const { data: projectsData } = useProjects(activeWorkspaceId ?? undefined, {
-    status: "active",
-  });
-  const projects = projectsData?.items ?? [];
+  // 제목 해석은 전 상태 프로젝트 맵을 쓴다 — active 20건만 보면 완료·보관 프로젝트를 가리키는 추천이
+  // "목록에 없음" 으로 떨어져 AI 가 지어낸 제목이 다시 노출됐다 (PR #189 P1 의 잔여 분기).
+  const {
+    byStatus,
+    titleMap,
+    isReady: isProjectMapReady,
+    isError: isProjectMapError,
+    isSettled: isProjectMapSettled,
+    isTruncated: isProjectMapTruncated,
+  } = useProjectTitleMap(activeWorkspaceId ?? undefined);
+  // classify 대상 picker 는 진행 중 프로젝트만 — 완료·보관 프로젝트에 새 항목을 넣지 않는다 (기존 동작 유지).
+  const projects = byStatus.active;
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
     item.aiSuggestedProjectId ?? ""
   );
+  // picker 에 실제로 있는 옵션만 제출 가능 — 완료·보관·권한 밖 추천 id 가 select 에 매칭 옵션 없이 숨은 채
+  // "이 프로젝트로 이동" 으로 전송되던 구멍을 막는다 (2026-09-06 review, codex P1).
+  const pickerProjectId = projects.some((p) => p.id === selectedProjectId) ? selectedProjectId : "";
+  // 추천 id 가 있는데 프로젝트 맵이 없으면(로딩 중·조회 실패) 확정을 막는다 — 검증 전 id 로 classify 하지 않는다.
+  // 실패는 "불러올 수 없음" 으로 말하고 '다른 프로젝트' 경로는 남겨 둔다.
+  const isConfirmBlocked = !!item.aiSuggestedProjectId && !isProjectMapReady;
+  const confirmBlockedTitle = isProjectMapError
+    ? "프로젝트 목록을 불러올 수 없습니다 — '다른 프로젝트' 로 지정하세요"
+    : "프로젝트 목록을 불러오는 중입니다";
   // 확정된(classify 요청을 보낸) 프로젝트 id — 확정 카드에 실제 대상 제목을 보여주기 위해 추적.
   const [confirmedProjectId, setConfirmedProjectId] = useState<string | null>(null);
 
-  // AI 추천 라벨 — existingProjectId 가 있으면 그 프로젝트의 실제 제목을 쓴다.
-  // 파이프라인은 AI 가 지어낸 `newProjectTitle` 을 id 와 함께 저장하므로(실측: 라벨 "IR 투자 유치 전략",
-  // 실제 classify 대상은 "💡 아이디어") 그대로 노출하면 사용자가 다른 프로젝트로 확정하게 된다.
-  const suggestedProject = item.aiSuggestedProjectId
-    ? projects.find((p) => p.id === item.aiSuggestedProjectId)
+  // AI 추천 라벨 — 세 갈래.
+  // (a) id 가 있고 맵에 있음 → 실제 제목. 파이프라인은 AI 가 지어낸 `newProjectTitle` 을 id 와 함께 저장하므로
+  //     (실측: 라벨 "IR 투자 유치 전략", 실제 classify 대상은 "💡 아이디어") AI 제목을 쓰면 사용자가 다른 프로젝트로 확정한다.
+  // (b) id 없음 + title 있음 → "새 프로젝트 제안". AI 제목 폴백은 여기서만.
+  // (c) id 가 있는데 맵(전 상태·100건)에 없음 → "(프로젝트 없음)" (2026-09-06 design-shotgun D2-A).
+  //     실제 원인은 요청자에게 보이지 않는 private/draft 프로젝트(visibility) 또는 101번째 이후 — 삭제는
+  //     FK(NO ACTION) 때문에 앱이 id 를 먼저 null 로 만들어 (b) 로 간다. 그래서 "삭제됨" 이라 쓰지 않는다.
+  //     맵 로딩 전에는 블록을 그리지 않아 (c) 로 잠깐 오판하지 않는다.
+  const suggestedTitle = item.aiSuggestedProjectId
+    ? titleMap.get(item.aiSuggestedProjectId)
     : undefined;
-  const suggestedLabel = suggestedProject?.title ?? item.aiSuggestedProjectTitle;
   const isNewProjectSuggestion = !item.aiSuggestedProjectId && !!item.aiSuggestedProjectTitle;
+  // "없음" 은 맵이 완성·정착됐고 잘리지 않았을 때만 확정한다 — refetch 엇갈림·100건 초과에서는 미표시가 안전하다.
+  const isSuggestedProjectMissing =
+    !!item.aiSuggestedProjectId &&
+    isProjectMapReady &&
+    isProjectMapSettled &&
+    !isProjectMapTruncated &&
+    suggestedTitle === undefined;
+  const suggestedLabel = isNewProjectSuggestion
+    ? item.aiSuggestedProjectTitle
+    : isSuggestedProjectMissing
+      ? "(프로젝트 없음)"
+      : suggestedTitle;
   const confirmedLabel =
-    projects.find((p) => p.id === confirmedProjectId)?.title ?? suggestedLabel ?? "프로젝트";
+    (confirmedProjectId ? titleMap.get(confirmedProjectId) : undefined) ?? "프로젝트";
 
   /* aiConfidence가 null일 때 0으로 폴백 */
   const confidencePercent = item.aiConfidence !== null
@@ -74,8 +107,9 @@ function SmartInboxItemCardImpl({ item }: SmartInboxItemCardProps) {
   const isAutoProcessed = item.isProcessed;
 
   function handleConfirm() {
-    // AI 제안 프로젝트가 있으면 그곳으로 classify(persist), 없으면 picker 오픈.
-    if (!item.aiSuggestedProjectId) {
+    // AI 제안 프로젝트가 있으면 그곳으로 classify(persist). 없거나(새 프로젝트 제안) 목록에 없는 id(권한 밖·미노출)면
+    // 보이지 않는 프로젝트로 보내지 않고 picker 를 연다.
+    if (!item.aiSuggestedProjectId || isSuggestedProjectMissing) {
       setStatus("editing");
       return;
     }
@@ -106,11 +140,11 @@ function SmartInboxItemCardImpl({ item }: SmartInboxItemCardProps) {
   }
 
   function handleClassifyToSelected() {
-    if (!selectedProjectId) return;
+    if (!pickerProjectId) return;
     setStatus("confirmed");
-    setConfirmedProjectId(selectedProjectId);
+    setConfirmedProjectId(pickerProjectId);
     classifyMutation.mutate(
-      { id: item.id, projectIds: [selectedProjectId] },
+      { id: item.id, projectIds: [pickerProjectId] },
       { onError: () => setStatus("editing") }
     );
   }
@@ -270,7 +304,7 @@ function SmartInboxItemCardImpl({ item }: SmartInboxItemCardProps) {
         </div>
       )}
 
-      {/* AI 추천 프로젝트 — id 미해석(새 프로젝트 제안)이면 라벨을 구분해 보여준다 */}
+      {/* AI 추천 프로젝트 — (a) 실제 제목 / (b) 새 프로젝트 제안 / (c) (프로젝트 없음). 규칙은 위 suggestedLabel 정의 참고 */}
       {suggestedLabel && (
         <div
           className="flex items-center gap-2 px-3 py-2 rounded mb-3"
@@ -282,7 +316,10 @@ function SmartInboxItemCardImpl({ item }: SmartInboxItemCardProps) {
           <span className="text-xs" style={{ color: "var(--accent)" }}>
             {isNewProjectSuggestion ? "새 프로젝트 제안:" : "AI 추천:"}
           </span>
-          <span className="text-xs font-medium" style={{ color: "var(--accent)" }}>
+          <span
+            className="text-xs font-medium"
+            style={{ color: isSuggestedProjectMissing ? "var(--text-muted)" : "var(--accent)" }}
+          >
             {suggestedLabel}
           </span>
           {confidencePercent !== null && (
@@ -302,7 +339,9 @@ function SmartInboxItemCardImpl({ item }: SmartInboxItemCardProps) {
         <div className="flex items-center gap-2">
           <button
             onClick={handleConfirm}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors"
+            disabled={isConfirmBlocked}
+            title={isConfirmBlocked ? confirmBlockedTitle : undefined}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: "var(--accent)",
               color: "var(--background)",
@@ -392,13 +431,19 @@ function SmartInboxItemCardImpl({ item }: SmartInboxItemCardProps) {
           <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
             프로젝트를 선택하세요
           </p>
-          {projects.length === 0 ? (
+          {!isProjectMapReady ? (
+            <p className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+              {isProjectMapError
+                ? "프로젝트 목록을 불러올 수 없습니다."
+                : "프로젝트 목록을 불러오는 중…"}
+            </p>
+          ) : projects.length === 0 ? (
             <p className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
               연결할 프로젝트가 없습니다. 먼저 프로젝트를 만들어주세요.
             </p>
           ) : (
             <select
-              value={selectedProjectId}
+              value={pickerProjectId}
               onChange={(e) => setSelectedProjectId(e.target.value)}
               className="w-full px-2 py-1.5 mb-2 rounded border text-sm bg-transparent outline-none"
               style={{
@@ -419,7 +464,7 @@ function SmartInboxItemCardImpl({ item }: SmartInboxItemCardProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={handleClassifyToSelected}
-              disabled={!selectedProjectId || classifyMutation.isPending}
+              disabled={!pickerProjectId || classifyMutation.isPending}
               className="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: "var(--accent)",

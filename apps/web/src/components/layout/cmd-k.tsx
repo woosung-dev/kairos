@@ -44,8 +44,20 @@ const CMD_GROUPS: { label: string; items: CmdItem[] }[] = [
 
 // 팔레트에 표시되는 단축키의 실제 구현 — 이전엔 라벨만 있고 키 핸들러가 없었다 (BUG-CASUAL CMD-K-SEQ).
 // "G" 를 누른 뒤 1초 안에 두 번째 키를 누르면 이동. "C" 는 단독. 입력 필드/contentEditable 안에서는 무시.
+// ★매칭은 물리 키 `e.code`("KeyG") 다 — 한국어 입력 소스에서는 `e.key` 가 'ㅎ'/'ㅏ' 로 들어와
+//   `e.key.toLowerCase()` 매칭이 전부 미동작했다 (2026-09-06 실측). 수정키 단독 keydown(Shift 등)은
+//   시퀀스를 지우지 않고, 다이얼로그·combobox·menu 가 열린 상태에서는 발화하지 않는다 (WCAG 2.1.4).
 const SEQUENCE_TIMEOUT_MS = 1000;
-const GO_TARGETS: Record<string, string> = {
+// 물리 키(e.code) 우선, 문자(e.key) 폴백 — QWERTY 한국어 IME 는 code 로, AZERTY/Dvorak 처럼 물리 위치가
+// 다른 배열은 팔레트에 적힌 문자 그대로 key 로 맞는다.
+const GO_TARGETS_BY_CODE: Record<string, string> = {
+  KeyI: "/inbox",
+  KeyP: "/projects",
+  KeyA: "/actions",
+  KeyN: "/notes",
+  KeyS: "/search",
+};
+const GO_TARGETS_BY_KEY: Record<string, string> = {
   i: "/inbox",
   p: "/projects",
   a: "/actions",
@@ -53,6 +65,18 @@ const GO_TARGETS: Record<string, string> = {
   s: "/search",
 };
 
+function resolveGoTarget(e: KeyboardEvent): string | undefined {
+  return GO_TARGETS_BY_CODE[e.code] ?? GO_TARGETS_BY_KEY[e.key.toLowerCase()];
+}
+function isKey(e: KeyboardEvent, code: string, char: string): boolean {
+  return e.code === code || e.key.toLowerCase() === char;
+}
+/** 문자 키만 시퀀스 판정 대상 — Shift/AltGraph/Dead/화살표 같은 비문자 keydown 은 pending 을 건드리지 않는다. */
+function isCharacterKey(e: KeyboardEvent): boolean {
+  return e.key.length === 1 || e.code in GO_TARGETS_BY_CODE || e.code === "KeyG" || e.code === "KeyC";
+}
+
+/** 입력 중이거나 키보드로 조작 중인 위젯(select/combobox/listbox/menu) 위에서는 단축키를 먹지 않는다. */
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName;
@@ -60,8 +84,27 @@ function isTypingTarget(target: EventTarget | null): boolean {
     tag === "INPUT" ||
     tag === "TEXTAREA" ||
     tag === "SELECT" ||
-    target.isContentEditable
+    target.isContentEditable ||
+    target.closest(
+      '[role="combobox"],[role="listbox"],[role="menu"],[role="menuitem"],[role="textbox"]',
+    ) !== null
   );
+}
+
+/**
+ * 열린 팝업(다이얼로그·메뉴·리스트박스) 이 있으면 문자 키는 그 위젯의 것이다 — base-ui Popup 은
+ * role 만 붙이고 문자 키를 stopPropagation 하지 않으므로 여기서 문서 단위로 막는다.
+ * ★닫힘 애니메이션 동안 DOM 에 남는 Popup(`data-closed`)·`hidden` 은 열린 것이 아니다 — Escape 직후의
+ *   g → a 첫 키를 삼키지 않도록 제외한다.
+ * ★비모달 안내 Popover(온보딩 툴팁) 도 floating-ui 기본값으로 role=dialog 를 달지만 내비를 막을 이유가 없다 —
+ *   `data-slot="popover-content"` 로 제외한다.
+ */
+const OPEN_POPUP_SELECTOR = ['[role="dialog"]', '[role="alertdialog"]', '[role="menu"]', '[role="listbox"]']
+  .map((role) => `${role}:not([data-closed]):not([hidden]):not([data-slot="popover-content"])`)
+  .join(",");
+
+function isPopupOpen(): boolean {
+  return document.querySelector(OPEN_POPUP_SELECTOR) !== null;
 }
 
 export function CmdK() {
@@ -88,7 +131,7 @@ export function CmdK() {
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      if ((e.metaKey || e.ctrlKey) && isKey(e, "KeyK", "k")) {
         e.preventDefault();
         toggleCmdK();
         return;
@@ -99,23 +142,26 @@ export function CmdK() {
         setIsRagMode(false);
         return;
       }
-      // 이하 단축키 시퀀스 — 팔레트가 열려 있거나 입력 중이거나 수정키가 눌린 상태면 무시
-      if (cmdKOpen || e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
-      const key = e.key.toLowerCase();
+      // 이하 단축키 시퀀스 — 팔레트가 열려 있거나 수정키 조합이면 무시
+      if (cmdKOpen || e.metaKey || e.ctrlKey || e.altKey) return;
+      // 비문자 키(수정키·Dead·화살표 등) 단독 keydown 은 판정 대상이 아니다 — pending 을 지우지 않는다 (g → Shift → a 유효).
+      if (!isCharacterKey(e)) return;
+      // 입력 중이거나 다이얼로그가 열려 있으면 무시 (pending 은 타임아웃으로 자연 소멸)
+      if (isTypingTarget(e.target) || isPopupOpen()) return;
       if (pendingGo !== null) {
         clearPending();
-        const target = GO_TARGETS[key];
+        const target = resolveGoTarget(e);
         if (target) {
           e.preventDefault();
           router.push(target);
         }
         return;
       }
-      if (key === "g") {
+      if (isKey(e, "KeyG", "g")) {
         pendingGo = window.setTimeout(clearPending, SEQUENCE_TIMEOUT_MS);
         return;
       }
-      if (key === "c") {
+      if (isKey(e, "KeyC", "c")) {
         e.preventDefault();
         router.push("/new");
       }

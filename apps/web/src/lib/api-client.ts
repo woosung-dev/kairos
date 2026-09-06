@@ -81,6 +81,9 @@ export class AuthRequiredError extends Error {
   }
 }
 
+/** BE 목록 API 의 `pageSize` 상한 (`Query(..., le=100)`, projects/actions router) — 한 번에 받을 수 있는 최대 건수. */
+export const API_PAGE_SIZE_MAX = 100;
+
 /**
  * 인증 토큰이 주입된 API 클라이언트 seam (PR-3 c5).
  * feature api 함수는 token 문자열 대신 이 인터페이스를 받는다.

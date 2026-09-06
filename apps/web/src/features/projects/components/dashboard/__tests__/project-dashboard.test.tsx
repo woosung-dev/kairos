@@ -49,8 +49,10 @@ vi.mock("@/features/projects/hooks", async (importOriginal) => ({
   useProject: vi.fn(),
 }));
 
+// 실물처럼 비공개일 때만 렌더하는 스텁 — `() => null` 이면 패널이 온보딩 게이트 안으로 되돌아가도 잡지 못한다.
 vi.mock("../../project-members-panel", () => ({
-  ProjectMembersPanel: () => null,
+  ProjectMembersPanel: ({ visibility }: { visibility: string }) =>
+    visibility === "private" ? <h2>프로젝트 멤버</h2> : null,
 }));
 
 const PROJECT: Project = {
@@ -129,5 +131,26 @@ describe("ProjectDashboard — 온보딩 게이트", () => {
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("Visibility 변경")).toBeInTheDocument();
+  });
+
+  // PR #189 P1 #4 회귀 가드: 비공개 + 콘텐츠 0 이어도 멤버 패널은 온보딩 게이트 밖(형제)에서 렌더된다.
+  // 이전엔 DashboardContent 의 children 이라 온보딩 뷰에 가려져 owner 가 멤버를 추가할 방법이 없었다.
+  it("비공개 프로젝트는 콘텐츠가 없어도 멤버 패널을 온보딩 뷰와 함께 렌더한다", () => {
+    vi.mocked(useProject).mockReturnValue({
+      data: { ...PROJECT, visibility: "private" },
+      isLoading: false,
+      error: null,
+    } as ReturnType<typeof useProject>);
+
+    renderProjectDashboard();
+
+    expect(screen.getByRole("heading", { name: "프로젝트를 시작하세요" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "프로젝트 멤버" })).toBeInTheDocument();
+  });
+
+  it("공개 프로젝트에는 멤버 패널이 없다", () => {
+    renderProjectDashboard();
+
+    expect(screen.queryByRole("heading", { name: "프로젝트 멤버" })).not.toBeInTheDocument();
   });
 });
