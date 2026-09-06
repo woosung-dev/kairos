@@ -55,6 +55,14 @@ alembic upgrade → 시드) 을 만들면 다음 sweep 가 3분 안에 시작된
 Inbox 20건이면 옵저버 ≤120. `SmartInbox` 에서 한 번 호출해 `titleMap`/`byStatus` 를 props 로 내리는 것이 맞다(카드 `memo()` 의 의도와도 정합).
 이전(`useProjects` 카드당 1회)부터 있던 구조라 별건.
 
+### BL-UX-8 — 회의에서 추출된 액션이 프로젝트 연결을 상속하지 않는다 (P2, 기능) `[2026-09-06 프로덕션 실측]`
+`meetings/pipeline_service.py` 는 `ActionItem(workspace_id, meeting_id, title, …)` 로만 저장하고 `project_id` 를 채우지 않는다. 자동 확정(`add_meeting_link`)·
+Inbox 확정(`inbox/service.py classify`) 도 회의↔프로젝트 링크만 만들고 기존 액션을 갱신하지 않는다. 결과: 실사용 데이터에서는 액션의 `projectId` 가 전부
+null 이라 액션 보드의 프로젝트 칩·프로젝트 필터, 프로젝트 대시보드 "이번 주 액션"(projectId 필터) 이 비어 있다 — PR #189/#190 이 고친 칩·필터 로직은
+시드(project_id 직접 삽입)에서만 살아 있던 셈. FE 에도 액션의 프로젝트를 바꾸는 UI 가 없다(BE PATCH `projectId` 는 있음).
+방향: (1) 추출 시 회의가 이미 프로젝트에 연결돼 있으면 상속 (2) `add_meeting_link` 시 그 회의의 `project_id IS NULL` 액션을 일괄 갱신 (3) 액션 행에서
+프로젝트 지정 UI. 회의 1개 = 프로젝트 N개(MeetingProjectLink) 인 경우의 규칙(첫 링크? 미배정 유지?) 은 사용자 결정 필요.
+
 ## BL-S29-1 — `mise run docs-check` 게이트 신설 (규칙 재중복 방지) ⏳ **미착수**
 
 **배경**: [ADR-029](adr/029-ai-rules-relocation.md) §2.2 가 「`apps/*/AGENTS.md` 는 `B-NN`·`F-NN`·`I-NN` 불변식을
