@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { workspaceKeys } from "@/lib/query-keys";
 import type { Workspace } from "@/features/workspaces/types";
-import { useProject, useProjectMembers, useProjects } from "../hooks";
+import { useProject, useProjectMembers, useProjectTitleMap, useProjects } from "../hooks";
 
 const {
   fetchProject,
@@ -106,5 +106,77 @@ describe("프로젝트 데이터 훅의 workspace id 가드", () => {
 
     await waitFor(() => expect(fetchWorkspaces).toHaveBeenCalledTimes(1));
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+// PR #189 후속 B — 제목 해석 맵은 상태 3종을 각각 pageSize 100 으로 받아 합친다.
+// BE ProjectService.list_projects 가 status 미지정을 active 로 기본 처리하므로(BUG-ARCHIVED-PROJECT-LEAK 방어)
+// "status 없이 한 번" 으로 바꾸면 완료·보관 프로젝트가 조용히 빠진다 — 2026-09-06 실측으로 잡힌 전제 오류.
+describe("useProjectTitleMap", () => {
+  it("active/completed/archived 를 각각 pageSize 100 으로 조회해 하나의 제목 맵으로 합친다", async () => {
+    fetchProjects.mockImplementation(async (_api: unknown, _wid: string, params?: { status?: string }) => ({
+      items: [{ id: `p-${params?.status}`, title: `프로젝트(${params?.status})`, status: params?.status }],
+      total: 1,
+      page: 1,
+      pageSize: 100,
+      hasNext: false,
+    }));
+
+    const { result } = renderHook(() => useProjectTitleMap(WID), { wrapper: createWrapper([WORKSPACE]) });
+
+    await waitFor(() => expect(result.current.isReady).toBe(true));
+    const statuses = fetchProjects.mock.calls.map((c) => c[2]);
+    expect(statuses).toEqual(
+      expect.arrayContaining([
+        { status: "active", pageSize: 100 },
+        { status: "completed", pageSize: 100 },
+        { status: "archived", pageSize: 100 },
+      ]),
+    );
+    expect(fetchProjects).toHaveBeenCalledTimes(3);
+    expect(result.current.projects.map((p) => p.id)).toEqual(["p-active", "p-completed", "p-archived"]);
+    expect(result.current.byStatus.completed.map((p) => p.id)).toEqual(["p-completed"]);
+    expect(result.current.titleMap.get("p-archived")).toBe("프로젝트(archived)");
+  });
+
+  it("한 갈래가 에러면 isReady=false (이전 캐시로 '없음' 오판 방지)", async () => {
+    fetchProjects.mockImplementation(async (_api: unknown, _wid: string, params?: { status?: string }) => {
+      if (params?.status === "completed") throw new Error("500");
+      return { items: [], total: 0, page: 1, pageSize: 100, hasNext: false };
+    });
+
+    const { result } = renderHook(() => useProjectTitleMap(WID), { wrapper: createWrapper([WORKSPACE]) });
+
+    await waitFor(() => expect(fetchProjects).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(result.current.isReady).toBe(false));
+    expect(result.current.isError).toBe(true);
+  });
+
+  it("상태별 total 이 받은 건수보다 크면 isTruncated=true", async () => {
+    fetchProjects.mockImplementation(async (_api: unknown, _wid: string, params?: { status?: string }) => ({
+      items: [{ id: `p-${params?.status}`, title: "x", status: params?.status }],
+      total: params?.status === "completed" ? 150 : 1,
+      page: 1,
+      pageSize: 100,
+      hasNext: params?.status === "completed",
+    }));
+
+    const { result } = renderHook(() => useProjectTitleMap(WID), { wrapper: createWrapper([WORKSPACE]) });
+
+    await waitFor(() => expect(result.current.isReady).toBe(true));
+    expect(result.current.isTruncated).toBe(true);
+    expect(result.current.isSettled).toBe(true);
+  });
+
+  it("세 갈래 중 하나라도 미도착이면 isReady=false (없음 오판 방지)", async () => {
+    fetchProjects.mockImplementation(async (_api: unknown, _wid: string, params?: { status?: string }) => {
+      if (params?.status === "archived") return new Promise(() => undefined);
+      return { items: [], total: 0, page: 1, pageSize: 100, hasNext: false };
+    });
+
+    const { result } = renderHook(() => useProjectTitleMap(WID), { wrapper: createWrapper([WORKSPACE]) });
+
+    await waitFor(() => expect(fetchProjects).toHaveBeenCalledTimes(3));
+    expect(result.current.isReady).toBe(false);
   });
 });

@@ -33,4 +33,19 @@ test.describe("/actions 액션 보드", () => {
     );
     expect(filteredErrors).toEqual([]);
   });
+
+  // PR #189 후속 C — 팔레트에 표시된 "G A" 시퀀스가 실제로 동작하는지 (물리 키 e.code 매칭).
+  test("전역 단축키 g → a 로 /actions 에 도달한다", async ({ page }) => {
+    // 첫 방문 온보딩 툴팁(role=dialog) 은 열린 동안 단축키를 막는 게 의도라, 전제조건으로 "이미 본 상태" 를 심는다
+    // (onboarding-tooltip-first-visit.spec 과 같은 키). 닫힘 애니메이션 타이밍에 기대는 대신 조건을 명시한다.
+    await page.addInitScript(() => {
+      window.localStorage.setItem("kairos.onboarding.tooltip_shown.dashboard", "1");
+    });
+    await page.goto("/dashboard");
+    await page.waitForLoadState("networkidle");
+    await page.keyboard.press("g");
+    await page.keyboard.press("a");
+    await expect(page).toHaveURL(/\/actions$/);
+    await expect(page.getByTestId("action-board")).toBeVisible();
+  });
 });

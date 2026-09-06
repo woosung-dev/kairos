@@ -1,6 +1,7 @@
 "use client";
 
 import { projectKeys, meetingKeys, onboardingKeys } from "@/lib/query-keys";
+import { API_PAGE_SIZE_MAX } from "@/lib/api-client";
 import { useApiClient } from "@/lib/use-api-client";
 import {
   useWorkspaceIdGuard,
@@ -73,6 +74,55 @@ export function useProjects(wid: string | undefined, params?: FetchProjectsParam
   });
 
   return withWorkspaceGuardLoading(query, isWorkspaceListPending, workspaceListError);
+}
+
+/**
+ * 제목 해석·필터 옵션용 전 상태 프로젝트 목록 (액션 보드 · Inbox 카드 공유).
+ *
+ * `useProjects(wid, { status: "active" })` 는 active 만 + BE 기본 pageSize 20 이라, 완료·보관 프로젝트나
+ * 21번째 이후 프로젝트를 가리키는 액션 칩이 "프로젝트" 로 퇴화하고 Inbox 는 AI 가 지어낸 제목을 다시
+ * 노출했다 (PR #189 P1 의 잔여 분기).
+ *
+ * ★BE `ProjectService.list_projects` 는 status 미지정을 **active 로 기본 처리**한다 (BUG-ARCHIVED-PROJECT-LEAK
+ *   방어 — repository 만 보면 "미지정=전체" 로 읽혀 2026-09-06 실측에서 완료 프로젝트가 빠졌다).
+ *   그래서 상태 3종을 각각 `API_PAGE_SIZE_MAX`(BE 상한 `le=100`) 로 받아 합친다. 쿼리 키에 params 가 들어가
+ *   사이드바의 active/archived 목록과 캐시가 섞이지 않는다.
+ */
+export function useProjectTitleMap(wid: string | undefined) {
+  const active = useProjects(wid, { status: "active", pageSize: API_PAGE_SIZE_MAX });
+  const completed = useProjects(wid, { status: "completed", pageSize: API_PAGE_SIZE_MAX });
+  const archived = useProjects(wid, { status: "archived", pageSize: API_PAGE_SIZE_MAX });
+  const byStatus = useMemo(
+    () => ({
+      active: active.data?.items ?? [],
+      completed: completed.data?.items ?? [],
+      archived: archived.data?.items ?? [],
+    }),
+    [active.data, completed.data, archived.data],
+  );
+  const projects = useMemo(
+    () => [...byStatus.active, ...byStatus.completed, ...byStatus.archived],
+    [byStatus],
+  );
+  const titleMap = useMemo(
+    () => new Map<string, string>(projects.map((p) => [p.id, p.title])),
+    [projects],
+  );
+  const queries = [active, completed, archived];
+  return {
+    projects,
+    byStatus,
+    titleMap,
+    // 셋 다 도착했고 에러가 없을 때만 "목록에 없음" 을 판정한다 — 미도착이거나 재조회가 실패해 이전 캐시만
+    // 남은 갈래가 있으면 오판 대신 미표시.
+    isReady: queries.every((q) => q.data !== undefined && !q.isError),
+    // 한 갈래라도 실패 — 소비처가 "불러오는 중" 과 "불러올 수 없음" 을 구분해 말할 수 있게 한다.
+    isError: queries.some((q) => q.isError),
+    // 상태 전이(완료/보관) 직후 3갈래 refetch 가 엇갈리는 한 RTT 동안은 "없음" 을 확정하지 않는다.
+    isSettled: queries.every((q) => !q.isFetching),
+    // 상태별 100건 상한을 넘는 워크스페이스 — 맵에 없다고 "없음" 이라 말할 수 없다.
+    isTruncated: queries.some((q) => (q.data?.total ?? 0) > (q.data?.items.length ?? 0)),
+  };
 }
 
 /**

@@ -6,11 +6,11 @@ import type { Project } from "@/features/projects/types";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import { ActionBoard } from "../action-board";
 
-const { mockUseActionItems, mockUseUpdateActionItem, mockUseProjects, mutate } = vi.hoisted(
+const { mockUseActionItems, mockUseUpdateActionItem, mockUseProjectTitleMap, mutate } = vi.hoisted(
   () => ({
     mockUseActionItems: vi.fn(),
     mockUseUpdateActionItem: vi.fn(),
-    mockUseProjects: vi.fn(),
+    mockUseProjectTitleMap: vi.fn(),
     mutate: vi.fn(),
   }),
 );
@@ -27,8 +27,9 @@ vi.mock("../../hooks", () => ({
     ]),
 }));
 
+// 전 상태 프로젝트 제목 맵 — 실물은 useProjects(wid, { pageSize: 100 }) 위에 얹힌다.
 vi.mock("@/features/projects/hooks", () => ({
-  useProjects: mockUseProjects,
+  useProjectTitleMap: mockUseProjectTitleMap,
 }));
 
 const ME_ID = "00000000-0000-0000-0000-0000000000aa";
@@ -66,6 +67,10 @@ const PROJECT_A: Project = {
 };
 
 const PROJECT_B: Project = { ...PROJECT_A, id: "project-b", title: "프로젝트 B", sortOrder: 1 };
+// 완료·보관 프로젝트 — 이전엔 active 20건만 조회해 이들의 액션 칩이 "프로젝트" 로 퇴화했다.
+const PROJECT_C: Project = { ...PROJECT_A, id: "project-c", title: "프로젝트 C", status: "completed", sortOrder: 2 };
+const PROJECT_D: Project = { ...PROJECT_A, id: "project-d", title: "프로젝트 D", status: "archived", sortOrder: 3 };
+const ALL_PROJECTS = [PROJECT_A, PROJECT_B, PROJECT_C, PROJECT_D];
 
 function action(overrides: Partial<ActionItem> & Pick<ActionItem, "id" | "title">): ActionItem {
   return {
@@ -128,10 +133,14 @@ beforeEach(() => {
     isLoading: false,
     error: null,
   });
-  mockUseProjects.mockReturnValue({
-    data: { items: [PROJECT_A, PROJECT_B], total: 2, page: 1, pageSize: 100, hasNext: false },
-    isLoading: false,
-    error: null,
+  mockUseProjectTitleMap.mockReturnValue({
+    projects: ALL_PROJECTS,
+    byStatus: { active: [PROJECT_A, PROJECT_B], completed: [PROJECT_C], archived: [PROJECT_D] },
+    titleMap: new Map(ALL_PROJECTS.map((p) => [p.id, p.title])),
+    isReady: true,
+    isError: false,
+    isSettled: true,
+    isTruncated: false,
   });
   mockUseUpdateActionItem.mockReturnValue({ mutate, isPending: false, variables: undefined });
 });
@@ -253,6 +262,71 @@ describe("ActionBoard", () => {
 
     expect(screen.getByText(/필터를 바꿔보세요/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "회의 추가" })).not.toBeInTheDocument();
+  });
+
+  it("완료·보관 프로젝트의 액션도 실제 제목 칩으로 렌더하고 select 에 그룹으로 나온다", () => {
+    mockUseActionItems.mockReturnValue({
+      data: {
+        items: [
+          action({ id: "a-c", title: "완료 프로젝트 액션", projectId: PROJECT_C.id }),
+          action({ id: "a-d", title: "보관 프로젝트 액션", projectId: PROJECT_D.id }),
+        ],
+        total: 2,
+        page: 1,
+        pageSize: 100,
+        hasNext: false,
+      },
+      isLoading: false,
+      error: null,
+    });
+    render(<ActionBoard />);
+
+    expect(screen.getByRole("link", { name: "프로젝트 C" })).toHaveAttribute("href", `/projects/${PROJECT_C.id}`);
+    expect(screen.getByRole("link", { name: "프로젝트 D" })).toHaveAttribute("href", `/projects/${PROJECT_D.id}`);
+    expect(screen.queryByRole("link", { name: "프로젝트" })).not.toBeInTheDocument();
+
+    const done = screen.getByRole("group", { name: "완료" });
+    expect(within(done).getByRole("option", { name: "프로젝트 C" })).toBeInTheDocument();
+    const archived = screen.getByRole("group", { name: "보관" });
+    expect(within(archived).getByRole("option", { name: "프로젝트 D" })).toBeInTheDocument();
+    // 진행 중은 그룹 없이 평면
+    expect(screen.getByRole("option", { name: "프로젝트 A" }).closest("optgroup")).toBeNull();
+  });
+
+  it("상태 pill 은 tablist/tab + aria-selected 로 선택 상태를 노출한다 (/projects 와 동일 패턴)", () => {
+    render(<ActionBoard />);
+
+    const tablist = screen.getByRole("tablist", { name: "액션 상태 필터" });
+    expect(within(tablist).getAllByRole("tab")).toHaveLength(4);
+    expect(screen.getByRole("tab", { name: "전체" })).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.click(screen.getByRole("tab", { name: "할 일" }));
+
+    expect(screen.getByRole("tab", { name: "할 일" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "전체" })).toHaveAttribute("aria-selected", "false");
+    // '내 액션만' 은 토글 — aria-pressed 유지, tab 아님
+    expect(screen.getByTestId("action-mine-filter")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("action-mine-filter")).not.toHaveAttribute("role", "tab");
+  });
+
+  it("total 이 받은 건수보다 크면 잘림 안내를, 아니면 안내 없이 렌더한다", () => {
+    render(<ActionBoard />);
+    expect(screen.queryByText(/더 있음/)).not.toBeInTheDocument();
+    cleanup();
+
+    mockUseActionItems.mockReturnValue({
+      data: { items: ACTIONS, total: 150, page: 1, pageSize: 100, hasNext: true },
+      isLoading: false,
+      error: null,
+    });
+    render(<ActionBoard />);
+    expect(screen.getByText(/최근 4건만 표시 · 146건 더 있음/)).toBeInTheDocument();
+  });
+
+  it("부제는 실제 기능(회의 추출)만 말한다 — 직접 추가 UI 는 없다", () => {
+    render(<ActionBoard />);
+    expect(screen.getByText("회의에서 추출된 액션을 한곳에서 관리합니다")).toBeInTheDocument();
+    expect(screen.queryByText(/직접 추가한/)).not.toBeInTheDocument();
   });
 
   it("워크스페이스 미선택 시 안내 문구를 렌더한다", () => {

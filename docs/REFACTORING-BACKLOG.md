@@ -37,6 +37,24 @@
 회의 상세에 삭제가 없고 BE `DELETE /meetings/{id}` 도 없다(Sprint 28 P3 carry). 잘못 올린 회의를 사용자가 정리할 수 없다.
 R2 원본 정리(BL-OCI-5)와 함께 설계.
 
+### BL-UX-5 — 로컬 QA 환경 원커맨드화: 시드 스크립트 커밋 + `mise run qa-local` (P3, DX) ⏳ **사용자 결정 대기**
+UI/UX sweep(PR #189)·후속(2026-09-06) 의 재현 환경은 세션 scratchpad 의 시드 스크립트(계정 2 + 팀 ws + 프로젝트 7/노트 5/
+text-capture 회의 3/액션 12/메모리 5)에만 있었고, 매 QA 마다 `.env` 오버라이드·계정 생성·JWT 발급을 손으로 반복했다(약 15분).
+`apps/api/scripts/seed_local_qa.py` 로 커밋하고 `[tasks.qa-local]` (kairos-dev-db 컨테이너 기동 → BE/FE env 오버라이드 →
+alembic upgrade → 시드) 을 만들면 다음 sweep 가 3분 안에 시작된다. ★함정 2건을 task 가 처리해야 한다: (1) `BETTER_AUTH_SECRET`
+을 매번 새로 만들면 `auth_jwks` 의 암호화된 키를 못 풀어 `/api/auth/token` 이 500 — secret 을 고정하거나 `auth_jwks` 를 비운다.
+(2) 완료/보관 프로젝트에 액션이 있는 상태를 시드에 포함해야 제목 해석 회귀(useProjectTitleMap)가 재현된다.
+
+### BL-UX-6 — 상태 필터 pill `role=tab` 의 키보드 계약 부재 (P3, a11y) `[2026-09-06 /review F9]`
+`/projects` 상태 탭과 `/actions` 상태 pill 이 `role=tablist/tab`+`aria-selected` 를 달지만 화살표 이동·roving tabindex·`aria-controls`/`tabpanel` 이
+없다(4개 전부 Tab 순서). SR 은 탭 위젯이라 안내하는데 화살표는 무반응. 두 곳에 공용 `useRovingTabs` 훅(ArrowLeft/Right/Home/End) 을 붙이거나
+`radiogroup`+`aria-checked` 로 낮춘다 — 한 PR 에서 두 화면 동시에.
+
+### BL-UX-7 — Inbox 카드당 프로젝트 제목 맵 훅 증식 (P4, 성능) `[2026-09-06 /review F11]`
+`SmartInboxItemCard` 가 카드마다 `useProjectTitleMap`(useQuery 3 + workspace guard 3)을 호출한다 — 네트워크는 React Query 가 dedupe 하지만
+Inbox 20건이면 옵저버 ≤120. `SmartInbox` 에서 한 번 호출해 `titleMap`/`byStatus` 를 props 로 내리는 것이 맞다(카드 `memo()` 의 의도와도 정합).
+이전(`useProjects` 카드당 1회)부터 있던 구조라 별건.
+
 ## BL-S29-1 — `mise run docs-check` 게이트 신설 (규칙 재중복 방지) ⏳ **미착수**
 
 **배경**: [ADR-029](adr/029-ai-rules-relocation.md) §2.2 가 「`apps/*/AGENTS.md` 는 `B-NN`·`F-NN`·`I-NN` 불변식을
