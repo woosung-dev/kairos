@@ -183,29 +183,18 @@ class IntegrationRepository:
             )
         )).one_or_none()
 
-    async def find_documents_by_workspace(
-        self,
-        workspace_id: uuid.UUID,
-    ) -> list[ExternalDocument]:
-        """본문을 defer한 목록. 본문이 필요하면 find_document_by_id를 사용한다."""
-        stmt = (
-            select(ExternalDocument)
-            .where(ExternalDocument.workspace_id == workspace_id)
-            .options(defer(ExternalDocument.plain_text))
-            .order_by(ExternalDocument.last_synced_at.desc().nulls_last())
-        )
-        return list((await self.session.exec(stmt)).all())
-
     async def find_documents_by_connection(
         self,
         connection_id: uuid.UUID,
         workspace_id: uuid.UUID,
     ) -> list[ExternalDocument]:
-        """연결 해제 시 회수 대상 목록. 본문은 defer 한다.
+        """연결 한정 외부 문서 목록 (회수 대상 + 관리 화면). 본문은 defer 한다.
 
-        ``find_documents_by_workspace`` 로 대신하지 않는다 — v0 는 workspace 당
-        google_drive 연결이 하나지만(`uq_..._workspace_provider`), 두 번째 provider 가
-        생기면 그 전제가 조용히 깨지고 남의 provider 문서까지 파기된다.
+        ★workspace 전량 조회판을 **의도적으로 두지 않는다.** v0 는 workspace 당
+        google_drive 연결이 하나라(`uq_..._workspace_provider`) 두 조회가 같은 결과를
+        내지만, 둘을 나란히 두면 호출자가 잘못된 쪽을 고르고 두 번째 provider 가
+        생기는 순간 남의 provider 문서까지 파기된다. 실제로 2026-09-11 독립 리뷰가
+        목록 엔드포인트에서 그 오선택을 잡아냈다. 진입점을 하나로 남긴다.
         """
         stmt = (
             select(ExternalDocument)

@@ -330,7 +330,10 @@ async def disconnect_google_drive(
     묻히면 권한이 살아 있는 채로 끝난다.
     """
     connection = await service.get_connection_by_provider(workspace_id, "google_drive")
-    if connection is None:
+    # 이미 해제된 연결은 "없음" 으로 취급한다. 그대로 진행하면 지울 토큰이 없어
+    # revoked=false 가 나오고, FE 가 이미 폐기가 끝난 연결에 대고 "Google 권한을
+    # 직접 해제하라" 는 거짓 경고를 띄운다.
+    if connection is None or connection.status == "disabled":
         raise IntegrationConnectionNotFoundError()
     outcome = await pipeline.disconnect_connection(connection.id, workspace_id)
     return DisconnectConnectionResponse(
@@ -353,8 +356,17 @@ async def list_google_drive_documents(
     상세 조회(`GET /external-documents/{id}`)는 RAG 인용 클릭 경로라
     `require_viewer` + project visibility 검증이지만, 목록은 "무엇이 팀 지식으로
     발행돼 있는가" 를 관리하는 화면이다. 본문은 repository 가 defer 한다.
+
+    ★**연결 한정**이다 (workspace 전량이 아니다). 경로가 `/google-drive/documents`
+    인데 provider 무관 목록을 돌려주면, FE 가 이 건수를 "해제 시 N건이 삭제된다" 는
+    파괴 경고로 쓰는 순간 거짓말이 된다 — 실제 삭제는 연결 한정이기 때문이다.
+    오늘은 workspace 당 google_drive 연결이 하나라 두 집합이 같지만, 두 번째
+    provider 가 생기면 조용히 갈라진다.
     """
-    documents = await service.list_documents(workspace_id)
+    connection = await service.get_connection_by_provider(workspace_id, "google_drive")
+    if connection is None:
+        return []
+    documents = await service.list_documents_by_connection(connection.id, workspace_id)
     return [ExternalDocumentResponse.model_validate(doc) for doc in documents]
 
 

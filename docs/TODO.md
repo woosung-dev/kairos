@@ -118,6 +118,10 @@
   **Report-Only** 로 내보낸다. 정책은 정적 grep 으로 만들어 브라우저 검증이 없다. 배포 후 주요 경로
   (로그인 · /new 녹음 · RAG 검색 · 설정>연동 Picker) 를 돌며 콘솔 CSP 위반 0건을 확인한 뒤 header key 를
   `Content-Security-Policy` 로 바꾼다. 전환 시 `e2e/tests/security-headers.spec.ts` 에 CSP 행을 추가한다. BL-S27e-3 과 병합.
+- [ ] **빈 본문 202 트랩 전수 점검** (P3) `[신규 · 2026-09-11]` `lib/api-client.ts` 가 이제 빈 본문
+  2xx 를 undefined 로 돌려준다. 같은 함정이 있던 다른 202 라우트(actions/inbox/meetings/memory)는
+  현재 본문을 주거나 FE 소비처가 없어 무해하지만, `contracts-check` 가 원리적으로 못 잡는
+  클래스다 — 빈 본문 202 를 새로 만들 때 FE 소비처를 함께 확인한다.
 - [ ] **`components/shared/prototype-switcher.tsx` importer 0** (P4) `[신규 · 2026-09-11]`
   `google-drive-prototype.tsx` 삭제로 유일한 소비자가 사라졌다. 다음 디자인 탐색에 재사용할지,
   dead-code 로 지울지 판단 필요 (note-editor.tsx 선례는 삭제).

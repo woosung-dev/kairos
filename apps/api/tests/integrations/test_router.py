@@ -1105,7 +1105,7 @@ async def test_disconnect_returns_revocation_outcome_to_the_owner(
     connection_id = uuid.uuid4()
     service = SimpleNamespace(
         get_connection_by_provider=AsyncMock(
-            return_value=SimpleNamespace(id=connection_id)
+            return_value=SimpleNamespace(id=connection_id, status="active")
         ),
     )
     pipeline = SimpleNamespace(
@@ -1156,6 +1156,7 @@ async def test_disconnect_never_exposes_the_refresh_token(
         get_connection_by_provider=AsyncMock(
             return_value=SimpleNamespace(
                 id=uuid.uuid4(),
+                status="active",
                 encrypted_refresh_token="encrypted-super-secret",
             )
         ),
@@ -1178,12 +1179,68 @@ async def test_disconnect_never_exposes_the_refresh_token(
     assert "refresh" not in response.text.lower()
 
 
+async def test_disconnect_treats_already_disabled_connection_as_absent(
+    client: AsyncClient,
+) -> None:
+    """두 번째 해제가 200 + revoked=false 로 끝나면 FE 가 이미 폐기가 끝난 연결에
+
+    대고 "Google 권한을 직접 해제하라" 는 거짓 경고를 띄운다.
+    """
+    workspace_id = uuid.uuid4()
+    service = SimpleNamespace(
+        get_connection_by_provider=AsyncMock(
+            return_value=SimpleNamespace(
+                id=uuid.uuid4(),
+                status="disabled",
+                encrypted_refresh_token=None,
+            )
+        ),
+    )
+    pipeline = SimpleNamespace(disconnect_connection=AsyncMock())
+    app.dependency_overrides[require_owner] = lambda: _member(workspace_id)
+    app.dependency_overrides[get_integration_service] = lambda: service
+    app.dependency_overrides[get_google_drive_sync_pipeline_service] = lambda: pipeline
+
+    response = await client.delete(
+        f"/api/v1/workspaces/{workspace_id}/integrations/google-drive",
+    )
+
+    assert response.status_code == 404
+    pipeline.disconnect_connection.assert_not_awaited()
+
+
+async def test_list_documents_returns_empty_when_not_connected(
+    client: AsyncClient,
+) -> None:
+    workspace_id = uuid.uuid4()
+    service = SimpleNamespace(
+        get_connection_by_provider=AsyncMock(return_value=None),
+        list_documents_by_connection=AsyncMock(),
+    )
+    app.dependency_overrides[require_owner] = lambda: _member(workspace_id)
+    app.dependency_overrides[get_integration_service] = lambda: service
+
+    response = await client.get(
+        f"/api/v1/workspaces/{workspace_id}/integrations/google-drive/documents",
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+    service.list_documents_by_connection.assert_not_awaited()
+
+
 async def test_list_documents_returns_published_documents_for_the_workspace(
     client: AsyncClient,
 ) -> None:
     workspace_id = uuid.uuid4()
     document = _external_document(workspace_id, None)
-    service = SimpleNamespace(list_documents=AsyncMock(return_value=[document]))
+    connection_id = uuid.uuid4()
+    service = SimpleNamespace(
+        get_connection_by_provider=AsyncMock(
+            return_value=SimpleNamespace(id=connection_id, status="active")
+        ),
+        list_documents_by_connection=AsyncMock(return_value=[document]),
+    )
     app.dependency_overrides[require_owner] = lambda: _member(workspace_id)
     app.dependency_overrides[get_integration_service] = lambda: service
 
@@ -1205,8 +1262,11 @@ async def test_list_documents_returns_published_documents_for_the_workspace(
             "lastSyncedAt": None,
         }
     ]
-    # I-9 — 목록 조회는 경로의 workspace_id 로만 좁혀진다.
-    assert service.list_documents.await_args.args == (workspace_id,)
+    # I-9 + 연결 한정 — 경로의 workspace_id 와 그 workspace 의 연결로만 좁혀진다.
+    assert service.list_documents_by_connection.await_args.args == (
+        connection_id,
+        workspace_id,
+    )
 
 
 async def test_list_documents_does_not_leak_document_bodies(
@@ -1216,7 +1276,12 @@ async def test_list_documents_does_not_leak_document_bodies(
     workspace_id = uuid.uuid4()
     document = _external_document(workspace_id, None)
     document.plain_text = "비공개 본문이 목록에 새면 안 된다"
-    service = SimpleNamespace(list_documents=AsyncMock(return_value=[document]))
+    service = SimpleNamespace(
+        get_connection_by_provider=AsyncMock(
+            return_value=SimpleNamespace(id=uuid.uuid4(), status="active")
+        ),
+        list_documents_by_connection=AsyncMock(return_value=[document]),
+    )
     app.dependency_overrides[require_owner] = lambda: _member(workspace_id)
     app.dependency_overrides[get_integration_service] = lambda: service
 

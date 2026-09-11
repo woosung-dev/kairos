@@ -283,9 +283,9 @@ class GoogleDriveSyncPipelineService:
                 workspace_id,
             )
 
-            # ② 사전/사후 무효화는 unpublish_document 와 같은 보장이되, 문서당이
-            #    아니라 배치 전체에 1쌍이다. 문서 N건마다 workspace 전량 무효화를
-            #    N번 도는 것은 같은 보장에 N배 비용이다.
+            # ② 사전 무효화는 이후 실패·취소에도 기존 본문이 노출될 창을 닫는다.
+            #    문서당이 아니라 배치 전체에 1쌍이다 — 문서 N건마다 workspace 전량
+            #    무효화를 N번 도는 것은 같은 보장에 N배 비용이다.
             await self._invalidate_document_caches(embedding_repository, workspace_id)
             for document in documents:
                 await embedding_repository.delete_by_source(
@@ -293,10 +293,9 @@ class GoogleDriveSyncPipelineService:
                     document.id,
                 )
                 await repository.delete_document(document.id, workspace_id)
-            await self._invalidate_document_caches(embedding_repository, workspace_id)
 
-            # ③ 파기와 같은 커밋에 둔다. 문서만 지워지고 연결이 살아남는 중간
-            #    상태를 만들지 않기 위해서다.
+            # ③ 파기와 **같은 커밋**에 둔다. 문서만 지워지고 연결·토큰이 살아남는
+            #    중간 상태를 만들지 않기 위해서다.
             await repository.update_connection_status(
                 connection_id,
                 workspace_id,
@@ -304,6 +303,15 @@ class GoogleDriveSyncPipelineService:
                 clear_refresh_token=True,
             )
             await repository.commit()
+
+            # ★사후 무효화는 반드시 이 커밋 **뒤**에 온다.
+            #
+            #   앞에 두면 `_invalidate_document_caches` 가 세션을 커밋해 ②가 ③보다
+            #   먼저 확정되고, 그 사이 장애 시 "문서는 영구 삭제됐는데 연결은 active,
+            #   refresh token 도 그대로" 인 상태가 남는다.
+            #   뒤에 두면 삭제가 확정된 뒤 무효화하므로, 삭제를 보지 못한 동시 RAG
+            #   질의가 남긴 캐시행까지 회수된다.
+            await self._invalidate_document_caches(embedding_repository, workspace_id)
 
         # ④ DB 커밋 뒤, 세션 밖에서 시도한다. 외부 호출 지연이 트랜잭션을 붙들지
         #    않게 한다.

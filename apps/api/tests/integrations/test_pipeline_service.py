@@ -64,6 +64,10 @@ class _PipelineState:
     generated_chunk_count: int = 0
     commits: int = 0
     # ADR-026 되돌리기 전략 — 연결 해제 (2026-09-11)
+    # ★operations 는 캐시·청크 연산만 본다 (기존 테스트의 의미를 보존한다).
+    #   journal 은 **커밋까지 포함한 전체 순서**다 — 커밋 경계를 단언하지 못하면
+    #   `repository.commit()` 한 줄을 지우는 변이를 어떤 테스트도 잡을 수 없다.
+    journal: list[str] = field(default_factory=list)
     connection: SimpleNamespace | None = None
     connection_status_updates: list[tuple[str, bool]] = field(default_factory=list)
     refresh_token_error: Exception | None = None
@@ -200,6 +204,7 @@ class _FakeIntegrationRepository:
     ) -> None:
         document = await self.find_document_by_id(document_id, workspace_id)
         if document is not None:
+            self.state.journal.append("delete_document")
             del self.state.documents[document_id]
 
     async def find_connection_by_id(
@@ -239,6 +244,7 @@ class _FakeIntegrationRepository:
         if connection is None:
             return
         self.state.operations.append("update_connection_status")
+        self.state.journal.append("update_connection_status")
         self.state.connection_status_updates.append((status, clear_refresh_token))
         connection.status = status
         if clear_refresh_token:
@@ -270,6 +276,7 @@ class _FakeIntegrationRepository:
                 setattr(sync_run, key, value)
 
     async def commit(self) -> None:
+        self.state.journal.append("commit")
         self.state.commits += 1
 
 
@@ -306,6 +313,7 @@ class _FakeEmbeddingRepository:
         source_id: uuid.UUID,
     ) -> None:
         self.state.operations.append("delete_chunks")
+        self.state.journal.append("delete_chunks")
         self.state.deleted_sources.append((source_type, source_id))
         self.state.chunk_project_ids.pop((source_type, source_id), None)
 
@@ -315,9 +323,11 @@ class _FakeEmbeddingRepository:
         project_id: uuid.UUID | None,
     ) -> None:
         self.state.operations.append("delete_caches")
+        self.state.journal.append("delete_caches")
         self.state.deleted_caches.append((workspace_id, project_id))
 
     async def commit(self) -> None:
+        self.state.journal.append("commit")
         self.state.commits += 1
 
 
@@ -352,7 +362,7 @@ class _FakeDriveClient:
         # 폐기가 로컬 파기보다 **뒤**에 왔는지 순서로 증명하기 위해 같은
         # operations 로그에 기록한다.
         if self.state is not None:
-            self.state.operations.append("revoke")
+            self.state.journal.append("revoke")
         self.revoked_tokens.append(refresh_token)
         if self.revoke_error is not None:
             raise self.revoke_error
@@ -397,11 +407,12 @@ def _make_document(
     revision_id: str = "revision-1",
     content_hash: str = "content-hash-1",
     plain_text: str = "기존 본문",
+    connection_id: uuid.UUID | None = None,
 ) -> SimpleNamespace:
     document = SimpleNamespace(
         id=uuid.uuid4(),
         workspace_id=state.workspace_id,
-        connection_id=state.connection_id,
+        connection_id=connection_id or state.connection_id,
         project_id=state.project_id,
         drive_file_id=file_id,
         title="기존 제목",
@@ -715,6 +726,35 @@ async def test_disconnect_unpublishes_every_document_of_the_connection(
     )
 
 
+async def test_disconnect_leaves_documents_of_another_connection_intact(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    """연결 필터 회귀 가드 — `find_documents_by_connection` 이 존재하는 유일한 이유.
+
+    v0 는 workspace 당 google_drive 연결이 하나라 오늘은 두 집합이 같지만, 두 번째
+    provider 가 생기면 필터 없는 조회는 **남의 provider 문서까지 파기**한다.
+    그 필터를 지우는 변이를 이 테스트가 잡는다.
+    """
+    state, pipeline, _, _ = pipeline_environment
+    _make_connection(state)
+    mine = _make_document(state, file_id="mine")
+    other_connection_id = uuid.uuid4()
+    theirs = _make_document(
+        state,
+        file_id="theirs",
+        connection_id=other_connection_id,
+    )
+
+    outcome = await pipeline.disconnect_connection(
+        state.connection_id,
+        state.workspace_id,
+    )
+
+    assert outcome.unpublished_documents == 1
+    assert list(state.documents) == [theirs.id]
+    assert state.deleted_sources == [("external_document", mine.id)]
+
+
 async def test_disconnect_revokes_after_local_teardown_and_disables_connection(
     pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
 ) -> None:
@@ -728,11 +768,19 @@ async def test_disconnect_revokes_after_local_teardown_and_disables_connection(
         state.workspace_id,
     )
 
-    assert state.operations == [
+    # ★journal 로 단언한다 — 커밋이 빠지면 "문서는 영구 삭제됐는데 연결·토큰은
+    #   살아 있는" 상태가 되고, 커밋을 보지 않는 단언은 그 변이를 통과시킨다.
+    #   파기(delete_chunks·delete_document)와 연결 비활성화가 **한 커밋 안**에 있고,
+    #   사후 캐시 무효화가 그 커밋 **뒤**에 오며, 폐기가 가장 마지막이어야 한다.
+    assert state.journal == [
         "delete_caches",
+        "commit",
         "delete_chunks",
-        "delete_caches",
+        "delete_document",
         "update_connection_status",
+        "commit",
+        "delete_caches",
+        "commit",
         "revoke",
     ]
     assert drive_client.revoked_tokens == ["refresh-token"]

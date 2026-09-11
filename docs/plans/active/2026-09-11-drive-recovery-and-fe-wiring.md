@@ -129,6 +129,18 @@ ADR-026 D5 가 요구한 대로 `script-src` 에 `https://apis.google.com`(Picke
 
 evaluator 가 올린 지적은 **반박하지 않고 먼저 재현**한다. 재현되면 고치고, 재현되지 않으면 그 근거를 기록한다.
 
+**실행 결과 (2026-09-11)** — 3건이 재현됐고 전부 해소했다.
+
+| 지적 | 재현 | 해소 |
+|---|---|---|
+| `disconnect` 의 ②·③ 이 서로 다른 트랜잭션 (`_invalidate_document_caches` 가 내부 커밋) | ✅ `repository.commit()` 한 줄을 지워도 116건 전부 통과 | 사후 무효화를 커밋 **뒤**로 옮겨 ②+③ 을 단일 커밋으로 묶음. fake session 에 `journal` 을 추가해 커밋 순서를 단언 |
+| `find_documents_by_connection` 의 연결 필터 무커버 | ✅ `connection_id` WHERE 삭제해도 전부 통과 (fake 가 필터를 재구현) | 컴파일된 SQL 을 단언하는 `test_repository_queries.py` 신설 (Docker 불필요). 추가로 workspace 전량 조회판을 **제거** — 나란히 두면 호출자가 잘못 고른다 |
+| 빈 본문 202 + `res.json()` → "다시 동기화" 버튼이 항상 실패 | ✅ `new Response('', {status:202}).json()` 이 reject | `lib/api-client.ts` 가 빈 본문 2xx 를 undefined 로 처리. 회귀 테스트 추가 (옛 동작으로 되돌리면 죽음) |
+
+부수 해소 — 목록 엔드포인트를 연결 한정으로 좁힘 · 이미 해제된 연결은 404 (거짓 경고 제거) ·
+Picker 테스트에 fetch spy 추가 (D5 "백엔드로 보내지 않는다" 를 실제로 고정) ·
+resync/unpublish 에 성공·실패 토스트 추가.
+
 ### 5.4 검증 증거 (AGENTS.md §4 표준)
 
 - BE: pytest 결과 요약 + Docker 오류 사유 grep
@@ -165,6 +177,6 @@ evaluator 가 올린 지적은 **반박하지 않고 먼저 재현**한다. 재�
 - [x] **W3** FE api/hooks + Picker + settings UI + CSP + vitest
 - [x] **W4** 문서 개정 + contracts 재생성
 - [x] **V1** 게이트 실행 + 베이스라인 대조
-- [ ] **V2** evaluator 독립 검증 + 지적 해소
-- [ ] **D1** 커밋 + 푸시
+- [x] **V2** evaluator 독립 검증 + 지적 해소
+- [x] **D1** 커밋 + 푸시
 - [ ] **D2** 배포 절차 인계

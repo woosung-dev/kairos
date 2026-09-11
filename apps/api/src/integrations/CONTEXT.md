@@ -60,6 +60,10 @@ DELETE /api/v1/workspaces/{workspace_id}/integrations/google-drive/documents/{do
 GET    /api/v1/workspaces/{workspace_id}/external-documents/{document_id}
 ```
 
+`GET .../google-drive/documents` 는 **연결 한정**이다 (workspace 전량이 아니다). 경로가 provider 를 가리키는데 provider 무관 목록을 주면, FE 가 그 건수를 "해제 시 N건이 삭제된다" 는 파괴 경고로 쓰는 순간 거짓이 된다. 그래서 workspace 전량 조회판은 repository 에도 두지 않는다 — 나란히 두면 호출자가 잘못된 쪽을 고른다.
+
+`DELETE .../integrations/google-drive` 는 이미 `disabled` 인 연결을 **없는 것으로 취급**해 404 를 준다. 그대로 진행하면 지울 토큰이 없어 `revoked=false` 가 나오고, FE 가 이미 폐기가 끝난 연결에 대고 "Google 권한을 직접 해제하라" 는 거짓 경고를 띄운다.
+
 `DELETE .../integrations/google-drive` 는 204 가 아니라 `{unpublishedDocuments, revoked}` 를 돌려준다.
 Google 폐기는 best-effort 라 실패할 수 있고, 그때 owner 가 직접 해제해야 한다는 사실을 숨기면 안 되기 때문이다.
 목록(`GET .../google-drive/documents`)은 **발행 관리 표면**이라 owner 전용이다 — 상세
@@ -69,7 +73,7 @@ OAuth callback은 고정 redirect URI 제약으로 I-13 예외이며, 서명 sta
 
 ## 6. 엣지 케이스
 
-- **연결 해제의 순서는 되돌릴 수 없다**: ① refresh token 복호화 → ② 문서·청크·캐시 파기 → ③ 연결 비활성화 + 토큰 삭제 → ④ Google 폐기. ④ 를 먼저 하면 폐기 성공 뒤 ② 가 실패했을 때 **토큰은 죽었는데 문서는 계속 검색되는** 상태가 남는다. 반대 순서의 실패는 "문서는 사라졌고 Google 에 grant 만 남은" 상태라 안전하고, 응답 `revoked=false` 로 수동 해제를 안내할 수 있다.
+- **연결 해제의 순서는 되돌릴 수 없다**: ① refresh token 복호화 → ② 문서·청크 파기 + ③ 연결 비활성화 + 토큰 삭제 (**한 커밋**) → 사후 캐시 무효화 → ④ Google 폐기. ②와 ③ 이 서로 다른 트랜잭션이면 그 사이 장애 때 "문서는 영구 삭제됐는데 연결은 active, refresh token 도 그대로" 인 상태가 남는다. 사후 캐시 무효화를 커밋 **앞**에 두면 (`_invalidate_document_caches` 가 세션을 커밋하므로) 정확히 그 분리가 발생한다 — 반드시 커밋 뒤다. ④ 를 먼저 하면 폐기 성공 뒤 ② 가 실패했을 때 **토큰은 죽었는데 문서는 계속 검색되는** 상태가 남는다. 반대 순서의 실패는 "문서는 사라졌고 Google 에 grant 만 남은" 상태라 안전하고, 응답 `revoked=false` 로 수동 해제를 안내할 수 있다.
 - 폐기는 **Drive circuit breaker 를 경유하지 않는다.** 원본 조회 실패로 열린 breaker 가 권한 회수까지 막으면, 회수가 가장 급한 순간에 그것을 못 하게 된다. 폐기 실패·예외는 연결 해제를 되돌리지 않는다.
 - 폐기 요청에 Google 이 주는 `400 invalid_token` 은 **성공으로 취급**한다 (이미 폐기·만료 = 목표 상태 달성, 멱등). OAuth 엔드포인트의 평면 오류 스키마(`{"error": "invalid_token"}`)는 Drive API 의 중첩 스키마와 달라 파서를 공유하지 않는다.
 - refresh token 복호화에 실패해도 파기는 진행한다 — 키가 깨진 연결일수록 끊을 수 있어야 한다. 이때 `revoked=false` 다.

@@ -16,6 +16,7 @@ interface TokenClientConfig {
 
 let localSetSpy: ReturnType<typeof vi.spyOn>;
 let sessionSetSpy: ReturnType<typeof vi.spyOn>;
+let fetchSpy: ReturnType<typeof vi.spyOn>;
 let cookieWrites: string[];
 
 function installGoogleGlobals(pickedDocs: { id: string; name: string }[]) {
@@ -77,6 +78,11 @@ beforeEach(() => {
     return node;
   }) as typeof document.head.appendChild);
 
+  // ★D5 "브라우저 토큰을 백엔드로 보내지 않는다" 를 실제로 고정한다. 이 spy 가
+  //   없으면 훅 안에 fetch 를 넣어도 테스트가 전부 통과한다 (2026-09-11 독립 리뷰 지적).
+  fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response("{}", { status: 200 }),
+  );
   localSetSpy = vi.spyOn(Storage.prototype, "setItem");
   sessionSetSpy = vi.spyOn(window.sessionStorage.__proto__, "setItem");
   cookieWrites = [];
@@ -116,6 +122,9 @@ describe("useGooglePicker", () => {
     ].join("|");
     expect(persistedValues).not.toContain(ACCESS_TOKEN);
     expect(cookieWrites).toEqual([]);
+
+    // ★훅은 네트워크를 전혀 건드리지 않는다 — 토큰은 Google Picker 빌더에만 간다.
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("취소하면 빈 배열을 돌려준다 — 서버로 아무것도 보내지 않는다", async () => {
@@ -144,6 +153,7 @@ describe("useGooglePicker", () => {
     });
 
     expect(picked).toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("토큰 획득에 실패하면 빈 배열 + 에러 — 서버 상태 변화는 0이다", async () => {
@@ -163,5 +173,7 @@ describe("useGooglePicker", () => {
 
     expect(picked).toEqual([]);
     expect(result.current.error).not.toBeNull();
+    // D5 — 토큰 획득 실패 시 서버 상태 변화는 0 이다.
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

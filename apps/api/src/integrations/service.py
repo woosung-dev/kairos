@@ -107,11 +107,15 @@ class IntegrationService:
     ) -> ExternalDocument | None:
         return await self.repo.find_document_by_id(document_id, workspace_id)
 
-    async def list_documents(
+    async def list_documents_by_connection(
         self,
+        connection_id: uuid.UUID,
         workspace_id: uuid.UUID,
     ) -> list[ExternalDocument]:
-        return await self.repo.find_documents_by_workspace(workspace_id)
+        return await self.repo.find_documents_by_connection(
+            connection_id,
+            workspace_id,
+        )
 
     async def list_documents_by_sync_run(
         self,

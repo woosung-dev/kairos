@@ -188,8 +188,18 @@ export function GoogleDrivePanel({ workspaceId }: GoogleDrivePanelProps) {
           {documents && documents.length > 0 && (
             <DocumentTable
               documents={documents}
-              onResync={(id) => resync.mutate(id)}
-              onUnpublish={(id) => unpublish.mutate(id)}
+              onResync={(id) =>
+                resync.mutate(id, {
+                  onSuccess: () => toast.success("다시 동기화를 시작했습니다"),
+                  onError: () => toast.error("다시 동기화를 시작하지 못했습니다"),
+                })
+              }
+              onUnpublish={(id) =>
+                unpublish.mutate(id, {
+                  onSuccess: () => toast.success("발행을 취소했습니다"),
+                  onError: () => toast.error("발행을 취소하지 못했습니다"),
+                })
+              }
               isResyncPending={resync.isPending}
               isUnpublishPending={unpublish.isPending}
             />

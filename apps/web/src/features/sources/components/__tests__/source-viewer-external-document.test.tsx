@@ -76,6 +76,7 @@ describe("SourceViewer external_document", () => {
       ok: true,
       status: 200,
       json: async () => externalDocumentResponse(),
+      text: async () => JSON.stringify(externalDocumentResponse()),
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -115,6 +116,7 @@ describe("SourceViewer external_document", () => {
         ok: false,
         status: 404,
         json: async () => ({ detail: "찾을 수 없습니다" }),
+        text: async () => JSON.stringify(({ detail: "찾을 수 없습니다" })),
       });
     vi.stubGlobal("fetch", fetchMock);
 

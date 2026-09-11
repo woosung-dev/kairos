@@ -3266,7 +3266,7 @@
     },
     "/api/v1/workspaces/{workspace_id}/integrations/google-drive/documents": {
       "get": {
-        "description": "발행된 외부 문서 목록 — 관리 표면이므로 owner 전용 (I-EXT-1).\n\n상세 조회(`GET /external-documents/{id}`)는 RAG 인용 클릭 경로라\n`require_viewer` + project visibility 검증이지만, 목록은 \"무엇이 팀 지식으로\n발행돼 있는가\" 를 관리하는 화면이다. 본문은 repository 가 defer 한다.",
+        "description": "발행된 외부 문서 목록 — 관리 표면이므로 owner 전용 (I-EXT-1).\n\n상세 조회(`GET /external-documents/{id}`)는 RAG 인용 클릭 경로라\n`require_viewer` + project visibility 검증이지만, 목록은 \"무엇이 팀 지식으로\n발행돼 있는가\" 를 관리하는 화면이다. 본문은 repository 가 defer 한다.\n\n★**연결 한정**이다 (workspace 전량이 아니다). 경로가 `/google-drive/documents`\n인데 provider 무관 목록을 돌려주면, FE 가 이 건수를 \"해제 시 N건이 삭제된다\" 는\n파괴 경고로 쓰는 순간 거짓말이 된다 — 실제 삭제는 연결 한정이기 때문이다.\n오늘은 workspace 당 google_drive 연결이 하나라 두 집합이 같지만, 두 번째\nprovider 가 생기면 조용히 갈라진다.",
         "operationId": "list_google_drive_documents_api_v1_workspaces__workspace_id__integrations_google_drive_documents_get",
         "parameters": [
           {
