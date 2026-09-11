@@ -1,6 +1,7 @@
 """Google Drive 외부 문서 동기화 오케스트레이터."""
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -16,6 +17,8 @@ from src.integrations.exceptions import (
     DriveSourceMissingError,
     DriveTemporaryError,
     DriveUnsupportedMimeTypeError,
+    IntegrationConnectionNotFoundError,
+    IntegrationEncryptionError,
 )
 from src.integrations.models import ExternalDocument
 from src.integrations.repository import IntegrationRepository
@@ -27,6 +30,19 @@ _PURGE_ALLOWED_ERRORS = (
 )
 
 DriveClientFactory = Callable[[], GoogleDriveClient]
+
+
+@dataclass(frozen=True)
+class DisconnectOutcome:
+    """연결 해제 결과.
+
+    ``revoked`` 를 응답에 싣는 이유 — Google 폐기는 best-effort 라 실패해도
+    연결 해제는 성립한다. 그 사실을 숨기면 owner 는 Google 계정에 grant 가
+    남아 있는 줄 모른다.
+    """
+
+    unpublished_documents: int
+    revoked: bool
 
 
 class GoogleDriveSyncPipelineService:
@@ -215,6 +231,99 @@ class GoogleDriveSyncPipelineService:
             await self._invalidate_document_caches(embedding_repository, workspace_id)
             await repository.delete_document(document.id, workspace_id)
             await repository.commit()
+
+    async def disconnect_connection(
+        self,
+        connection_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+    ) -> DisconnectOutcome:
+        """연결을 해제하고 그 연결이 발행한 외부 문서를 전부 회수한다.
+
+        ADR-026 "되돌리기 전략" 1~3단계를 한 경계에서 수행한다. **순서가 설계의
+        핵심**이다.
+
+        ① refresh token 을 메모리로 꺼낸다 (③ 이 지우기 전이어야 한다)
+        ② 문서·청크·캐시를 파기한다 — Kairos 쪽 노출을 닫는 유일한 조치
+        ③ 연결을 비활성화하고 저장된 토큰을 지운다
+        ④ 마지막에 Google 폐기를 시도한다 (best-effort)
+
+        ★ ④ 를 먼저 하면 안 된다. 폐기에 성공한 뒤 ② 가 실패하면 **토큰은 죽었는데
+        문서는 계속 검색되는** 상태가 남는다. 반대 순서의 실패는 "문서는 사라졌고
+        Google 에 grant 만 남은" 상태라 훨씬 안전하고, 응답의 ``revoked`` 로
+        owner 에게 수동 해제를 안내할 수 있다.
+
+        ★ 폐기 실패가 연결 해제를 되돌리지 않는다. Google 장애 때문에 연결을 못
+        끊는 것이야말로 이 경로가 없애려는 상태다.
+        """
+        async with self._session_factory() as session:
+            repository = IntegrationRepository(session)
+            integration_service = IntegrationService(repository)
+            embedding_repository = EmbeddingRepository(session)
+
+            connection = await repository.find_connection_by_id(
+                connection_id,
+                workspace_id,
+            )
+            if connection is None:
+                raise IntegrationConnectionNotFoundError()
+
+            # ① 복호화 실패가 회수를 막지 않는다. 폐기만 포기하고 파기는 진행한다 —
+            #    키가 깨진 연결일수록 끊을 수 있어야 한다.
+            refresh_token: str | None = None
+            try:
+                refresh_token = await integration_service.get_decrypted_refresh_token(
+                    connection_id,
+                    workspace_id,
+                )
+            except (IntegrationConnectionNotFoundError, IntegrationEncryptionError):
+                refresh_token = None
+
+            documents = await repository.find_documents_by_connection(
+                connection_id,
+                workspace_id,
+            )
+
+            # ② 사전/사후 무효화는 unpublish_document 와 같은 보장이되, 문서당이
+            #    아니라 배치 전체에 1쌍이다. 문서 N건마다 workspace 전량 무효화를
+            #    N번 도는 것은 같은 보장에 N배 비용이다.
+            await self._invalidate_document_caches(embedding_repository, workspace_id)
+            for document in documents:
+                await embedding_repository.delete_by_source(
+                    "external_document",
+                    document.id,
+                )
+                await repository.delete_document(document.id, workspace_id)
+            await self._invalidate_document_caches(embedding_repository, workspace_id)
+
+            # ③ 파기와 같은 커밋에 둔다. 문서만 지워지고 연결이 살아남는 중간
+            #    상태를 만들지 않기 위해서다.
+            await repository.update_connection_status(
+                connection_id,
+                workspace_id,
+                status="disabled",
+                clear_refresh_token=True,
+            )
+            await repository.commit()
+
+        # ④ DB 커밋 뒤, 세션 밖에서 시도한다. 외부 호출 지연이 트랜잭션을 붙들지
+        #    않게 한다.
+        revoked = False
+        if refresh_token is not None:
+            drive_client = self._drive_client_factory()
+            try:
+                revoked = await drive_client.revoke_refresh_token(refresh_token)
+            except Exception:
+                # 파기는 이미 커밋됐다. 여기서 예외가 새어 나가면 500 이 되고,
+                # owner 는 회수가 통째로 실패한 줄 안다 — 실제로는 Kairos 쪽
+                # 회수가 끝난 상태다. 폐기 실패는 revoked=False 로만 알린다.
+                revoked = False
+            finally:
+                await drive_client.aclose()
+
+        return DisconnectOutcome(
+            unpublished_documents=len(documents),
+            revoked=revoked,
+        )
 
     async def _process_document_with_safety(
         self,

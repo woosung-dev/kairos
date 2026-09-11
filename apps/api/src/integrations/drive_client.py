@@ -24,6 +24,7 @@ from src.services.ai_resilience import (
 GOOGLE_DOC_MIME_TYPE = "application/vnd.google-apps.document"
 
 _GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+_GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 _DRIVE_FILES_URL = "https://www.googleapis.com/drive/v3/files"
 _RATE_LIMIT_REASONS = frozenset({"rateLimitExceeded", "userRateLimitExceeded"})
 _PERMISSION_REVOKED_REASONS = frozenset({"insufficientFilePermissions"})
@@ -151,6 +152,37 @@ class GoogleDriveClient:
         return GoogleAuthorizationCodeToken(
             refresh_token=refresh_token,
             expires_in=expires_in,
+        )
+
+    async def revoke_refresh_token(self, refresh_token: str) -> bool:
+        """Google 에서 refresh token 을 폐기하고 성공 여부를 반환한다.
+
+        연결 해제의 **best-effort 원격 단계**다. 예외를 던지지 않고 ``False`` 를
+        반환한다 — Google 장애가 Kairos 연결 해제를 막으면, 권한 회수가 가장
+        급한 순간에 그것을 못 하게 된다.
+
+        ★circuit breaker 를 경유하지 않는다. Drive 원본 조회 실패로 열린 breaker
+        때문에 권한 회수까지 차단되면 같은 문제가 생기므로, 여기서는
+        ``with_drive_timeout`` (내부에서 ``drive_breaker.check()`` 를 한다) 대신
+        timeout 만 직접 건다. 폐기 결과도 breaker 에 기록하지 않는다.
+        """
+        try:
+            response = await asyncio.wait_for(
+                self._client.post(
+                    _GOOGLE_REVOKE_URL,
+                    data={"token": refresh_token},
+                ),
+                timeout=self._timeout_sec,
+            )
+        except (asyncio.TimeoutError, httpx.RequestError):
+            return False
+        if response.is_success:
+            return True
+        # 이미 폐기·만료된 토큰에 Google 은 400 invalid_token 을 준다. 목표 상태가
+        # 이미 달성돼 있으므로 성공으로 취급한다 (멱등).
+        return (
+            response.status_code == 400
+            and self._oauth_error_code(response) == "invalid_token"
         )
 
     async def get_file_metadata(
@@ -320,6 +352,24 @@ class GoogleDriveClient:
                 return DrivePermissionRevokedError()
             return DriveReauthenticationRequiredError()
         return DriveTemporaryError()
+
+    @staticmethod
+    def _oauth_error_code(response: httpx.Response) -> str | None:
+        """OAuth 엔드포인트의 **평면** 오류 코드를 읽는다.
+
+        ``{"error": "invalid_token"}`` 형태로, Drive API 의 중첩
+        ``{"error": {"errors": [{"reason": ...}]}}`` 와 스키마가 다르다.
+        그래서 ``_google_error_reasons`` 와 공유하지 않는다 — 한쪽 파서로
+        양쪽을 읽으면 조용히 ``None`` 이 되어 분기가 뭉개진다.
+        """
+        try:
+            payload = response.json()
+        except ValueError:
+            return None
+        if not isinstance(payload, dict):
+            return None
+        error = payload.get("error")
+        return error if isinstance(error, str) else None
 
     @staticmethod
     def _google_error_reasons(response: httpx.Response) -> frozenset[str]:

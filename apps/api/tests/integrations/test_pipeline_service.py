@@ -31,6 +31,7 @@ from src.integrations.exceptions import (
     DriveSourceMissingError,
     DriveTemporaryError,
     DriveUnsupportedMimeTypeError,
+    IntegrationConnectionNotFoundError,
     IntegrationEncryptionError,
 )
 from src.integrations.models import ExternalDocument, IntegrationConnection
@@ -62,6 +63,10 @@ class _PipelineState:
     embedded_documents: list[dict[str, object]] = field(default_factory=list)
     generated_chunk_count: int = 0
     commits: int = 0
+    # ADR-026 되돌리기 전략 — 연결 해제 (2026-09-11)
+    connection: SimpleNamespace | None = None
+    connection_status_updates: list[tuple[str, bool]] = field(default_factory=list)
+    refresh_token_error: Exception | None = None
 
 
 class _FakeSession:
@@ -197,6 +202,48 @@ class _FakeIntegrationRepository:
         if document is not None:
             del self.state.documents[document_id]
 
+    async def find_connection_by_id(
+        self,
+        connection_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+    ) -> SimpleNamespace | None:
+        connection = self.state.connection
+        if (
+            connection is None
+            or connection.id != connection_id
+            or connection.workspace_id != workspace_id
+        ):
+            return None
+        return connection
+
+    async def find_documents_by_connection(
+        self,
+        connection_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+    ) -> list[SimpleNamespace]:
+        return [
+            document
+            for document in self.state.documents.values()
+            if document.connection_id == connection_id
+            and document.workspace_id == workspace_id
+        ]
+
+    async def update_connection_status(
+        self,
+        connection_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        status: str,
+        clear_refresh_token: bool = False,
+    ) -> None:
+        connection = await self.find_connection_by_id(connection_id, workspace_id)
+        if connection is None:
+            return
+        self.state.operations.append("update_connection_status")
+        self.state.connection_status_updates.append((status, clear_refresh_token))
+        connection.status = status
+        if clear_refresh_token:
+            connection.encrypted_refresh_token = None
+
     async def find_sync_run_by_id(
         self,
         sync_run_id: uuid.UUID,
@@ -237,6 +284,8 @@ class _FakeIntegrationService:
     ) -> str:
         assert connection_id == self.repository.state.connection_id
         assert workspace_id == self.repository.state.workspace_id
+        if self.repository.state.refresh_token_error is not None:
+            raise self.repository.state.refresh_token_error
         return "refresh-token"
 
 
@@ -290,9 +339,24 @@ class _FakeDriveClient:
         self.metadata: dict[str, DriveFileMetadata | Exception] = {}
         self.exports: dict[str, DriveExport | Exception] = {}
         self.refresh_error: Exception | None = None
+        # 연결 해제 — 폐기는 best-effort 다 (ADR-026 되돌리기 전략)
+        self.revoked_tokens: list[str] = []
+        self.revoke_result: bool = True
+        self.revoke_error: Exception | None = None
+        self.state: "_PipelineState | None" = None
 
     async def aclose(self) -> None:
         self.aclose_calls += 1
+
+    async def revoke_refresh_token(self, refresh_token: str) -> bool:
+        # 폐기가 로컬 파기보다 **뒤**에 왔는지 순서로 증명하기 위해 같은
+        # operations 로그에 기록한다.
+        if self.state is not None:
+            self.state.operations.append("revoke")
+        self.revoked_tokens.append(refresh_token)
+        if self.revoke_error is not None:
+            raise self.revoke_error
+        return self.revoke_result
 
     async def refresh_access_token(self, *args: object, **kwargs: object) -> str:
         self.refresh_calls += 1
@@ -560,6 +624,7 @@ def pipeline_environment(
 ) -> tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory]:
     state = _PipelineState()
     drive_client = _FakeDriveClient()
+    drive_client.state = state
     session_factory = _FakeSessionFactory(state)
     monkeypatch.setattr(
         pipeline_module,
@@ -611,6 +676,186 @@ async def test_confirmed_source_errors_purge_document_content(
     assert document.content_hash == ""
     assert document.sync_status == "purged"
     assert document.revision_id == "revision-1"
+
+
+def _make_connection(state: _PipelineState) -> SimpleNamespace:
+    connection = SimpleNamespace(
+        id=state.connection_id,
+        workspace_id=state.workspace_id,
+        provider="google_drive",
+        status="active",
+        encrypted_refresh_token="encrypted-refresh-token",
+    )
+    state.connection = connection
+    return connection
+
+
+async def test_disconnect_unpublishes_every_document_of_the_connection(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    """변이 가드 — 파기 루프를 1건에서 break 하면 죽어야 한다."""
+    state, pipeline, _, _ = pipeline_environment
+    _make_connection(state)
+    documents = [
+        _make_document(state, file_id=f"document-{index}") for index in range(3)
+    ]
+
+    outcome = await pipeline.disconnect_connection(
+        state.connection_id,
+        state.workspace_id,
+    )
+
+    assert outcome.unpublished_documents == 3
+    assert state.documents == {}
+    assert sorted(str(source_id) for _, source_id in state.deleted_sources) == sorted(
+        str(document.id) for document in documents
+    )
+    assert all(
+        source_type == "external_document" for source_type, _ in state.deleted_sources
+    )
+
+
+async def test_disconnect_revokes_after_local_teardown_and_disables_connection(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    """변이 가드 — 폐기를 파기보다 먼저 옮기면 순서 단언이 죽어야 한다."""
+    state, pipeline, drive_client, _ = pipeline_environment
+    connection = _make_connection(state)
+    _make_document(state)
+
+    outcome = await pipeline.disconnect_connection(
+        state.connection_id,
+        state.workspace_id,
+    )
+
+    assert state.operations == [
+        "delete_caches",
+        "delete_chunks",
+        "delete_caches",
+        "update_connection_status",
+        "revoke",
+    ]
+    assert drive_client.revoked_tokens == ["refresh-token"]
+    assert state.connection_status_updates == [("disabled", True)]
+    assert connection.status == "disabled"
+    assert connection.encrypted_refresh_token is None
+    assert outcome.revoked is True
+
+
+async def test_disconnect_invalidates_caches_once_per_batch_not_per_document(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    """문서 N건에 workspace 전량 무효화를 N번 돌면 죽어야 한다."""
+    state, pipeline, _, _ = pipeline_environment
+    _make_connection(state)
+    for index in range(4):
+        _make_document(state, file_id=f"document-{index}")
+
+    await pipeline.disconnect_connection(state.connection_id, state.workspace_id)
+
+    # 불변식을 인덱스가 아니라 "무효화 2회가 청크 삭제 전부를 감싼다" 로 쓴다.
+    # 뒤에 붙는 단계(update_connection_status·revoke)가 바뀌어도 이 단언은
+    # 의미를 유지한다.
+    invalidations = [
+        index
+        for index, operation in enumerate(state.operations)
+        if operation == "delete_caches"
+    ]
+    chunk_deletions = [
+        index
+        for index, operation in enumerate(state.operations)
+        if operation == "delete_chunks"
+    ]
+    assert len(invalidations) == 2
+    assert len(chunk_deletions) == 4
+    assert invalidations[0] < min(chunk_deletions)
+    assert max(chunk_deletions) < invalidations[1]
+
+
+async def test_disconnect_survives_revocation_failure_without_restoring_access(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    """변이 가드 — 폐기 실패를 raise 로 전파하면 죽어야 한다.
+
+    Google 장애가 연결 해제를 막으면, 권한 회수가 가장 급한 순간에 그것을
+    못 하게 된다.
+    """
+    state, pipeline, drive_client, _ = pipeline_environment
+    connection = _make_connection(state)
+    _make_document(state)
+    drive_client.revoke_result = False
+
+    outcome = await pipeline.disconnect_connection(
+        state.connection_id,
+        state.workspace_id,
+    )
+
+    assert outcome.revoked is False
+    # 폐기에 실패해도 로컬 회수는 되돌리지 않는다.
+    assert outcome.unpublished_documents == 1
+    assert state.documents == {}
+    assert connection.status == "disabled"
+    assert connection.encrypted_refresh_token is None
+
+
+async def test_disconnect_reports_outcome_when_revocation_raises(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    """파기 커밋 뒤의 폐기 예외가 500 으로 새어 나가면 죽어야 한다.
+
+    이 경로에서 예외가 전파되면 owner 는 회수가 통째로 실패한 줄 알지만,
+    실제로는 Kairos 쪽 회수가 이미 끝나 있다.
+    """
+    state, pipeline, drive_client, _ = pipeline_environment
+    _make_connection(state)
+    _make_document(state)
+    drive_client.revoke_error = RuntimeError("google revoke exploded")
+
+    outcome = await pipeline.disconnect_connection(
+        state.connection_id,
+        state.workspace_id,
+    )
+
+    assert outcome.revoked is False
+    assert outcome.unpublished_documents == 1
+    assert state.documents == {}
+    assert drive_client.aclose_calls == 1
+
+
+async def test_disconnect_tears_down_even_when_token_cannot_be_decrypted(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    """키가 깨진 연결일수록 끊을 수 있어야 한다."""
+    state, pipeline, drive_client, _ = pipeline_environment
+    connection = _make_connection(state)
+    _make_document(state)
+    state.refresh_token_error = IntegrationEncryptionError()
+
+    outcome = await pipeline.disconnect_connection(
+        state.connection_id,
+        state.workspace_id,
+    )
+
+    assert outcome.revoked is False
+    assert drive_client.revoked_tokens == []
+    assert state.documents == {}
+    assert connection.status == "disabled"
+
+
+async def test_disconnect_rejects_connection_of_another_workspace(
+    pipeline_environment: tuple[_PipelineState, GoogleDriveSyncPipelineService, _FakeDriveClient, _FakeSessionFactory],
+) -> None:
+    """I-9 — 남의 workspace 연결을 끊어 문서를 파기할 수 없다."""
+    state, pipeline, _, _ = pipeline_environment
+    _make_connection(state)
+    _make_document(state)
+
+    with pytest.raises(IntegrationConnectionNotFoundError):
+        await pipeline.disconnect_connection(state.connection_id, uuid.uuid4())
+
+    assert len(state.documents) == 1
+    assert state.deleted_sources == []
+    assert state.connection_status_updates == []
 
 
 async def test_unpublish_invalidates_caches_before_deleting_chunks(

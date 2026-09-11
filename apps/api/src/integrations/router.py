@@ -45,7 +45,9 @@ from src.integrations.pipeline_service import GoogleDriveSyncPipelineService
 from src.integrations.repository import IntegrationRepository
 from src.integrations.schemas import (
     AuthorizationUrlResponse,
+    DisconnectConnectionResponse,
     ExternalDocumentDetailResponse,
+    ExternalDocumentResponse,
     ImportExternalDocumentsRequest,
     IntegrationConnectionResponse,
     IntegrationSyncRunResponse,
@@ -304,6 +306,56 @@ async def get_google_drive_connection(
     if connection is None:
         return None
     return IntegrationConnectionResponse.model_validate(connection)
+
+
+@router.delete(
+    "/integrations/google-drive",
+    response_model=DisconnectConnectionResponse,
+)
+async def disconnect_google_drive(
+    workspace_id: uuid.UUID,
+    member: WorkspaceMember = Depends(require_owner),
+    service: IntegrationService = Depends(get_integration_service),
+    pipeline: GoogleDriveSyncPipelineService = Depends(
+        get_google_drive_sync_pipeline_service
+    ),
+) -> DisconnectConnectionResponse:
+    """연결 해제 + 발행 문서 전량 회수 + Google 토큰 폐기 (ADR-026 되돌리기 전략).
+
+    204 가 아니라 본문을 돌려준다. Google 폐기는 best-effort 라 실패할 수 있고,
+    그때 owner 가 직접 해제해야 한다는 사실을 알려야 하기 때문이다.
+
+    ★BackgroundTask 가 아니라 **동기**다. 회수는 사용자가 결과를 확인해야 하는
+    조치이고, BackgroundTasks 는 재시도가 없어(ADR-028 §5-⑤) 실패가 조용히
+    묻히면 권한이 살아 있는 채로 끝난다.
+    """
+    connection = await service.get_connection_by_provider(workspace_id, "google_drive")
+    if connection is None:
+        raise IntegrationConnectionNotFoundError()
+    outcome = await pipeline.disconnect_connection(connection.id, workspace_id)
+    return DisconnectConnectionResponse(
+        unpublished_documents=outcome.unpublished_documents,
+        revoked=outcome.revoked,
+    )
+
+
+@router.get(
+    "/integrations/google-drive/documents",
+    response_model=list[ExternalDocumentResponse],
+)
+async def list_google_drive_documents(
+    workspace_id: uuid.UUID,
+    member: WorkspaceMember = Depends(require_owner),
+    service: IntegrationService = Depends(get_integration_service),
+) -> list[ExternalDocumentResponse]:
+    """발행된 외부 문서 목록 — 관리 표면이므로 owner 전용 (I-EXT-1).
+
+    상세 조회(`GET /external-documents/{id}`)는 RAG 인용 클릭 경로라
+    `require_viewer` + project visibility 검증이지만, 목록은 "무엇이 팀 지식으로
+    발행돼 있는가" 를 관리하는 화면이다. 본문은 repository 가 defer 한다.
+    """
+    documents = await service.list_documents(workspace_id)
+    return [ExternalDocumentResponse.model_validate(doc) for doc in documents]
 
 
 @router.post(

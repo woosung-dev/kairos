@@ -33,6 +33,19 @@ class IntegrationConnectionResponse(BaseModel):
     model_config = {"from_attributes": True, "populate_by_name": True}
 
 
+class DisconnectConnectionResponse(BaseModel):
+    """연결 해제 결과.
+
+    ``revoked=False`` 는 해제 실패가 아니다 — Kairos 쪽 회수는 끝났고 Google
+    측 폐기만 확인되지 않은 상태다. FE 는 이때 수동 해제를 안내한다.
+    """
+
+    unpublished_documents: int = Field(alias="unpublishedDocuments")
+    revoked: bool
+
+    model_config = {"populate_by_name": True}
+
+
 class ImportExternalDocumentsRequest(BaseModel):
     file_ids: list[str] = Field(min_length=1, alias="fileIds")
     project_id: uuid.UUID | None = Field(default=None, alias="projectId")

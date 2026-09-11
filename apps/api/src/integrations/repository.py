@@ -196,6 +196,28 @@ class IntegrationRepository:
         )
         return list((await self.session.exec(stmt)).all())
 
+    async def find_documents_by_connection(
+        self,
+        connection_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+    ) -> list[ExternalDocument]:
+        """연결 해제 시 회수 대상 목록. 본문은 defer 한다.
+
+        ``find_documents_by_workspace`` 로 대신하지 않는다 — v0 는 workspace 당
+        google_drive 연결이 하나지만(`uq_..._workspace_provider`), 두 번째 provider 가
+        생기면 그 전제가 조용히 깨지고 남의 provider 문서까지 파기된다.
+        """
+        stmt = (
+            select(ExternalDocument)
+            .where(
+                ExternalDocument.workspace_id == workspace_id,
+                ExternalDocument.connection_id == connection_id,
+            )
+            .options(defer(ExternalDocument.plain_text))
+            .order_by(ExternalDocument.last_synced_at.desc().nulls_last())
+        )
+        return list((await self.session.exec(stmt)).all())
+
     async def find_documents_by_sync_run(
         self,
         sync_run_id: uuid.UUID,

@@ -526,3 +526,107 @@ async def test_error_messages_exclude_tokens_and_document_body() -> None:
     assert access_token not in message
     assert refresh_token not in message
     assert document_body not in message
+
+
+# ─── revoke_refresh_token — ADR-026 되돌리기 전략 (2026-09-11) ────────────────
+
+
+async def test_revoke_refresh_token_posts_token_and_reports_success() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/revoke"
+        assert request.content == b"token=refresh-token"
+        return httpx.Response(200, request=request)
+
+    async with _client(handler) as http_client:
+        assert await GoogleDriveClient(http_client).revoke_refresh_token(
+            "refresh-token"
+        ) is True
+
+
+async def test_revoke_treats_already_invalid_token_as_success() -> None:
+    """이미 폐기·만료된 토큰의 400 invalid_token 은 목표 상태가 달성된 것이다."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            400,
+            json={"error": "invalid_token", "error_description": "Token expired"},
+            request=request,
+        )
+
+    async with _client(handler) as http_client:
+        assert await GoogleDriveClient(http_client).revoke_refresh_token(
+            "refresh-token"
+        ) is True
+
+
+@pytest.mark.parametrize(
+    "response_factory",
+    [
+        lambda request: httpx.Response(
+            400, json={"error": "invalid_request"}, request=request
+        ),
+        lambda request: httpx.Response(400, text="not json", request=request),
+        lambda request: httpx.Response(401, request=request),
+        lambda request: httpx.Response(500, request=request),
+        lambda request: httpx.Response(429, request=request),
+    ],
+    ids=("other-400", "non-json-400", "401", "500", "429"),
+)
+async def test_revoke_reports_failure_without_raising(
+    response_factory: Callable[[httpx.Request], httpx.Response],
+) -> None:
+    """폐기 실패는 예외가 아니라 False 다 — 연결 해제를 막으면 안 된다."""
+
+    async with _client(response_factory) as http_client:
+        assert await GoogleDriveClient(http_client).revoke_refresh_token(
+            "refresh-token"
+        ) is False
+
+
+async def test_revoke_reports_failure_on_network_error() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("boom", request=request)
+
+    async with _client(handler) as http_client:
+        assert await GoogleDriveClient(http_client).revoke_refresh_token(
+            "refresh-token"
+        ) is False
+
+
+async def test_revoke_reports_failure_on_timeout() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(0.2)
+        return httpx.Response(200, request=request)
+
+    async with _client(handler) as http_client:
+        client = GoogleDriveClient(http_client, timeout_sec=0.01)
+        assert await client.revoke_refresh_token("refresh-token") is False
+
+
+async def test_revoke_is_not_blocked_by_open_drive_circuit_breaker() -> None:
+    """★설계 주장의 고정 — Drive 조회가 breaker 를 열어도 권한 회수는 통과한다.
+
+    breaker 를 경유하게 만들면(예: with_drive_timeout 사용) 장애 중에 연결을
+    끊지 못하게 되고, 그건 이 경로가 없애려던 상태다.
+    """
+    revoke_calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal revoke_calls
+        if request.url.path == "/revoke":
+            revoke_calls += 1
+            return httpx.Response(200, request=request)
+        return httpx.Response(503, request=request)
+
+    async with _client(handler) as http_client:
+        client = GoogleDriveClient(http_client)
+        for _ in range(drive_breaker.failure_threshold):
+            with pytest.raises(DriveTemporaryError):
+                await client.get_file_metadata("access-token", "document-1")
+        # breaker 가 열렸음을 확인한다 — 열리지 않았다면 이 테스트는 무의미하다.
+        with pytest.raises(DriveTemporaryError):
+            await client.get_file_metadata("access-token", "document-1")
+
+        assert await client.revoke_refresh_token("refresh-token") is True
+
+    assert revoke_calls == 1

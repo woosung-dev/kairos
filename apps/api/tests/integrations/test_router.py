@@ -42,6 +42,7 @@ from src.integrations.models import (
     IntegrationConnection,
     IntegrationOAuthState,
 )
+from src.integrations.pipeline_service import DisconnectOutcome
 from src.integrations.repository import IntegrationRepository
 from src.main import app
 from src.workspaces.models import Workspace, WorkspaceMember
@@ -210,6 +211,9 @@ def test_integration_route_paths_match_endpoint_contract() -> None:
             f"{workspace_prefix}/integrations/google-drive/documents/{{document_id}}",
         ),
         ("GET", f"{workspace_prefix}/external-documents/{{document_id}}"),
+        # ADR-026 되돌리기 전략 — 연결 해제와 발행 목록 (2026-09-11)
+        ("DELETE", f"{workspace_prefix}/integrations/google-drive"),
+        ("GET", f"{workspace_prefix}/integrations/google-drive/documents"),
     } <= routes
 
 
@@ -226,6 +230,9 @@ def test_integration_route_paths_match_endpoint_contract() -> None:
             None,
         ),
         ("delete", "/integrations/google-drive/documents/{resource_id}", None),
+        # I-EXT-1 — 회수와 발행 목록도 owner 전용이다 (2026-09-11)
+        ("delete", "/integrations/google-drive", None),
+        ("get", "/integrations/google-drive/documents", None),
     ],
 )
 async def test_workspace_owner_endpoints_reject_non_owner(
@@ -1085,3 +1092,138 @@ async def test_concurrent_callbacks_consume_same_nonce_once(
 
     assert sorted((first.status_code, second.status_code)) == [302, 400]
     assert exchange.await_count == 1
+
+
+# ─── 연결 해제 + 발행 목록 — ADR-026 되돌리기 전략 (2026-09-11) ───────────────
+
+
+async def test_disconnect_returns_revocation_outcome_to_the_owner(
+    client: AsyncClient,
+) -> None:
+    """204 가 아니라 결과를 돌려준다 — 폐기 실패는 owner 가 알아야 조치한다."""
+    workspace_id = uuid.uuid4()
+    connection_id = uuid.uuid4()
+    service = SimpleNamespace(
+        get_connection_by_provider=AsyncMock(
+            return_value=SimpleNamespace(id=connection_id)
+        ),
+    )
+    pipeline = SimpleNamespace(
+        disconnect_connection=AsyncMock(
+            return_value=DisconnectOutcome(unpublished_documents=3, revoked=False)
+        ),
+    )
+    app.dependency_overrides[require_owner] = lambda: _member(workspace_id)
+    app.dependency_overrides[get_integration_service] = lambda: service
+    app.dependency_overrides[get_google_drive_sync_pipeline_service] = lambda: pipeline
+
+    response = await client.delete(
+        f"/api/v1/workspaces/{workspace_id}/integrations/google-drive",
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"unpublishedDocuments": 3, "revoked": False}
+    assert pipeline.disconnect_connection.await_args.args == (
+        connection_id,
+        workspace_id,
+    )
+
+
+async def test_disconnect_returns_404_when_no_connection_exists(
+    client: AsyncClient,
+) -> None:
+    workspace_id = uuid.uuid4()
+    service = SimpleNamespace(get_connection_by_provider=AsyncMock(return_value=None))
+    pipeline = SimpleNamespace(disconnect_connection=AsyncMock())
+    app.dependency_overrides[require_owner] = lambda: _member(workspace_id)
+    app.dependency_overrides[get_integration_service] = lambda: service
+    app.dependency_overrides[get_google_drive_sync_pipeline_service] = lambda: pipeline
+
+    response = await client.delete(
+        f"/api/v1/workspaces/{workspace_id}/integrations/google-drive",
+    )
+
+    assert response.status_code == 404
+    pipeline.disconnect_connection.assert_not_awaited()
+
+
+async def test_disconnect_never_exposes_the_refresh_token(
+    client: AsyncClient,
+) -> None:
+    """ADR-026 D5 — refresh token 은 API 응답에 실리지 않는다."""
+    workspace_id = uuid.uuid4()
+    service = SimpleNamespace(
+        get_connection_by_provider=AsyncMock(
+            return_value=SimpleNamespace(
+                id=uuid.uuid4(),
+                encrypted_refresh_token="encrypted-super-secret",
+            )
+        ),
+    )
+    pipeline = SimpleNamespace(
+        disconnect_connection=AsyncMock(
+            return_value=DisconnectOutcome(unpublished_documents=1, revoked=True)
+        ),
+    )
+    app.dependency_overrides[require_owner] = lambda: _member(workspace_id)
+    app.dependency_overrides[get_integration_service] = lambda: service
+    app.dependency_overrides[get_google_drive_sync_pipeline_service] = lambda: pipeline
+
+    response = await client.delete(
+        f"/api/v1/workspaces/{workspace_id}/integrations/google-drive",
+    )
+
+    assert response.status_code == 200
+    assert "encrypted-super-secret" not in response.text
+    assert "refresh" not in response.text.lower()
+
+
+async def test_list_documents_returns_published_documents_for_the_workspace(
+    client: AsyncClient,
+) -> None:
+    workspace_id = uuid.uuid4()
+    document = _external_document(workspace_id, None)
+    service = SimpleNamespace(list_documents=AsyncMock(return_value=[document]))
+    app.dependency_overrides[require_owner] = lambda: _member(workspace_id)
+    app.dependency_overrides[get_integration_service] = lambda: service
+
+    response = await client.get(
+        f"/api/v1/workspaces/{workspace_id}/integrations/google-drive/documents",
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "id": str(document.id),
+            "projectId": None,
+            "driveFileId": "drive-document-id",
+            "title": "외부 회의록",
+            "mimeType": "application/vnd.google-apps.document",
+            "originUrl": "https://docs.google.com/document/d/drive-document-id",
+            "revisionId": "revision-1",
+            "syncStatus": "completed",
+            "lastSyncedAt": None,
+        }
+    ]
+    # I-9 — 목록 조회는 경로의 workspace_id 로만 좁혀진다.
+    assert service.list_documents.await_args.args == (workspace_id,)
+
+
+async def test_list_documents_does_not_leak_document_bodies(
+    client: AsyncClient,
+) -> None:
+    """목록은 본문을 싣지 않는다 — repository 가 defer 하는 이유를 계약으로 고정한다."""
+    workspace_id = uuid.uuid4()
+    document = _external_document(workspace_id, None)
+    document.plain_text = "비공개 본문이 목록에 새면 안 된다"
+    service = SimpleNamespace(list_documents=AsyncMock(return_value=[document]))
+    app.dependency_overrides[require_owner] = lambda: _member(workspace_id)
+    app.dependency_overrides[get_integration_service] = lambda: service
+
+    response = await client.get(
+        f"/api/v1/workspaces/{workspace_id}/integrations/google-drive/documents",
+    )
+
+    assert response.status_code == 200
+    assert "비공개 본문" not in response.text
+    assert "plainText" not in response.text
