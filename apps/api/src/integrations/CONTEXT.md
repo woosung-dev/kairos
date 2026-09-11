@@ -4,7 +4,9 @@
 
 > 상위: `/apps/api/CONTEXT.md` → `/CONTEXT-MAP.md`. 상세 결정: `docs/adr/026-external-source-ingest-rail.md`.
 >
-> **현재 상태 (2026-07-31)**: ADR-026의 모델·repository/service·GoogleDriveClient·동기화 pipeline·외부 문서 임베딩 경로와 OAuth authorize/callback 라우터가 구현됐다.
+> **현재 상태 (2026-09-11)**: ADR-026의 모델·repository/service·GoogleDriveClient·동기화 pipeline·외부 문서 임베딩 경로와 OAuth authorize/callback 라우터가 구현됐다. 2026-09-11 에 **회수 경로(연결 해제 + Google 토큰 폐기 + 발행 문서 전량 회수)와 발행 목록 엔드포인트**가 추가되고 FE 쓰기 경로(Picker 포함)가 연결됐다.
+>
+> ⚠ **실 Google API 왕복은 아직 검증되지 않았다** — Drive 전용 OAuth 클라이언트가 미발급이다 (`docs/TODO.md` `## Blocked`). 모든 테스트는 fixture/stub 기준이며 ADR-026 §8 Go/No-Go 는 미판정이다.
 
 ---
 
@@ -49,6 +51,8 @@
 POST   /api/v1/workspaces/{workspace_id}/integrations/google-drive/authorize
 GET    /api/v1/integrations/google-drive/callback
 GET    /api/v1/workspaces/{workspace_id}/integrations/google-drive
+DELETE /api/v1/workspaces/{workspace_id}/integrations/google-drive
+GET    /api/v1/workspaces/{workspace_id}/integrations/google-drive/documents
 POST   /api/v1/workspaces/{workspace_id}/integrations/google-drive/documents
 GET    /api/v1/workspaces/{workspace_id}/integrations/sync-runs/{sync_run_id}
 POST   /api/v1/workspaces/{workspace_id}/integrations/google-drive/documents/{document_id}/sync
@@ -56,10 +60,19 @@ DELETE /api/v1/workspaces/{workspace_id}/integrations/google-drive/documents/{do
 GET    /api/v1/workspaces/{workspace_id}/external-documents/{document_id}
 ```
 
+`DELETE .../integrations/google-drive` 는 204 가 아니라 `{unpublishedDocuments, revoked}` 를 돌려준다.
+Google 폐기는 best-effort 라 실패할 수 있고, 그때 owner 가 직접 해제해야 한다는 사실을 숨기면 안 되기 때문이다.
+목록(`GET .../google-drive/documents`)은 **발행 관리 표면**이라 owner 전용이다 — 상세
+(`GET /external-documents/{id}`)만 RAG 인용 클릭 경로라 `require_viewer` + project visibility 검증을 탄다.
+
 OAuth callback은 고정 redirect URI 제약으로 I-13 예외이며, 서명 state의 workspace·요청자·nonce·PKCE·만료 검증으로 격리를 보전한다. `nonce`는 authorize에서 `IntegrationOAuthState` 행으로 저장되고 callback에서 원자적으로 소비돼 재사용을 막는다 (§6).
 
 ## 6. 엣지 케이스
 
+- **연결 해제의 순서는 되돌릴 수 없다**: ① refresh token 복호화 → ② 문서·청크·캐시 파기 → ③ 연결 비활성화 + 토큰 삭제 → ④ Google 폐기. ④ 를 먼저 하면 폐기 성공 뒤 ② 가 실패했을 때 **토큰은 죽었는데 문서는 계속 검색되는** 상태가 남는다. 반대 순서의 실패는 "문서는 사라졌고 Google 에 grant 만 남은" 상태라 안전하고, 응답 `revoked=false` 로 수동 해제를 안내할 수 있다.
+- 폐기는 **Drive circuit breaker 를 경유하지 않는다.** 원본 조회 실패로 열린 breaker 가 권한 회수까지 막으면, 회수가 가장 급한 순간에 그것을 못 하게 된다. 폐기 실패·예외는 연결 해제를 되돌리지 않는다.
+- 폐기 요청에 Google 이 주는 `400 invalid_token` 은 **성공으로 취급**한다 (이미 폐기·만료 = 목표 상태 달성, 멱등). OAuth 엔드포인트의 평면 오류 스키마(`{"error": "invalid_token"}`)는 Drive API 의 중첩 스키마와 달라 파서를 공유하지 않는다.
+- refresh token 복호화에 실패해도 파기는 진행한다 — 키가 깨진 연결일수록 끊을 수 있어야 한다. 이때 `revoked=false` 다.
 - Drive 삭제·휴지통·실제 권한 회수가 확인되면 `ExternalDocument` plain text, `EmbeddingChunk`, 관련 `SemanticCache`를 즉시 제거한다 (ADR-023 D-6.5 부분 개정).
 - 401/403은 세부 reason을 판별한다. 판별할 수 없으면 purge하지 않고 `reauth_required`로 보류한다.
 - unsupported MIME은 조용히 건너뛰지 않는다. metadata 수신 직후 지원 여부를 판별해, 최초 import에서도 metadata 기반의 빈 문서 행을 먼저 만든 뒤 `DriveUnsupportedMimeTypeError`를 raise한다. 기존 오류 흐름이 그 행을 `failed`로 확정하므로 선택한 파일이 polling 목록에서 사라지지 않는다.
