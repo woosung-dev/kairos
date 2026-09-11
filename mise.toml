@@ -280,6 +280,8 @@ set -a && source deploy/oci/build.env && set +a && \
     --build-arg NEXT_PUBLIC_RECALL_ENABLED="$NEXT_PUBLIC_RECALL_ENABLED" \
     --build-arg NEXT_PUBLIC_FOUNDER_USER_ID="$NEXT_PUBLIC_FOUNDER_USER_ID" \
     --build-arg NEXT_PUBLIC_APP_ENV="$NEXT_PUBLIC_APP_ENV" \
+    --build-arg NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID="$NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID" \
+    --build-arg NEXT_PUBLIC_GOOGLE_PICKER_API_KEY="$NEXT_PUBLIC_GOOGLE_PICKER_API_KEY" \
     apps/web
 '''
 

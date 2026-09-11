@@ -18,13 +18,12 @@ import {
   useUpdateWorkspaceSettings,
 } from "@/features/workspaces/hooks";
 import { DangerZone } from "@/features/workspaces/components/DangerZone";
-import { GoogleDrivePrototype } from "@/features/workspaces/components/google-drive-prototype";
+import { GoogleDrivePanel } from "@/features/integrations/components/google-drive-panel";
 import { inferWorkspaceType } from "@/features/workspaces/utils";
 
 const THRESHOLD_PRESETS = [0.7, 0.8, 0.9, 0.95] as const;
 // Sprint 24 Wave 2 T-AUDIT-VIEW: audit tab 추가 — admin/owner 만 노출.
 const VALID_TABS = ["members", "invites", "general", "audit", "integrations"] as const;
-const IS_GOOGLE_DRIVE_PROTOTYPE_ENABLED = process.env.NODE_ENV !== "production";
 
 const ROLE_LABEL: Record<string, string> = {
   owner: "owner",
@@ -83,7 +82,7 @@ function SettingsContent() {
 
   const tabParam = searchParams.get("tab");
   const activeTab = (VALID_TABS as readonly string[]).includes(tabParam ?? "") &&
-    (tabParam !== "integrations" || (isOwner && IS_GOOGLE_DRIVE_PROTOTYPE_ENABLED))
+    (tabParam !== "integrations" || isOwner)
     ? tabParam ?? "members"
     : "members";
 
@@ -188,23 +187,13 @@ function SettingsContent() {
             <Building2 className="w-4 h-4" aria-hidden />
             일반
           </TabsTrigger>
-          {isOwner && IS_GOOGLE_DRIVE_PROTOTYPE_ENABLED && (
+          {isOwner && (
             <TabsTrigger
               value="integrations"
               className="gap-1.5 cursor-pointer text-sm shrink-0"
             >
               <PlugZap className="w-4 h-4" aria-hidden />
               연동
-              <span
-                style={{
-                  ...MONO_STYLE,
-                  fontSize: 10,
-                  color: "var(--accent)",
-                  marginLeft: 2,
-                }}
-              >
-                P
-              </span>
             </TabsTrigger>
           )}
           {/* Sprint 24 Wave 2 T-AUDIT-VIEW: Audit 탭 — admin/owner 만 노출.
@@ -405,12 +394,9 @@ function SettingsContent() {
           </div>
         </TabsContent>
 
-        {isOwner && IS_GOOGLE_DRIVE_PROTOTYPE_ENABLED && (
+        {isOwner && (
           <TabsContent value="integrations">
-            <GoogleDrivePrototype
-              workspaceName={workspace?.name ?? "이 워크스페이스"}
-              variant={searchParams.get("variant")}
-            />
+            <GoogleDrivePanel workspaceId={activeWorkspaceId} />
           </TabsContent>
         )}
       </Tabs>
