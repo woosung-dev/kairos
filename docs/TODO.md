@@ -118,6 +118,20 @@
   **Report-Only** 로 내보낸다. 정책은 정적 grep 으로 만들어 브라우저 검증이 없다. 배포 후 주요 경로
   (로그인 · /new 녹음 · RAG 검색 · 설정>연동 Picker) 를 돌며 콘솔 CSP 위반 0건을 확인한 뒤 header key 를
   `Content-Security-Policy` 로 바꾼다. 전환 시 `e2e/tests/security-headers.spec.ts` 에 CSP 행을 추가한다. BL-S27e-3 과 병합.
+- [ ] **BL-EXT-DISCONNECT-RACE** (P2) `[신규 · 2026-09-12]` 진행 중 sync run 과 연결 해제가
+  경합한다. import BackgroundTask 는 이미 발급된 access token 을 들고 루프를 도는데,
+  그 사이 `disconnect_connection` 이 문서를 전부 파기하고 연결을 비활성화해도 루프는
+  남은 file_ids 를 계속 발행한다 → **폐기된 연결에 붙은 검색 가능 문서**가 남는다.
+  루프 안에서 연결 상태를 재확인하는 fence 가 필요하다 (어느 지점에서 어떻게 중단할지
+  설계 결정 필요 — sync run 을 failed 로 닫을지, 조용히 조기 반환할지).
+- [ ] **BL-EXT-DISCONNECT-BULK** (P3) `[신규 · 2026-09-12]` 연결 해제의 문서 파기가 건당
+  DELETE 3회 + flush 2회다. 200건이면 동기 요청 안에서 약 600 statement — Cloudflare
+  프록시 타임아웃(100s)에 걸리면 서버는 커밋했는데 FE 는 실패로 알고, `revoked=false`
+  안내를 영영 못 받는다. 이미 connection 한정이므로 집합 DELETE 2문으로 줄일 수 있다.
+- [ ] **Drive 파괴 액션 확인 다이얼로그** (P2) `[신규 · 2026-09-12]` 연결 해제와 문서별
+  발행 취소가 **클릭 한 번에 되돌릴 수 없이** 실행된다 (본문·임베딩·캐시 영구 삭제 +
+  토큰 폐기). 재동기화 버튼과 한 칸 옆이라 오클릭 위험이 크다. `DangerZone` 의 하우스
+  패턴(다이얼로그 + 이름 재입력)을 따를지 판단 필요.
 - [ ] **빈 본문 202 트랩 전수 점검** (P3) `[신규 · 2026-09-11]` `lib/api-client.ts` 가 이제 빈 본문
   2xx 를 undefined 로 돌려준다. 같은 함정이 있던 다른 202 라우트(actions/inbox/meetings/memory)는
   현재 본문을 주거나 FE 소비처가 없어 무해하지만, `contracts-check` 가 원리적으로 못 잡는

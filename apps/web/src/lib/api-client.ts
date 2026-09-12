@@ -66,14 +66,21 @@ async function coreApiFetch<T = unknown>(
     return undefined as T;
   }
 
-  // 본문을 text 로 먼저 읽는다. content-length 로 판별하지 않는 이유 — 청크 전송
-  // 응답에는 그 헤더가 아예 없다. 빈 본문만 undefined 로 바꾸고, 깨진 JSON 은
-  // 예전처럼 그대로 throw 시킨다 (조용히 undefined 로 만들면 서버 버그가 숨는다).
-  const body = await res.text();
-  if (body === "") {
-    return undefined as T;
+  // 202 Accepted 는 본문이 없을 수 있다 (B-7/I-EXT-3 의 장기 작업 접수 응답 중
+  // 일부는 `Response(status_code=202)` 다). 그 경우 res.json() 이 "Unexpected end
+  // of JSON input" 으로 reject 되어, 서버는 정상 접수했는데 FE 의 onSuccess 가
+  // 통째로 건너뛰어진다.
+  //
+  // ★허용을 202 로만 좁힌다. 200 의 빈 본문은 프록시 절단이나 핸들러 버그이므로
+  //   조용히 undefined 를 돌려주면 원인에서 멀리 떨어진 곳에서 터진다 — 계속
+  //   시끄럽게 실패시킨다. content-length 로 판별하지 않는 이유는 청크 전송
+  //   응답에 그 헤더가 없기 때문이다.
+  if (res.status === 202) {
+    const body = await res.text();
+    return (body === "" ? undefined : JSON.parse(body)) as T;
   }
-  return JSON.parse(body) as T;
+
+  return res.json() as Promise<T>;
 }
 
 /**

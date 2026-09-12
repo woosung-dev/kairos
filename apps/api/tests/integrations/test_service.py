@@ -183,7 +183,7 @@ async def test_connect_disconnect_reauthorize_reuses_connection(
     )
     first_ciphertext = first.encrypted_refresh_token
 
-    await service.disconnect_connection(first.id, seed.workspace.id)
+    await service.disable_connection(first.id, seed.workspace.id)
     token_expires_at = datetime.now(UTC).replace(tzinfo=None)
     reauthorizing_user = User(
         auth_user_id=f"ba_service_reauthorize_{uuid.uuid4().hex[:8]}",
@@ -351,7 +351,7 @@ async def test_disconnect_clears_encrypted_refresh_token(
 ) -> None:
     seed = await _seed_service_workspace(integration_session, "disconnect")
 
-    await _service(integration_session).disconnect_connection(
+    await _service(integration_session).disable_connection(
         seed.connection.id,
         seed.workspace.id,
     )

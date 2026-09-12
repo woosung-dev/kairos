@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { API_PAGE_SIZE_MAX } from "@/lib/api-client";
 import { useProjects } from "@/features/projects/hooks";
 import { formatDateTime } from "@/lib/format-date";
 import {
@@ -63,12 +64,20 @@ export function GoogleDrivePanel({ workspaceId }: GoogleDrivePanelProps) {
 
   const { data: connection, isPending: isConnectionPending } =
     useGoogleDriveConnection(workspaceId);
-  const isConnected = !!connection && connection.status !== "disabled";
+  // ★"active" 만 연결됨이다. `!== "disabled"` 로 두면 reauth_required 가 연결됨으로
+  //   잡혀 재연결 카드가 절대 뜨지 않고, owner 의 유일한 탈출구가 "연결 해제"(=문서
+  //   전량 영구 삭제) 가 된다.
+  const isConnected = !!connection && connection.status === "active";
 
   const { data: documents } = useGoogleDriveDocuments(workspaceId, {
     enabled: isConnected,
   });
-  const { data: projects } = useProjects(workspaceId);
+  // ★pageSize 를 명시한다. 기본값은 20 이라 프로젝트가 21개 넘으면 선택지에서
+  //   조용히 사라지고, 그 문서는 projectId=null 로 저장돼 RAG 에서 제외된다
+  //   (features/projects/hooks.ts 의 useProjectTitleMap 이 같은 회귀를 기록한다).
+  const { data: projects } = useProjects(workspaceId, {
+    pageSize: API_PAGE_SIZE_MAX,
+  });
   const { data: syncRun } = useIntegrationSyncRun(workspaceId, syncRunId);
 
   const picker = useGooglePicker();
@@ -178,7 +187,7 @@ export function GoogleDrivePanel({ workspaceId }: GoogleDrivePanelProps) {
           {syncRun?.status === "failed" && (
             <p
               className="flex items-center gap-2 text-caption"
-              style={{ color: "var(--danger, #dc2626)" }}
+              style={{ color: "var(--error)" }}
             >
               <AlertTriangle size={13} aria-hidden />
               {syncRun.errorSummary ?? "가져오기에 실패했습니다"}
@@ -360,7 +369,7 @@ function ImportCard({
         </p>
       )}
       {pickerError && (
-        <p className="text-caption" style={{ color: "var(--danger, #dc2626)" }}>
+        <p className="text-caption" style={{ color: "var(--error)" }}>
           {pickerError}
         </p>
       )}
@@ -410,7 +419,7 @@ function DocumentTable({
                 className="text-caption"
                 style={{
                   color: ATTENTION_STATUSES.has(document.syncStatus)
-                    ? "var(--danger, #dc2626)"
+                    ? "var(--error)"
                     : "var(--text-muted)",
                 }}
               >

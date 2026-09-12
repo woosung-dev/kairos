@@ -35,7 +35,10 @@ const cspDirectives = [
   "img-src 'self' data: blob: https:",
   // 녹음 미리듣기는 blob: object URL 이다 (app/(app)/new/page.tsx).
   "media-src 'self' blob: data:",
-  `connect-src 'self' ${API_ORIGIN} https://www.googleapis.com https://accounts.google.com`,
+  // ★Picker 는 googleapis.com 뿐 아니라 로더 호스트와 docs/content 서브도메인으로도
+  //   XHR 을 낸다. frame-src 에만 넣고 connect-src 에서 빼면 enforcing 으로 올리는
+  //   순간 파일 목록이 blocked 로 죽는다 — 이 CSP 가 존재하는 이유가 그 기능이다.
+  `connect-src 'self' ${API_ORIGIN} https://www.googleapis.com https://accounts.google.com https://apis.google.com https://content.googleapis.com https://docs.google.com`,
   // GIS 토큰 팝업과 Picker 본체가 iframe 으로 뜬다.
   "frame-src 'self' https://accounts.google.com https://docs.google.com https://content.googleapis.com",
   "object-src 'none'",

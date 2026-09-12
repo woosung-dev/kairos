@@ -225,12 +225,19 @@ class GoogleDriveSyncPipelineService:
 
             # 사전 무효화는 이후 실패·취소에도 기존 본문이 노출될 창을 닫는다.
             await self._invalidate_document_caches(embedding_repository, workspace_id)
+
+            # 청크 삭제와 문서 행 삭제를 **한 커밋**에 둔다. `_invalidate_document_caches`
+            # 가 세션을 커밋하므로, 사후 무효화를 이 둘 사이에 두면 청크만 먼저
+            # 확정되고 그 사이 장애 시 `ExternalDocument` 행이 plain_text 를 가진 채
+            # 남아 `GET /external-documents/{id}` 로 계속 읽힌다.
+            # (disconnect_connection 과 같은 경계 규칙이다.)
             await embedding_repository.delete_by_source("external_document", document.id)
-            # 사후 무효화는 삭제 사이 도착한 캐시행을 덮는다. 중복이 아니므로 하나를
-            # 제거하면 이번 권한 회수 캐시 누출 회귀가 다시 발생한다.
-            await self._invalidate_document_caches(embedding_repository, workspace_id)
             await repository.delete_document(document.id, workspace_id)
             await repository.commit()
+
+            # 사후 무효화는 삭제가 확정된 뒤 온다. 삭제를 보지 못한 동시 RAG 질의가
+            # 남긴 캐시행까지 회수한다 — 하나를 제거하면 권한 회수 캐시 누출이 재발한다.
+            await self._invalidate_document_caches(embedding_repository, workspace_id)
 
     async def disconnect_connection(
         self,

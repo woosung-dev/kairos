@@ -18,6 +18,7 @@ let localSetSpy: ReturnType<typeof vi.spyOn>;
 let sessionSetSpy: ReturnType<typeof vi.spyOn>;
 let fetchSpy: ReturnType<typeof vi.spyOn>;
 let cookieWrites: string[];
+let originalCookieDescriptor: PropertyDescriptor | undefined;
 
 function installGoogleGlobals(pickedDocs: { id: string; name: string }[]) {
   let capturedCallback: ((data: unknown) => void) | null = null;
@@ -86,6 +87,12 @@ beforeEach(() => {
   localSetSpy = vi.spyOn(Storage.prototype, "setItem");
   sessionSetSpy = vi.spyOn(window.sessionStorage.__proto__, "setItem");
   cookieWrites = [];
+  // defineProperty 오버라이드는 vi.restoreAllMocks() 가 되돌리지 못한다 —
+  // 원본 디스크립터를 잡아뒀다가 afterEach 에서 직접 복원한다.
+  originalCookieDescriptor = Object.getOwnPropertyDescriptor(
+    Document.prototype,
+    "cookie",
+  );
   Object.defineProperty(document, "cookie", {
     configurable: true,
     get: () => "",
@@ -96,6 +103,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  if (originalCookieDescriptor) {
+    Object.defineProperty(document, "cookie", originalCookieDescriptor);
+  }
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
   delete window.google;
