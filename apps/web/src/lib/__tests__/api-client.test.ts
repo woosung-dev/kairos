@@ -45,6 +45,23 @@ describe("createApiClient", () => {
     await expect(api.fetch<void>("/notes/1", { method: "DELETE" })).resolves.toBeUndefined();
   });
 
+  it("fetch: 본문 없는 202 Accepted 도 undefined 반환 (reject 하지 않는다)", async () => {
+    // B-7/I-EXT-3 의 장기 작업은 202 로 접수만 알린다. 일부 라우트는 본문이 비어
+    // 있는데, 204 만 특수 처리하면 res.json() 이 "Unexpected end of JSON input" 으로
+    // reject 되어 서버는 접수했는데 FE 의 캐시 무효화가 통째로 건너뛰어진다.
+    // (실제 회귀: Drive 문서 "다시 동기화" 버튼이 아무 일도 하지 않았다.)
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("", { status: 202 }),
+    );
+    const api = createApiClient(async () => "tok-123");
+
+    await expect(
+      api.fetch<void>("/workspaces/ws-1/integrations/google-drive/documents/d-1/sync", {
+        method: "POST",
+      }),
+    ).resolves.toBeUndefined();
+  });
+
   it("fetch: 403 응답은 detail과 status를 보존한 ApiError를 던진다", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       jsonResponse({ detail: "워크스페이스 접근 권한이 없습니다" }, 403),

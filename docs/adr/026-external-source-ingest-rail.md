@@ -1,6 +1,6 @@
 # ADR-026 — 외부 소스 ingest 레일 v0 — Google Drive를 첫 provider로
 
-**Status**: Accepted  
+**Status**: Accepted (2026-09-11 부분 개정 — D5 CSP · D10 Picker 키 전달, §개정 이력 참조)  
 **Date**: 2026-07-30  
 **관련**: `docs/requirements/prd.md` §3.6 X축 v3/v5 · ADR-014 (orchestrator 진입 권한 검증) · ADR-020 (I-20/I-21) · ADR-023 D-6.4/D-6.5 · ADR-024 (부팅 차단형 validator 교훈) · ADR-025 (4단계 역할 위계) · `CONTEXT-MAP.md` I-2/I-9/I-13/I-15/I-20/I-21  
 **부분 개정 대상**: ADR-023 D-6.5 — supersede가 아닌 `external_document` 예외 조항 추가
@@ -181,6 +181,38 @@ D9에 열거한 항목은 코드 구현과 같은 PR에서 W2가 갱신한다. �
 - **BL-EXT-INGEST-2**: ADR-008의 Secret Manager 이관을 완료한다. 현행 `env_vars` 주입을 `--set-secrets`로 전환한다.
 - **BL-EXT-INGEST-3**: 자동 동기화를 검토한다. Drive changes API와 changes token으로 변경분을 처리하고, webhook은 변경 신호로만 사용한다. webhook 단독 운영은 금지한다.
 - **BL-EXT-INGEST-4**: 두 번째 provider가 실제 범위에 들어올 때 provider abstraction 필요성을 재평가한다.
+
+## 개정 이력
+
+### 2026-09-11 — D5/D10 부분 개정 (Picker 키 전달 경로 확정)
+
+W2 구현 시점에 D5 가 미정으로 남겨둔 "브라우저가 Picker API key 와 client_id 를 어떻게 받는가" 를 확정한다.
+구현 계획: `docs/plans/active/2026-09-11-drive-recovery-and-fe-wiring.md`.
+
+**결정** — `NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID` · `NEXT_PUBLIC_GOOGLE_PICKER_API_KEY` 를
+`apps/web/Dockerfile` build-arg 로 주입해 브라우저 번들에 인라인한다.
+
+**D10 의 어느 부분이 바뀌는가** — D10 은 `GOOGLE_PICKER_API_KEY` 를 `SecretStr` 로 선언해
+I-15 를 따르라고 했다. 그 선언의 전제는 "이 키가 서버 밖으로 나가지 않는다" 였는데, Picker 는
+**브라우저에서 도는 UI** 라 그 전제가 성립하지 않는다. 서버가 중계해도 결국 브라우저에 도달하므로
+`SecretStr` 은 보호가 아니라 보호한다는 착각만 남긴다.
+
+- Picker API key 의 실제 보호 수단은 Google 콘솔의 **HTTP referrer 제한**이다. 배포 시 이 제한을
+  거는 것이 이 결정의 전제 조건이다.
+- `GOOGLE_OAUTH_CLIENT_ID` 는 D10 도 이미 "OAuth 인가 URL 과 Picker JS 에 노출되는 공개 식별자"
+  라며 `str` 로 뒀다 — 이 개정은 그 논리를 API key 까지 일관되게 적용하는 것이다.
+- **`GOOGLE_OAUTH_CLIENT_SECRET` 은 그대로 `SecretStr` + 서버 전용이다.** `--build-arg` 는 이미지
+  레이어 히스토리에 평문으로 남으므로 `build.env` 에 절대 넣지 않는다.
+- BE 의 `google_picker_api_key: SecretStr` 선언은 **소비처가 없어진다.** 제거는 별도 정리로 남긴다
+  (설정 키 제거는 서버 `.env` 동기화를 동반하므로 이 변경에 묶지 않는다).
+
+**D5 의 CSP 조항** — "Picker 도입 시 CSP 를 함께 도입·개정한다" 를 이행하되, `Content-Security-Policy-Report-Only`
+로 시작한다. 정책이 정적 grep 으로 작성돼 **브라우저에서 검증되지 않았고**, 곧바로 enforcing 으로 켰다가
+directive 가 하나라도 모자라면 앱이 조용히 깨지기 때문이다 — 부팅 차단형 validator 로 prod 를 전면
+다운시킨 ADR-024 사고와 같은 실패 모드다. 전환 조건은 `apps/web/next.config.ts` 주석과 BL-S27e-3.
+
+**미해결 (이 개정이 판정하지 않는 것)** — Drive 전용 OAuth 클라이언트가 미발급이라 실 Google API
+왕복은 검증되지 않았다. §8 Go/No-Go 와 Phase 4 는 여전히 미판정이다.
 
 ## 참고 링크
 

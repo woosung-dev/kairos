@@ -98,6 +98,7 @@ describe("ItemPromoteModal — 5 도메인 endpoint dispatch", () => {
         ok: true,
         status: 200,
         json: async () => makeOkResponse(newIdKey),
+        text: async () => JSON.stringify(makeOkResponse(newIdKey)),
       });
       vi.stubGlobal("fetch", fetchMock);
 
@@ -166,15 +167,17 @@ describe("ItemPromoteModal — Sprint 24 BL-064 note polling", () => {
     const onOpenChange = vi.fn();
 
     // promote POST 응답 (snake_case 보존 — Codex 2차 P2-3)
+    const promoteBody = {
+      new_note_id: "99999999-9999-9999-9999-999999999999",
+      audit_id: "88888888-8888-8888-8888-888888888888",
+      status: "embedding_pending",
+      embedding_status: "pending",
+    };
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 202,
-      json: async () => ({
-        new_note_id: "99999999-9999-9999-9999-999999999999",
-        audit_id: "88888888-8888-8888-8888-888888888888",
-        status: "embedding_pending",
-        embedding_status: "pending",
-      }),
+      json: async () => promoteBody,
+      text: async () => JSON.stringify(promoteBody),
     });
     vi.stubGlobal("fetch", fetchMock);
 

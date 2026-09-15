@@ -67,11 +67,23 @@ class IntegrationService:
         await self.repo.commit()
         return connection
 
-    async def disconnect_connection(
+    async def disable_connection(
         self,
         connection_id: uuid.UUID,
         workspace_id: uuid.UUID,
     ) -> None:
+        """연결만 비활성화하고 저장된 토큰을 지운다.
+
+        ★**이것은 "연결 해제" 가 아니다.** 발행된 `ExternalDocument` 와 그
+        임베딩 청크·SemanticCache 를 그대로 남기므로, 이것만 부르면 "토큰은
+        지웠는데 문서는 계속 검색되는" 상태가 된다 — ADR-026 회수 전략이
+        없애려는 바로 그 상태다.
+
+        사용자향 연결 해제는 `GoogleDriveSyncPipelineService.disconnect_connection`
+        하나뿐이다 (문서 전량 회수 + Google 폐기 포함). 이 메서드는 토큰 수명만
+        다루는 저수준 조각이며, 이름으로 그 차이를 드러내려고 `disconnect_` 접두사를
+        쓰지 않는다.
+        """
         connection = await self.repo.find_connection_by_id(connection_id, workspace_id)
         if connection is None:
             raise IntegrationConnectionNotFoundError()
@@ -107,11 +119,15 @@ class IntegrationService:
     ) -> ExternalDocument | None:
         return await self.repo.find_document_by_id(document_id, workspace_id)
 
-    async def list_documents(
+    async def list_documents_by_connection(
         self,
+        connection_id: uuid.UUID,
         workspace_id: uuid.UUID,
     ) -> list[ExternalDocument]:
-        return await self.repo.find_documents_by_workspace(workspace_id)
+        return await self.repo.find_documents_by_connection(
+            connection_id,
+            workspace_id,
+        )
 
     async def list_documents_by_sync_run(
         self,

@@ -53,9 +53,31 @@ async function coreApiFetch<T = unknown>(
     throw new ApiError(error.detail || `HTTP ${res.status}`, res.status);
   }
 
-  // 204 No Content
+  // 본문 없는 2xx — 204 뿐만이 아니다.
+  //
+  // ★202 Accepted 는 B-7/I-EXT-3 의 장기 작업 규약이고, 그 중 일부는 본문 없이
+  //   `Response(status_code=202)` 만 돌려준다. 204 만 특수 처리하면 그런 응답에서
+  //   `res.json()` 이 "Unexpected end of JSON input" 으로 reject 되어, 서버는 정상
+  //   접수했는데 FE 의 onSuccess(캐시 무효화)가 통째로 건너뛰어진다. 화면은 "버튼이
+  //   아무 일도 안 함" 이 되고 콘솔에는 unhandled error 가 남는다.
+  //   OpenAPI 는 빈 본문 202 도 스키마가 있는 것처럼 기록하므로 contracts-check 가
+  //   원리적으로 못 잡는 자리다 — 여기서 닫는다.
   if (res.status === 204) {
     return undefined as T;
+  }
+
+  // 202 Accepted 는 본문이 없을 수 있다 (B-7/I-EXT-3 의 장기 작업 접수 응답 중
+  // 일부는 `Response(status_code=202)` 다). 그 경우 res.json() 이 "Unexpected end
+  // of JSON input" 으로 reject 되어, 서버는 정상 접수했는데 FE 의 onSuccess 가
+  // 통째로 건너뛰어진다.
+  //
+  // ★허용을 202 로만 좁힌다. 200 의 빈 본문은 프록시 절단이나 핸들러 버그이므로
+  //   조용히 undefined 를 돌려주면 원인에서 멀리 떨어진 곳에서 터진다 — 계속
+  //   시끄럽게 실패시킨다. content-length 로 판별하지 않는 이유는 청크 전송
+  //   응답에 그 헤더가 없기 때문이다.
+  if (res.status === 202) {
+    const body = await res.text();
+    return (body === "" ? undefined : JSON.parse(body)) as T;
   }
 
   return res.json() as Promise<T>;

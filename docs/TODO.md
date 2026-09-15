@@ -61,6 +61,14 @@
   private 로 되돌리면 즉시 재발한다. 복구 확인: dependabot PR #163 재실행에서 `changes` success /
   `contract-check` success (그 전 5 run 은 전부 4~8초 만에 실패).
 - ~~Sentry DSN 발급~~ — **2026-08-14 ADR-028 로 Sentry 자체를 제거**했다. DSN 이 한 번도 설정된 적 없어 BE·FE 모두 비활성 상태였고, 의존성·번들 비용만 지불 중이었다. 재도입 지점은 `apps/web/src/lib/track-error.ts` seam. 현재 관측은 `docker logs`.
+- [ ] 🔴 **Drive 전용 Google OAuth 클라이언트 발급** (운영자) — ADR-026 이 Phase 4 blocker 로 적었는데
+  이 목록에 항목이 없어 추적에서 빠져 있었다 (2026-09-11 등재). **로그인용과 반드시 다른 클라이언트**다
+  (`docs/development/secrets.md` "Google OAuth 클라이언트는 두 개다").
+  필요한 것: ① OAuth 클라이언트 (scope `drive.file`, redirect `https://kairos-api.woosung.dev/api/v1/integrations/google-drive/callback`)
+  → `GOOGLE_OAUTH_CLIENT_ID`/`SECRET` ② 같은 프로젝트의 API 키 + **HTTP referrer 제한** → `NEXT_PUBLIC_GOOGLE_PICKER_API_KEY`
+  ③ `NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID` 는 ①의 client_id 와 **같은 값** (ADR-026 D5).
+  **차단되는 것**: 실 Google API 왕복 검증 · Picker 실동작 · ADR-026 §8 Go/No-Go 판정.
+  현재 코드는 전부 fixture/stub 기준으로만 검증됐다.
 - [ ] **외부 user 1명 실제 dogfooding** — Sprint 22 spec `git history` 12분 walkthrough.
 - [x] ~~**T-3 Sprint 14 Clerk Production 인스턴스 발급**~~ — **ADR-031 로 무효.** Clerk 를 걷어냈으므로 Production 인스턴스 발급 자체가 대상이 아니다.
 - [ ] **T-SEC-CLERK-ROTATE → 인스턴스 삭제로 대체** (운영자) 노출된 dev `CLERK_SECRET_KEY`(`sk_test_mvhptL…`)는 **rotation 이 아니라 Clerk dev 인스턴스 삭제**로 무효화한다 (ADR-031 종료 조건). ⚠️ "시급 아님(dev 키 + repo private)" 이라는 2026-05-29 판단은 **레포가 public 이 된 시점에 무효**다. git 히스토리 675 커밋에 키가 남아 있다. **컷오버 +7일(롤백 창 종료) 시점에 실행**한다 — 그 전에 지우면 구 이미지로 롤백할 수 없다.
@@ -106,6 +114,34 @@
 - [ ] **BL-EXT-CACHE-2** (P2) **정밀 캐시 무효화.** 캐시 `sources`가 참조하는 chunk id를 기준으로 대상 캐시행만 삭제하는 방식은 아직 구현하지 않았다. 읽기 시점 fail-closed로 노출은 닫혔고, 남은 목적은 캐시 효율을 높이는 성능 과제다.
 - [ ] **BL-NOTES-CACHE-2** (P2) **노트 캐시 무효화의 scope 갭.** `embed_note_async`는 `invalidate_cache(workspace_id, note.project_id)`로 project scope만 무효화한다. 전역 질의로 만들어진 `project_id IS NULL` 캐시행은 그 노트의 청크를 참조해도 살아남는다. 읽기 시점 fail-closed로 노출은 닫혔고, 남은 것은 cache miss와 재검색에 따른 캐시 효율이다.
   - ⚠ **정정 기록**: 2026-08-01 설계 라운드가 이 항목을 "무효화 DELETE 가 커밋되지 않고 롤백된다(P1 프로덕션 결함)" 로 보고했으나 **사실이 아니다.** `EmbeddingService.invalidate_cache`(`embeddings/service.py:329-336`, 2026-08-01 기준)가 `delete_caches` 뒤에 이미 commit 한다. 설계 에이전트는 `delete_caches`(flush만)와 호출부만 읽고 그 사이 한 줄짜리 함수를 열지 않았으며, "실측" 은 실제 코드 경로가 아니라 **가설한 패턴을 합성 재현**한 것이었다. 회귀 테스트를 쓰고 결함 상태로 mutation 했을 때 테스트가 죽지 않아 발견했다. 남는 것은 위의 scope 갭뿐이다.
+- [ ] **CSP enforcing 전환** (P2) `[신규 · 2026-09-11]` `apps/web/next.config.ts` 가 Picker 용 CSP 를
+  **Report-Only** 로 내보낸다. 정책은 정적 grep 으로 만들어 브라우저 검증이 없다. 배포 후 주요 경로
+  (로그인 · /new 녹음 · RAG 검색 · 설정>연동 Picker) 를 돌며 콘솔 CSP 위반 0건을 확인한 뒤 header key 를
+  `Content-Security-Policy` 로 바꾼다. 전환 시 `e2e/tests/security-headers.spec.ts` 에 CSP 행을 추가한다. BL-S27e-3 과 병합.
+- [ ] **BL-EXT-DISCONNECT-RACE** (P2) `[신규 · 2026-09-12]` 진행 중 sync run 과 연결 해제가
+  경합한다. import BackgroundTask 는 이미 발급된 access token 을 들고 루프를 도는데,
+  그 사이 `disconnect_connection` 이 문서를 전부 파기하고 연결을 비활성화해도 루프는
+  남은 file_ids 를 계속 발행한다 → **폐기된 연결에 붙은 검색 가능 문서**가 남는다.
+  루프 안에서 연결 상태를 재확인하는 fence 가 필요하다 (어느 지점에서 어떻게 중단할지
+  설계 결정 필요 — sync run 을 failed 로 닫을지, 조용히 조기 반환할지).
+- [ ] **BL-EXT-DISCONNECT-BULK** (P3) `[신규 · 2026-09-12]` 연결 해제의 문서 파기가 건당
+  DELETE 3회 + flush 2회다. 200건이면 동기 요청 안에서 약 600 statement — Cloudflare
+  프록시 타임아웃(100s)에 걸리면 서버는 커밋했는데 FE 는 실패로 알고, `revoked=false`
+  안내를 영영 못 받는다. 이미 connection 한정이므로 집합 DELETE 2문으로 줄일 수 있다.
+- [ ] **Drive 파괴 액션 확인 다이얼로그** (P2) `[신규 · 2026-09-12]` 연결 해제와 문서별
+  발행 취소가 **클릭 한 번에 되돌릴 수 없이** 실행된다 (본문·임베딩·캐시 영구 삭제 +
+  토큰 폐기). 재동기화 버튼과 한 칸 옆이라 오클릭 위험이 크다. `DangerZone` 의 하우스
+  패턴(다이얼로그 + 이름 재입력)을 따를지 판단 필요.
+- [ ] **빈 본문 202 트랩 전수 점검** (P3) `[신규 · 2026-09-11]` `lib/api-client.ts` 가 이제 빈 본문
+  2xx 를 undefined 로 돌려준다. 같은 함정이 있던 다른 202 라우트(actions/inbox/meetings/memory)는
+  현재 본문을 주거나 FE 소비처가 없어 무해하지만, `contracts-check` 가 원리적으로 못 잡는
+  클래스다 — 빈 본문 202 를 새로 만들 때 FE 소비처를 함께 확인한다.
+- [ ] **`components/shared/prototype-switcher.tsx` importer 0** (P4) `[신규 · 2026-09-11]`
+  `google-drive-prototype.tsx` 삭제로 유일한 소비자가 사라졌다. 다음 디자인 탐색에 재사용할지,
+  dead-code 로 지울지 판단 필요 (note-editor.tsx 선례는 삭제).
+- [ ] **`google_picker_api_key: SecretStr` 소비처 0** (P3) `[신규 · 2026-09-11]` ADR-026 D10 개정으로
+  Picker 키가 `NEXT_PUBLIC_*` 빌드 인자로 옮겨가 BE 선언은 소비처가 없다. 제거는 서버 `.env` 동기화를
+  동반하므로 별도 정리로 분리했다.
 - [ ] **BL-EXT-REASON-1** (P2) `ExternalDocument` 에 문서별 실패 **사유** 컬럼이 없다. ADR-026 D4 "문서별 `failed` 상태와 사유를 남긴다" 의 사유 절반이 미충족. 현재는 sync run `error_summary` 한 줄뿐. 마이그레이션 필요.
 - [ ] **BL-EXT-SYNC-3** (P2) 최초 import 의 export 5xx/timeout 은 여전히 문서 행을 남기지 않는다. BL-EXT-SYNC-1 과 같은 UX 결함 클래스이나 트리거가 다르다 (이번엔 미지원 MIME 만 좁게 수정).
 - [ ] **BL-EMBED-2** (P2) `embed_note` 도 노트 전문을 L1 임베딩 입력으로 보내고 단일 `generate_embeddings` 호출을 쓴다 — BL-EXT-EMBED-1 과 동일한 구조적 결함. `embed_meeting` 은 요청당 입력 배열 한도 쪽 노출이 더 크다.

@@ -485,6 +485,25 @@
         "title": "CreateWorkspaceRequest",
         "type": "object"
       },
+      "DisconnectConnectionResponse": {
+        "description": "연결 해제 결과.\n\n``revoked=False`` 는 해제 실패가 아니다 — Kairos 쪽 회수는 끝났고 Google\n측 폐기만 확인되지 않은 상태다. FE 는 이때 수동 해제를 안내한다.",
+        "properties": {
+          "revoked": {
+            "title": "Revoked",
+            "type": "boolean"
+          },
+          "unpublishedDocuments": {
+            "title": "Unpublisheddocuments",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "unpublishedDocuments",
+          "revoked"
+        ],
+        "title": "DisconnectConnectionResponse",
+        "type": "object"
+      },
       "EmbeddingStatusOut": {
         "description": "GET /notes/{id}/embedding-status 응답 (Sprint 24 BL-064, NEW endpoint).\n\nNEW endpoint 이므로 camelCase alias 사용 (FE 가 신규로 read 하는 schema —\n기존 modal 의 snake_case 직접 read 흐름과 무관).",
         "properties": {
@@ -3080,6 +3099,58 @@
       }
     },
     "/api/v1/workspaces/{workspace_id}/integrations/google-drive": {
+      "delete": {
+        "description": "연결 해제 + 발행 문서 전량 회수 + Google 토큰 폐기 (ADR-026 되돌리기 전략).\n\n204 가 아니라 본문을 돌려준다. Google 폐기는 best-effort 라 실패할 수 있고,\n그때 owner 가 직접 해제해야 한다는 사실을 알려야 하기 때문이다.\n\n★BackgroundTask 가 아니라 **동기**다. 회수는 사용자가 결과를 확인해야 하는\n조치이고, BackgroundTasks 는 재시도가 없어(ADR-028 §5-⑤) 실패가 조용히\n묻히면 권한이 살아 있는 채로 끝난다.",
+        "operationId": "disconnect_google_drive_api_v1_workspaces__workspace_id__integrations_google_drive_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisconnectConnectionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disconnect Google Drive",
+        "tags": [
+          "integrations"
+        ]
+      },
       "get": {
         "operationId": "get_google_drive_connection_api_v1_workspaces__workspace_id__integrations_google_drive_get",
         "parameters": [
@@ -3194,6 +3265,62 @@
       }
     },
     "/api/v1/workspaces/{workspace_id}/integrations/google-drive/documents": {
+      "get": {
+        "description": "발행된 외부 문서 목록 — 관리 표면이므로 owner 전용 (I-EXT-1).\n\n상세 조회(`GET /external-documents/{id}`)는 RAG 인용 클릭 경로라\n`require_viewer` + project visibility 검증이지만, 목록은 \"무엇이 팀 지식으로\n발행돼 있는가\" 를 관리하는 화면이다. 본문은 repository 가 defer 한다.\n\n★**연결 한정**이다 (workspace 전량이 아니다). 경로가 `/google-drive/documents`\n인데 provider 무관 목록을 돌려주면, FE 가 이 건수를 \"해제 시 N건이 삭제된다\" 는\n파괴 경고로 쓰는 순간 거짓말이 된다 — 실제 삭제는 연결 한정이기 때문이다.\n오늘은 workspace 당 google_drive 연결이 하나라 두 집합이 같지만, 두 번째\nprovider 가 생기면 조용히 갈라진다.",
+        "operationId": "list_google_drive_documents_api_v1_workspaces__workspace_id__integrations_google_drive_documents_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExternalDocumentResponse"
+                  },
+                  "title": "Response List Google Drive Documents Api V1 Workspaces  Workspace Id  Integrations Google Drive Documents Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Google Drive Documents",
+        "tags": [
+          "integrations"
+        ]
+      },
       "post": {
         "operationId": "import_google_drive_documents_api_v1_workspaces__workspace_id__integrations_google_drive_documents_post",
         "parameters": [

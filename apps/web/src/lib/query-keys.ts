@@ -104,3 +104,14 @@ export const externalDocumentKeys = {
   detail: (wid: string, id: string) =>
     [...externalDocumentKeys.all, "detail", wid, id] as const,
 };
+
+// ADR-026 — Google Drive 연동 (연결 · 발행 문서 · 동기화 실행)
+export const integrationKeys = {
+  all: ["integrations"] as const,
+  connection: (wid: string) =>
+    [...integrationKeys.all, "google-drive", "connection", wid] as const,
+  documents: (wid: string) =>
+    [...integrationKeys.all, "google-drive", "documents", wid] as const,
+  syncRun: (wid: string, syncRunId: string) =>
+    [...integrationKeys.all, "sync-runs", wid, syncRunId] as const,
+};

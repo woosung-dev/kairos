@@ -410,7 +410,18 @@ export interface paths {
         get: operations["get_google_drive_connection_api_v1_workspaces__workspace_id__integrations_google_drive_get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Disconnect Google Drive
+         * @description 연결 해제 + 발행 문서 전량 회수 + Google 토큰 폐기 (ADR-026 되돌리기 전략).
+         *
+         *     204 가 아니라 본문을 돌려준다. Google 폐기는 best-effort 라 실패할 수 있고,
+         *     그때 owner 가 직접 해제해야 한다는 사실을 알려야 하기 때문이다.
+         *
+         *     ★BackgroundTask 가 아니라 **동기**다. 회수는 사용자가 결과를 확인해야 하는
+         *     조치이고, BackgroundTasks 는 재시도가 없어(ADR-028 §5-⑤) 실패가 조용히
+         *     묻히면 권한이 살아 있는 채로 끝난다.
+         */
+        delete: operations["disconnect_google_drive_api_v1_workspaces__workspace_id__integrations_google_drive_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -440,7 +451,21 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Google Drive Documents
+         * @description 발행된 외부 문서 목록 — 관리 표면이므로 owner 전용 (I-EXT-1).
+         *
+         *     상세 조회(`GET /external-documents/{id}`)는 RAG 인용 클릭 경로라
+         *     `require_viewer` + project visibility 검증이지만, 목록은 "무엇이 팀 지식으로
+         *     발행돼 있는가" 를 관리하는 화면이다. 본문은 repository 가 defer 한다.
+         *
+         *     ★**연결 한정**이다 (workspace 전량이 아니다). 경로가 `/google-drive/documents`
+         *     인데 provider 무관 목록을 돌려주면, FE 가 이 건수를 "해제 시 N건이 삭제된다" 는
+         *     파괴 경고로 쓰는 순간 거짓말이 된다 — 실제 삭제는 연결 한정이기 때문이다.
+         *     오늘은 workspace 당 google_drive 연결이 하나라 두 집합이 같지만, 두 번째
+         *     provider 가 생기면 조용히 갈라진다.
+         */
+        get: operations["list_google_drive_documents_api_v1_workspaces__workspace_id__integrations_google_drive_documents_get"];
         put?: never;
         /** Import Google Drive Documents */
         post: operations["import_google_drive_documents_api_v1_workspaces__workspace_id__integrations_google_drive_documents_post"];
@@ -1325,6 +1350,19 @@ export interface components {
         CreateWorkspaceRequest: {
             /** Name */
             name: string;
+        };
+        /**
+         * DisconnectConnectionResponse
+         * @description 연결 해제 결과.
+         *
+         *     ``revoked=False`` 는 해제 실패가 아니다 — Kairos 쪽 회수는 끝났고 Google
+         *     측 폐기만 확인되지 않은 상태다. FE 는 이때 수동 해제를 안내한다.
+         */
+        DisconnectConnectionResponse: {
+            /** Revoked */
+            revoked: boolean;
+            /** Unpublisheddocuments */
+            unpublishedDocuments: number;
         };
         /**
          * EmbeddingStatusOut
@@ -2660,6 +2698,39 @@ export interface operations {
             };
         };
     };
+    disconnect_google_drive_api_v1_workspaces__workspace_id__integrations_google_drive_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisconnectConnectionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     authorize_google_drive_api_v1_workspaces__workspace_id__integrations_google_drive_authorize_post: {
         parameters: {
             query?: never;
@@ -2680,6 +2751,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthorizationUrlResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_google_drive_documents_api_v1_workspaces__workspace_id__integrations_google_drive_documents_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExternalDocumentResponse"][];
                 };
             };
             /** @description Validation Error */

@@ -45,8 +45,10 @@ vi.mock("@/features/audit/components/audit-list", () => ({
 vi.mock("@/features/workspaces/components/DangerZone", () => ({
   DangerZone: () => null,
 }));
-vi.mock("@/features/workspaces/components/google-drive-prototype", () => ({
-  GoogleDrivePrototype: () => null,
+// 연동 패널은 React Query 훅을 쓴다 — 이 spec 은 일반 탭의 이름 폼만 보므로
+// (TabsContent 모의가 모든 탭 자식을 렌더한다) 여기서 잘라낸다.
+vi.mock("@/features/integrations/components/google-drive-panel", () => ({
+  GoogleDrivePanel: () => null,
 }));
 vi.mock("@/components/ui/tabs", () => ({
   Tabs: ({ children }: { children: ReactNode }) => <div>{children}</div>,

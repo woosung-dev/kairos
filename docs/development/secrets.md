@@ -68,6 +68,8 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 | `BETTER_AUTH_DATABASE_URL` 🔒 | ✅ | ➖ | 서버 `.env` (web) | **node-postgres 형식**. BE 의 `postgresql+asyncpg://` 와 다르다 |
 | `GOOGLE_CLIENT_ID` | ✅ | ➖ | 서버 `.env` (web) | ★Drive 연동의 `GOOGLE_OAUTH_CLIENT_ID` 와 **다른 클라이언트** (아래 주의 참조) |
 | `GOOGLE_CLIENT_SECRET` 🔒 | ✅ | ➖ | 서버 `.env` (web) | 위와 같은 클라이언트의 시크릿 |
+| `NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID` | ✅ | ➖ | `build.env` | ★api 의 `GOOGLE_OAUTH_CLIENT_ID` 와 **같은 값** (ADR-026 D5 — client_id 동일성이 필수 불변식) |
+| `NEXT_PUBLIC_GOOGLE_PICKER_API_KEY` | ✅ | ➖ | `build.env` | GCP → API 키. 보호 수단은 **HTTP referrer 제한** (ADR-026 D10 개정) |
 
 ---
 
@@ -131,6 +133,13 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 |---|---|---|---|
 | **로그인** | web | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | `{BETTER_AUTH_URL}/api/auth/callback/google` |
 | **Drive 연동** (ADR-026) | api | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | `/api/v1/integrations/google-drive/callback` |
+| **Drive Picker** (ADR-026 D5) | web (빌드) | `NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID` — **api 와 같은 client_id** | (브라우저 전용, redirect 없음) |
+
+★Picker 행의 client_id 는 위 Drive 연동 행과 **같은 값이어야 한다.** `drive.file` 은 앱+파일 단위
+grant 라, 브라우저가 Picker 로 얻은 grant 를 서버가 자기 refresh token 으로 읽으려면 두 쪽의
+client_id 가 동일해야 한다. 다르면 Picker 는 열리는데 서버 export 가 404/403 으로 죽는다.
+**`GOOGLE_OAUTH_CLIENT_SECRET` 은 절대 `NEXT_PUBLIC_*` 이나 `build.env` 에 넣지 않는다** —
+`--build-arg` 는 이미지 레이어 히스토리에 평문으로 남는다.
 
 같은 GCP 프로젝트 안에 클라이언트를 **따로** 만든다. Drive 스코프는 Google 의 restricted scope 라
 앱 검증 대상이고, 로그인을 같은 클라이언트에 얹으면 ① 로그인이 그 검증 반경에 들어가고

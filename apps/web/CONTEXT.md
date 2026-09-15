@@ -91,7 +91,7 @@ apps/web/src/
 | feedback/ | feedback | feedback-button (dogfooding 위젯) |
 | home/ | (다도메인 조합 — 대시보드) | dashboard-suggestions, ActivityFeed |
 | inbox/ | inbox | inbox-list, inbox-item-card, smart-inbox |
-| integrations/ | integrations | 외부 문서 상세 조회 (Google Drive, ADR-026) |
+| integrations/ | integrations | google-drive-panel (연결·Picker·가져오기·재동기화·발행취소·연결해제) + 외부 문서 상세 조회 · use-google-picker (ADR-026) |
 | meetings/ | meetings | upload, meeting-detail, transcript-viewer |
 | members/ | workspaces (member + invite) | invite-manager, member-list |
 | memory/ | memory | CaptureSheet, RecallResultCard |
