@@ -79,6 +79,7 @@ apps/web/src/
 | F-10 | **DESIGN.md 토큰 사용** — Tailwind 임의 색/폰트 금지 | code review |
 | F-11 | **API URL 패턴**: `/api/v1/workspaces/{workspaceId}/<resource>` (CONTEXT-MAP I-13). `workspaceId`는 라우트 또는 store에서 획득 | `<feature>/api.ts` |
 | F-12 | **SSE 수신 패턴**: RAG 답변은 `EventSource` 또는 `fetch + ReadableStream`으로 chunk 누적 | `features/rag/hooks.ts` |
+| F-13 | **Enter 로 제출하는 `onKeyDown` 은 `e.nativeEvent.isComposing` 이면 무시** — 한글 조합 확정용 Enter 에서 전송·생성·선택이 일어나면 안 된다 (G3-018) | `rag-input.test.tsx` · `cmd-k.test.tsx` |
 
 ---
 

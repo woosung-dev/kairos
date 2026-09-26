@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowUpRight, Folder, Loader2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Loader2, AlertTriangle } from "lucide-react";
 import { formatDate } from "@/lib/format-date";
 import { MeetingSummaryView } from "./meeting-summary-view";
 import { TranscriptView } from "./transcript-view";
 import { ActionView } from "./action-view";
+import { MeetingProjectLinks } from "./meeting-project-links";
 import { ExportButton } from "@/components/shared/ExportButton";
 import { exportMeeting } from "../api";
 import { useMeetingDetail } from "../hooks";
@@ -127,6 +128,9 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
   const [activeTab, setActiveTab] = useState<TabType>("요약");
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  // 프로젝트 연결·해제는 member 이상 (BE require_member). role 을 직접 구독해야 로드 시 리렌더된다.
+  const workspaceRole = useWorkspaceStore((s) => s.workspaceRole);
+  const canEditProjectLinks = workspaceRole !== null && workspaceRole !== "viewer";
 
   const { data: meeting, isLoading, error } = useMeetingDetail(
     activeWorkspaceId ?? undefined,
@@ -268,26 +272,13 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
           </div>
         )}
 
-        {/* 연결 프로젝트 — API 가 이미 내려주던 `projects` 를 이전엔 렌더하지 않았다 */}
-        {linkedProjects.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 mt-3" data-testid="meeting-linked-projects">
-            {linkedProjects.map((project) => (
-              <Link
-                key={project.id}
-                href={`/projects/${project.id}`}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-micro font-medium transition-colors hover:opacity-80"
-                style={{
-                  background: "var(--accent-subtle)",
-                  color: "var(--accent)",
-                  borderRadius: "var(--radius-sm)",
-                }}
-              >
-                <Folder size={11} />
-                {project.title}
-              </Link>
-            ))}
-          </div>
-        )}
+        {/* 연결 프로젝트 — 칩 + (member 이상) 연결·해제 (C-002). viewer 는 읽기 전용 */}
+        <MeetingProjectLinks
+          workspaceId={activeWorkspaceId ?? undefined}
+          meetingId={meetingId}
+          linkedProjects={linkedProjects}
+          canEdit={canEditProjectLinks}
+        />
       </div>
 
       {/* 상태별 본문: 실패 / 처리중 / 완료 탭 (S28b BUG-MEETING-FAILED-UI) */}

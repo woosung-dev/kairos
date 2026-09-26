@@ -7,6 +7,7 @@ import { usePresignedUpload } from "@/features/upload/hooks";
 import { useRecording, type RecordingState } from "@/features/upload/useRecording";
 import { useCreateMeeting, useCaptureText } from "@/features/meetings/hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import { codePointLength } from "@/lib/text-length";
 
 const CONTENT_TYPES = [
   {
@@ -36,6 +37,11 @@ const CONTENT_TYPES = [
 
 type ContentType = (typeof CONTENT_TYPES)[number]["id"];
 
+// BE CaptureTextRequest.transcript_text 의 min_length / max_length (meetings/schemas.py).
+// ★코드 포인트로 센다 — String.length 는 😀 를 2 로 세어 BE 와 어긋났다 (C-025).
+const CAPTURE_MIN_CHARS = 50;
+const CAPTURE_MAX_CHARS = 200_000;
+
 export default function NewContentPage() {
   const router = useRouter();
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
@@ -61,6 +67,10 @@ export default function NewContentPage() {
   const [captureError, setCaptureError] = useState<string | null>(null);
   const captureTextMutation = useCaptureText(activeWorkspaceId ?? undefined);
   const isCapturing = captureTextMutation.isPending;
+  const captureLength = codePointLength(captureContent);
+  const isCaptureTooShort = captureLength < CAPTURE_MIN_CHARS;
+  const isCaptureTooLong = captureLength > CAPTURE_MAX_CHARS;
+  const isCaptureReady = !!captureTitle && !isCaptureTooShort && !isCaptureTooLong;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -98,7 +108,7 @@ export default function NewContentPage() {
   };
 
   const handleCapture = async () => {
-    if (!captureTitle || captureContent.length < 50 || !activeWorkspaceId) return;
+    if (!isCaptureReady || !activeWorkspaceId) return;
     setCaptureError(null);
     try {
       const result = await captureTextMutation.mutateAsync({
@@ -379,7 +389,7 @@ export default function NewContentPage() {
 
               <div>
                 <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
-                  회의 내용 <span style={{ color: "var(--text-muted)" }}>(최소 50자)</span>
+                  회의 내용 <span style={{ color: "var(--text-muted)" }}>(최소 {CAPTURE_MIN_CHARS}자)</span>
                 </label>
                 <textarea
                   placeholder="회의록, 스크립트, 메모를 붙여넣으세요"
@@ -395,15 +405,22 @@ export default function NewContentPage() {
                 />
                 <p
                   className="text-xs mt-1"
-                  style={{ color: captureContent.length < 50 ? "var(--error)" : "var(--text-muted)" }}
+                  style={{
+                    color: isCaptureTooShort || isCaptureTooLong ? "var(--error)" : "var(--text-muted)",
+                  }}
+                  data-testid="capture-char-count"
                 >
-                  {captureContent.length}자
-                  {captureContent.length < 50 ? ` (${50 - captureContent.length}자 더 필요)` : ""}
+                  {captureLength}자
+                  {isCaptureTooShort ? ` (${CAPTURE_MIN_CHARS - captureLength}자 더 필요)` : ""}
+                  {isCaptureTooLong
+                    ? ` (최대 ${CAPTURE_MAX_CHARS}자 — ${captureLength - CAPTURE_MAX_CHARS}자 초과)`
+                    : ""}
                 </p>
               </div>
 
               {captureError && (
                 <div
+                  data-testid="capture-error"
                   className="px-3 py-2 rounded text-sm"
                   style={{
                     background: "rgba(248,113,113,0.1)",
@@ -432,20 +449,20 @@ export default function NewContentPage() {
               <div className="flex justify-end">
                 <button
                   onClick={handleCapture}
-                  disabled={!captureTitle || captureContent.length < 50 || isCapturing || !activeWorkspaceId}
+                  disabled={!isCaptureReady || isCapturing || !activeWorkspaceId}
                   className="px-6 py-2 rounded text-sm font-medium"
                   style={{
                     background:
-                      captureTitle && captureContent.length >= 50 && !isCapturing
+                      isCaptureReady && !isCapturing
                         ? "var(--accent)"
                         : "var(--surface-active)",
                     color:
-                      captureTitle && captureContent.length >= 50 && !isCapturing
+                      isCaptureReady && !isCapturing
                         ? "var(--background)"
                         : "var(--text-muted)",
                     borderRadius: "var(--radius-sm)",
                     cursor:
-                      !captureTitle || captureContent.length < 50 || isCapturing
+                      !isCaptureReady || isCapturing
                         ? "not-allowed"
                         : "pointer",
                   }}

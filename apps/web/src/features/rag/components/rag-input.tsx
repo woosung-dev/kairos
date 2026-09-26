@@ -24,6 +24,8 @@ export function RagInput({ onSubmit, fabSafe = false }: RagInputProps) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // 한글 조합 중 Enter 는 조합 확정용이다 — 여기서 전송하면 마지막 음절이 입력창에 남는다 (G3-018)
+    if (e.nativeEvent.isComposing) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();

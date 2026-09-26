@@ -136,3 +136,24 @@ describe("useWorkspaceStore — ensureOwner 계정 전환 가드 (BL-S27c-12)", 
     expect(useWorkspaceStore.getState().ownerUserId).toBe("user_A");
   });
 });
+
+describe("useWorkspaceStore — activateWorkspaceForUser (C-001 초대 수락 착지)", () => {
+  beforeEach(() => {
+    useWorkspaceStore.setState({ activeWorkspaceId: null, ownerUserId: null });
+  });
+
+  it("빈 저장소 — setActiveWorkspaceId 만 쓰면 ensureOwner 가 수락한 ws 를 지운다 (원인 재현)", () => {
+    useWorkspaceStore.getState().setActiveWorkspaceId("ws-accepted");
+    useWorkspaceStore.getState().ensureOwner("user_A");
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBeNull();
+  });
+
+  it("소유자와 활성 ws 를 함께 확정하면 ensureOwner 뒤에도 수락한 ws 가 유지된다", () => {
+    useWorkspaceStore.getState().activateWorkspaceForUser("user_A", "ws-accepted");
+    useWorkspaceStore.getState().ensureOwner("user_A");
+    expect(useWorkspaceStore.getState()).toMatchObject({
+      ownerUserId: "user_A",
+      activeWorkspaceId: "ws-accepted",
+    });
+  });
+});

@@ -58,7 +58,7 @@ export function VisibilityChangeDialog({
         <DialogHeader>
           <DialogTitle>Visibility 변경</DialogTitle>
           <DialogDescription>
-            프로젝트 가시성을 변경합니다. admin 이상만 변경 가능.
+            프로젝트 가시성을 변경합니다. admin 이상 또는 프로젝트를 만든 사람만 변경할 수 있습니다.
           </DialogDescription>
         </DialogHeader>
 

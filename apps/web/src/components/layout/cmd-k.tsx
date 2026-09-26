@@ -279,7 +279,8 @@ export function CmdK() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
+              // 한글 조합 중 Enter 는 조합 확정용 — 전송하지 않는다 (G3-018)
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 handleSubmit();
               }

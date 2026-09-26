@@ -7,7 +7,7 @@ import {
   withWorkspaceGuardLoading,
 } from "@/features/workspaces/hooks";
 import { useEffect } from "react";
-import { useMe } from "@/features/auth/hooks";
+import { meQueryOptions, useMe } from "@/features/auth/hooks";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceStore } from "@/features/workspaces/store";
 import {
@@ -223,6 +223,8 @@ export function useInviteInfo(code: string) {
 export function useAcceptInvite() {
   const api = useApiClient();
   const queryClient = useQueryClient();
+  const activateWorkspaceForUser = useWorkspaceStore((s) => s.activateWorkspaceForUser);
+  const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId);
 
   return useMutation({
     mutationFn: (code: string) => acceptInvite(api, code),
@@ -232,7 +234,18 @@ export function useAcceptInvite() {
     // useCreateWorkspace 는 setQueryData 로 같은 불변식을 지키고 있었다.
     // ⚠ 현재 앱 안에 /invite 로 가는 링크가 없어 초대는 항상 전체 로드(빈 캐시)로
     // 열리므로 이 경로는 아직 도달 불가다. 불변식을 균일하게 하는 방어다.
-    onSuccess: () => {
+    onSuccess: async (result) => {
+      // C-001: 활성 ws 와 소유자(내부 user id)를 함께 확정한다. 활성 ws 만 세팅하면 빈 저장소에서
+      // panel-layout 의 ensureOwner 가 ownerUserId(null)≠me.id 로 보고 활성 ws 를 지우고,
+      // self-heal 이 목록 첫 ws(정렬 보장 없음)로 덮어써 수락한 팀이 아닌 곳에 착지했다.
+      // 이 onSuccess 는 mutate 호출부의 onSuccess(페이지 이동)보다 먼저 끝난다.
+      try {
+        const me = await queryClient.fetchQuery(meQueryOptions(api));
+        activateWorkspaceForUser(me.id, result.workspaceId);
+      } catch {
+        // me 조회 실패 — 수락 자체는 성공했으므로 활성 ws 만이라도 세팅한다 (이전 동작).
+        setActiveWorkspaceId(result.workspaceId);
+      }
       queryClient.invalidateQueries({ queryKey: workspaceKeys.list() });
     },
   });

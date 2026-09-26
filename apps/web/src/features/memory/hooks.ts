@@ -2,6 +2,7 @@
 "use client";
 
 import { memoryKeys } from "@/lib/query-keys";
+import { codePointLength } from "@/lib/text-length";
 import { useApiClient } from "@/lib/use-api-client";
 import {
   useMutation,
@@ -81,6 +82,9 @@ export function useCaptureVoice(workspaceId: string | undefined) {
 /**
  * Memory recall query — 디바운싱은 호출 측에서 수행하고, q를 그대로 전달.
  */
+/** BE `GET /memory/recall` 의 `q` max_length (memory/router.py) */
+export const RECALL_QUERY_MAX = 200;
+
 export function useRecall(
   workspaceId: string | undefined,
   q: string,
@@ -93,7 +97,13 @@ export function useRecall(
       if (!workspaceId) throw new Error("워크스페이스가 선택되지 않았습니다");
       return recallMemory(api, workspaceId, q);
     },
-    enabled: enabled && !!workspaceId && q.trim().length >= 2,
+    // BE min_length/max_length 는 code point 기준 (Pydantic) — UTF-16 length 로 세면 이모지 1개가 통과해 422.
+    // 상한은 BE 가 받는 원문(trim 전) 기준이다.
+    enabled:
+      enabled &&
+      !!workspaceId &&
+      codePointLength(q.trim()) >= 2 &&
+      codePointLength(q) <= RECALL_QUERY_MAX,
     staleTime: 30_000,
   });
 }

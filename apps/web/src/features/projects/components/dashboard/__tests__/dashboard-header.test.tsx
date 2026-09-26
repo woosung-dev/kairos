@@ -19,24 +19,27 @@ const PROJECT: Project = {
   visibility: "public",
   tags: [],
   sortOrder: 0,
+  createdById: "user-creator",
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
 };
 
-function renderHeader(canManage: boolean) {
+function renderHeader(canManage: boolean, canEdit: boolean = canManage) {
   const onEditClick = vi.fn();
+  const onVisibilityClick = vi.fn();
   render(
     <DashboardHeader
       project={PROJECT}
       canManage={canManage}
+      canEdit={canEdit}
       isRoleLoading={false}
-      onVisibilityClick={vi.fn()}
+      onVisibilityClick={onVisibilityClick}
       onEditClick={onEditClick}
       onArchiveClick={vi.fn()}
       onDeleteClick={vi.fn()}
     />,
   );
-  return { onEditClick };
+  return { onEditClick, onVisibilityClick };
 }
 
 describe("DashboardHeader — 관리 드롭다운 접근성 이름", () => {
@@ -53,8 +56,27 @@ describe("DashboardHeader — 관리 드롭다운 접근성 이름", () => {
     expect(onEditClick).toHaveBeenCalledTimes(1);
   });
 
-  it("canManage 가 false 면 트리거 자체가 없다", () => {
+  it("canManage·canEdit 가 모두 false 면 트리거 자체가 없고 visibility 배지도 비활성", () => {
     renderHeader(false);
     expect(screen.queryByLabelText("프로젝트 관리 메뉴")).toBeNull();
+    expect(screen.getByLabelText("Visibility: 공개")).toBeDisabled();
+  });
+});
+
+// 2026-09-27 결정 — 작성자는 workspace role 이 member 여도 visibility 를 바꿀 수 있다.
+// 아카이브·삭제는 여전히 admin 이상 (BE /archive·DELETE 가 require_admin).
+describe("DashboardHeader — 작성자(member) 권한", () => {
+  it("작성자는 visibility 배지를 누를 수 있고 관리 메뉴에는 편집만 있다", async () => {
+    const { onVisibilityClick } = renderHeader(false, true);
+
+    const badge = screen.getByLabelText("Visibility: 공개");
+    expect(badge).toBeEnabled();
+    fireEvent.click(badge);
+    expect(onVisibilityClick).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByLabelText("프로젝트 관리 메뉴"));
+    expect(await screen.findByText("편집")).toBeTruthy();
+    expect(screen.queryByText("아카이브")).toBeNull();
+    expect(screen.queryByText("삭제")).toBeNull();
   });
 });

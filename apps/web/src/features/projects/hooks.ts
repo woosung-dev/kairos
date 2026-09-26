@@ -1,14 +1,21 @@
 "use client";
 
-import { projectKeys, meetingKeys, onboardingKeys } from "@/lib/query-keys";
-import { API_PAGE_SIZE_MAX } from "@/lib/api-client";
+import {
+  actionKeys,
+  inboxKeys,
+  meetingKeys,
+  onboardingKeys,
+  projectKeys,
+} from "@/lib/query-keys";
+import { API_PAGE_SIZE_MAX, ApiError } from "@/lib/api-client";
 import { useApiClient } from "@/lib/use-api-client";
 import {
   useWorkspaceIdGuard,
   withWorkspaceGuardLoading,
 } from "@/features/workspaces/hooks";
 import { useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   fetchProjects,
   fetchProject,
@@ -213,6 +220,29 @@ export function useArchiveProject(wid: string | undefined) {
 }
 
 /**
+ * 회의↔프로젝트 링크가 바뀌면 그 링크로 파생되는 화면을 모두 다시 읽는다.
+ * - 회의 상세(연결 칩) · 워크스페이스/프로젝트별 회의 목록(대시보드·사이드바)
+ * - 인박스·액션: BE 는 회의 가시성(링크된 프로젝트)으로 인박스 요약·추출 액션을 거른다 (C-014~016)
+ */
+function invalidateMeetingLinkViews(queryClient: QueryClient, wid: string, meetingId: string) {
+  queryClient.invalidateQueries({ queryKey: meetingKeys.detail(wid, meetingId) });
+  queryClient.invalidateQueries({ queryKey: meetingKeys.byWorkspace(wid) });
+  queryClient.invalidateQueries({ queryKey: inboxKeys.byWorkspace(wid) });
+  queryClient.invalidateQueries({ queryKey: actionKeys.byWorkspace(wid) });
+}
+
+/** 링크 변경 실패 문구 — 404 는 "권한 밖이거나 사라짐" 이다 (BE 는 존재 여부를 숨기려 403 대신 404 를 준다). */
+export function meetingLinkErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    if (error.status === 404) {
+      return "회의나 프로젝트에 접근할 수 없습니다. 삭제되었거나 권한이 없을 수 있어요.";
+    }
+    if (error.status === 403) return "프로젝트 연결은 Member 이상만 할 수 있습니다.";
+  }
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+/**
  * 회의에 프로젝트 연결
  */
 export function useAddMeetingProject(wid: string | undefined) {
@@ -228,11 +258,11 @@ export function useAddMeetingProject(wid: string | undefined) {
       projectId: string;
     }) => addMeetingProject(api, wid!, meetingId, projectId),
     onSuccess: (_data, variables) => {
-      if (wid) {
-        queryClient.invalidateQueries({
-          queryKey: meetingKeys.detail(wid, variables.meetingId),
-        });
-      }
+      if (wid) invalidateMeetingLinkViews(queryClient, wid, variables.meetingId);
+      toast.success("프로젝트에 연결했습니다");
+    },
+    onError: (error) => {
+      toast.error(meetingLinkErrorMessage(error, "프로젝트 연결에 실패했습니다"));
     },
   });
 }
@@ -253,11 +283,11 @@ export function useRemoveMeetingProject(wid: string | undefined) {
       projectId: string;
     }) => removeMeetingProject(api, wid!, meetingId, projectId),
     onSuccess: (_data, variables) => {
-      if (wid) {
-        queryClient.invalidateQueries({
-          queryKey: meetingKeys.detail(wid, variables.meetingId),
-        });
-      }
+      if (wid) invalidateMeetingLinkViews(queryClient, wid, variables.meetingId);
+      toast.success("프로젝트 연결을 해제했습니다");
+    },
+    onError: (error) => {
+      toast.error(meetingLinkErrorMessage(error, "프로젝트 연결 해제에 실패했습니다"));
     },
   });
 }

@@ -33,8 +33,11 @@ export const noteKeys = {
 
 export const meetingKeys = {
   all: ["meetings"] as const,
+  // invalidate prefix — 워크스페이스 전체 목록 + 프로젝트별 목록(list(wid, pid)) 을 한 번에 매칭.
+  // list(wid) 는 끝이 "all" 이라 프로젝트별 목록의 prefix 가 아니다.
+  byWorkspace: (wid: string) => [...meetingKeys.all, "list", wid] as const,
   list: (wid: string, projectId?: string) =>
-    [...meetingKeys.all, "list", wid, projectId ?? "all"] as const,
+    [...meetingKeys.byWorkspace(wid), projectId ?? "all"] as const,
   detail: (wid: string, id: string) =>
     [...meetingKeys.all, "detail", wid, id] as const,
   status: (wid: string, id: string) =>

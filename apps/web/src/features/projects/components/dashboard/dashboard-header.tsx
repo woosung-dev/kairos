@@ -1,4 +1,5 @@
-// 프로젝트 대시보드 헤더 — 제목/상태/visibility 뱃지 + canManage 관리 드롭다운 (BL-AV-1 분해)
+// 프로젝트 대시보드 헤더 — 제목/상태/visibility 뱃지 + 관리 드롭다운 (BL-AV-1 분해)
+// 권한: 편집·visibility = admin 이상 또는 프로젝트 작성자(canEdit) / 아카이브·삭제 = admin 이상(canManage)
 "use client";
 
 import { MoreHorizontal } from "lucide-react";
@@ -34,6 +35,7 @@ const STATUS_COLOR: Record<ProjectStatus, string> = {
 export function DashboardHeader({
   project,
   canManage,
+  canEdit,
   isRoleLoading,
   onVisibilityClick,
   onEditClick,
@@ -41,7 +43,10 @@ export function DashboardHeader({
   onDeleteClick,
 }: {
   project: Project;
+  /** admin/owner — 아카이브·삭제 */
   canManage: boolean;
+  /** admin/owner 또는 작성자 — 편집·visibility 변경 (2026-09-27 결정: 작성자는 member 여도 visibility 변경 가능) */
+  canEdit: boolean;
   isRoleLoading: boolean;
   onVisibilityClick: () => void;
   onEditClick: () => void;
@@ -69,13 +74,13 @@ export function DashboardHeader({
         <VisibilityBadge
           visibility={project.visibility}
           isLoading={isRoleLoading}
-          interactive={canManage}
+          interactive={canEdit}
           onClick={() => {
-            // closure 캐싱 회피 (BUG-H02) — 호출 시점 canManage 평가
-            if (canManage) onVisibilityClick();
+            // closure 캐싱 회피 (BUG-H02) — 호출 시점 canEdit 평가
+            if (canEdit) onVisibilityClick();
           }}
         />
-        {canManage && (
+        {canEdit && (
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label="프로젝트 관리 메뉴"
@@ -85,13 +90,17 @@ export function DashboardHeader({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={onEditClick}>편집</DropdownMenuItem>
-              <DropdownMenuItem onClick={onArchiveClick}>아카이브</DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={onDeleteClick}
-              >
-                삭제
-              </DropdownMenuItem>
+              {canManage && (
+                <>
+                  <DropdownMenuItem onClick={onArchiveClick}>아카이브</DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={onDeleteClick}
+                  >
+                    삭제
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

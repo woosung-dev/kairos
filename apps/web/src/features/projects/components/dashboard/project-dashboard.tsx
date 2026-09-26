@@ -51,7 +51,7 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [archiveAlertOpen, setArchiveAlertOpen] = useState(false);
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
-  const { canManage, isLoading: isRoleLoading } = useWorkspaceRole(wid);
+  const { canManage, role, userId, isLoading: isRoleLoading } = useWorkspaceRole(wid);
 
   const { data: project, isLoading: projectLoading, error: projectError } = useProject(wid, projectId);
 
@@ -95,11 +95,18 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
     );
   }
 
+  // 작성자는 workspace role 이 member 여도 편집·visibility 를 바꿀 수 있다 (2026-09-27 결정, BE PATCH 동일 규칙).
+  // userId 는 멤버십의 내부 users.id — createdById 와 같은 축이다 (ADR-031).
+  // viewer 로 강등된 작성자는 제외한다 — BE PATCH 가 member 이상을 먼저 요구한다 (E-FE E-3).
+  const isCreator = !!userId && project.createdById === userId && role !== "viewer";
+  const canEdit = canManage || isCreator;
+
   return (
     <div className="p-6">
       <DashboardHeader
         project={project}
         canManage={canManage}
+        canEdit={canEdit}
         isRoleLoading={isRoleLoading}
         onVisibilityClick={() => setVisibilityDialogOpen(true)}
         onEditClick={() => setEditDialogOpen(true)}
@@ -125,6 +132,7 @@ export function ProjectDashboard({ projectId }: ProjectDashboardProps) {
         wid={wid}
         projectId={projectId}
         project={project}
+        canArchive={canManage}
         visibilityDialogOpen={visibilityDialogOpen}
         onVisibilityDialogOpenChange={setVisibilityDialogOpen}
         editDialogOpen={editDialogOpen}
