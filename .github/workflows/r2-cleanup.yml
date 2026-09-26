@@ -1,22 +1,26 @@
-# R2 nightly cleanup — uploads/ prefix 누적 객체 정리 (BL-043)
-# 수동 트리거 전용 (workflow_dispatch). 사용자 검증 후 cron 추가.
-name: R2 Cleanup
+# R2 인벤토리 — Kairos prefix(uploads/ · memory/) 의 객체 수·용량만 본다 (읽기 전용 · 체크리스트 0-12)
+#
+# ★이 워크플로는 더 이상 삭제하지 않는다 (2026-09-27).
+#   예전 버전은 `delete=true` 로 uploads/ 아래 N 일 지난 객체를 DB 참조 확인 없이 전부 지웠다 —
+#   살아 있는 회의 원본까지 (D-001 · D-002). 고아 판정에는 운영 DB 가 필요하고 러너는 DB 에 닿지 않는다.
+#   미참조 객체 정리는 서버에서 한다 → docs/operations/r2-cleanup-cron.md §2
+# ★키 목록을 출력하지 않는다. 공개 레포의 Actions 로그는 누구나 읽고, 키에 회의 파일명이 들어 있다.
+#   스크립트의 --inventory 모드가 prefix 별 개수·용량·오래된 객체 수만 찍는다.
+name: R2 Inventory (read-only)
 
 on:
   workflow_dispatch:
     inputs:
       days:
-        description: "이 N 일보다 오래된 객체 정리"
+        description: "이 N 일보다 오래된 객체 수를 따로 센다 (최소 7)"
         required: false
         default: "30"
-      delete:
-        description: "실제 삭제 (false = dry run)"
-        type: boolean
-        required: false
-        default: false
+
+permissions:
+  contents: read
 
 jobs:
-  cleanup:
+  inventory:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -35,15 +39,12 @@ jobs:
       - name: Sync deps
         run: uv sync --frozen
 
-      - name: Run R2 cleanup
+      # 입력값은 env 로 넘긴다 (run 블록에 ${{ }} 를 직접 넣지 않는다 — 스크립트 주입 방지).
+      - name: Run R2 inventory (no delete, no keys printed)
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
-        run: |
-          DELETE_FLAG=""
-          if [ "${{ inputs.delete }}" = "true" ]; then
-            DELETE_FLAG="--delete"
-          fi
-          uv run python -m scripts.r2_cleanup --days ${{ inputs.days }} $DELETE_FLAG
+          DAYS: ${{ inputs.days }}
+        run: uv run python -m scripts.r2_cleanup --inventory --days "$DAYS"

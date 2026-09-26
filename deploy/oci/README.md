@@ -125,6 +125,16 @@ uptime && free -h && df -h /
 mise run deploy-gc <롤백용_태그>
 ```
 
+## DB 백업
+
+`backup/pg-backup.sh` — 일 1회 `pg_dump -Fc` → `~/kairos/backups/` 14일 보관 → R2 `backups/kairos/YYYY/MM/DD/`.
+`backup/pg-restore-check.sh` — 덤프를 임시 컨테이너에 복원해 테이블별 row count 를 원본과 대조한다.
+설치·cron 줄·복원 절차는 [`docs/operations/runbooks/db-backup-restore.md`](../../docs/operations/runbooks/db-backup-restore.md).
+
+```bash
+scp -r deploy/oci/backup truewords-oracle:~/kairos/     # 맥에서. 이후 서버에서 런북 §2 대로 crontab 등록
+```
+
 ## 함정
 
 - **`/health` 200 은 배포 검증이 아니다.** 플레이스홀더 키로도 200 이 난다. 인증까지 살아 있는지는
@@ -133,7 +143,8 @@ mise run deploy-gc <롤백용_태그>
 - **`.env` 인라인 주석 금지.** 값에 섞인 한글이 헤더 ascii 인코딩에서 터져 500 을 만든다.
   `CORS_ORIGINS` 오염은 조용한 CORS 전면 차단으로 나타난다.
 - **원격 실행은 `bash -lc`.** 비로그인 셸의 PATH 문제.
-- **`docker compose down -v` 금지.** `-v` 는 `db-data` 볼륨을 지운다. 백업이 아직 없다.
+- **`docker compose down -v` 금지.** `-v` 는 `db-data` 볼륨을 지운다. 백업은 `backup/pg-backup.sh` 가
+  cron 으로 돌 때만 존재한다 (`crontab -l | grep pg-backup`). 있어도 마지막 백업 이후 데이터는 잃는다.
 - **`docker system prune` / `docker image prune -a` 금지.** 이 호스트는 quantbridge·truewords 와
   공유한다. 정리는 `mise run deploy-gc` 로만 — `kairos-api` / `kairos-web` 리포지토리로 한정한다.
 - **`docker images` 는 생성일순이 아니다.** 이 서버는 Docker 29 + containerd 이미지 스토어라
@@ -144,6 +155,6 @@ mise run deploy-gc <롤백용_태그>
 
 ## 미착수 (BL 등재)
 
-- DB 백업 자동화 — 운영 전환 시 착수. 현재는 개발 단계라 의도적으로 없다.
+- DB 백업 **cron 등록** — 스크립트는 준비됐다(위 "DB 백업"). 서버 crontab 등록은 사용자가 한다.
 - presigned URL 업로드 전환 — 100MB 초과 파일이 실제로 필요해지면.
 - GitHub Actions 자동 배포 — 수동 3회 성공 + 7일 무사고 후.
