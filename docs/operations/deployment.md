@@ -104,8 +104,10 @@ mise run deploy-rollback <이전TAG>
 `restart: unless-stopped` 와 결합하면 마이그레이션 실패가 무한 재시작 루프가 되기 때문이다
 (2026-06-23~30 prod 전면 다운이 그 형태였다).
 
-**백업은 아직 없다.** 개발 단계라 의도적으로 제외했고 운영 전환 시 착수한다(BL-OCI-1).
-그때까지 **`docker compose down -v` 는 절대 금지** — `-v` 가 `db-data` 볼륨을 지운다.
+**백업** — `deploy/oci/backup/pg-backup.sh` 가 일 1회 `pg_dump -Fc` → 로컬 14일 보관 → R2 `backups/kairos/`
+사본을 만든다. 복원 리허설은 `pg-restore-check.sh` (새 임시 컨테이너 + 테이블별 row count 대조).
+**서버 crontab 등록 전까지는 실제 백업이 없다** — 절차는 [`runbooks/db-backup-restore.md`](runbooks/db-backup-restore.md).
+어느 경우든 **`docker compose down -v` 는 절대 금지** — `-v` 가 `db-data` 볼륨을 지운다.
 
 이전 원본인 Neon(`neondb`)은 당분간 남겨 두어 사실상의 백업 역할을 한다.
 

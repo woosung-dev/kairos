@@ -11,6 +11,66 @@ export class ApiError extends Error {
   }
 }
 
+/** FastAPI RequestValidationError 의 detail 항목 ({ loc, msg, type, ctx }) */
+interface ValidationIssue {
+  loc?: unknown;
+  type?: unknown;
+  ctx?: unknown;
+}
+
+function isValidationIssue(value: unknown): value is ValidationIssue {
+  return typeof value === "object" && value !== null && "loc" in value;
+}
+
+/** loc 의 마지막 문자열 요소 = 필드명 ("body"/"query"/"path" 같은 위치 접두어는 건너뛴다). */
+function fieldOf(issue: ValidationIssue): string | null {
+  if (!Array.isArray(issue.loc)) return null;
+  const names = issue.loc.filter(
+    (part): part is string =>
+      typeof part === "string" && !["body", "query", "path", "header"].includes(part),
+  );
+  return names.at(-1) ?? null;
+}
+
+function limitOf(issue: ValidationIssue, key: "min_length" | "max_length"): number | null {
+  if (typeof issue.ctx !== "object" || issue.ctx === null) return null;
+  const limit = (issue.ctx as Record<string, unknown>)[key];
+  return typeof limit === "number" ? limit : null;
+}
+
+/** 422 detail 배열 → 한국어 한 줄. 첫 항목만 말한다 (Pydantic msg 는 영어라 노출하지 않는다). */
+function formatValidationIssues(issues: ValidationIssue[]): string {
+  const first = issues[0];
+  const field = first ? fieldOf(first) : null;
+  const hint = field ? ` (${field})` : "";
+  if (first?.type === "string_too_short") {
+    const min = limitOf(first, "min_length");
+    return min !== null ? `최소 ${min}자 이상 입력해 주세요${hint}` : `입력값이 너무 짧습니다${hint}`;
+  }
+  if (first?.type === "string_too_long") {
+    const max = limitOf(first, "max_length");
+    return max !== null ? `최대 ${max}자까지 입력할 수 있습니다${hint}` : `입력값이 너무 깁니다${hint}`;
+  }
+  if (first?.type === "missing") return `필수 입력값이 비어 있습니다${hint}`;
+  return `입력값을 확인해 주세요${hint}`;
+}
+
+/**
+ * BE 오류 본문의 detail → 사용자에게 보일 메시지.
+ *
+ * ★FastAPI 422 는 detail 이 `{loc,msg,type}` 객체 **배열**이다. 그대로 `new Error(detail)` 에
+ *   넘기면 "[object Object]" 가 화면에 뜬다 (C-025). 문자열이 아닌 detail 은 여기서 한국어로 바꾼다.
+ */
+export function formatErrorDetail(detail: unknown, status: number): string {
+  if (typeof detail === "string" && detail) return detail;
+  if (Array.isArray(detail)) {
+    const issues = detail.filter(isValidationIssue);
+    if (issues.length > 0) return formatValidationIssues(issues);
+  }
+  if (status === 422) return "입력값을 확인해 주세요";
+  return `요청을 처리하지 못했습니다 (HTTP ${status})`;
+}
+
 /**
  * BE API 호출 코어 — createApiClient 전용 내부 경로.
  * token 옵션은 여기서만 처리한다 (외부 노출 금지 — PR-3 c8 복붙 회귀 봉쇄).
@@ -50,7 +110,7 @@ async function coreApiFetch<T = unknown>(
     const error = await res
       .json()
       .catch(() => ({ detail: "요청 실패" }));
-    throw new ApiError(error.detail || `HTTP ${res.status}`, res.status);
+    throw new ApiError(formatErrorDetail(error?.detail, res.status), res.status);
   }
 
   // 본문 없는 2xx — 204 뿐만이 아니다.

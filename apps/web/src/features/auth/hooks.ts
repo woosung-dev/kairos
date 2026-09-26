@@ -7,8 +7,9 @@
 //   세션을 직접 쓰면 그 둘이 섞여, Clerk 시절 `member.clerkId === user.id` 매칭이
 //   깨졌던 것과 같은 종류의 결합이 다시 생긴다.
 
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 
+import type { ApiClient } from "@/lib/api-client";
 import { useApiClient } from "@/lib/use-api-client";
 
 export interface Me {
@@ -27,13 +28,21 @@ export const meKeys = {
   detail: ["auth", "me"] as const,
 };
 
-export function useMe() {
-  const api = useApiClient();
-  return useQuery({
+/**
+ * `useMe` 와 같은 쿼리 정의 — 훅 밖(mutation 콜백)에서 `queryClient.fetchQuery` 로 같은 캐시를 쓰기 위해 분리.
+ * (초대 수락 직후 내부 user id 가 필요하다 — C-001)
+ */
+export function meQueryOptions(api: ApiClient) {
+  return queryOptions({
     queryKey: meKeys.detail,
     queryFn: () => api.fetch<Me>("/users/me"),
     // 로그인 세션 동안 거의 바뀌지 않는다. onboardingStep 갱신은 해당 훅이 직접 무효화한다.
     staleTime: 5 * 60_000,
     retry: false,
   });
+}
+
+export function useMe() {
+  const api = useApiClient();
+  return useQuery(meQueryOptions(api));
 }

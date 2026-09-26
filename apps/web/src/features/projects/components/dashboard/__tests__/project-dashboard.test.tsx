@@ -64,6 +64,7 @@ const PROJECT: Project = {
   visibility: "public",
   tags: [],
   sortOrder: 0,
+  createdById: "user-creator",
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
 };
@@ -152,5 +153,44 @@ describe("ProjectDashboard — 온보딩 게이트", () => {
     renderProjectDashboard();
 
     expect(screen.queryByRole("heading", { name: "프로젝트 멤버" })).not.toBeInTheDocument();
+  });
+});
+
+// 2026-09-27 결정 — 작성자는 member 여도 visibility 를 바꿀 수 있다. 판정 축은 멤버십의 내부 users.id.
+describe("ProjectDashboard — 작성자 visibility 권한", () => {
+  function mockRole(userId: string, role: "member" | "viewer" = "member") {
+    vi.mocked(useWorkspaceRole).mockReturnValue({
+      role,
+      userId,
+      isLoading: false,
+      isOwner: false,
+      isAdmin: false,
+      canManage: false,
+    });
+  }
+
+  it("member 작성자는 visibility 배지로 변경 다이얼로그를 연다", () => {
+    mockRole(PROJECT.createdById);
+    renderProjectDashboard();
+
+    fireEvent.click(screen.getByLabelText("Visibility: 공개"));
+
+    expect(screen.getByText("Visibility 변경")).toBeInTheDocument();
+  });
+
+  it("viewer 로 강등된 작성자는 배지가 비활성이다 (BE PATCH 는 member 이상)", () => {
+    mockRole(PROJECT.createdById, "viewer");
+    renderProjectDashboard();
+
+    expect(screen.getByLabelText("Visibility: 공개")).toBeDisabled();
+    expect(screen.queryByLabelText("프로젝트 관리 메뉴")).toBeNull();
+  });
+
+  it("작성자가 아닌 member 는 배지가 비활성이고 관리 메뉴도 없다", () => {
+    mockRole("user-someone-else");
+    renderProjectDashboard();
+
+    expect(screen.getByLabelText("Visibility: 공개")).toBeDisabled();
+    expect(screen.queryByLabelText("프로젝트 관리 메뉴")).toBeNull();
   });
 });

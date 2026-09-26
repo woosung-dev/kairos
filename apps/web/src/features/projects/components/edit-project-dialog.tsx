@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useUpdateProject } from "../hooks";
-import type { Project } from "../types";
+import type { Project, ProjectStatus } from "../types";
 
 const editProjectSchema = z.object({
   title: z.string().min(1, "프로젝트 이름을 입력하세요"),
@@ -42,11 +42,22 @@ const editProjectSchema = z.object({
 
 type EditProjectFormData = z.infer<typeof editProjectSchema>;
 
+const STATUS_LABELS: Record<ProjectStatus, string> = {
+  active: "진행 중",
+  completed: "완료",
+  archived: "보관",
+};
+
 interface EditProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   workspaceId: string;
   project: Project;
+  /**
+   * admin/owner 여부. BE 는 "보관(archived)" 진입·해제를 admin 이상에게만 허용한다 (C-017).
+   * false 면 보관 옵션을 숨기고, 이미 보관된 프로젝트는 상태만 잠근 채 다른 필드를 저장할 수 있다.
+   */
+  canArchive: boolean;
 }
 
 export function EditProjectDialog({
@@ -54,8 +65,14 @@ export function EditProjectDialog({
   onOpenChange,
   workspaceId,
   project,
+  canArchive,
 }: EditProjectDialogProps) {
   const updateProject = useUpdateProject(workspaceId);
+  // 보관 상태의 member 편집 — 상태를 바꾸면 BE 가 403 이므로 잠근다 (현재 값 그대로 보내는 것은 허용).
+  const isStatusLocked = !canArchive && project.status === "archived";
+  const statusOptions: ProjectStatus[] = canArchive || isStatusLocked
+    ? ["active", "completed", "archived"]
+    : ["active", "completed"];
 
   const form = useForm<EditProjectFormData>({
     resolver: zodResolver(editProjectSchema),
@@ -150,18 +167,32 @@ export function EditProjectDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>상태</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    disabled={isStatusLocked}
+                  >
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
+                      <SelectTrigger data-testid="edit-project-status">
+                        {/* items 미등록 상태에서 base-ui 는 raw 값("active")을 그리므로 라벨로 옮긴다 */}
+                        <SelectValue>
+                          {(value: ProjectStatus) => STATUS_LABELS[value] ?? value}
+                        </SelectValue>
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="active">진행 중</SelectItem>
-                      <SelectItem value="completed">완료</SelectItem>
-                      <SelectItem value="archived">보관</SelectItem>
+                      {statusOptions.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {STATUS_LABELS[status]}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  {isStatusLocked && (
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      보관 해제는 관리자만 할 수 있습니다. 다른 항목은 저장할 수 있어요.
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}

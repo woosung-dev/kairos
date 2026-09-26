@@ -180,7 +180,8 @@ export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
                 border: "1px solid var(--border-subtle)",
               }}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
+                // 한글 조합 중 Enter 는 조합 확정용 — 생성하지 않는다 (G3-018)
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   handleCreate();
                 } else if (e.key === "Escape") {

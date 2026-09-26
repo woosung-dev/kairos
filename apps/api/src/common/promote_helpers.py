@@ -22,6 +22,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from .promote_models import PROMOTABLE_ITEM_TYPES, ItemPromotionAudit
+from .visibility import RequesterContext, apply_fk_project_visibility
 
 
 class PromoteValidationError(Exception):
@@ -142,6 +143,8 @@ async def clone_action_items_for_promote(
     target_workspace_id: uuid.UUID,
     target_project_id: uuid.UUID | None,
     session: AsyncSession,
+    requester_user_id: uuid.UUID | None = None,
+    requester_role: str | None = None,
 ) -> int:
     """Meeting promote 의 source ActionItem rows 자동 복제 (Sprint 24 BL-063).
 
@@ -172,10 +175,15 @@ async def clone_action_items_for_promote(
     from src.actions.models import ActionItem
     from src.workspaces.models import WorkspaceMember
 
-    # 1. source ActionItem rows fetch
-    source_result = await session.exec(
-        select(ActionItem).where(ActionItem.meeting_id == source_meeting_id)
+    # 1. source ActionItem rows fetch — promoter 가 볼 수 없는 액션(private 프로젝트로 분류된 것)은
+    # 복제하지 않는다. 사본은 project_id=None 이라 대상 WS 전원에게 보이기 때문 (2026-09-27 E1-02).
+    source_stmt = select(ActionItem).where(ActionItem.meeting_id == source_meeting_id)
+    source_stmt = apply_fk_project_visibility(
+        source_stmt,
+        ActionItem.project_id,
+        RequesterContext(requester_user_id, requester_role),
     )
+    source_result = await session.exec(source_stmt)
     source_items = list(source_result.all())
     if not source_items:
         return 0

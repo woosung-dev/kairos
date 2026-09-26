@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useInviteInfo, useAcceptInvite } from "@/features/members/hooks";
-import { useWorkspaceStore } from "@/features/workspaces/store";
+import { authHrefWithCallback } from "@/features/auth/callback-url";
 
 // role 원문(소문자 영문) 노출 방지 — 한국어 라벨 매핑
 const ROLE_JOIN_LABELS: Record<string, string> = {
@@ -29,12 +29,11 @@ export default function InvitePage({
   const isSignedIn = !!session;
   const { data: info, isLoading, isError, refetch } = useInviteInfo(code);
   const acceptInvite = useAcceptInvite();
-  const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId);
 
+  // 활성 워크스페이스·소유자 확정은 useAcceptInvite 가 소유한다 (C-001) — 여기서는 이동만.
   const handleAccept = () => {
     acceptInvite.mutate(code, {
-      onSuccess: (result) => {
-        setActiveWorkspaceId(result.workspaceId);
+      onSuccess: () => {
         router.push("/");
       },
     });
@@ -166,16 +165,30 @@ export default function InvitePage({
                     참여하려면 먼저 로그인이 필요합니다
                   </p>
                   {/* ADR-031: Clerk 의 modal 로그인 동등물이 없어 페이지 이동으로 바꿨다.
-                      callbackURL 은 Better Auth 의 trustedOrigins 가 검증하므로
-                      외부 URL 로의 open redirect 는 성립하지 않는다. */}
+                      폼은 callbackURL 을 same-origin 상대 경로로만 받는다 (features/auth/callback-url).
+                      계정이 없는 초대받은 사람도 가입 뒤 이 페이지로 돌아오게 가입 CTA 를 함께 둔다 (E2-X01). */}
                   <Button
                     className="w-full cursor-pointer"
                     size="lg"
                     render={
                       <Link
-                        href={`/sign-in?callbackURL=${encodeURIComponent(`/invite/${code}`)}`}
+                        href={authHrefWithCallback("/sign-in", `/invite/${code}`)}
+                        data-testid="invite-sign-in"
                       >
                         로그인하고 참여
+                      </Link>
+                    }
+                  />
+                  <Button
+                    variant="outline"
+                    className="w-full cursor-pointer"
+                    size="lg"
+                    render={
+                      <Link
+                        href={authHrefWithCallback("/sign-up", `/invite/${code}`)}
+                        data-testid="invite-sign-up"
+                      >
+                        가입하고 참여
                       </Link>
                     }
                   />

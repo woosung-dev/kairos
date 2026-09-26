@@ -1857,7 +1857,7 @@ export interface components {
             /** Description */
             description?: string | null;
             /** Status */
-            status?: string | null;
+            status?: ("active" | "completed" | "archived") | null;
             /** Tags */
             tags?: string[] | null;
             /** Title */

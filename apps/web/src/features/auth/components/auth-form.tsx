@@ -12,6 +12,7 @@ import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { authHrefWithCallback, sanitizeCallbackURL } from "../callback-url";
 
 type Mode = "signIn" | "signUp";
 
@@ -34,19 +35,31 @@ const COPY = {
   },
 } as const;
 
-/** Better Auth 에러 코드를 한국어로 옮긴다. 미매핑은 원문 노출 대신 일반 문구로 덮는다. */
-function toKoreanError(code: string | undefined, fallback: string): string {
+/**
+ * Better Auth 에러 코드를 한국어로 옮긴다. 미매핑은 원문 노출 대신 일반 문구로 덮는다.
+ *
+ * ★중복 가입의 실제 코드는 `USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL` 이다 (better-auth 1.6
+ *   `api/routes/sign-up` → 422, 원문 "User already exists. Use another email."). `USER_ALREADY_EXISTS`
+ *   만 매핑해 두어 영어 원문이 화면에 떴다 (C-024). 서버 영어 메시지는 fallback 으로 쓰지 않는다.
+ */
+export function toKoreanError(code: string | undefined, status?: number): string {
   switch (code) {
     case "INVALID_EMAIL_OR_PASSWORD":
       return "이메일 또는 비밀번호가 올바르지 않습니다.";
     case "USER_ALREADY_EXISTS":
+    case "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL":
       return "이미 가입된 이메일입니다. 로그인해 주세요.";
     case "PASSWORD_TOO_SHORT":
       return "비밀번호는 8자 이상이어야 합니다.";
+    case "PASSWORD_TOO_LONG":
+      return "비밀번호가 너무 깁니다.";
     case "INVALID_EMAIL":
       return "이메일 형식이 올바르지 않습니다.";
+    case "INVALID_PASSWORD":
+      return "비밀번호가 올바르지 않습니다.";
     default:
-      return fallback || "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+      if (status === 429) return "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.";
+      return "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
 }
 
@@ -54,8 +67,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const copy = COPY[mode];
   const router = useRouter();
   const searchParams = useSearchParams();
-  // 보호 라우트에서 튕겨온 경우 원래 목적지로 돌려보낸다 (proxy.ts 가 심어준다).
-  const callbackURL = searchParams.get("callbackURL") ?? "/dashboard";
+  // 보호 라우트에서 튕겨온 경우 원래 목적지로 돌려보낸다 (proxy.ts·초대 페이지가 심어준다).
+  // same-origin 상대 경로만 허용 — 성공 뒤 router.push 는 Better Auth 의 trustedOrigins 를 거치지 않는다.
+  const callbackURL = sanitizeCallbackURL(searchParams.get("callbackURL"));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -78,7 +92,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
               callbackURL,
             });
       if (result.error) {
-        setError(toKoreanError(result.error.code, result.error.message ?? ""));
+        setError(toKoreanError(result.error.code, result.error.status));
         return;
       }
       router.push(callbackURL);
@@ -198,8 +212,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
         style={{ fontSize: 13, color: "var(--text-secondary)" }}
       >
         {copy.switchPrompt}{" "}
+        {/* 전환해도 callbackURL 을 유지한다 — 버리면 초대받은 신규 사용자가 가입 뒤 초대 페이지로 못 돌아온다 (E2-X01) */}
         <Link
-          href={copy.switchHref}
+          href={authHrefWithCallback(copy.switchHref, callbackURL)}
+          data-testid="auth-switch-link"
           style={{ color: "var(--accent)", textDecoration: "underline" }}
         >
           {copy.switchLabel}

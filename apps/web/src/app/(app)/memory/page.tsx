@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
 import { useWorkspaceStore } from "@/features/workspaces/store";
-import { useRecall } from "@/features/memory/hooks";
+import { RECALL_QUERY_MAX, useRecall } from "@/features/memory/hooks";
 import { CaptureSheet } from "@/features/memory/components/CaptureSheet";
 import { RecallResultCard } from "@/features/memory/components/RecallResultCard";
 import { useBreakpoint } from "@/hooks/use-media-query";
+import { codePointLength } from "@/lib/text-length";
 
 const DEBOUNCE_MS = 300;
 
@@ -38,7 +39,9 @@ export default function MemoryPage() {
   const debouncedQuery = useDebouncedValue(query, DEBOUNCE_MS);
 
   const isEmpty = !query.trim();
-  const isQueryReady = debouncedQuery.trim().length >= 2;
+  // BE `q` 는 code point 기준 min_length=2 — 이모지 1개(UTF-16 2칸)를 2자로 세면 422 가 난다
+  const isQueryTooLong = codePointLength(debouncedQuery) > RECALL_QUERY_MAX;
+  const isQueryReady = codePointLength(debouncedQuery.trim()) >= 2 && !isQueryTooLong;
 
   const { data, isLoading, isError } = useRecall(
     workspaceId,
@@ -53,6 +56,10 @@ export default function MemoryPage() {
         <h1 className="mb-1 text-2xl font-semibold">메모 검색</h1>
         <p className="text-sm text-muted-foreground">
           저장한 모든 메모를 검색하세요. AI가 의미와 키워드 모두로 찾아드립니다.
+        </p>
+        {/* C-020 — 메모는 개인 공간이다. 팀원이 볼 거라 오해하지 않게 헤더에서 먼저 알린다 */}
+        <p className="mt-1 text-xs text-muted-foreground" data-testid="memory-private-hint">
+          메모는 작성한 본인에게만 보입니다. 팀과 나누려면 검색 결과의 &lsquo;팀으로 올리기&rsquo;를 누르세요.
         </p>
       </header>
 
@@ -78,7 +85,11 @@ export default function MemoryPage() {
       )}
 
       {!isEmpty && !isQueryReady && (
-        <p className="text-sm text-muted-foreground">두 글자 이상 입력해 주세요.</p>
+        <p className="text-sm text-muted-foreground">
+          {isQueryTooLong
+            ? `검색어는 ${RECALL_QUERY_MAX}자 이하로 입력해 주세요.`
+            : "두 글자 이상 입력해 주세요."}
+        </p>
       )}
 
       {!isEmpty && isQueryReady && isLoading && (

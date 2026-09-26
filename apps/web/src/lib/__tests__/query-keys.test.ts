@@ -45,6 +45,7 @@ describe("query-keys 형태 스냅샷", () => {
   });
 
   it("meetingKeys", () => {
+    expect(meetingKeys.byWorkspace(WID)).toEqual(["meetings", "list", WID]);
     expect(meetingKeys.list(WID)).toEqual(["meetings", "list", WID, "all"]);
     expect(meetingKeys.list(WID, "p1")).toEqual(["meetings", "list", WID, "p1"]);
     expect(meetingKeys.detail(WID, ID)).toEqual(["meetings", "detail", WID, ID]);

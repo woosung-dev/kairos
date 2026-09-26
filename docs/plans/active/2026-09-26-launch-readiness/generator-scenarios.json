@@ -1,0 +1,3923 @@
+{
+ "G1-access": [
+  {
+   "id": "G1-001",
+   "area": "auth",
+   "title": "Sign-up rejects password < 8 chars",
+   "role": "anon",
+   "preconditions": "logged out on /sign-up",
+   "steps": [
+    "Open /sign-up",
+    "Enter fresh email + 7-char password + name",
+    "Submit"
+   ],
+   "expected": "Better Auth returns 400 PASSWORD_TOO_SHORT; FE shows '비밀번호는 8자 이상이어야 합니다.'. Note the HTML input also has minLength=8 so native validation may block before submit.",
+   "source": "apps/web/node_modules/better-auth/dist/api/routes/sign-up.mjs:152-156 (PASSWORD_TOO_SHORT); auth-form.tsx:44-45,167 (minLength=8); context/create-context.mjs:185 (minPasswordLength=8)",
+   "priority": "P2",
+   "method": "both",
+   "api": "POST /api/auth/sign-up/email {email,password,name}"
+  },
+  {
+   "id": "G1-002",
+   "area": "auth",
+   "title": "Sign-up duplicate email → 422 USER_ALREADY_EXISTS",
+   "role": "newbie",
+   "preconditions": "an account with email X already exists (owner)",
+   "steps": [
+    "Open /sign-up",
+    "Enter existing email + valid password",
+    "Submit"
+   ],
+   "expected": "422 UNPROCESSABLE_ENTITY code USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL; FE maps USER_ALREADY_EXISTS to '이미 가입된 이메일입니다. 로그인해 주세요.' Note: FE only maps USER_ALREADY_EXISTS, BE emits USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL, so falls to generic message — flag as minor mapping gap, not a security defect.",
+   "source": "apps/web/node_modules/better-auth/dist/api/routes/sign-up.mjs:208; auth-form.tsx:42-43 (only USER_ALREADY_EXISTS mapped)",
+   "priority": "P2",
+   "method": "both",
+   "api": "POST /api/auth/sign-up/email"
+  },
+  {
+   "id": "G1-003",
+   "area": "auth",
+   "title": "Sign-in wrong password → 401 generic message",
+   "role": "anon",
+   "preconditions": "owner account exists",
+   "steps": [
+    "Open /sign-in",
+    "Enter owner email + wrong password",
+    "Submit"
+   ],
+   "expected": "401 UNAUTHORIZED INVALID_EMAIL_OR_PASSWORD; FE shows '이메일 또는 비밀번호가 올바르지 않습니다.' (same message for unknown email — no user enumeration). Intended design.",
+   "source": "apps/web/node_modules/better-auth/dist/api/routes/sign-in.mjs:292,298,304,311; auth-form.tsx:40-41",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST /api/auth/sign-in/email"
+  },
+  {
+   "id": "G1-004",
+   "area": "auth",
+   "title": "Sign-in success routes to callbackURL",
+   "role": "anon",
+   "preconditions": "member account exists",
+   "steps": [
+    "Visit /projects while logged out → redirected to /sign-in?callbackURL=/projects",
+    "Sign in with valid creds"
+   ],
+   "expected": "After success router.push(callbackURL) → lands on /projects. callbackURL validated by Better Auth trustedOrigins (relative path allowed).",
+   "source": "apps/web/src/features/auth/components/auth-form.tsx:58,73,84; proxy.ts:35-40",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G1-005",
+   "area": "auth",
+   "title": "Protected route redirect preserves callbackURL with query string",
+   "role": "anon",
+   "preconditions": "logged out",
+   "steps": [
+    "Navigate directly to /settings?tab=members"
+   ],
+   "expected": "302/redirect to /sign-in?callbackURL=%2Fsettings%3Ftab%3Dmembers (pathname+search preserved). Only cookie presence checked, not validity.",
+   "source": "apps/web/src/proxy.ts:31-41",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G1-006",
+   "area": "auth",
+   "title": "proxy redirect is UX-only, not authz — BE is real defense",
+   "role": "anon",
+   "preconditions": "attacker sets a bogus session cookie value",
+   "steps": [
+    "Set any non-empty better-auth session cookie",
+    "GET /projects (page)",
+    "Observe BE calls still 401 without valid JWT"
+   ],
+   "expected": "proxy.getSessionCookie only checks cookie existence (no signature/exp), so page shell may render, but every /api/v1 call returns 401 (invalid JWT). No data leaks. Intended design — document, not a defect.",
+   "source": "apps/web/src/proxy.ts:3-7,35; apps/api/src/auth/dependencies.py:176-239",
+   "priority": "P1",
+   "method": "both"
+  },
+  {
+   "id": "G1-007",
+   "area": "auth",
+   "title": "Open-redirect via crafted callbackURL is blocked",
+   "role": "anon",
+   "preconditions": "logged out",
+   "steps": [
+    "Manually visit /sign-in?callbackURL=https://evil.com",
+    "Sign in"
+   ],
+   "expected": "Better Auth origin-check rejects absolute untrusted callbackURL with 403 INVALID_CALLBACK_URL on the sign-in POST (allowRelativePaths only for relative). Login should not bounce to evil.com.",
+   "source": "apps/web/node_modules/better-auth/dist/api/middlewares/origin-check.mjs:54-65; auth/trusted-origins.mjs:15 (relative-path regex); lib/auth.ts:38 trustedOrigins=[baseURL]",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST /api/auth/sign-in/email {callbackURL:'https://evil.com'}"
+  },
+  {
+   "id": "G1-008",
+   "area": "auth",
+   "title": "/api/auth/token returns JWT for authenticated session",
+   "role": "member",
+   "preconditions": "member signed in (session cookie present)",
+   "steps": [
+    "GET /api/auth/token with credentials:include"
+   ],
+   "expected": "200 {token:<JWT>}. JWT default exp 15m, issuer=baseURL origin, alg EdDSA. Payload carries sub/name/email only.",
+   "source": "apps/web/node_modules/better-auth/dist/plugins/jwt/index.mjs:128-146; sign.mjs:13,18,20; apps/web/src/lib/auth.ts:45-50",
+   "priority": "P1",
+   "method": "api",
+   "api": "GET /api/auth/token"
+  },
+  {
+   "id": "G1-009",
+   "area": "auth",
+   "title": "/api/auth/token requires a session → 401 when logged out",
+   "role": "anon",
+   "preconditions": "no session cookie",
+   "steps": [
+    "GET /api/auth/token without cookie"
+   ],
+   "expected": "401 UNAUTHORIZED (sessionMiddleware). FE fetchToken returns null → ApiClient throws AuthRequiredError.",
+   "source": "apps/web/node_modules/better-auth/dist/api/routes/session.mjs:319-326; apps/web/src/lib/use-api-client.ts:43-46; lib/api-client.ts:127",
+   "priority": "P2",
+   "method": "api",
+   "api": "GET /api/auth/token"
+  },
+  {
+   "id": "G1-010",
+   "area": "auth",
+   "title": "Missing/invalid Authorization header → BE 401",
+   "role": "anon",
+   "preconditions": "none",
+   "steps": [
+    "curl GET /api/v1/workspaces/{id} with no Authorization header",
+    "Repeat with 'Bearer garbage'"
+   ],
+   "expected": "Both 401. No header → '인증이 필요합니다'; malformed token → jwt.InvalidTokenError → '유효하지 않은 토큰입니다'.",
+   "source": "apps/api/src/auth/dependencies.py:176-177,234-236",
+   "priority": "P1",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}"
+  },
+  {
+   "id": "G1-011",
+   "area": "auth",
+   "title": "Expired JWT → BE 401 (not served from claims cache)",
+   "role": "member",
+   "preconditions": "obtain a member JWT, wait until exp (or forge exp in past)",
+   "steps": [
+    "Use an expired but well-formed JWT as Bearer",
+    "GET /api/v1/workspaces/{teamWsId}/projects"
+   ],
+   "expected": "401 '토큰이 만료되었습니다' (ExpiredSignatureError). Claims cache TTL is capped at min(60s, token.exp-now) so an already-expired token is never cache-served.",
+   "source": "apps/api/src/auth/dependencies.py:110-136 (_jwt_cache_set exp cap),224-226",
+   "priority": "P0",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}/projects"
+  },
+  {
+   "id": "G1-012",
+   "area": "auth",
+   "title": "JWT with wrong issuer → 401",
+   "role": "member",
+   "preconditions": "craft/obtain JWT signed by a key with mismatched iss",
+   "steps": [
+    "Send token whose iss != AUTH_JWT_ISSUER",
+    "GET any /api/v1 endpoint"
+   ],
+   "expected": "401 '유효하지 않은 토큰 발급자입니다' (InvalidIssuerError). issuer is explicitly verified.",
+   "source": "apps/api/src/auth/dependencies.py:201,227-230",
+   "priority": "P1",
+   "method": "api"
+  },
+  {
+   "id": "G1-013",
+   "area": "auth",
+   "title": "alg confusion: header alg not in allowlist → 401",
+   "role": "anon",
+   "preconditions": "forge a token with alg=none or HS256 over the JWKS public key",
+   "steps": [
+    "Craft token with alg=none / alg=HS256",
+    "Send as Bearer to /api/v1"
+   ],
+   "expected": "401 — jwt.decode enforces algorithms allowlist (default EdDSA); header alg is not trusted. Config validator rejects an empty algorithms list.",
+   "source": "apps/api/src/auth/dependencies.py:195-200,206; auth/CONTEXT.md:59 (algorithm allowlist invariant)",
+   "priority": "P0",
+   "method": "api"
+  },
+  {
+   "id": "G1-014",
+   "area": "auth",
+   "title": "Sign-out clears JWT cache; stale token stops after logout",
+   "role": "member",
+   "preconditions": "member signed in",
+   "steps": [
+    "Click 로그아웃 in header",
+    "Confirm queryClient.clear + clearAuthTokenCache + authClient.signOut ran",
+    "Attempt an authenticated action"
+   ],
+   "expected": "FE drops cached JWT immediately; session cookie invalidated. Any in-memory token no longer attached (clearAuthTokenCache). Note: a copied Bearer token still validates at BE up to 15m (JWT non-revocable, ADR-031 D5) — expected design.",
+   "source": "apps/web/src/components/layout/header.tsx:170-176; use-api-client.ts:72-76; auth/CONTEXT.md:58",
+   "priority": "P1",
+   "method": "both"
+  },
+  {
+   "id": "G1-015",
+   "area": "auth",
+   "title": "Session persists across reload (cookie-based)",
+   "role": "owner",
+   "preconditions": "owner signed in",
+   "steps": [
+    "Reload the app / reopen tab",
+    "Observe still authenticated (GET /users/me 200)"
+   ],
+   "expected": "Session cookie persists; /users/me returns owner. No re-login prompt.",
+   "source": "apps/web/src/lib/auth-client.ts; apps/api/src/auth/router.py:12-13",
+   "priority": "P3",
+   "method": "ui",
+   "api": "GET /api/v1/users/me"
+  },
+  {
+   "id": "G1-016",
+   "area": "ratelimit",
+   "title": "Sign-in special rate rule: 3 requests / 10s per IP",
+   "role": "anon",
+   "preconditions": "rateLimit enabled (production/NODE_ENV=production or explicit enable); note it defaults OFF in dev",
+   "steps": [
+    "POST /api/auth/sign-in/email 4x within 10s from same IP",
+    "Observe 4th response"
+   ],
+   "expected": "4th returns 429 'Too many requests' with X-Retry-After. window=10, max=3 for /sign-in,/sign-up,/change-password,/change-email. CAVEAT: rateLimit.enabled defaults to isProduction; in the local QA stack (next start, NODE_ENV likely production) it is ON, but verify — if NODE_ENV!=production it is disabled and this test yields no 429.",
+   "source": "apps/web/node_modules/better-auth/dist/api/rate-limiter/index.mjs:370-383 (special rules 10s/3); context/create-context.mjs:171 (enabled=isProduction)",
+   "priority": "P1",
+   "method": "api",
+   "api": "POST /api/auth/sign-in/email"
+  },
+  {
+   "id": "G1-017",
+   "area": "ratelimit",
+   "title": "HYPOTHESIS: client X-Forwarded-For spoofing to evade per-IP bucket",
+   "role": "anon",
+   "preconditions": "rate limit enabled; no trustedProxies/ipAddressHeaders configured in lib/auth.ts",
+   "steps": [
+    "Send >3 sign-in attempts within 10s, each with a distinct spoofed X-Forwarded-For header (e.g. 1.1.1.1, 2.2.2.2, …)",
+    "Observe whether the limit resets per spoofed IP"
+   ],
+   "expected": "LIKELY BYPASS. getIp default header is x-forwarded-for; with no trustedProxies set, a single-value XFF is trusted verbatim (getIPFromHeader: length===1 path). Each distinct spoofed IP = distinct bucket key ip|path → attacker resets the 3/10s counter at will. Because next start also sets XFF from socket.remoteAddress via ??= (only when absent), a client-supplied XFF wins. Config has no advanced.ipAddress.* → no mitigation. Flag as P0 security finding to confirm.",
+   "source": "@better-auth/core/dist/utils/ip.mjs:172-217 (getIp/getIPFromHeader, DEFAULT_IP_HEADERS=['x-forwarded-for'], trustedProxies default empty); apps/web/node_modules/next/dist/server/base-server.js:577 (x-forwarded-for ??= remoteAddress); apps/web/src/lib/auth.ts (no advanced.ipAddress config)",
+   "priority": "P0",
+   "method": "api",
+   "api": "POST /api/auth/sign-in/email with spoofed X-Forwarded-For"
+  },
+  {
+   "id": "G1-018",
+   "area": "ratelimit",
+   "title": "HYPOTHESIS: all users collapse into one bucket behind Cloudflare Tunnel",
+   "role": "anon",
+   "preconditions": "prod behind Cloudflare Tunnel; XFF may present tunnel/proxy IP or be multi-value",
+   "steps": [
+    "From two different real clients, exhaust sign-in limit",
+    "Observe whether client B is throttled by client A's attempts"
+   ],
+   "expected": "POSSIBLE availability/DoS: if XFF resolves to a shared proxy IP (or multi-value with no trustedProxies → getIPFromHeader returns null → NO_TRUSTED_IP_KEY single shared bucket), all users share one 3/10s bucket → one attacker locks out everyone's sign-in. Local test cannot fully reproduce Cloudflare; verify header shape in prod. Design tension worth flagging.",
+   "source": "@better-auth/core/dist/utils/ip.mjs:186-191 (multi-value w/o trustedProxies → null),275-287 (NO_TRUSTED_IP_KEY shared bucket)",
+   "priority": "P1",
+   "method": "api"
+  },
+  {
+   "id": "G1-019",
+   "area": "workspace",
+   "title": "Create team workspace seeds owner member + template projects",
+   "role": "member",
+   "preconditions": "any authenticated user",
+   "steps": [
+    "POST /api/v1/workspaces {name:'QA New'}"
+   ],
+   "expected": "201; creator added as WorkspaceMember role=owner; 3 template projects (🚀 시작하기 / 💡 아이디어 / 📋 회의록) seeded; onboarding step→1. Response has type='team'.",
+   "source": "apps/api/src/workspaces/service.py:22-72; templates.py:25,35,44",
+   "priority": "P2",
+   "method": "both",
+   "api": "POST /api/v1/workspaces {name}"
+  },
+  {
+   "id": "G1-020",
+   "area": "workspace",
+   "title": "Rename workspace: owner only, name ≤60, non-blank",
+   "role": "owner",
+   "preconditions": "owner of QA Team",
+   "steps": [
+    "PATCH /api/v1/workspaces/{teamWsId}/settings {name:'Renamed'}",
+    "Try name of 61 chars",
+    "Try whitespace-only name",
+    "Try empty body {}"
+   ],
+   "expected": "owner rename 200. 61 chars → 422 (max_length=60). whitespace-only → 422 (model_validator strips → blank). empty body → 422 ('at least one of inboxThreshold or name required').",
+   "source": "apps/api/src/workspaces/router.py:46-55 (require_owner); schemas.py:74-94",
+   "priority": "P1",
+   "method": "both",
+   "api": "PATCH /api/v1/workspaces/{workspace_id}/settings {name}"
+  },
+  {
+   "id": "G1-021",
+   "area": "workspace",
+   "title": "Rename workspace by admin → 403",
+   "role": "admin",
+   "preconditions": "admin in QA Team",
+   "steps": [
+    "PATCH /api/v1/workspaces/{teamWsId}/settings {name:'x'} as admin"
+   ],
+   "expected": "403 'owner 이상 권한이 필요합니다' (require_owner bypasses cache, DB fresh).",
+   "source": "apps/api/src/workspaces/router.py:46-51; rbac.py:113-115,141",
+   "priority": "P1",
+   "method": "both",
+   "api": "PATCH /api/v1/workspaces/{workspace_id}/settings"
+  },
+  {
+   "id": "G1-022",
+   "area": "workspace",
+   "title": "Update inbox_threshold bounds 0.5–1.0",
+   "role": "owner",
+   "preconditions": "owner",
+   "steps": [
+    "PATCH settings {inboxThreshold:0.7} → ok",
+    "PATCH {inboxThreshold:0.4} → reject",
+    "PATCH {inboxThreshold:1.5} → reject"
+   ],
+   "expected": "0.7 → 200; 0.4/1.5 → 422 (ge=0.5, le=1.0). FE presets 0.7/0.8/0.9/0.95.",
+   "source": "apps/api/src/workspaces/schemas.py:76-78; app/(app)/settings/page.tsx:24",
+   "priority": "P2",
+   "method": "both",
+   "api": "PATCH /api/v1/workspaces/{workspace_id}/settings {inboxThreshold}"
+  },
+  {
+   "id": "G1-023",
+   "area": "workspace",
+   "title": "Delete workspace: owner only, cascade, personal blocked",
+   "role": "owner",
+   "preconditions": "owner of a disposable team workspace",
+   "steps": [
+    "DELETE /api/v1/workspaces/{teamWsId} as owner",
+    "DELETE own personal workspace"
+   ],
+   "expected": "team → 204 + full app-level cascade in single tx + member RBAC caches invalidated. personal → 403 '개인 워크스페이스에는 삭제를 수행할 수 없습니다' (PersonalWorkspaceProtected).",
+   "source": "apps/api/src/workspaces/service.py:130-149; workspaces/router.py:58-65; exceptions.py:58-65",
+   "priority": "P1",
+   "method": "both",
+   "api": "DELETE /api/v1/workspaces/{workspace_id}"
+  },
+  {
+   "id": "G1-024",
+   "area": "workspace",
+   "title": "Delete workspace by admin → 403",
+   "role": "admin",
+   "preconditions": "admin in QA Team",
+   "steps": [
+    "DELETE /api/v1/workspaces/{teamWsId} as admin"
+   ],
+   "expected": "403 (require_owner). Workspace remains.",
+   "source": "apps/api/src/workspaces/router.py:58-63",
+   "priority": "P1",
+   "method": "api",
+   "api": "DELETE /api/v1/workspaces/{workspace_id}"
+  },
+  {
+   "id": "G1-025",
+   "area": "workspace",
+   "title": "DangerZone UI hidden for personal + non-owner",
+   "role": "admin",
+   "preconditions": "admin viewing settings general tab; also owner viewing personal ws",
+   "steps": [
+    "As admin open /settings?tab=general",
+    "As owner switch to personal ws, open general tab"
+   ],
+   "expected": "DangerZone renders only when isOwner AND type==='team'. Admin and personal-ws show no delete UI. BE still enforces regardless.",
+   "source": "apps/web/src/app/(app)/settings/page.tsx:351-362",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G1-026",
+   "area": "workspace",
+   "title": "Get workspace detail requires membership (non-member → 403)",
+   "role": "outsider",
+   "preconditions": "outsider not in QA Team",
+   "steps": [
+    "GET /api/v1/workspaces/{teamWsId} as outsider"
+   ],
+   "expected": "403 '워크스페이스 멤버가 아닙니다' (require_viewer / RoleChecker find_member None). Prevents ws name/owner/memberCount/threshold leak (BUG-C01 regression).",
+   "source": "apps/api/src/workspaces/router.py:35-43; rbac.py:119-125",
+   "priority": "P0",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}"
+  },
+  {
+   "id": "G1-027",
+   "area": "workspace",
+   "title": "Switch workspace updates active scope",
+   "role": "multi",
+   "preconditions": "user is member of ≥2 workspaces",
+   "steps": [
+    "Use WorkspaceSwitcher to pick another ws",
+    "Observe scoped queries invalidate and role re-sync"
+   ],
+   "expected": "activeWorkspaceId updated (persisted localStorage), workspace-scoped queries invalidated, useSyncWorkspaceRole refetches role. No cross-tenant 403 leaks.",
+   "source": "apps/web/src/features/workspaces/components/WorkspaceSwitcher.tsx:60-64; components/layout/panel-layout.tsx:96",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G1-028",
+   "area": "workspace",
+   "title": "Self-heal when stored active workspace is inaccessible",
+   "role": "member",
+   "preconditions": "member; localStorage active wid points at owner personal ws (not a member)",
+   "steps": [
+    "Inject inaccessible wid into kairos-workspace localStorage",
+    "Navigate to /projects directly"
+   ],
+   "expected": "panel-layout effect detects invalid wid (not in accessible list) and switches to workspaces[0]; toast shown; page renders grid or empty state (no infinite 403). BE returns 403 for the bad wid until healed.",
+   "source": "apps/web/src/components/layout/panel-layout.tsx:66-94; e2e t23-inaccessible-wid-heal.spec.ts",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G1-029",
+   "area": "workspace",
+   "title": "Account switch clears prior user's active workspace",
+   "role": "multi",
+   "preconditions": "login as owner then log out and login as outsider in same browser",
+   "steps": [
+    "As owner set active ws",
+    "Log out, log in as outsider",
+    "Load app"
+   ],
+   "expected": "ensureOwner(me.id) resets activeWorkspaceId when persist owner != current user id (BL-S27c-12) → no cross-tenant 403 from stale wid.",
+   "source": "apps/web/src/components/layout/panel-layout.tsx:62-64; features/workspaces/store.ts:10-20",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G1-030",
+   "area": "invite",
+   "title": "Create invite: admin+ only, defaults, validation",
+   "role": "admin",
+   "preconditions": "admin in QA Team",
+   "steps": [
+    "POST /api/v1/workspaces/{teamWsId}/invites {role:'member',defaultProjectVisibility:'private',maxUses:5,expiresInDays:14}",
+    "Try expiresInDays:40",
+    "Try role:'owner'"
+   ],
+   "expected": "201 with code (12 chars), inviteUrl, defaults. expiresInDays>30 → 422 (le=30). role='owner' → 422 (pattern admin|member|viewer). maxUses ge=1.",
+   "source": "apps/api/src/workspaces/invite_router.py:33-48; schemas.py:47-57",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{workspace_id}/invites"
+  },
+  {
+   "id": "G1-031",
+   "area": "invite",
+   "title": "Create invite by member/viewer → 403",
+   "role": "member",
+   "preconditions": "member in QA Team",
+   "steps": [
+    "POST /api/v1/workspaces/{teamWsId}/invites as member, then as viewer"
+   ],
+   "expected": "403 (require_admin). FE InviteManager shows '초대 링크 관리 권한이 필요합니다' for non-admin and does not mount the create form.",
+   "source": "apps/api/src/workspaces/invite_router.py:33-40; apps/web/src/features/members/components/invite-manager.tsx:53-77",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{workspace_id}/invites"
+  },
+  {
+   "id": "G1-032",
+   "area": "invite",
+   "title": "List/revoke invites: admin+ only",
+   "role": "admin",
+   "preconditions": "admin; ≥1 active invite",
+   "steps": [
+    "GET /invites as admin (200)",
+    "GET as member/viewer (403)",
+    "DELETE /invites/{id} as admin (204)"
+   ],
+   "expected": "list & deactivate require_admin. Non-admin GET → 403 (FE useInvites enabled=false for member/viewer). Deactivate flips is_active=false.",
+   "source": "apps/api/src/workspaces/invite_router.py:51-69; invite_service.py:119-127; app/(app)/settings/page.tsx:66-71",
+   "priority": "P1",
+   "method": "both",
+   "api": "GET/DELETE /api/v1/workspaces/{workspace_id}/invites"
+  },
+  {
+   "id": "G1-033",
+   "area": "invite",
+   "title": "Accept invite logged out → sign-in → return and join",
+   "role": "newbie",
+   "preconditions": "valid invite code; newbie logged out",
+   "steps": [
+    "Open /invite/{code}",
+    "Click 로그인하고 참여 → /sign-in?callbackURL=/invite/{code}",
+    "Sign in",
+    "Click 워크스페이스 참여"
+   ],
+   "expected": "After login returns to /invite/{code}; accept → membership created with invite role; active ws set to joined ws; redirect to /. default_project_visibility seeded onto member (W-5).",
+   "source": "apps/web/src/app/invite/[code]/page.tsx:34-41,171-181; apps/api/src/workspaces/invite_service.py:159-220",
+   "priority": "P0",
+   "method": "both",
+   "api": "POST /api/v1/invites/{code}/accept"
+  },
+  {
+   "id": "G1-034",
+   "area": "invite",
+   "title": "Accept nonexistent code → 404",
+   "role": "member",
+   "preconditions": "authenticated",
+   "steps": [
+    "POST /api/v1/invites/BADCODE12345/accept"
+   ],
+   "expected": "404 '존재하지 않는 초대 링크입니다' (InviteNotFoundError). Public info GET returns isValid=false with reason.",
+   "source": "apps/api/src/workspaces/invite_router.py:92-94; invite_service.py:163-165",
+   "priority": "P2",
+   "method": "api",
+   "api": "POST /api/v1/invites/{code}/accept"
+  },
+  {
+   "id": "G1-035",
+   "area": "invite",
+   "title": "Accept expired/deactivated invite → 410",
+   "role": "newbie",
+   "preconditions": "invite deactivated or expires_at in past; requester not yet a member",
+   "steps": [
+    "Owner deactivates an invite",
+    "Non-member POST /invites/{code}/accept"
+   ],
+   "expected": "410 with reason ('비활성화된 초대 링크입니다' / '만료된 초대 링크입니다'). Must be non-member first (else 409 short-circuits).",
+   "source": "apps/api/src/workspaces/invite_router.py:95-96; invite_service.py:167-169,299-307; e2e t18-invite-validation.spec.ts",
+   "priority": "P1",
+   "method": "api",
+   "api": "POST /api/v1/invites/{code}/accept"
+  },
+  {
+   "id": "G1-036",
+   "area": "invite",
+   "title": "Accept when already a member → 409",
+   "role": "member",
+   "preconditions": "member already in QA Team; valid invite for QA Team",
+   "steps": [
+    "POST /api/v1/invites/{code}/accept as existing member"
+   ],
+   "expected": "409 '이미 워크스페이스 멤버입니다' (MemberAlreadyExistsError, pre-check find_member).",
+   "source": "apps/api/src/workspaces/invite_router.py:97-98; invite_service.py:179-181",
+   "priority": "P1",
+   "method": "api",
+   "api": "POST /api/v1/invites/{code}/accept"
+  },
+  {
+   "id": "G1-037",
+   "area": "invite",
+   "title": "maxUses exhaustion auto-deactivates and blocks further accept",
+   "role": "newbie",
+   "preconditions": "invite with maxUses=1",
+   "steps": [
+    "First non-member accepts (success)",
+    "Second non-member accepts same code"
+   ],
+   "expected": "First → membership + use_count→1 ≥ maxUses → auto deactivate. Second → 410 '사용 한도에 도달한 초대 링크입니다' (or is_active false).",
+   "source": "apps/api/src/workspaces/invite_service.py:208-214,306",
+   "priority": "P1",
+   "method": "api",
+   "api": "POST /api/v1/invites/{code}/accept"
+  },
+  {
+   "id": "G1-038",
+   "area": "invite",
+   "title": "Concurrent accept race → {201/200,409}, membership=1, never 500",
+   "role": "multi",
+   "preconditions": "non-member + valid unlimited invite",
+   "steps": [
+    "Fire 2 concurrent POST /invites/{code}/accept for same user"
+   ],
+   "expected": "One succeeds, other 409; final membership count exactly 1; no 500/IntegrityError (ON CONFLICT DO NOTHING + uq_workspace_member).",
+   "source": "apps/api/src/workspaces/repository.py:166-195; models.py:28-30; e2e t11-concurrent-accept.spec.ts",
+   "priority": "P1",
+   "method": "api"
+  },
+  {
+   "id": "G1-039",
+   "area": "invite",
+   "title": "Personal-workspace invite blocked (create + any residual accept)",
+   "role": "owner",
+   "preconditions": "owner viewing own personal ws",
+   "steps": [
+    "POST /api/v1/workspaces/{personalWsId}/invites",
+    "(if a code somehow existed) accept it"
+   ],
+   "expected": "create → 403 '개인 워크스페이스에는 초대를 수행할 수 없습니다'; accept path also guards personal → 403 '멤버 추가'. W-2 / I-19.",
+   "source": "apps/api/src/workspaces/invite_service.py:59-61,171-176; e2e t10-personal-invite-block.spec.ts",
+   "priority": "P1",
+   "method": "api",
+   "api": "POST /api/v1/workspaces/{personalWsId}/invites"
+  },
+  {
+   "id": "G1-040",
+   "area": "invite",
+   "title": "Revoked invite still lists as inactive / re-accept blocked",
+   "role": "admin",
+   "preconditions": "admin revokes an invite",
+   "steps": [
+    "DELETE invite",
+    "GET /invites (active only list)"
+   ],
+   "expected": "list_invites returns only is_active=true, so revoked invite disappears from admin list; accept returns 410.",
+   "source": "apps/api/src/workspaces/repository.py:265-275; invite_service.py:302-303",
+   "priority": "P2",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}/invites"
+  },
+  {
+   "id": "G1-041",
+   "area": "member",
+   "title": "List members: viewer+ can read; non-member 403",
+   "role": "viewer",
+   "preconditions": "viewer in QA Team; outsider not a member",
+   "steps": [
+    "GET /members as viewer (200)",
+    "GET /members as outsider (403)"
+   ],
+   "expected": "viewer 200 with email/displayName/role (no clerkId/authUserId leak). outsider 403.",
+   "source": "apps/api/src/workspaces/member_router.py:20-27; invite_service.py:224-239",
+   "priority": "P1",
+   "method": "both",
+   "api": "GET /api/v1/workspaces/{workspace_id}/members"
+  },
+  {
+   "id": "G1-042",
+   "area": "member",
+   "title": "Change member role: owner only",
+   "role": "owner",
+   "preconditions": "owner; a member exists",
+   "steps": [
+    "PATCH /members/{memberId} {role:'admin'} as owner (200)",
+    "Same as admin (403)"
+   ],
+   "expected": "owner 200 + RBAC cache invalidated immediately; admin → 403 (require_owner). role pattern admin|member|viewer.",
+   "source": "apps/api/src/workspaces/member_router.py:30-44; invite_service.py:241-270; schemas.py:40-41",
+   "priority": "P0",
+   "method": "both",
+   "api": "PATCH /api/v1/workspaces/{workspace_id}/members/{member_id} {role}"
+  },
+  {
+   "id": "G1-043",
+   "area": "member",
+   "title": "Owner cannot be demoted or removed",
+   "role": "owner",
+   "preconditions": "owner member row",
+   "steps": [
+    "PATCH /members/{ownerMemberId} {role:'admin'}",
+    "DELETE /members/{ownerMemberId}"
+   ],
+   "expected": "Both 403 (CannotModifyOwnerError → 403 'Owner의 역할은 변경할 수 없습니다' / 'Owner는 제거할 수 없습니다'). Also role pattern excludes 'owner' so can't promote to owner.",
+   "source": "apps/api/src/workspaces/invite_service.py:254-255,282-283; member_router.py:43-44,59-60; e2e t17-owner-protection.spec.ts",
+   "priority": "P0",
+   "method": "both",
+   "api": "PATCH/DELETE /api/v1/workspaces/{workspace_id}/members/{member_id}"
+  },
+  {
+   "id": "G1-044",
+   "area": "member",
+   "title": "Remove member: admin+; removed member loses access + project memberships",
+   "role": "admin",
+   "preconditions": "admin; a member (also a ProjectMember of Gamma) exists",
+   "steps": [
+    "DELETE /members/{memberId} as admin",
+    "Removed user attempts GET /workspaces/{teamWsId}/projects"
+   ],
+   "expected": "204; ProjectMember rows for that user in the ws deleted (privilege-residue fix); removed user → 403 on ws-scoped calls (after RBAC cache invalidation/15s). member/viewer cannot remove (require_admin → 403).",
+   "source": "apps/api/src/workspaces/member_router.py:47-60; invite_service.py:272-295",
+   "priority": "P0",
+   "method": "both",
+   "api": "DELETE /api/v1/workspaces/{workspace_id}/members/{member_id}"
+  },
+  {
+   "id": "G1-045",
+   "area": "member",
+   "title": "Demotion admin→viewer takes effect on destructive routes immediately",
+   "role": "admin",
+   "preconditions": "owner demotes an admin to viewer",
+   "steps": [
+    "Owner PATCH admin→viewer",
+    "Immediately (within 15s) demoted user attempts DELETE a project / create invite"
+   ],
+   "expected": "Destructive/admin routes use require_admin (cache bypass, DB fresh) → 403 immediately after demotion (invalidate_member_cache also called). Distinguish from the documented 15s window below.",
+   "source": "apps/api/src/auth/rbac.py:113-133,140; invite_service.py:260-264; auth/CONTEXT.md:70",
+   "priority": "P0",
+   "method": "both"
+  },
+  {
+   "id": "G1-046",
+   "area": "member",
+   "title": "KNOWN 15s window: demoted viewer may pass member-cache write routes",
+   "role": "member",
+   "preconditions": "member demoted to viewer; within 15s cache window; single BE instance",
+   "steps": [
+    "Owner demotes member→viewer",
+    "Within 15s demoted user POST a note/meeting capture/inbox classify"
+   ],
+   "expected": "invalidate_member_cache is called on role change so single-instance should reflect immediately; but non-fresh member routes (create/capture/classify/dismiss/upload) rely on 15s TTL cache and are the documented residual (BL-BE-RBAC-FRESH-REMAINING-1) — cross-instance stale up to 15s. Mark as intended/known-debt, not a new defect, unless a write succeeds after invalidation on single instance.",
+   "source": "apps/api/src/auth/rbac.py:33-41,82-84,136-141; auth/CONTEXT.md:70; notes/router.py:92 (create=require_member)",
+   "priority": "P1",
+   "method": "api"
+  },
+  {
+   "id": "G1-047",
+   "area": "member",
+   "title": "FE member management UI gating matches BE",
+   "role": "admin",
+   "preconditions": "admin & viewer views of member list",
+   "steps": [
+    "As admin open member list (role-change hidden — owner only; remove shown)",
+    "As viewer open member list (no manage menu)",
+    "Owner sees role-change + remove; owner row has no menu"
+   ],
+   "expected": "role-change items render only for isOwner; remove renders for isAdmin; owner row (isCurrentOwner) shows no manage menu; current user badge shown. BE is source of truth.",
+   "source": "apps/web/src/features/members/components/member-list.tsx:66-67,117,183,192-231",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G1-048",
+   "area": "rbac",
+   "title": "RBAC matrix — projects create (POST)",
+   "role": "multi",
+   "preconditions": "one token per role",
+   "steps": [
+    "POST /projects as viewer/member/admin/owner"
+   ],
+   "expected": "viewer→403; member/admin/owner→201 (require_member). FE hides create button for viewer (canWrite=hasRole('member')).",
+   "source": "apps/api/src/projects/router.py:85-102; app/(app)/projects/page.tsx:39,64",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{workspace_id}/projects {title}"
+  },
+  {
+   "id": "G1-049",
+   "area": "rbac",
+   "title": "RBAC matrix — project update title/status/tags (PATCH)",
+   "role": "multi",
+   "preconditions": "role tokens; existing accessible project",
+   "steps": [
+    "PATCH /projects/{id} {title} per role"
+   ],
+   "expected": "viewer→403; member/admin/owner→200 (require_member_fresh; general update is member+, AD-32).",
+   "source": "apps/api/src/projects/router.py:105-124",
+   "priority": "P1",
+   "method": "api",
+   "api": "PATCH /api/v1/workspaces/{workspace_id}/projects/{id} {title}"
+  },
+  {
+   "id": "G1-050",
+   "area": "rbac",
+   "title": "RBAC matrix — project visibility change (admin+)",
+   "role": "multi",
+   "preconditions": "role tokens; project",
+   "steps": [
+    "PATCH /projects/{id} {visibility:'private'} per role"
+   ],
+   "expected": "viewer→403 (require_member_fresh); member→403 (explicit route check '.. visibility 변경은 admin 이상만'); admin/owner→200.",
+   "source": "apps/api/src/projects/router.py:110-124 (member check L114-115); P-7",
+   "priority": "P0",
+   "method": "both",
+   "api": "PATCH /api/v1/workspaces/{workspace_id}/projects/{id} {visibility}"
+  },
+  {
+   "id": "G1-051",
+   "area": "rbac",
+   "title": "RBAC matrix — project archive & delete (admin+)",
+   "role": "multi",
+   "preconditions": "role tokens; deletable project (no content) + archivable project",
+   "steps": [
+    "POST /projects/{id}/archive per role",
+    "DELETE /projects/{id} per role"
+   ],
+   "expected": "viewer/member→403; admin/owner→archive 200, delete 204 (require_admin). FE dashboard header manage menu only for canManage (admin+).",
+   "source": "apps/api/src/projects/router.py:170-187; features/members/hooks.ts:86-88; dashboard-header.tsx:78",
+   "priority": "P0",
+   "method": "both",
+   "api": "DELETE /api/v1/workspaces/{workspace_id}/projects/{id}"
+  },
+  {
+   "id": "G1-052",
+   "area": "rbac",
+   "title": "RBAC matrix — project members add/remove (admin+)",
+   "role": "multi",
+   "preconditions": "role tokens; private project Gamma; a ws member to add",
+   "steps": [
+    "POST /projects/{gammaId}/members {userId} per role",
+    "DELETE /projects/{gammaId}/members/{userId} per role"
+   ],
+   "expected": "viewer/member→403; admin/owner→201/204 (require_admin). GET members is viewer+.",
+   "source": "apps/api/src/projects/router.py:130-167",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{workspace_id}/projects/{id}/members {userId}"
+  },
+  {
+   "id": "G1-053",
+   "area": "rbac",
+   "title": "RBAC matrix — notes create/update/delete",
+   "role": "multi",
+   "preconditions": "role tokens; a public-project note",
+   "steps": [
+    "POST /notes per role",
+    "PATCH /notes/{id} per role",
+    "DELETE /notes/{id} per role"
+   ],
+   "expected": "create: viewer→403 else 201 (require_member). update/delete: viewer→403 (require_member_fresh). delete additionally requires authorship or admin+ (see G1-063).",
+   "source": "apps/api/src/notes/router.py:88-92,111-117,145-149",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST/PATCH/DELETE /api/v1/workspaces/{workspace_id}/notes"
+  },
+  {
+   "id": "G1-054",
+   "area": "rbac",
+   "title": "RBAC matrix — meetings capture/upload create (member+)",
+   "role": "multi",
+   "preconditions": "role tokens",
+   "steps": [
+    "POST /meetings/capture {title,transcriptText} per role",
+    "POST /meetings {title,file_key} per role"
+   ],
+   "expected": "viewer→403; member/admin/owner→202 (require_member). transcriptText min 50 / max 200k chars (422 otherwise). FE /new blocks viewer.",
+   "source": "apps/api/src/meetings/router.py:25-70; schemas.py:28-36; app/(app)/new/page.tsx:116",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{workspace_id}/meetings/capture"
+  },
+  {
+   "id": "G1-055",
+   "area": "rbac",
+   "title": "RBAC matrix — action-items create/update",
+   "role": "multi",
+   "preconditions": "role tokens; existing action",
+   "steps": [
+    "POST /action-items per role",
+    "PATCH /action-items/{id} per role"
+   ],
+   "expected": "create: viewer→403 else 201 (require_member). update: viewer→403 (require_member_fresh). FE action-board canWrite=member+.",
+   "source": "apps/api/src/actions/router.py:42-84; features/actions/components/action-board.tsx:73",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{workspace_id}/action-items"
+  },
+  {
+   "id": "G1-056",
+   "area": "rbac",
+   "title": "RBAC matrix — inbox classify/dismiss (member+); list viewer+",
+   "role": "multi",
+   "preconditions": "role tokens; an inbox item",
+   "steps": [
+    "GET /inbox per role",
+    "POST /inbox/{id}/classify per role",
+    "POST /inbox/{id}/dismiss per role"
+   ],
+   "expected": "list: viewer+ 200. classify/dismiss: viewer→403 else 200 (require_member).",
+   "source": "apps/api/src/inbox/router.py:19-55",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{workspace_id}/inbox/{id}/classify {projectIds}"
+  },
+  {
+   "id": "G1-057",
+   "area": "rbac",
+   "title": "RBAC matrix — promote endpoints (member/member_fresh)",
+   "role": "multi",
+   "preconditions": "role tokens; source items + a second team ws where promoter is member",
+   "steps": [
+    "POST /notes/{id}/promote (member_fresh)",
+    "POST /meetings/{id}/promote (member_fresh)",
+    "POST /inbox/{id}/promote (member)",
+    "POST /action-items/{id}/promote (member)",
+    "POST /memory/{id}/promote (member)"
+   ],
+   "expected": "viewer→403 across all; member+ allowed subject to promote-target validation (400 same/personal, 403 target-invalid/not-member).",
+   "source": "apps/api/src/notes/router.py:176; meetings/router.py:156; inbox/router.py:69; actions/router.py:98; memory/router.py:133",
+   "priority": "P2",
+   "method": "api"
+  },
+  {
+   "id": "G1-058",
+   "area": "rbac",
+   "title": "RBAC matrix — RAG ask (viewer+)",
+   "role": "multi",
+   "preconditions": "role tokens",
+   "steps": [
+    "POST /rag/ask {question} per role",
+    "POST as outsider"
+   ],
+   "expected": "viewer/member/admin/owner→SSE stream (require_viewer). outsider (non-member)→403 before stream. Question 2–500 chars else 422.",
+   "source": "apps/api/src/rag/router.py:20-41; rag/CONTEXT.md R-12",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{workspace_id}/rag/ask {question}"
+  },
+  {
+   "id": "G1-059",
+   "area": "rbac",
+   "title": "RBAC matrix — workspace settings/members/invites/audit",
+   "role": "multi",
+   "preconditions": "role tokens",
+   "steps": [
+    "PATCH /settings, DELETE /workspaces/{id} (owner)",
+    "members PATCH (owner) / DELETE (admin)",
+    "invites POST/GET/DELETE (admin)",
+    "GET /audit/promotions (admin)"
+   ],
+   "expected": "settings & ws delete & role-change → owner only (403 below). member remove/invites/audit → admin+ (member/viewer 403).",
+   "source": "apps/api/src/workspaces/router.py:46-65; member_router.py; invite_router.py; common/audit_router.py:32",
+   "priority": "P1",
+   "method": "api"
+  },
+  {
+   "id": "G1-060",
+   "area": "rbac",
+   "title": "RBAC matrix — integrations (owner only)",
+   "role": "multi",
+   "preconditions": "role tokens; QA Team",
+   "steps": [
+    "POST /integrations/google-drive/authorize per role",
+    "GET/DELETE /integrations/google-drive per role",
+    "GET/POST /integrations/google-drive/documents per role"
+   ],
+   "expected": "viewer/member/admin→403; owner→proceeds (authorize may 503 'Google OAuth 설정이 필요합니다' since Drive client unissued locally). external-documents/{id} detail is viewer+ (with project visibility gate).",
+   "source": "apps/api/src/integrations/router.py:186-192,296-302,311-317,461-465,476-483; router.py:154-160 (503)",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{workspace_id}/integrations/google-drive/authorize"
+  },
+  {
+   "id": "G1-061",
+   "area": "rbac",
+   "title": "RBAC matrix — memory capture (member+), recall/detail (viewer+)",
+   "role": "multi",
+   "preconditions": "role tokens",
+   "steps": [
+    "POST /memory (capture) per role",
+    "GET /memory/recall, /memory/{id} per role"
+   ],
+   "expected": "capture: viewer→403 else 202 (require_member). recall/detail/metrics: viewer+ 200 (require_viewer). Note memory is workspace-scoped, not per-user-private within a ws — a viewer can recall other members' memories in that ws (verify: intended?).",
+   "source": "apps/api/src/memory/router.py:50-133; memory/service.py:257-260 (recall scoped by workspace_id only)",
+   "priority": "P2",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}/memory/recall?q="
+  },
+  {
+   "id": "G1-062",
+   "area": "visibility",
+   "title": "Public project visible to all roles (list+detail)",
+   "role": "viewer",
+   "preconditions": "Alpha=public",
+   "steps": [
+    "GET /projects (viewer)",
+    "GET /projects/{alphaId} (viewer)"
+   ],
+   "expected": "Alpha present in list and detail 200 for viewer/member/admin/owner. public=whole workspace.",
+   "source": "apps/api/src/common/visibility.py:67-68,103-113; projects/CONTEXT.md P-5",
+   "priority": "P1",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}/projects/{id}"
+  },
+  {
+   "id": "G1-063",
+   "area": "visibility",
+   "title": "Draft project visible only to creator (+admin/owner)",
+   "role": "multi",
+   "preconditions": "Beta=draft created by member",
+   "steps": [
+    "GET /projects/{betaId} as member(creator), viewer, admin, owner",
+    "List /projects as each"
+   ],
+   "expected": "creator(member) 200; admin/owner 200 (bypass); viewer (non-creator) → 404 ProjectNotFoundError and absent from list. draft=creator-only.",
+   "source": "apps/api/src/common/visibility.py:69-74; projects/service.py:156-166",
+   "priority": "P0",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}/projects/{id}"
+  },
+  {
+   "id": "G1-064",
+   "area": "visibility",
+   "title": "Private project visible only to ProjectMember (+admin/owner)",
+   "role": "multi",
+   "preconditions": "Gamma=private, members={admin,member}; viewer NOT a member",
+   "steps": [
+    "GET /projects/{gammaId} as member(PM), viewer(non-PM), admin, owner",
+    "List as each"
+   ],
+   "expected": "member & admin & owner 200; viewer → 404 and absent from list. private=ProjectMember only, admin/owner bypass. Membership predicate also requires current WorkspaceMember (orphan PM blocked).",
+   "source": "apps/api/src/common/visibility.py:75-113 (member_exists flatten); projects/service.py:160-166",
+   "priority": "P0",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}/projects/{id}"
+  },
+  {
+   "id": "G1-065",
+   "area": "visibility",
+   "title": "Notes inherit owning-project visibility (detail/list/export)",
+   "role": "multi",
+   "preconditions": "admin note in Gamma(private); member note in Beta(draft by member)",
+   "steps": [
+    "viewer GET /notes list, GET /notes/{gammaNoteId}, GET /notes/{gammaNoteId}/export",
+    "member GET Gamma note (is PM → allowed)",
+    "admin/owner GET both"
+   ],
+   "expected": "viewer → 404 on Gamma note detail/export and it's filtered from list; draft note visible only to creator+admin/owner; project_id=null/public notes → any ws member. admin/owner bypass.",
+   "source": "apps/api/src/notes/service.py:148-189; notes/CONTEXT.md tenant boundary; repository apply_fk_project_visibility",
+   "priority": "P0",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}/notes/{id}"
+  },
+  {
+   "id": "G1-066",
+   "area": "visibility",
+   "title": "Meeting linked to private project gated for non-member (detail/status/export)",
+   "role": "multi",
+   "preconditions": "text-capture meeting linked to Gamma(private) by admin",
+   "steps": [
+    "viewer GET /meetings/{id}, /meetings/{id}/status, /meetings/{id}/export",
+    "member(PM of Gamma) GET same",
+    "admin/owner GET same"
+   ],
+   "expected": "viewer → 404 (all links inaccessible); member/admin/owner 200. Meeting with 0 links → any ws member. Multi-link: accessible if ANY linked project accessible, but inaccessible linked projects' meta must be hidden from detail JSON.",
+   "source": "apps/api/src/meetings/service.py:169-215,217-286,287-333; meetings/CONTEXT.md §7 CAND-A",
+   "priority": "P0",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}/meetings/{id}"
+  },
+  {
+   "id": "G1-067",
+   "area": "visibility",
+   "title": "Actions in private project filtered from list + update gated",
+   "role": "multi",
+   "preconditions": "an action with project_id=Gamma",
+   "steps": [
+    "viewer GET /action-items (Gamma action absent)",
+    "viewer PATCH /action-items/{gammaActionId} → 404",
+    "member(PM) PATCH → 200"
+   ],
+   "expected": "list _action_visibility_filter excludes private for non-member; update _verify_action_visibility → 404 for non-member; admin/owner bypass; project_id=null/public pass.",
+   "source": "apps/api/src/actions/repository.py:13-27; actions/service.py:157-220; actions/CONTEXT.md A-8",
+   "priority": "P1",
+   "method": "api",
+   "api": "PATCH /api/v1/workspaces/{workspace_id}/action-items/{id}"
+  },
+  {
+   "id": "G1-068",
+   "area": "visibility",
+   "title": "RAG does not leak private-project chunks to non-member (global ask)",
+   "role": "member",
+   "preconditions": "private Gamma content embedded with a unique token; member is NOT a Gamma PM (use viewer for stricter)",
+   "steps": [
+    "viewer POST /rag/ask {question echoing private token, timeRange:'1m'} (cache skip)",
+    "Inspect search_results chunks + answer"
+   ],
+   "expected": "No private chunk in search_results and no leak in answer; public-token control query returns its chunk. PROJECT_VISIBILITY_FILTER_SQL applied in vector+text search. admin/owner bypass visibility (but still tenant-scoped).",
+   "source": "apps/api/src/common/visibility.py:154-176; embeddings/repository.py:186-192,222-224; e2e t5-rag-leak.spec.ts",
+   "priority": "P0",
+   "method": "api",
+   "api": "POST /api/v1/workspaces/{workspace_id}/rag/ask {question,timeRange:'1m'}"
+  },
+  {
+   "id": "G1-069",
+   "area": "visibility",
+   "title": "RAG project-scoped ask on inaccessible private project → SSE error, no stream",
+   "role": "viewer",
+   "preconditions": "Gamma private; viewer non-member",
+   "steps": [
+    "viewer POST /rag/ask {projectId:gammaId, question}"
+   ],
+   "expected": "SSE error event 'Private 프로젝트는 명시적 멤버만 접근 가능합니다.' + done; generation never starts. draft non-creator → 'Draft 프로젝트는 작성자만 접근 가능합니다.' admin/owner bypass visibility but cross-tenant projectId still blocked first.",
+   "source": "apps/api/src/rag/pipeline_service.py:42-123; rag/CONTEXT.md R-10",
+   "priority": "P0",
+   "method": "api",
+   "api": "POST /api/v1/workspaces/{workspace_id}/rag/ask {projectId,question}"
+  },
+  {
+   "id": "G1-070",
+   "area": "visibility",
+   "title": "Meeting/note export to markdown respects visibility",
+   "role": "viewer",
+   "preconditions": "private-linked meeting + private-project note",
+   "steps": [
+    "viewer GET /meetings/{id}/export?format=md",
+    "viewer GET /notes/{id}/export?format=json"
+   ],
+   "expected": "Both → 404 for non-member (export path runs same _verify_*_visibility gate before serializing). No transcript/summary/plaintext leak.",
+   "source": "apps/api/src/meetings/service.py:310-333; notes/service.py:240-252",
+   "priority": "P1",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}/meetings/{id}/export"
+  },
+  {
+   "id": "G1-071",
+   "area": "visibility",
+   "title": "Draft-note delete authorship gate ordering (visibility 404 before authorship 403)",
+   "role": "multi",
+   "preconditions": "note in private/draft project by member",
+   "steps": [
+    "non-member viewer DELETE note → expect gate",
+    "non-creator member(PM) DELETE others' note in accessible project"
+   ],
+   "expected": "viewer blocked at require_member_fresh (403) first; where visible-but-not-author: 404 if project not visible, else 403 '작성자 또는 admin 이상만 삭제할 수 있습니다'. Contract: visibility=404 (hide), authorship=403. admin/owner bypass.",
+   "source": "apps/api/src/notes/pipeline_service.py:110-151; notes/exceptions.py:12-22; notes/CONTEXT.md N-11",
+   "priority": "P1",
+   "method": "api",
+   "api": "DELETE /api/v1/workspaces/{workspace_id}/notes/{id}"
+  },
+  {
+   "id": "G1-072",
+   "area": "xtenant",
+   "title": "Outsider probes QA Team project IDs → 403 (not member)",
+   "role": "outsider",
+   "preconditions": "outsider has valid JWT; knows Alpha/Gamma IDs",
+   "steps": [
+    "GET /api/v1/workspaces/{teamWsId}/projects/{alphaId} as outsider",
+    "PATCH, DELETE same"
+   ],
+   "expected": "403 at require_viewer/require_member (not a member of teamWsId) — fails before resource lookup. No 200/404-leak of existence via membership gate.",
+   "source": "apps/api/src/projects/router.py:70-82; rbac.py:119-125",
+   "priority": "P0",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{teamWsId}/projects/{id}"
+  },
+  {
+   "id": "G1-073",
+   "area": "xtenant",
+   "title": "IDOR: member of QA Team requests Outsider Co resource IDs via own ws path → 404",
+   "role": "member",
+   "preconditions": "member in QA Team; knows Outsider Co project/note/meeting/action IDs",
+   "steps": [
+    "GET /api/v1/workspaces/{teamWsId}/projects/{outsiderProjectId}",
+    "GET .../notes/{outsiderNoteId}",
+    "GET .../meetings/{outsiderMeetingId}",
+    "GET .../action-items list filtered by outsider action"
+   ],
+   "expected": "404 (find_by_id has workspace_id WHERE → cross-tenant resource in own-ws path yields None → NotFound). Not 403, not 200.",
+   "source": "apps/api/src/projects/service.py:150-153; notes/service.py:198-201; meetings/service.py:226-230; F-4 lock-in",
+   "priority": "P0",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{teamWsId}/notes/{outsiderNoteId}"
+  },
+  {
+   "id": "G1-074",
+   "area": "xtenant",
+   "title": "IDOR: member uses Outsider Co ws_id in path (not a member) → 403",
+   "role": "member",
+   "preconditions": "member in QA Team, not Outsider Co; knows outsiderWsId + a resource id",
+   "steps": [
+    "GET /api/v1/workspaces/{outsiderWsId}/projects/{outsiderProjectId} as QA member",
+    "PATCH/DELETE variants"
+   ],
+   "expected": "403 (require_* find_member None) — membership gate blocks before resource. Consistent 403 regardless of resource existence (no enumeration).",
+   "source": "apps/api/src/auth/rbac.py:119-125",
+   "priority": "P0",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{outsiderWsId}/projects/{id}"
+  },
+  {
+   "id": "G1-075",
+   "area": "xtenant",
+   "title": "IDOR: cross-workspace secondary FK on note create/update → 404",
+   "role": "member",
+   "preconditions": "member in QA Team; an Outsider Co projectId",
+   "steps": [
+    "POST /notes {projectId: outsiderProjectId} in teamWs path",
+    "PATCH existing note {projectId: outsiderProjectId}"
+   ],
+   "expected": "404 ProjectNotFoundError (secondary FK verified in-workspace). No cross-tenant link created.",
+   "source": "apps/api/src/notes/service.py:82-93,225-232; notes/CONTEXT.md N-3",
+   "priority": "P0",
+   "method": "api",
+   "api": "POST /api/v1/workspaces/{teamWsId}/notes {projectId:<outsider>}"
+  },
+  {
+   "id": "G1-076",
+   "area": "xtenant",
+   "title": "IDOR: inbox classify with cross-workspace projectId → 404",
+   "role": "member",
+   "preconditions": "member; an inbox item in QA Team; outsider projectId",
+   "steps": [
+    "POST /inbox/{id}/classify {projectIds:[outsiderProjectId]}"
+   ],
+   "expected": "404 ProjectNotFoundError (require_in_workspace on each project_id). No cross-tenant meeting-project link.",
+   "source": "apps/api/src/inbox/service.py:96-104; inbox/CONTEXT.md IB-7",
+   "priority": "P0",
+   "method": "api",
+   "api": "POST /api/v1/workspaces/{teamWsId}/inbox/{id}/classify {projectIds}"
+  },
+  {
+   "id": "G1-077",
+   "area": "xtenant",
+   "title": "IDOR: action-item cross-workspace project/meeting/assignee → 404",
+   "role": "member",
+   "preconditions": "member; outsider project/meeting IDs; a user id not in QA Team",
+   "steps": [
+    "POST /action-items {projectId:outsiderProjectId}",
+    "POST {meetingId:outsiderMeetingId}",
+    "POST {assigneeId:<non-member userId>}"
+   ],
+   "expected": "404 for each (ProjectNotFound / MeetingNotFound / '워크스페이스 멤버' NotFound). assignee must be a WorkspaceMember.",
+   "source": "apps/api/src/actions/CONTEXT.md A-7; actions/service.py _verify_secondary_fks",
+   "priority": "P0",
+   "method": "api",
+   "api": "POST /api/v1/workspaces/{teamWsId}/action-items {assigneeId}"
+  },
+  {
+   "id": "G1-078",
+   "area": "xtenant",
+   "title": "IDOR: RAG projectId from another tenant even for admin → SSE error",
+   "role": "admin",
+   "preconditions": "admin in QA Team; outsider projectId",
+   "steps": [
+    "admin POST /rag/ask {projectId: outsiderProjectId, question}"
+   ],
+   "expected": "SSE error '프로젝트를 찾을 수 없거나 접근 권한이 없습니다.' + done. Tenant check runs role-independent BEFORE visibility bypass — admin/owner cannot cross tenant boundary.",
+   "source": "apps/api/src/rag/pipeline_service.py:92-100 (Codex F-2 tenant-first)",
+   "priority": "P0",
+   "method": "api",
+   "api": "POST /api/v1/workspaces/{teamWsId}/rag/ask {projectId:<outsider>,question}"
+  },
+  {
+   "id": "G1-079",
+   "area": "xtenant",
+   "title": "IDOR: cross-workspace member/invite mutation → 404/403",
+   "role": "admin",
+   "preconditions": "admin in QA Team; an Outsider Co memberId / inviteId",
+   "steps": [
+    "PATCH /workspaces/{teamWsId}/members/{outsiderMemberId} {role:'admin'}",
+    "DELETE /workspaces/{teamWsId}/invites/{outsiderInviteId}"
+   ],
+   "expected": "404 (find_member_by_id / find_invite_by_id require member_id+workspace_id → None). No cross-tenant role change or invite revoke.",
+   "source": "apps/api/src/workspaces/repository.py:130-139,254-263; invite_service.py:251-253,123-125",
+   "priority": "P0",
+   "method": "api",
+   "api": "PATCH /api/v1/workspaces/{teamWsId}/members/{outsiderMemberId}"
+  },
+  {
+   "id": "G1-080",
+   "area": "xtenant",
+   "title": "IDOR: audit promotions cannot read other tenant's audit rows",
+   "role": "admin",
+   "preconditions": "admin in QA Team",
+   "steps": [
+    "GET /workspaces/{teamWsId}/audit/promotions",
+    "Attempt with outsiderWsId path (non-member)"
+   ],
+   "expected": "Own ws: only rows where target_workspace_id==teamWsId. outsiderWs path → 403 (require_admin non-member). No cross-tenant audit leakage.",
+   "source": "apps/api/src/common/audit_router.py:26-48; audit_repository.py:48-49",
+   "priority": "P1",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}/audit/promotions"
+  },
+  {
+   "id": "G1-081",
+   "area": "xtenant",
+   "title": "IDOR: memory recall/detail scoped to workspace only",
+   "role": "outsider",
+   "preconditions": "outsider; a QA Team memory id",
+   "steps": [
+    "GET /workspaces/{teamWsId}/memory/{memoryId} as outsider",
+    "GET /workspaces/{outsiderWsId}/memory/{qaMemoryId}"
+   ],
+   "expected": "teamWs path → 403 (non-member); own-ws path with foreign id → 404 (get_by_id workspace_id filter). No cross-tenant memory read.",
+   "source": "apps/api/src/memory/router.py:114-122; memory/repository.py:46-53",
+   "priority": "P1",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}/memory/{id}"
+  },
+  {
+   "id": "G1-082",
+   "area": "settings",
+   "title": "Settings tab gating: members/invites/audit=admin+, general owner-only content, integrations=owner",
+   "role": "multi",
+   "preconditions": "role tokens; open /settings",
+   "steps": [
+    "viewer/member open /settings (members tab)",
+    "Try ?tab=audit, ?tab=integrations, ?tab=invites directly per role"
+   ],
+   "expected": "Audit & integrations triggers render only for admin+/owner respectively; direct ?tab=integrations for non-owner falls back to members; invites tab shows permission message for non-admin; general tab shows owner-only forms + owner sees '설정 변경은 소유자만' for non-owner. BE enforces underlying APIs.",
+   "source": "apps/web/src/app/(app)/settings/page.tsx:83-93,190-210,234-256,261-349",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G1-083",
+   "area": "settings",
+   "title": "Audit tab content lists promotions for admin/owner",
+   "role": "admin",
+   "preconditions": "admin; ≥1 promotion into QA Team exists",
+   "steps": [
+    "Open /settings?tab=audit as admin",
+    "Filter by itemType"
+   ],
+   "expected": "AuditList renders table with itemType labels (회의/노트/Inbox/액션), source/new IDs, embedding_status; empty state '아직 promote 이력이 없습니다.'; member/viewer get permission message (tab hidden + guarded content).",
+   "source": "apps/web/src/app/(app)/settings/page.tsx:368-395; features/audit/components/audit-list.tsx:13-19,107-119",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G1-084",
+   "area": "settings",
+   "title": "Founder-only /admin/recall-metrics; admin sees 접근 권한 없음",
+   "role": "multi",
+   "preconditions": "owner is the founder (NEXT_PUBLIC_FOUNDER_USER_ID == owner.id); admin is not",
+   "steps": [
+    "owner opens /admin/recall-metrics",
+    "admin opens /admin/recall-metrics"
+   ],
+   "expected": "owner(founder) → metrics render (memory/metrics query enabled). admin/member/viewer → '접근 권한 없음' page, metrics query disabled (enabled=isFounder). Gate is by internal user id, not role.",
+   "source": "apps/web/src/app/(app)/admin/recall-metrics/page.tsx:13,23,34,41-50",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G1-085",
+   "area": "settings",
+   "title": "Non-founder still cannot read metrics API even if reached (viewer+ BE)",
+   "role": "admin",
+   "preconditions": "admin token",
+   "steps": [
+    "GET /api/v1/workspaces/{teamWsId}/memory/metrics as admin"
+   ],
+   "expected": "BE returns 200 (memory metrics is require_viewer, workspace-scoped, NOT founder-gated at BE). Founder restriction is FE-only. Flag: admin/member can fetch workspace memory metrics directly via API — confirm whether that's acceptable (metrics are ws-level counts, likely low-sensitivity, but the /admin page implies founder-only).",
+   "source": "apps/api/src/memory/router.py:104-111 (require_viewer); recall-metrics/page.tsx:34 (FE-only gate)",
+   "priority": "P2",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}/memory/metrics"
+  },
+  {
+   "id": "G1-086",
+   "area": "auth",
+   "title": "Lazy-seed on first authenticated call creates User + personal ws (newbie)",
+   "role": "newbie",
+   "preconditions": "brand-new account, first ever API call",
+   "steps": [
+    "Sign up newbie",
+    "First GET /users/me (or dashboard fanout)"
+   ],
+   "expected": "User row lazy-seeded (ON CONFLICT auth_user_id), personal workspace + owner member seeded (partial unique index), onboarding_step→1. Concurrent fanout does not 500 (race-safe).",
+   "source": "apps/api/src/auth/dependencies.py:254-366; auth/CONTEXT.md §5",
+   "priority": "P1",
+   "method": "api",
+   "api": "GET /api/v1/users/me"
+  },
+  {
+   "id": "G1-087",
+   "area": "rbac",
+   "title": "Cross-workspace ProjectMember add blocked (add member not in ws) → 403",
+   "role": "admin",
+   "preconditions": "admin in QA Team; a userId that is a member of Outsider Co but not QA Team",
+   "steps": [
+    "POST /projects/{gammaId}/members {userId: outsiderUserId}"
+   ],
+   "expected": "403 CrossWorkspaceMemberError '해당 사용자가 워크스페이스 멤버가 아닙니다' (I-17: find_member None). Order: project 404 → personal 403 → ws-member 403 → dup 409.",
+   "source": "apps/api/src/projects/service.py:190-236; projects/CONTEXT.md P-8",
+   "priority": "P1",
+   "method": "api",
+   "api": "POST /api/v1/workspaces/{teamWsId}/projects/{id}/members {userId}"
+  },
+  {
+   "id": "G1-088",
+   "area": "visibility",
+   "title": "Private project self-lockout prevention: creator auto-added as ProjectMember",
+   "role": "member",
+   "preconditions": "member creates a private project",
+   "steps": [
+    "POST /projects {title,visibility:'private'} as member",
+    "GET /projects/{newId} as same member"
+   ],
+   "expected": "201 then 200 — creator auto-added as ProjectMember so not locked out (repo.add_member on private create).",
+   "source": "apps/api/src/projects/service.py:83-86",
+   "priority": "P1",
+   "method": "api",
+   "api": "POST /api/v1/workspaces/{workspace_id}/projects {visibility:'private'}"
+  },
+  {
+   "id": "G1-089",
+   "area": "visibility",
+   "title": "Invite-seeded default visibility applied on member's project create",
+   "role": "member",
+   "preconditions": "member joined via invite with defaultProjectVisibility='private'",
+   "steps": [
+    "member POST /projects {title} with NO visibility field"
+   ],
+   "expected": "Created project visibility='private' (fallback chain data.visibility→member.default_project_visibility→public); creator auto-added as PM. Explicit visibility in body overrides.",
+   "source": "apps/api/src/projects/router.py:97-100; workspaces/CONTEXT.md W-5; e2e t20-create-visibility.spec.ts",
+   "priority": "P2",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{workspace_id}/projects {title}"
+  },
+  {
+   "id": "G1-090",
+   "area": "visibility",
+   "title": "List projects defaults to active-only (archived/completed hidden unless requested)",
+   "role": "viewer",
+   "preconditions": "Done(completed) + Old(archived) + active projects exist",
+   "steps": [
+    "GET /projects (no status)",
+    "GET /projects?status=archived"
+   ],
+   "expected": "Default status coerced to 'active' → Done/Old absent; explicit status='archived' returns Old. Prevents archived leak into default view. Visibility filter still applies on top.",
+   "source": "apps/api/src/projects/service.py:115-139",
+   "priority": "P2",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}/projects?status=archived"
+  },
+  {
+   "id": "G1-091",
+   "area": "auth",
+   "title": "Sign-up autoSignIn establishes session (newbie lands authenticated)",
+   "role": "newbie",
+   "preconditions": "logged out",
+   "steps": [
+    "Complete /sign-up with fresh email + valid password",
+    "Observe redirect to callbackURL/dashboard"
+   ],
+   "expected": "Session created (autoSignIn default true), router.push(callbackURL). /users/me 200 immediately. If email flow ever required verification, this changes — but current config emailAndPassword only enabled, no verification.",
+   "source": "apps/web/src/lib/auth.ts:31; auth-form.tsx:74-86",
+   "priority": "P2",
+   "method": "both",
+   "api": "POST /api/auth/sign-up/email"
+  },
+  {
+   "id": "G1-092",
+   "area": "xtenant",
+   "title": "meeting-project link endpoints reject cross-tenant meeting/project",
+   "role": "member",
+   "preconditions": "member; outsider meetingId/projectId",
+   "steps": [
+    "POST /meetings/{outsiderMeetingId}/projects/{alphaId}",
+    "POST /meetings/{alphaMeetingId}/projects/{outsiderProjectId}"
+   ],
+   "expected": "404 (MeetingNotFound via _verify_secondary_fks / ProjectNotFound via add_meeting_link workspace check). No cross-tenant link.",
+   "source": "apps/api/src/projects/service.py:310-326; repository.py:302-334",
+   "priority": "P1",
+   "method": "api",
+   "api": "POST /api/v1/workspaces/{workspace_id}/meetings/{meeting_id}/projects/{project_id}"
+  },
+  {
+   "id": "G1-093",
+   "area": "visibility",
+   "title": "Draft/private project detail hides linked-meeting existence to non-member via list filter",
+   "role": "viewer",
+   "preconditions": "meeting linked to public Alpha AND private Gamma",
+   "steps": [
+    "viewer GET /meetings?projectId=gammaId",
+    "viewer GET /meetings/{crossLinkedMeetingId} detail"
+   ],
+   "expected": "projectId=inaccessible → empty_page (no existence leak). detail: meeting accessible via Alpha link, but 'projects' array must omit Gamma (inaccessible link meta hidden).",
+   "source": "apps/api/src/meetings/service.py:104-140,258-285",
+   "priority": "P1",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{workspace_id}/meetings?projectId=<gamma>"
+  },
+  {
+   "id": "G1-094",
+   "area": "auth",
+   "title": "JWT audience mismatch → 401 when audience configured",
+   "role": "member",
+   "preconditions": "AUTH_JWT_AUDIENCE set (verify config); craft token wrong aud",
+   "steps": [
+    "Send token with wrong aud",
+    "GET /api/v1 endpoint"
+   ],
+   "expected": "If audience configured: 401 '유효하지 않은 토큰 대상입니다' (InvalidAudienceError). If AUTH_JWT_AUDIENCE None (dev): aud verification skipped — verify which mode the QA stack runs.",
+   "source": "apps/api/src/auth/dependencies.py:207-211,231-233",
+   "priority": "P2",
+   "method": "api"
+  }
+ ],
+ "G2-content": [
+  {
+   "id": "G2-001",
+   "area": "new",
+   "title": "/new 카드·탭 렌더 + 첨부 카드 '준비 중' 비활성",
+   "role": "owner",
+   "preconditions": "owner 로그인, 활성 워크스페이스 = QA Team",
+   "steps": [
+    "/new 진입",
+    "카드 목록(회의 업로드/녹음/텍스트 캡처/노트/첨부) 확인",
+    "첨부 카드 클릭 시도",
+    "탭(업로드/녹음/텍스트) 전환하며 각 폼 렌더 확인"
+   ],
+   "expected": "카드가 정의 순서대로 렌더되고 첨부 카드는 '준비 중' 표시와 함께 클릭 불가. 탭 전환 시 해당 폼만 표시되고 console.error 0건",
+   "source": "apps/web/src/app/(app)/new/page.tsx:11-35, apps/web/src/app/(app)/new/page.tsx:155-173, apps/web/src/app/(app)/new/page.tsx:208-236",
+   "priority": "P3",
+   "method": "ui"
+  },
+  {
+   "id": "G2-002",
+   "area": "new",
+   "title": "viewer 의 /new 차단 + capture API 403",
+   "role": "viewer",
+   "preconditions": "viewer 로그인, QA Team 활성",
+   "steps": [
+    "/new 진입",
+    "안내 문구와 '돌아가기' 버튼 확인 후 클릭",
+    "viewer JWT 로 POST /api/v1/workspaces/{QA}/meetings/capture {title:'v', transcriptText:(50자 이상)}"
+   ],
+   "expected": "UI: '콘텐츠를 추가하려면 Member 이상 권한이 필요합니다' + '돌아가기'(router.back). API: 403 detail 'member 이상 권한이 필요합니다', 회의 미생성",
+   "source": "apps/web/src/app/(app)/new/page.tsx:116-131, apps/api/src/meetings/router.py:48-53, apps/api/src/auth/rbac.py:127-132",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{QA}/meetings/capture"
+  },
+  {
+   "id": "G2-003",
+   "area": "new",
+   "title": "텍스트 캡처 50자 카운터·버튼 비활성",
+   "role": "member",
+   "preconditions": "member 로그인, /new 텍스트 탭",
+   "steps": [
+    "제목 입력, 본문 49자 입력",
+    "카운터 문구와 'AI 분석 시작' 버튼 상태 확인",
+    "1자 추가해 50자로 만든 뒤 다시 확인"
+   ],
+   "expected": "49자: '49자 (1자 더 필요)' 가 error 색으로 표시되고 제출 불가(handleCapture 가 length<50 이면 return). 50자: 안내 사라지고 제출 가능",
+   "source": "apps/web/src/app/(app)/new/page.tsx:396-402, apps/web/src/app/(app)/new/page.tsx:100-101",
+   "priority": "P3",
+   "method": "ui"
+  },
+  {
+   "id": "G2-004",
+   "area": "new",
+   "title": "이모지 25개(JS length 50) 캡처 — FE 통과, BE 422, UI '[object Object]'",
+   "role": "member",
+   "preconditions": "member 로그인, /new 텍스트 탭",
+   "steps": [
+    "제목 '이모지 테스트', 본문에 '😀' 25개(서로게이트 쌍 → JS length 50) 입력",
+    "카운터가 '50자' 로 표시되는지 확인",
+    "'AI 분석 시작' 클릭",
+    "에러 영역 문구와 네트워크 응답 확인"
+   ],
+   "expected": "FE 는 length 50 으로 통과시키지만 BE min_length=50 은 코드포인트 25개로 판정해 422. 422 detail 은 배열이라 ApiError 메시지가 '[object Object]' 로 표시됨(코드 예측). 회의 미생성",
+   "source": "apps/web/src/app/(app)/new/page.tsx:100-112, apps/api/src/meetings/schemas.py:27-34, apps/api/src/main.py:154-166, apps/web/src/lib/api-client.ts:49-53",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{QA}/meetings/capture"
+  },
+  {
+   "id": "G2-005",
+   "area": "new",
+   "title": "캡처 본문 200,001자 — BE 422, FE 상한 없음",
+   "role": "member",
+   "preconditions": "member 로그인",
+   "steps": [
+    "/new 텍스트 탭 본문에 200,001자 붙여넣기(카운터·렌더 지연 관찰)",
+    "'AI 분석 시작' 클릭",
+    "API 로 동일 payload 직접 POST 해 status/detail 기록"
+   ],
+   "expected": "FE 는 상한 검사가 없어 전송하고, BE max_length=200000 으로 422. UI 에러는 '[object Object]'(배열 detail). 200,000자는 202",
+   "source": "apps/api/src/meetings/schemas.py:32-34, apps/web/src/app/(app)/new/page.tsx:100-112, apps/web/src/lib/api-client.ts:49-53",
+   "priority": "P2",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{QA}/meetings/capture"
+  },
+  {
+   "id": "G2-006",
+   "area": "new",
+   "title": "캡처 제목 공백만/1,000자/한글·이모지 — trim·길이 제한 없음",
+   "role": "member",
+   "preconditions": "member 로그인",
+   "steps": [
+    "제목 '   '(공백 3칸) + 본문 60자로 캡처",
+    "제목 1,000자(한글) + 본문 60자로 캡처",
+    "제목 '🔥회의 — 결정 사항 ✅' 로 캡처",
+    "각 회의 상세 헤더·인박스 카드·/actions 칩에서 표시와 overflow 확인"
+   ],
+   "expected": "모두 202 로 생성(title 은 제약 없는 str, FE 는 !captureTitle 만 검사). 공백 제목 회의가 생기고 인박스 제목은 '    요약'. 1,000자 제목이 헤더/카드 레이아웃을 깨지 않는지(truncate) 기록",
+   "source": "apps/api/src/meetings/schemas.py:27-28, apps/web/src/app/(app)/new/page.tsx:100, apps/api/src/meetings/pipeline_service.py:113-116",
+   "priority": "P2",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{QA}/meetings/capture"
+  },
+  {
+   "id": "G2-007",
+   "area": "integrity",
+   "title": "'AI 분석 시작' 더블클릭 — 회의 중복 생성 여부",
+   "role": "member",
+   "preconditions": "member 로그인, /new 텍스트 탭, 유효 제목+본문 60자",
+   "steps": [
+    "Playwright dblclick(또는 click 2회 연속, delay 0) 으로 'AI 분석 시작' 클릭",
+    "네트워크에서 POST /meetings/capture 호출 수 기록",
+    "/inbox 와 GET /meetings 에서 동일 제목 회의 수 확인"
+   ],
+   "expected": "POST 1회, 회의 1건이어야 함. 중복 방지는 isCapturing(=mutation.isPending) 로 버튼 disabled 되는 재렌더에만 의존하므로 재렌더 전 두 번째 클릭이 들어가면 2건 생성 → 2건이면 결함",
+   "source": "apps/web/src/app/(app)/new/page.tsx:63, apps/web/src/app/(app)/new/page.tsx:100-112",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G2-008",
+   "area": "new",
+   "title": "업로드 크기 한도 — FE 90MB, BE 는 env 따라 500MiB/90MiB",
+   "role": "member",
+   "preconditions": "member 로그인, 91MB 더미 mp3 와 89MB 더미 mp3 준비",
+   "steps": [
+    "/new 업로드 탭에서 91MB 파일 선택 후 업로드",
+    "에러 문구 확인",
+    "API POST /upload/file 에 95MB 파일 직접 전송해 status 기록(로컬 MAX_UPLOAD_BYTES 값도 기록)"
+   ],
+   "expected": "FE: '파일이 너무 큽니다 (91MB). 최대 90MB까지 업로드할 수 있습니다.' 로 차단, 네트워크 전송 없음. BE: 기본 max_upload_bytes=500MiB 면 95MB 가 통과, 운영 env 94371840 이면 413 '파일 크기 {n}바이트가 한도 {m}바이트를 초과합니다'",
+   "source": "apps/web/src/features/upload/hooks.ts:20, apps/web/src/features/upload/hooks.ts:41-45, apps/api/src/upload/router.py:85-89, apps/api/src/core/config.py:112, deploy/oci/.env.example:91",
+   "priority": "P2",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{QA}/upload/file",
+   "doc_conflict": "apps/api/src/upload/CONTEXT.md:43,68 은 500MB 한도라 적지만 FE 는 90MB, 운영 env 는 94371840B(90MiB)"
+  },
+  {
+   "id": "G2-009",
+   "area": "new",
+   "title": "업로드 MIME·확장자·시그니처·빈 파일 검증",
+   "role": "member",
+   "preconditions": "member JWT, 파일 4종: 0바이트 a.mp3 / zip 을 application/zip 으로 / 실제 wav 를 b.mp3+audio/mpeg 로 / 텍스트를 c.mp3+audio/mpeg 로",
+   "steps": [
+    "각 파일을 multipart 로 POST /upload/file",
+    "status 와 detail 기록",
+    "정상 m4a(audio/x-m4a) 도 전송해 201 {fileKey} 확인"
+   ],
+   "expected": "0바이트 → 400 '빈 파일은 업로드할 수 없습니다'. zip → 415 '지원하지 않는 MIME: application/zip'. 확장자·MIME 불일치 → 415 '확장자 .{ext}는 MIME {mime}와 일치하지 않습니다'. 내용 불일치 → 415 '파일 내용({detected})이 선언 MIME({declared})과 일치하지 않습니다'. 정상 → 201 {fileKey: 'uploads/{uuid}/{filename}'}",
+   "source": "apps/api/src/upload/router.py:67-103, apps/api/src/upload/service.py:203-228, apps/api/src/upload/exceptions.py:13, apps/api/src/upload/exceptions.py:30, apps/api/src/upload/exceptions.py:39, apps/api/src/upload/exceptions.py:48, apps/api/src/common/r2.py:61",
+   "priority": "P2",
+   "method": "api",
+   "api": "POST /api/v1/workspaces/{QA}/upload/file"
+  },
+  {
+   "id": "G2-010",
+   "area": "new",
+   "title": "녹음 탭 — 빈 blob 차단 + 제목 비우면 기본 제목",
+   "role": "member",
+   "preconditions": "Chromium --use-fake-device-for-media-stream --use-fake-ui-for-media-stream, member 로그인",
+   "steps": [
+    "/new 녹음 탭에서 녹음 시작 후 즉시 정지",
+    "업로드 클릭 → 문구 확인",
+    "3초 녹음 후 제목 비운 채 업로드",
+    "생성된 회의 제목과 fileKey 파일명 확인"
+   ],
+   "expected": "0바이트면 '녹음 데이터가 비어 있습니다. 다시 녹음해 주세요.' 로 중단. 정상 녹음은 파일명 'recording-{epoch}.webm|mp4', 제목 '녹음_{toLocaleDateString}' 으로 생성",
+   "source": "apps/web/src/app/(app)/new/page.tsx:531-544",
+   "priority": "P3",
+   "method": "ui"
+  },
+  {
+   "id": "G2-011",
+   "area": "pipeline",
+   "title": "존재하지 않는 fileKey → 202 후 failed, 재시도 버튼 없음",
+   "role": "member",
+   "preconditions": "member JWT",
+   "steps": [
+    "POST /meetings {title:'실패 유도', fileKey:'uploads/00000000-0000-0000-0000-000000000000/none.mp3'}",
+    "GET /meetings/{id}/status 를 3초 간격으로 폴링",
+    "/meetings/{id} UI 에서 실패 화면·문구·버튼 확인",
+    "error_message 에 내부 예외 문자열(버킷명·경로 등)이 노출되는지 기록"
+   ],
+   "expected": "202 {id,status:'uploading'} 후 status='failed', error_message=str(e). UI 는 FailedMeetingView 를 렌더하고 재처리(retry) 버튼은 없음(BL-S27c-4). 원시 예외 텍스트 노출 여부를 기록",
+   "source": "apps/api/src/meetings/router.py:25-45, apps/api/src/meetings/pipeline_service.py:245-252, apps/web/src/features/meetings/components/meeting-detail.tsx:90-118",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{QA}/meetings",
+   "known": "BL-S27c-4",
+   "doc_conflict": "apps/api/src/meetings/CONTEXT.md:135 은 실패 시 재시도 버튼을 서술하지만 FailedMeetingView 에 retry 없음"
+  },
+  {
+   "id": "G2-012",
+   "area": "pipeline",
+   "title": "오디오 회의 상태 전이 uploading→transcribing→analyzing→completed",
+   "role": "member",
+   "preconditions": "meeting-script.json 으로 만든 2화자 m4a(약 1분) 준비",
+   "steps": [
+    "/new 업로드 탭에서 m4a 업로드, 제목 '베타 출시 회의'",
+    "상세 페이지 ProcessingView 라벨 변화 캡처",
+    "병행해서 GET /meetings/{id}/status 를 1초 간격 폴링해 관측된 status 집합 기록",
+    "완료까지 걸린 시간 기록"
+   ],
+   "expected": "관측 status ⊆ {uploading, transcribing, analyzing, completed}. 'summarizing' 과 'embedding' 은 BE 가 설정하지 않으므로 나오지 않음. FE 는 3초마다 폴링하고 completed 에서 멈춤",
+   "source": "apps/api/src/meetings/models.py:24, apps/api/src/meetings/pipeline_service.py:171, apps/api/src/meetings/pipeline_service.py:174-254, apps/web/src/features/meetings/hooks.ts:37-55, apps/web/src/features/meetings/components/meeting-detail.tsx:29-36",
+   "priority": "P1",
+   "method": "both",
+   "api": "GET /api/v1/workspaces/{QA}/meetings/{id}/status",
+   "doc_conflict": "docs/architecture/cross-domain-pipeline.md:227 은 'summarizing' 상태를 명시하지만 코드는 'analyzing' 사용"
+  },
+  {
+   "id": "G2-013",
+   "area": "pipeline",
+   "title": "텍스트 캡처는 transcribing 을 건너뛰고 화자 '텍스트' 단일 세그먼트",
+   "role": "member",
+   "preconditions": "capture-texts.json 의 alpha 본문",
+   "steps": [
+    "/new 텍스트 탭에서 alpha 본문 캡처, 제목 'Alpha 스프린트 점검'",
+    "status 폴링으로 관측 status 기록",
+    "완료 후 transcript 탭의 화자·세그먼트 수 확인"
+   ],
+   "expected": "status 는 analyzing → completed(transcribing 없음). transcript 는 speaker '텍스트' 인 세그먼트로 표시",
+   "source": "apps/api/src/meetings/pipeline_service.py:256-312",
+   "priority": "P2",
+   "method": "both"
+  },
+  {
+   "id": "G2-014",
+   "area": "pipeline",
+   "title": "오디오 transcript 화자 분리 미동작 — 모두 'Speaker'",
+   "role": "member",
+   "preconditions": "G2-012 완료된 2화자 오디오 회의",
+   "steps": [
+    "회의 상세 transcript 탭 열기",
+    "화자 라벨 종류와 참석자 수 표시 확인"
+   ],
+   "expected": "모든 세그먼트 화자가 'Speaker' 로 동일하고 참석자 1명으로 표시(코드상 diarization 결과를 쓰지 않음)",
+   "source": "apps/api/src/services/transcription.py:100, apps/api/src/services/transcription.py:146, apps/api/src/services/transcription.py:209",
+   "priority": "P2",
+   "method": "ui",
+   "doc_conflict": "docs/requirements/mvp-phase1.md:20 은 화자 분리(pyannote)를 기능으로 명시"
+  },
+  {
+   "id": "G2-015",
+   "area": "pipeline",
+   "title": "요약·결정·액션 추출 정확도 (meeting-script 기준)",
+   "role": "member",
+   "preconditions": "G2-012 완료 회의 (스크립트: 결정 2, 액션 3, 비액션 일정 1)",
+   "steps": [
+    "요약 탭에서 결정 사항 목록 확인",
+    "액션 탭에서 액션 수·제목·마감일·우선순위 확인",
+    "GET /actions?meetingId 성격으로 API 조회해 assigneeId·dueDate·projectId 필드 기록"
+   ],
+   "expected": "결정 2건(베타 출시 10월 20일 확정, 결제 모듈 토스페이먼츠). 액션 3건, dueDate 2026-10-02 / 2026-10-10 / 2026-10-15. '다음 주 화요일 회의' 는 액션이 아님. 담당자 이름(이서연/김민준/박지훈)은 title/description 에만 있고 assigneeId 는 null(저장 시 assignee 미설정). 과거 연도 dueDate 는 버려짐",
+   "source": "apps/api/src/meetings/pipeline_service.py:84-101, apps/api/src/common/prompts.py:27-96, apps/api/src/services/ai_processing.py:30-61",
+   "priority": "P1",
+   "method": "both"
+  },
+  {
+   "id": "G2-016",
+   "area": "action",
+   "title": "회의 추출 액션이 프로젝트를 상속하지 않음 (BL-UX-8)",
+   "role": "member",
+   "preconditions": "Alpha 에 연결된(자동 확정 또는 수동) 회의가 액션을 1건 이상 추출",
+   "steps": [
+    "/actions 에서 프로젝트 필터 'Alpha' 선택",
+    "'프로젝트 미배정' 선택",
+    "해당 액션 카드의 프로젝트 칩과 회의(mic) 링크 확인",
+    "API 로 액션 projectId 확인"
+   ],
+   "expected": "액션 projectId=null 이므로 'Alpha' 필터에는 없고 '프로젝트 미배정' 에 나타남. 칩은 '프로젝트' fallback, mic 링크는 원 회의로 이동",
+   "source": "apps/api/src/meetings/pipeline_service.py:87-93, apps/web/src/features/actions/components/action-board.tsx:201-227, apps/web/src/features/actions/components/action-board.tsx:398-420",
+   "priority": "P2",
+   "method": "both",
+   "known": "BL-UX-8"
+  },
+  {
+   "id": "G2-017",
+   "area": "pipeline",
+   "title": "자동 확정 — 임계값 이상이면 Alpha 자동 연결, 인박스 목록에서 사라지고 되돌릴 수 없음",
+   "role": "owner",
+   "preconditions": "owner 가 inbox_threshold 를 0.5 로 설정(API PATCH), alpha 캡처 텍스트",
+   "steps": [
+    "member 로 alpha 본문 캡처",
+    "완료 후 GET /inbox?isProcessed=true 에서 해당 항목의 aiConfidence·aiSuggestedProjectId·isProcessed 확인",
+    "/inbox UI 에 항목이 보이는지 확인",
+    "회의 상세의 연결 프로젝트 칩 확인",
+    "자동 확정을 되돌리는 UI 경로가 있는지 탐색"
+   ],
+   "expected": "confidence ≥ 0.5 이고 existingProjectId 가 있으면 is_processed=true, meeting↔Alpha 링크 생성, 청크 project_id=Alpha. /inbox 는 isProcessed=false 만 보여 항목이 숨고 되돌리기 경로 없음. existingProjectId 가 없으면 is_processed=true 이지만 링크는 생기지 않음",
+   "source": "apps/api/src/meetings/pipeline_service.py:108-158, apps/web/src/features/inbox/components/smart-inbox.tsx:48-50",
+   "priority": "P1",
+   "method": "both",
+   "api": "GET /api/v1/workspaces/{QA}/inbox?isProcessed=true",
+   "doc_conflict": "docs/requirements/mvp-phase1.md:33-36 은 자동 확정 항목도 되돌리기 가능하다고 서술(inbox/CONTEXT.md:78 IB-1 계열) — 코드는 목록에서 숨김"
+  },
+  {
+   "id": "G2-018",
+   "area": "inbox",
+   "title": "인박스 임계값 설정 — owner 전용, 범위 0.5~1.0",
+   "role": "multi",
+   "preconditions": "owner·admin JWT",
+   "steps": [
+    "owner 로 /settings?tab=general 에서 임계값 프리셋(70/80/90/95%) 확인 후 95% 선택",
+    "토스트 문구 확인",
+    "admin 으로 같은 탭 진입 → 컨트롤 노출 여부",
+    "API PATCH /workspaces/{QA} {inboxThreshold:0.49}, {inboxThreshold:1.01}, {} 를 owner 로, {inboxThreshold:0.8} 을 admin 으로 호출"
+   ],
+   "expected": "owner: '임계값이 95%로 변경되었습니다'. admin UI: 임계값 컨트롤 없음. API: 0.49/1.01 → 422, 빈 body → 422, admin → 403 'owner 이상 권한이 필요합니다'. 기본값 0.9",
+   "source": "apps/web/src/app/(app)/settings/page.tsx:24, apps/web/src/app/(app)/settings/page.tsx:286-330, apps/api/src/workspaces/router.py:46-55, apps/api/src/workspaces/schemas.py:76-78, apps/api/src/workspaces/schemas.py:92-93, apps/web/src/features/workspaces/hooks.ts:130-132, apps/api/src/auth/rbac.py:127-132",
+   "priority": "P2",
+   "method": "both",
+   "api": "PATCH /api/v1/workspaces/{QA}"
+  },
+  {
+   "id": "G2-019",
+   "area": "pipeline",
+   "title": "AI 후보 목록에 완료/보관 공개 프로젝트 포함 — 보관 프로젝트 자동 연결 가능성",
+   "role": "owner",
+   "preconditions": "threshold 0.5, 'Old'(archived)·'Done'(completed) 가 public",
+   "steps": [
+    "'Old' 프로젝트 제목·주제를 반복 언급하는 60자 이상 텍스트 캡처",
+    "인박스 항목의 aiSuggestedProjectId 확인",
+    "자동 확정되었다면 회의가 Old 에 연결됐는지 확인"
+   ],
+   "expected": "후보는 status 필터 없이 전달되므로 Old/Done 이 추천·자동 연결될 수 있음(관측 결과 기록). 결정 필요 항목으로 TODO 등재됨",
+   "source": "apps/api/src/meetings/pipeline_service.py:70-74, apps/api/src/projects/repository.py:48-66",
+   "priority": "P2",
+   "method": "api",
+   "known": "TODO.md Questions: Inbox 확정 → 완료/보관 프로젝트 분류 허용 여부 (docs/TODO.md:89)"
+  },
+  {
+   "id": "G2-020",
+   "area": "pipeline",
+   "title": "AI 후보 목록은 public 전용 — Gamma(private)·Beta(draft) 는 추천 불가, 20개 상한",
+   "role": "admin",
+   "preconditions": "gamma 캡처 텍스트",
+   "steps": [
+    "admin 으로 gamma 본문 캡처",
+    "인박스 항목 aiSuggestedProjectId / aiSuggestedProjectTitle 확인"
+   ],
+   "expected": "find_by_workspace 가 requester 없이 호출돼 public 만 후보. Gamma 로의 추천·자동 확정은 불가하고 newProjectTitle 또는 다른 public 프로젝트가 제안됨. 21개 이상 프로젝트면 sort_order 순 상위 20개만 후보",
+   "source": "apps/api/src/meetings/pipeline_service.py:70, apps/api/src/common/visibility.py:116-124, apps/api/src/projects/repository.py:48-66",
+   "priority": "P2",
+   "method": "api"
+  },
+  {
+   "id": "G2-021",
+   "area": "integrity",
+   "title": "RAG 누수 — Gamma 에 연결된 회의 청크가 project_id NULL 로 viewer 에게 검색됨",
+   "role": "viewer",
+   "preconditions": "admin 이 gamma 본문('코드명 블루펭귄')을 캡처하고 인박스 확정 또는 회의 상세에서 Gamma 로 연결. 대조군: admin 의 Gamma 노트에 '코드명 블루펭귄 노트' 포함",
+   "steps": [
+    "viewer 로 RAG 패널에서 '블루펭귄 프로젝트 내용 알려줘' 질의",
+    "/search 에서 '블루펭귄' 검색",
+    "답변 텍스트와 출처(source_id) 기록",
+    "outsider(Outsider Co) 로 동일 질의 → 결과 없음 확인",
+    "member(Gamma 멤버) 로 '레드팬더' 질의 → Outsider 내용 미노출 확인"
+   ],
+   "expected": "코드 예측: 파이프라인은 자동 확정일 때만 청크 project_id 를 채우고, 수동 연결·인박스 확정은 청크를 동기화하지 않으며, 필터는 project_id IS NULL 을 통과시키므로 viewer 답변·출처에 Gamma 회의의 '블루펭귄' 이 노출됨. 노트는 PATCH 시 sync_note_project_id 로 동기화되어 비노출(대조군). outsider 는 워크스페이스 필터로 0건. 헌법 기준으로는 비노출이어야 하므로 노출 시 P0 결함",
+   "source": "apps/api/src/meetings/pipeline_service.py:141-158, apps/api/src/projects/service.py:310-326, apps/api/src/inbox/service.py:78-135, apps/api/src/common/visibility.py:154-157, apps/api/src/embeddings/repository.py:216-253, apps/api/src/notes/router.py:131-137",
+   "priority": "P0",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{QA}/rag/ask",
+   "doc_conflict": "CONTEXT-MAP.md:64 은 private 프로젝트를 'RAG 검색 자동 제외' 로 정의"
+  },
+  {
+   "id": "G2-022",
+   "area": "integrity",
+   "title": "인박스 목록에 visibility 필터 없음 — viewer 가 Gamma 회의 요약을 읽음",
+   "role": "viewer",
+   "preconditions": "Gamma 에 연결된 캡처 회의의 인박스 항목 존재(확정됨 또는 미처리)",
+   "steps": [
+    "viewer JWT 로 GET /inbox (필터 없음) 과 GET /inbox?isProcessed=true",
+    "제목 '{Gamma 회의 제목} 요약' 항목의 summary 에 '블루펭귄' 포함 여부 확인",
+    "미처리라면 /inbox UI 에서도 카드로 보이는지 확인",
+    "항목 sourceId 로 GET /meetings/{sourceId} → 404 인지 확인(대조)"
+   ],
+   "expected": "코드 예측: list_inbox 는 workspace_id 만 필터하므로 viewer 에게 Gamma 회의 요약 전문과 sourceId 가 반환됨(누수). 회의 상세 자체는 404. 헌법 기준 비노출이어야 함",
+   "source": "apps/api/src/inbox/service.py:59-76, apps/api/src/inbox/router.py:19-25, apps/api/src/meetings/service.py:169-215",
+   "priority": "P0",
+   "method": "both",
+   "api": "GET /api/v1/workspaces/{QA}/inbox",
+   "doc_conflict": "CONTEXT-MAP.md:64 (private = ProjectMember 만)"
+  },
+  {
+   "id": "G2-023",
+   "area": "integrity",
+   "title": "Gamma 회의에서 추출된 액션이 viewer 의 /actions 에 노출",
+   "role": "viewer",
+   "preconditions": "Gamma 연결 회의가 액션을 추출(gamma 텍스트에 액션 포함)",
+   "steps": [
+    "viewer 로 /actions 진입, 전체 필터",
+    "Gamma 회의 유래 액션 제목(블루펭귄 관련) 표시 여부 확인",
+    "해당 카드의 mic 링크 클릭 → 회의 상세 결과 확인",
+    "API GET /actions 로 동일 확인"
+   ],
+   "expected": "코드 예측: 액션 project_id=NULL 이고 액션 visibility 필터는 NULL 을 통과시키므로 viewer 에게 제목·설명이 노출. mic 링크는 회의 상세 404(회의 게이트는 링크 기반). 헌법 기준 비노출이어야 함",
+   "source": "apps/api/src/meetings/pipeline_service.py:87-93, apps/api/src/actions/repository.py:21, apps/api/src/common/visibility.py:128, apps/api/src/actions/service.py:197-245",
+   "priority": "P0",
+   "method": "both",
+   "api": "GET /api/v1/workspaces/{QA}/actions",
+   "known": "BL-UX-8",
+   "doc_conflict": "CONTEXT-MAP.md:64"
+  },
+  {
+   "id": "G2-024",
+   "area": "meeting",
+   "title": "대조군 — viewer 의 Gamma 회의 상세·export·status 는 404",
+   "role": "viewer",
+   "preconditions": "Gamma 연결 회의 id 확보(인박스 sourceId)",
+   "steps": [
+    "GET /meetings/{gid}",
+    "GET /meetings/{gid}/export?format=md",
+    "GET /meetings/{gid}/status",
+    "UI /meetings/{gid} 진입"
+   ],
+   "expected": "세 API 모두 404, UI 는 에러 상태(meeting-detail 에러 뷰). admin/member(Gamma 멤버) 는 200",
+   "source": "apps/api/src/meetings/service.py:169-215, apps/api/src/meetings/service.py:287-308, apps/api/src/meetings/service.py:310-335, apps/web/src/features/meetings/components/meeting-detail.tsx:144-153",
+   "priority": "P1",
+   "method": "both"
+  },
+  {
+   "id": "G2-025",
+   "area": "integrity",
+   "title": "비멤버 member 가 private 프로젝트의 회의 링크를 해제 → 회의가 전체 공개",
+   "role": "member",
+   "preconditions": "owner 가 private 'Delta' 생성(프로젝트 멤버 = owner 만), owner 가 캡처한 회의 M-D 를 Delta 에 연결. member 는 Delta 비멤버",
+   "steps": [
+    "member 로 GET /inbox 에서 M-D 의 sourceId 확보",
+    "member 로 GET /meetings/{M-D} → 404 확인",
+    "member 로 DELETE /meetings/{M-D}/projects/{Delta}",
+    "viewer 로 GET /meetings/{M-D}"
+   ],
+   "expected": "코드 예측: 링크 해제는 require_member + tenant 검증만 있어 204. 이후 회의가 어떤 private 프로젝트에도 속하지 않아 viewer 가 200 으로 전문 열람(IDOR). 기대 정책은 403/404",
+   "source": "apps/api/src/projects/router.py:207-214, apps/api/src/projects/service.py:327-337, apps/api/src/inbox/service.py:59-76, apps/api/src/meetings/service.py:169-215",
+   "priority": "P0",
+   "method": "api",
+   "api": "DELETE /api/v1/workspaces/{QA}/meetings/{mid}/projects/{pid}"
+  },
+  {
+   "id": "G2-026",
+   "area": "project",
+   "title": "비멤버 member 가 자기 회의를 private 프로젝트에 연결",
+   "role": "member",
+   "preconditions": "G2-025 의 Delta, member 소유 캡처 회의 M-m",
+   "steps": [
+    "member 로 POST /meetings/{M-m}/projects {projectId: Delta}",
+    "owner 로 Delta 대시보드에서 회의 표시 확인",
+    "member 로 GET /meetings/{M-m} 결과 확인"
+   ],
+   "expected": "코드 예측: 201(visibility 검사 없음). 연결 후 member 자신은 자기 회의를 404 로 잃을 수 있음(회의 게이트가 private 링크 기준). 결과 기록",
+   "source": "apps/api/src/projects/router.py:193-204, apps/api/src/projects/service.py:310-326, apps/api/src/meetings/service.py:169-215",
+   "priority": "P2",
+   "method": "api",
+   "api": "POST /api/v1/workspaces/{QA}/meetings/{mid}/projects"
+  },
+  {
+   "id": "G2-027",
+   "area": "project",
+   "title": "PATCH /projects 에 visibility·작성자 게이트 없음 — member 가 Delta 수정·Alpha 보관",
+   "role": "member",
+   "preconditions": "G2-025 의 Delta(owner private), Alpha(owner public)",
+   "steps": [
+    "member 로 GET /projects/{Delta} → 404 확인",
+    "member 로 PATCH /projects/{Delta} {title:'hijacked'}",
+    "member 로 POST /projects/{Alpha}/archive",
+    "member 로 PATCH /projects/{Alpha} {status:'archived'}",
+    "owner 로 원복"
+   ],
+   "expected": "코드 예측: Delta PATCH 는 200 + 전체 dict 반환(읽기 404 인데 쓰기 200 = 존재·내용 누설). archive 엔드포인트는 403 'admin 이상 권한이 필요합니다' 이지만 PATCH status=archived 는 200 으로 우회",
+   "source": "apps/api/src/projects/router.py:105-124, apps/api/src/projects/router.py:179-186, apps/api/src/projects/service.py:141-167, apps/api/src/projects/service.py:251-280, apps/api/src/auth/rbac.py:127-132",
+   "priority": "P0",
+   "method": "api",
+   "api": "PATCH /api/v1/workspaces/{QA}/projects/{pid}",
+   "doc_conflict": "apps/api/src/projects/CONTEXT.md:62 (P-7) 의 보관 권한 규칙과 PATCH 경로 불일치"
+  },
+  {
+   "id": "G2-028",
+   "area": "project",
+   "title": "viewer 가 Gamma 멤버 목록 조회 — 프로젝트는 404, 멤버 목록은 200",
+   "role": "viewer",
+   "preconditions": "Gamma id",
+   "steps": [
+    "viewer 로 GET /projects/{Gamma}",
+    "viewer 로 GET /projects/{Gamma}/members"
+   ],
+   "expected": "코드 예측: 프로젝트 조회 404, 멤버 목록은 require_viewer + visibility 없음으로 200(admin·member 이름/이메일 노출). 일관성 결함",
+   "source": "apps/api/src/projects/router.py:130-138, apps/api/src/projects/service.py:141-167",
+   "priority": "P1",
+   "method": "api",
+   "api": "GET /api/v1/workspaces/{QA}/projects/{pid}/members"
+  },
+  {
+   "id": "G2-029",
+   "area": "project",
+   "title": "프로젝트 status 임의 문자열 저장 — 기본 목록에서 사라짐",
+   "role": "member",
+   "preconditions": "member 가 만든 테스트 프로젝트 T1(public)",
+   "steps": [
+    "PATCH /projects/{T1} {status:'garbage'}",
+    "GET /projects (기본) 와 /projects UI 탭별 목록 확인",
+    "PATCH {status:'active'} 로 원복"
+   ],
+   "expected": "코드 예측: 값 검증 없이 200, 'garbage' 저장. 기본 목록은 active 만 반환하므로 T1 이 어떤 탭에도 안 보일 수 있음(관측 기록)",
+   "source": "apps/api/src/projects/service.py:104-139, apps/api/src/projects/service.py:251-280, apps/web/src/app/(app)/projects/page.tsx:15-34",
+   "priority": "P2",
+   "method": "both",
+   "api": "PATCH /api/v1/workspaces/{QA}/projects/{pid}"
+  },
+  {
+   "id": "G2-030",
+   "area": "meeting",
+   "title": "완료 회의 상세 — 탭·export md/json·잘못된 format",
+   "role": "member",
+   "preconditions": "Alpha 연결 완료 회의",
+   "steps": [
+    "요약/트랜스크립트/액션 탭 전환",
+    "내보내기 md, json 각각 다운로드 → 파일명·한글·이모지 보존 확인",
+    "API GET /meetings/{id}/export?format=pdf",
+    "상단 뒤로가기 링크 목적지 확인, /meetings 직접 진입"
+   ],
+   "expected": "탭 3종 정상, 내보내기 성공 토스트 '내보내기 완료'. format=pdf → 422(pattern md|json). 회의 목록 페이지는 없음(BL-UX-4) — 뒤로가기 목적지와 /meetings 404 여부 기록",
+   "source": "apps/web/src/features/meetings/components/meeting-detail.tsx:170-172, apps/web/src/features/meetings/components/meeting-detail.tsx:215, apps/web/src/features/meetings/components/meeting-detail.tsx:305-320, apps/web/src/components/shared/ExportButton.tsx:36-45, apps/api/src/meetings/router.py:107-112",
+   "priority": "P1",
+   "method": "both",
+   "known": "BL-UX-4"
+  },
+  {
+   "id": "G2-031",
+   "area": "meeting",
+   "title": "처리 중 회의 — export 숨김, promote 버튼은 노출되지만 400",
+   "role": "member",
+   "preconditions": "오디오 업로드 직후(transcribing 중)",
+   "steps": [
+    "회의 상세에서 ProcessingView 와 버튼 영역 확인",
+    "'팀으로 올리기' 클릭 → 대상 팀 선택 후 실행",
+    "토스트 문구 기록"
+   ],
+   "expected": "export 는 completed 에서만 렌더. promote 는 상태와 무관하게 노출되고 실행 시 400 '진행 중인 회의는 promote 할 수 없습니다 (완료 또는 실패 상태만 가능)' 토스트",
+   "source": "apps/web/src/features/meetings/components/meeting-detail.tsx:71-86, apps/web/src/features/meetings/components/meeting-detail.tsx:215-232, apps/api/src/meetings/exceptions.py:50-51, apps/web/src/components/shared/ItemPromoteModal.tsx:219",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G2-032",
+   "area": "meeting",
+   "title": "회의 promote — 성공·오류 분기 + 두 번 실행 시 중복 사본",
+   "role": "member",
+   "preconditions": "member 개인 워크스페이스의 완료 회의(임베딩 완료), member 는 QA Team 멤버. newbie 는 팀 없음",
+   "steps": [
+    "개인 ws 회의에서 '팀으로 올리기' → QA Team 선택 → 실행",
+    "같은 회의로 한 번 더 promote",
+    "QA Team 에서 동일 제목 회의 수 확인",
+    "API 로 targetWorkspaceId=개인 ws(자기 자신), 다른 개인 ws, outsider 의 Outsider Co 로 각각 호출",
+    "newbie 로 promote 모달 열기"
+   ],
+   "expected": "성공 시 202 + '회의을(를) 팀에 복사 중…' 토스트. 2회 실행 → 사본 2건(멱등 가드 없음). 같은 ws → 400 '같은 워크스페이스로는 promote 할 수 없습니다', 개인 ws → 400 '개인 워크스페이스로는 promote 할 수 없습니다', 비멤버 ws → 403 '대상 워크스페이스가 유효하지 않습니다'. 임베딩 미완료 → 400 '회의 임베딩이 아직 완료되지 않았습니다...'. newbie 모달은 '팀 워크스페이스가 없어요'",
+   "source": "apps/api/src/meetings/router.py:146-170, apps/api/src/meetings/service.py:415-589, apps/api/src/meetings/exceptions.py:16-69, apps/web/src/components/shared/ItemPromoteModal.tsx:116-118, apps/web/src/components/shared/ItemPromoteModal.tsx:214-219, apps/web/src/components/shared/ItemPromoteModal.tsx:267-268",
+   "priority": "P1",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{src}/meetings/{id}/promote"
+  },
+  {
+   "id": "G2-033",
+   "area": "meeting",
+   "title": "viewer 에게 promote·액션 체크박스가 활성 — 조용한 403",
+   "role": "viewer",
+   "preconditions": "Alpha 연결 완료 회의(액션 포함)",
+   "steps": [
+    "viewer 로 회의 상세 진입",
+    "'팀으로 올리기' 버튼 노출 확인 후 실행",
+    "액션 탭 체크박스 클릭 → 네트워크 응답과 UI 상태·토스트 확인",
+    "새로고침 후 상태 확인"
+   ],
+   "expected": "promote 버튼이 노출되고 실행 시 403 'member 이상 권한이 필요합니다' 토스트. ActionView 체크박스는 RBAC 비활성·onError 가 없어 PATCH 403 이 사용자에게 알려지지 않음(무반응 또는 낙관적 변경 후 원복) — 관측 기록",
+   "source": "apps/web/src/features/meetings/components/meeting-detail.tsx:220-232, apps/web/src/features/meetings/components/action-view.tsx:30-34, apps/api/src/actions/router.py:61-66, apps/api/src/meetings/router.py:156",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G2-034",
+   "area": "meeting",
+   "title": "회의 상세 연결 프로젝트 칩 — 연결·해제 UI 흐름",
+   "role": "member",
+   "preconditions": "프로젝트 미연결 완료 회의",
+   "steps": [
+    "회의 상세에서 프로젝트 연결 UI 로 Beta(draft, member 소유) 연결",
+    "칩 표시 확인 후 해제",
+    "같은 프로젝트 재연결 두 번(API POST 2회) 결과 확인"
+   ],
+   "expected": "연결 시 칩 렌더, 해제 시 제거. 중복 연결은 409 '이미 {x}입니다' 류 또는 기존 링크 반환 — 관측 기록",
+   "source": "apps/web/src/features/meetings/components/meeting-detail.tsx:272-290, apps/api/src/projects/router.py:193-214, apps/api/src/common/exceptions.py:19",
+   "priority": "P2",
+   "method": "both"
+  },
+  {
+   "id": "G2-035",
+   "area": "meeting",
+   "title": "회의 상세 ActionView 는 워크스페이스 액션 100건만 받아 클라이언트 필터",
+   "role": "member",
+   "preconditions": "API 로 워크스페이스에 액션 101건 이상 생성(POST /actions), 그 뒤 새 회의가 액션 추출",
+   "steps": [
+    "새 회의 상세 액션 탭 확인",
+    "API 로 해당 회의 액션 수와 비교"
+   ],
+   "expected": "pageSize 100 + meetingId 클라이언트 필터라 최신 100건 밖의 회의 액션은 누락되고 빈 상태가 표시될 수 있음(관측 기록)",
+   "source": "apps/web/src/features/meetings/components/action-view.tsx:23-28, apps/web/src/features/meetings/components/action-view.tsx:59-73",
+   "priority": "P3",
+   "method": "both"
+  },
+  {
+   "id": "G2-036",
+   "area": "note",
+   "title": "빠른 메모 생성 — 검증·성공 토스트·목록 반영",
+   "role": "member",
+   "preconditions": "member 로그인, 노트 화면",
+   "steps": [
+    "제목·내용 모두 비우고 저장",
+    "제목만 '한글 제목 🚀' 입력 후 저장",
+    "목록 첫 항목 확인"
+   ],
+   "expected": "빈 입력: '제목 또는 내용을 입력해주세요'. 성공: '메모가 저장되었습니다' 후 목록 상단에 표시. 목록 비었을 때 빈 상태 문구 표시",
+   "source": "apps/web/src/features/notes/components/quick-memo.tsx:57-82, apps/web/src/features/notes/components/quick-memo.tsx:236-247, apps/api/src/notes/router.py:87-108",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G2-037",
+   "area": "integrity",
+   "title": "빠른 메모 저장 더블클릭 — 노트 중복 여부",
+   "role": "member",
+   "preconditions": "제목 입력 상태",
+   "steps": [
+    "저장 버튼 dblclick",
+    "POST /notes 호출 수와 목록 동일 제목 수 확인"
+   ],
+   "expected": "POST 1회여야 함. 가드는 isPending 기반 disabled 뿐이라 재렌더 전 2회 클릭 시 2건 생성 가능 → 2건이면 결함",
+   "source": "apps/web/src/features/notes/components/quick-memo.tsx:101-115, apps/web/src/features/notes/components/quick-memo.tsx:171",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G2-038",
+   "area": "note",
+   "title": "노트 자동저장 — 1초 안에 이탈하면 마지막 편집 유실",
+   "role": "member",
+   "preconditions": "member 소유 노트 상세, 편집 모드",
+   "steps": [
+    "본문 끝에 '마지막문장' 입력",
+    "300ms 안에 뒤로가기(또는 사이드바 링크) 클릭",
+    "노트 재진입 후 본문 확인, 네트워크에서 PATCH 발생 여부 확인"
+   ],
+   "expected": "코드 예측: 디바운스 1000ms, unmount cleanup 이 타이머를 clear 만 하고 flush 하지 않아 PATCH 미발생 → '마지막문장' 유실. 기대 정책은 보존",
+   "source": "apps/web/src/features/notes/components/note-detail.tsx:29, apps/web/src/features/notes/components/note-detail.tsx:88-94",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G2-039",
+   "area": "note",
+   "title": "노트 자동저장 정상 경로 — '저장 중...' 표시와 1회 PATCH",
+   "role": "member",
+   "preconditions": "member 소유 노트",
+   "steps": [
+    "제목과 본문을 연속 타이핑(2초간)",
+    "타이핑 중지 후 1.5초 대기",
+    "PATCH 횟수와 '저장 중...' 표시 확인",
+    "새로고침 후 내용 확인"
+   ],
+   "expected": "타이핑 멈춘 뒤 1초 후 PATCH(제목/본문 각 디바운스), '저장 중...' 이 잠시 표시, 새로고침 후 내용 유지. 본문 변경 시 BG 재임베딩 예약",
+   "source": "apps/web/src/features/notes/components/note-detail.tsx:29, apps/web/src/features/notes/components/note-detail.tsx:312-320, apps/api/src/notes/router.py:111-142",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G2-040",
+   "area": "note",
+   "title": "노트 삭제 정책 — 작성자 + admin 이상만",
+   "role": "multi",
+   "preconditions": "owner 의 Alpha 노트 N-o, member 의 무프로젝트 노트 N-m, viewer 계정",
+   "steps": [
+    "member 로 N-o 상세 → 삭제 버튼 노출 여부",
+    "member JWT 로 DELETE /notes/{N-o}",
+    "member 로 N-m 삭제(다이얼로그 확인)",
+    "admin 으로 member 의 다른 노트 삭제",
+    "viewer JWT 로 DELETE /notes/{N-o}"
+   ],
+   "expected": "member UI: N-o 에 삭제 버튼 없음. API: 403 '작성자 또는 admin 이상만 삭제할 수 있습니다'. 자기 노트: 204 + '노트를 삭제했습니다'. admin: 204. viewer: 403 'member 이상 권한이 필요합니다'. 보이지 않는 노트는 403 이 아니라 404",
+   "source": "apps/web/src/features/notes/components/note-detail.tsx:45-51, apps/web/src/features/notes/components/note-detail.tsx:136-146, apps/api/src/notes/exceptions.py:12-23, apps/api/src/notes/pipeline_service.py:110-160, apps/api/src/notes/CONTEXT.md:72",
+   "priority": "P1",
+   "method": "both",
+   "api": "DELETE /api/v1/workspaces/{QA}/notes/{id}"
+  },
+  {
+   "id": "G2-041",
+   "area": "note",
+   "title": "member 가 타인 노트 편집 가능 (역할 기반 편집)",
+   "role": "member",
+   "preconditions": "owner 의 Alpha 노트 N-o",
+   "steps": [
+    "member 로 N-o 상세 → 편집 버튼 노출 확인",
+    "본문 수정 후 자동저장",
+    "API PATCH /notes/{N-o} {title:'member edit'}"
+   ],
+   "expected": "코드 예측: canWrite 는 역할 기반이라 편집 가능, PATCH 200. 작성자 검사 없음",
+   "source": "apps/web/src/features/notes/components/note-detail.tsx:41-46, apps/api/src/notes/service.py:205-238",
+   "priority": "P2",
+   "method": "both",
+   "api": "PATCH /api/v1/workspaces/{QA}/notes/{id}",
+   "doc_conflict": "docs/requirements/mvp-phase1.md:70-75 는 Member 가 자기 콘텐츠만 편집한다고 서술"
+  },
+  {
+   "id": "G2-042",
+   "area": "note",
+   "title": "노트를 비멤버 private 프로젝트로 이동 — 대상 visibility 미검사",
+   "role": "member",
+   "preconditions": "G2-025 의 Delta, member 의 무프로젝트 노트 N-m2",
+   "steps": [
+    "PATCH /notes/{N-m2} {projectId: Delta}",
+    "member 로 GET /notes/{N-m2}",
+    "owner 로 Delta 노트 목록 확인"
+   ],
+   "expected": "코드 예측: 같은 워크스페이스 검증만 있어 200. 이동 후 member 는 자기 노트를 404 로 잃음(Delta 비멤버)",
+   "source": "apps/api/src/notes/service.py:222-238, apps/api/src/notes/router.py:120-137",
+   "priority": "P2",
+   "method": "api",
+   "api": "PATCH /api/v1/workspaces/{QA}/notes/{id}"
+  },
+  {
+   "id": "G2-043",
+   "area": "note",
+   "title": "대조군 — viewer 의 Gamma 노트 상세·embedding-status 404",
+   "role": "viewer",
+   "preconditions": "admin 의 Gamma 노트 N-g",
+   "steps": [
+    "GET /notes/{N-g}",
+    "GET /notes/{N-g}/embedding-status",
+    "GET /notes?projectId={Gamma}",
+    "노트 목록 UI 에서 N-g 부재 확인"
+   ],
+   "expected": "상세·embedding-status 404(visibility 게이트), 목록에 미포함. member(Gamma 멤버) 는 200",
+   "source": "apps/api/src/notes/service.py:420-440, apps/api/src/notes/router.py:197-214, apps/api/src/notes/repository.py:22",
+   "priority": "P1",
+   "method": "both"
+  },
+  {
+   "id": "G2-044",
+   "area": "integrity",
+   "title": "잘못된 UUID 쿼리/바디 → 500 (422 아님)",
+   "role": "member",
+   "preconditions": "member JWT",
+   "steps": [
+    "GET /notes?projectId=not-a-uuid",
+    "PATCH /notes/{id} {projectId:'abc'}",
+    "POST /inbox/{id}/classify {projectIds:['abc']}",
+    "POST /actions {title:'x', projectId:'abc'}"
+   ],
+   "expected": "코드 예측: 라우터의 uuid.UUID() ValueError 가 전역 핸들러로 가서 500 {detail:'Internal Server Error'}. 기대는 422",
+   "source": "apps/api/src/notes/router.py:29-46, apps/api/src/notes/router.py:120-124, apps/api/src/inbox/router.py:36-45, apps/api/src/actions/router.py:42-58, apps/api/src/main.py:128-141",
+   "priority": "P2",
+   "method": "api"
+  },
+  {
+   "id": "G2-045",
+   "area": "note",
+   "title": "빈 노트 — embedding-status 영구 pending, promote 는 오해 소지 400",
+   "role": "member",
+   "preconditions": "member 가 제목만 있고 본문 없는 노트 생성(개인 ws)",
+   "steps": [
+    "GET /notes/{id}/embedding-status 를 1분간 폴링",
+    "노트에서 '팀으로 올리기' → QA Team",
+    "토스트 문구 기록"
+   ],
+   "expected": "chunk 0 + audit 없음 → status 'pending', chunkCount 0 이 계속. promote → 400 '노트 임베딩이 아직 완료되지 않았습니다. 잠시 후 다시 시도해주세요.'(실제 원인은 빈 본문이라 재시도해도 불가)",
+   "source": "apps/api/src/notes/service.py:349-350, apps/api/src/notes/service.py:440-446, apps/api/src/notes/exceptions.py:58-67",
+   "priority": "P2",
+   "method": "both"
+  },
+  {
+   "id": "G2-046",
+   "area": "note",
+   "title": "노트 promote 두 번 → 사본 2건 + 임베딩 상태 토스트",
+   "role": "member",
+   "preconditions": "member 개인 ws 에 본문 있는 노트(임베딩 완료)",
+   "steps": [
+    "노트 promote → QA Team",
+    "토스트 흐름('노트을(를) 팀에 복사 중…' → '임베딩 재생성 완료') 확인",
+    "같은 노트 한 번 더 promote",
+    "QA Team 노트 목록에서 동일 제목 수 확인"
+   ],
+   "expected": "각 호출 202, 사본 2건(멱등성 없음, 원본 불변 I-18). 사본 projectId=null",
+   "source": "apps/api/src/notes/router.py:166-193, apps/web/src/components/shared/ItemPromoteModal.tsx:151-221",
+   "priority": "P2",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{src}/notes/{id}/promote"
+  },
+  {
+   "id": "G2-047",
+   "area": "note",
+   "title": "노트·인박스 목록 첫 페이지(20건)만 — 페이지네이션 UI 없음",
+   "role": "member",
+   "preconditions": "API 로 노트 21건, 미처리 인박스 21건 이상 생성",
+   "steps": [
+    "노트 목록에서 개수 확인, 스크롤 끝 확인",
+    "/inbox 개수 확인"
+   ],
+   "expected": "각 20건만 표시, 21번째(가장 오래된) 는 UI 로 접근 불가(더보기 없음)",
+   "source": "apps/web/src/features/notes/hooks.ts:15-22, apps/api/src/inbox/service.py:59-64",
+   "priority": "P3",
+   "method": "ui"
+  },
+  {
+   "id": "G2-048",
+   "area": "inbox",
+   "title": "인박스 기본 흐름 — 미처리 목록, AI 추천 확정",
+   "role": "member",
+   "preconditions": "threshold 0.9(기본), 미처리 인박스 항목(AI 추천 = Alpha)",
+   "steps": [
+    "/inbox 진입, 카드의 제목·요약·신뢰도 라벨 확인",
+    "AI 추천 확정 버튼 클릭",
+    "토스트, 목록 제거, 회의 상세의 Alpha 칩 확인"
+   ],
+   "expected": "isProcessed=false 만 표시. 확정 → '프로젝트에 연결되었습니다', 항목이 목록에서 사라지고 회의↔Alpha 링크 생성",
+   "source": "apps/web/src/features/inbox/components/smart-inbox.tsx:48-50, apps/web/src/features/inbox/components/inbox-item-card.tsx:82-97, apps/web/src/features/inbox/components/inbox-item-card.tsx:340-384, apps/web/src/features/inbox/hooks.ts:56, apps/api/src/inbox/service.py:78-135",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G2-049",
+   "area": "inbox",
+   "title": "프로젝트 선택기는 active 만 — API 는 완료/보관 프로젝트 분류 허용",
+   "role": "member",
+   "preconditions": "미처리 인박스 항목 2건",
+   "steps": [
+    "카드의 '다른 프로젝트' 선택기 열어 Done/Old 부재 확인",
+    "API POST /inbox/{id}/classify {projectIds:[Old]}",
+    "AI 추천이 Done/Old 인 항목이 있으면 확정 버튼 동작 기록"
+   ],
+   "expected": "선택기에는 active 만. API 는 status 검사 없이 200 + linkedProjects=[Old]. 확정 정책은 미결정이라 관측 결과만 기록",
+   "source": "apps/web/src/features/inbox/components/inbox-item-card.tsx:58, apps/api/src/inbox/service.py:78-135",
+   "priority": "P2",
+   "method": "both",
+   "api": "POST /api/v1/workspaces/{QA}/inbox/{id}/classify",
+   "known": "docs/TODO.md:89 (Questions)"
+  },
+  {
+   "id": "G2-050",
+   "area": "inbox",
+   "title": "무시·되돌리기 — '되돌리기' 는 로컬 상태만 복구",
+   "role": "member",
+   "preconditions": "미처리 인박스 항목 2건",
+   "steps": [
+    "항목 A 무시 → 토스트 확인",
+    "항목 B 확정 직후 표시되는 '되돌리기' 클릭",
+    "네트워크 요청 여부 확인",
+    "새로고침 후 B 의 존재와 회의 링크 확인"
+   ],
+   "expected": "무시 → '항목을 무시했습니다', is_processed=true. '되돌리기' 는 setStatus('idle') 만 하고 API 호출 없음 → 새로고침 후 B 는 사라지고 링크 유지(되돌리기 무효)",
+   "source": "apps/web/src/features/inbox/hooks.ts:66-80, apps/web/src/features/inbox/components/inbox-item-card.tsx:138-140, apps/web/src/features/inbox/components/inbox-item-card.tsx:171-184, apps/api/src/inbox/service.py:137-150",
+   "priority": "P1",
+   "method": "ui",
+   "doc_conflict": "docs/requirements/mvp-phase1.md:34 는 분류 되돌리기를 기능으로 서술"
+  },
+  {
+   "id": "G2-051",
+   "area": "inbox",
+   "title": "viewer 에게 인박스 조작 버튼 노출 — 클릭 시 403 토스트",
+   "role": "viewer",
+   "preconditions": "미처리 인박스 항목",
+   "steps": [
+    "viewer 로 /inbox 진입",
+    "확정·무시·다른 프로젝트 버튼 노출 확인",
+    "확정 클릭 → 토스트 기록"
+   ],
+   "expected": "카드에 역할 게이트가 없어 버튼 노출. BE require_member → 403, 토스트 'member 이상 권한이 필요합니다'",
+   "source": "apps/web/src/features/inbox/components/inbox-item-card.tsx:340-384, apps/api/src/inbox/router.py:36-52, apps/web/src/features/inbox/hooks.ts:59",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G2-052",
+   "area": "inbox",
+   "title": "인박스 빈 상태",
+   "role": "newbie",
+   "preconditions": "newbie 개인 ws(콘텐츠 0)",
+   "steps": [
+    "/inbox 진입",
+    "빈 상태 문구·CTA 확인, console.error 확인"
+   ],
+   "expected": "빈 상태 컴포넌트가 렌더(BL-S27c-6 등재 이후 구현됨 — 구현 상태 확인). 에러 시엔 에러 뷰",
+   "source": "apps/web/src/features/inbox/components/smart-inbox.tsx:147-160, apps/web/src/features/inbox/components/smart-inbox.tsx:84-91",
+   "priority": "P3",
+   "method": "ui",
+   "known": "BL-S27c-6"
+  },
+  {
+   "id": "G2-053",
+   "area": "inbox",
+   "title": "인박스 promote — 사본은 미처리 첨부, 중복 허용, 원본 visibility 미검사",
+   "role": "member",
+   "preconditions": "member 개인 ws 의 인박스 항목",
+   "steps": [
+    "POST /inbox/{id}/promote {targetWorkspaceId: QA}",
+    "같은 요청 1회 더",
+    "QA Team 인박스에서 사본 수·sourceType·isProcessed 확인"
+   ],
+   "expected": "202/200, 사본 2건(멱등 없음), 사본은 attachment 타입·isProcessed=false, embedding_status 'n/a'",
+   "source": "apps/api/src/inbox/service.py:154-252, apps/api/src/inbox/router.py:59-69",
+   "priority": "P2",
+   "method": "api",
+   "api": "POST /api/v1/workspaces/{src}/inbox/{id}/promote"
+  },
+  {
+   "id": "G2-054",
+   "area": "inbox",
+   "title": "classify 빈 배열 — 무시와 동일하게 사라짐",
+   "role": "member",
+   "preconditions": "미처리 인박스 항목",
+   "steps": [
+    "POST /inbox/{id}/classify {projectIds:[]}",
+    "GET /inbox 에서 항목 상태 확인"
+   ],
+   "expected": "스키마에 최소 길이 없음 → 200, is_processed=true, linkedProjects=[] (연결 없이 목록에서 사라짐)",
+   "source": "apps/api/src/inbox/schemas.py:8-11, apps/api/src/inbox/service.py:78-135",
+   "priority": "P3",
+   "method": "api"
+  },
+  {
+   "id": "G2-055",
+   "area": "project",
+   "title": "프로젝트 생성 — member 도 private 생성 가능, 작성자 자동 멤버",
+   "role": "member",
+   "preconditions": "member 로그인",
+   "steps": [
+    "/projects 에서 새 프로젝트 → 공개 범위 'private', 제목 'M-Priv', 태그 'AI, ai , AI'",
+    "생성 후 대시보드 멤버 패널 확인",
+    "viewer 로 GET /projects/{M-Priv}",
+    "태그 저장값 확인"
+   ],
+   "expected": "201, member 가 프로젝트 멤버로 자동 등록, viewer 404. 태그는 FE trim 만 되고 중복·대소문자 정규화 없음(['AI','ai','AI'] 류) — P-4 미구현",
+   "source": "apps/api/src/projects/router.py:84-101, apps/api/src/projects/service.py:63-102, apps/web/src/features/projects/components/create-project-dialog.tsx:40-45, apps/web/src/features/projects/components/create-project-dialog.tsx:68-93",
+   "priority": "P2",
+   "method": "both",
+   "doc_conflict": "apps/api/src/projects/CONTEXT.md:59 (P-4 태그 정규화) 미구현"
+  },
+  {
+   "id": "G2-056",
+   "area": "project",
+   "title": "member 의 visibility 변경 차단 — 뱃지 비활성·관리 메뉴 숨김·API 403",
+   "role": "member",
+   "preconditions": "M-Priv(G2-055)",
+   "steps": [
+    "member 로 M-Priv 대시보드 진입",
+    "헤더 visibility 뱃지 클릭 → 다이얼로그 열림 여부",
+    "관리 드롭다운(편집/보관/삭제) 노출 여부",
+    "API PATCH /projects/{M-Priv} {visibility:'public'}",
+    "admin 으로 뱃지 클릭 → private→public 변경 성공 확인 후 원복"
+   ],
+   "expected": "member: 뱃지는 non-interactive, 관리 드롭다운 없음(canManage=false; 편집 다이얼로그 자체에는 visibility 필드가 없음). API 403 'visibility 변경은 admin 이상만 가능합니다.'. admin: VisibilityChangeDialog 로 변경 성공. 생성 시에는 member 도 private 선택 가능 — 비대칭 기록",
+   "source": "apps/web/src/features/projects/components/dashboard/dashboard-header.tsx:72-78, apps/web/src/features/projects/components/dashboard/project-dashboard.tsx:54, apps/web/src/features/projects/components/dashboard/project-admin-dialogs.tsx:57-67, apps/web/src/features/projects/components/edit-project-dialog.tsx:36-41, apps/api/src/projects/router.py:113-115",
+   "priority": "P2",
+   "method": "both"
+  },
+  {
+   "id": "G2-057",
+   "area": "project",
+   "title": "프로젝트 삭제 — 콘텐츠 있으면 409, 빈 프로젝트 204, member 403",
+   "role": "multi",
+   "preconditions": "Alpha(노트·회의 연결), 빈 프로젝트 E",
+   "steps": [
+    "admin 으로 Alpha 대시보드 → 삭제 → 확인",
+    "토스트와 다이얼로그 유지 여부",
+    "admin 으로 E 삭제",
+    "member JWT 로 DELETE /projects/{E2}"
+   ],
+   "expected": "Alpha → 409 '이 프로젝트에 노트 N개, 액션 M개가 연결되어 있습니다. 먼저 삭제하거나 다른 프로젝트로 이동하세요.' 토스트, 다이얼로그 유지. E → 204. member → 403 'admin 이상 권한이 필요합니다'. 회의만 연결되고 노트·액션 0 인 프로젝트는 삭제되고 링크·청크는 정리됨",
+   "source": "apps/api/src/projects/service.py:282-302, apps/api/src/projects/exceptions.py:13-23, apps/web/src/features/projects/components/dashboard/project-admin-dialogs.tsx:79-127, apps/api/src/projects/router.py:170-177",
+   "priority": "P1",
+   "method": "both"
+  },
+  {
+   "id": "G2-058",
+   "area": "project",
+   "title": "보관 후 목록 필터·탭",
+   "role": "admin",
+   "preconditions": "테스트 프로젝트 T2",
+   "steps": [
+    "T2 대시보드에서 보관",
+    "/projects 기본 탭·보관 탭에서 T2 위치 확인",
+    "/new 캡처 후 인박스 선택기에 T2 부재 확인"
+   ],
+   "expected": "status=archived, 기본(active) 목록에서 빠지고 보관 필터에 표시. 인박스 선택기는 active 만",
+   "source": "apps/api/src/projects/service.py:104-139, apps/api/src/projects/service.py:304-308, apps/web/src/app/(app)/projects/page.tsx:64-110, apps/web/src/features/inbox/components/inbox-item-card.tsx:58",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G2-059",
+   "area": "project",
+   "title": "프로젝트 멤버 패널 — 추가·중복·외부인·권한",
+   "role": "multi",
+   "preconditions": "Gamma, outsider 의 user id",
+   "steps": [
+    "admin 으로 Gamma 멤버 패널에서 viewer 추가",
+    "같은 사용자 재추가(API)",
+    "outsider userId 로 추가(API)",
+    "member 로 패널 진입 → 관리 컨트롤 노출 여부",
+    "admin 으로 viewer 제거"
+   ],
+   "expected": "추가 → '프로젝트 멤버를 추가했습니다'. 중복 → 409 '이미 {x}입니다'. outsider → 403 '해당 사용자가 워크스페이스 멤버가 아닙니다'. member 는 읽기 전용(canManage=false). 제거 → '프로젝트 멤버를 제거했습니다', 이후 viewer 의 Gamma 조회 404",
+   "source": "apps/web/src/features/projects/components/project-members-panel.tsx:47-48, apps/web/src/features/projects/components/project-members-panel.tsx:93-107, apps/api/src/projects/service.py:190-236, apps/api/src/projects/exceptions.py:26-33, apps/api/src/common/exceptions.py:16-22, apps/web/src/features/members/hooks.ts:88",
+   "priority": "P2",
+   "method": "both"
+  },
+  {
+   "id": "G2-060",
+   "area": "project",
+   "title": "프로젝트 대시보드 섹션·탭 렌더",
+   "role": "member",
+   "preconditions": "Alpha(노트·회의·액션 있음), 빈 프로젝트",
+   "steps": [
+    "Alpha 대시보드 탭 전환(개요/노트/회의/멤버 등)",
+    "섹션별 개수와 실제 데이터 비교",
+    "빈 프로젝트 대시보드 빈 상태 확인"
+   ],
+   "expected": "섹션이 정의대로 렌더, 인사이트 섹션은 숨김 처리. 회의 추출 액션은 projectId null 이라 Alpha 액션 섹션에 없음(BL-UX-8)",
+   "source": "apps/web/src/features/projects/components/dashboard/project-dashboard.tsx:63-96, apps/web/src/features/projects/components/dashboard/dashboard-content.tsx:22-51",
+   "priority": "P3",
+   "method": "ui",
+   "known": "BL-UX-8"
+  },
+  {
+   "id": "G2-061",
+   "area": "action",
+   "title": "/actions '내 액션' 필터는 assigneeId 기준 — AI 추출 액션은 비어 보임",
+   "role": "member",
+   "preconditions": "G2-015 회의 액션 3건(담당자 이름만 텍스트에 있음)",
+   "steps": [
+    "/actions 에서 상태·기한·'내 액션' 필터 순서대로 적용",
+    "각 필터 결과 개수와 상단 카운트 비교"
+   ],
+   "expected": "'내 액션' 은 assigneeId 비교라 AI 추출 액션 0건. 상태 필터·카운트는 서로 일치. 생성 UI 는 없음(AI 추출 전용)",
+   "source": "apps/web/src/features/actions/components/action-board.tsx:28-36, apps/web/src/features/actions/components/action-board.tsx:99-112, apps/web/src/features/actions/components/action-board.tsx:140-145, apps/api/src/meetings/pipeline_service.py:87-93",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G2-062",
+   "area": "action",
+   "title": "액션 상태 토글 — member 성공, viewer 비활성, 실패 토스트",
+   "role": "multi",
+   "preconditions": "Alpha 회의 유래 액션",
+   "steps": [
+    "member 로 /actions 에서 체크박스 토글 → 새로고침 후 유지 확인",
+    "viewer 로 체크박스 disabled 와 title 속성 확인",
+    "member 세션에서 Playwright 로 PATCH /actions/* 를 abort 한 뒤 토글"
+   ],
+   "expected": "member: PATCH 200, 상태 유지. viewer: disabled + title 'Member 이상만 변경할 수 있습니다'. 네트워크 실패: '액션 상태 변경에 실패했습니다' 토스트",
+   "source": "apps/web/src/features/actions/components/action-board.tsx:114-120, apps/web/src/features/actions/components/action-board.tsx:333-347, apps/api/src/actions/router.py:61-66",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G2-063",
+   "area": "action",
+   "title": "액션 PATCH 검증 — 외부인 담당자 404, status/priority 임의값 저장, 잘못된 날짜",
+   "role": "member",
+   "preconditions": "액션 A 하나",
+   "steps": [
+    "PATCH /actions/{A} {assigneeId: outsider userId}",
+    "PATCH {status:'garbage', priority:'urgent!!'}",
+    "PATCH {dueDate:'2026-02-30'}",
+    "/actions UI 에서 A 의 표시 확인 후 원복"
+   ],
+   "expected": "외부인 → 404 '워크스페이스 멤버을(를) 찾을 수 없습니다'. status/priority 는 검증 없이 200 저장(UI 에서 A 가 어떤 상태 열에도 안 보일 수 있음 — 관측). 잘못된 날짜 → 422",
+   "source": "apps/api/src/actions/service.py:64-89, apps/api/src/actions/service.py:197-245, apps/api/src/actions/schemas.py:20-32",
+   "priority": "P2",
+   "method": "api",
+   "api": "PATCH /api/v1/workspaces/{QA}/actions/{id}"
+  },
+  {
+   "id": "G2-064",
+   "area": "integrity",
+   "title": "캡처 중 네트워크 실패 — 에러 표시·재시도",
+   "role": "member",
+   "preconditions": "Playwright route 로 POST /meetings/capture abort",
+   "steps": [
+    "유효 입력으로 'AI 분석 시작'",
+    "에러 문구와 버튼 재활성화 확인",
+    "route 해제 후 재시도"
+   ],
+   "expected": "fetch 실패 메시지(또는 '캡처 실패') 가 에러 영역에 표시, 페이지 이동 없음, 입력 보존. 재시도 시 정상 202 + 상세 이동",
+   "source": "apps/web/src/app/(app)/new/page.tsx:100-112",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G2-065",
+   "area": "integrity",
+   "title": "같은 노트 동시 편집 — 마지막 쓰기 승리, 충돌 경고 없음",
+   "role": "multi",
+   "preconditions": "owner·member 두 브라우저 컨텍스트에서 같은 Alpha 노트 열기",
+   "steps": [
+    "owner 가 본문 A 수정(자동저장 완료 대기)",
+    "member 는 새로고침 없이 본문 B 수정",
+    "양쪽 새로고침 후 본문 확인"
+   ],
+   "expected": "버전 검사가 없어 나중 PATCH 가 전체 content 로 덮어써 owner 의 A 가 유실. 경고 UI 없음",
+   "source": "apps/api/src/notes/service.py:222-238",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G2-066",
+   "area": "integrity",
+   "title": "cross-tenant 인박스 분류 — 다른 워크스페이스 프로젝트 id 거부",
+   "role": "outsider",
+   "preconditions": "Outsider Co 인박스 항목, QA Team 의 Alpha id",
+   "steps": [
+    "outsider 로 POST /workspaces/{OutsiderCo}/inbox/{oid}/classify {projectIds:[Alpha]}",
+    "outsider 로 POST /workspaces/{OutsiderCo}/meetings/{outsiderMeeting}/projects {projectId: Alpha}"
+   ],
+   "expected": "둘 다 404(프로젝트를 찾을 수 없음), 링크 미생성, 인박스 항목 미처리 유지",
+   "source": "apps/api/src/inbox/service.py:93-103, apps/api/src/projects/service.py:316-321",
+   "priority": "P1",
+   "method": "api"
+  },
+  {
+   "id": "G2-067",
+   "area": "pipeline",
+   "title": "처리 중 BE 재시작 — 회의가 transcribing/analyzing 에 영구 정지",
+   "role": "member",
+   "preconditions": "오디오 업로드 직후, 실행자가 BE 컨테이너 재시작 권한 보유",
+   "steps": [
+    "transcribing 확인 직후 BE 재시작",
+    "5분간 status 폴링",
+    "UI 표시 확인"
+   ],
+   "expected": "BackgroundTasks 는 재시도가 없어 status 가 그대로 정지, FE 는 3초 폴링을 계속, 복구 경로 없음",
+   "source": "apps/web/src/features/meetings/hooks.ts:37-55, apps/api/src/meetings/pipeline_service.py:174-254",
+   "priority": "P3",
+   "method": "both",
+   "known": "BL-OCI-4"
+  },
+  {
+   "id": "G2-068",
+   "area": "pipeline",
+   "title": "Gemini 비정형 응답(existingProjectId 가 UUID 아님 등) → 회의 failed",
+   "role": "member",
+   "preconditions": "다양한 주제의 캡처 5건(프로젝트명 모호, 영어·한글 혼용, 숫자 id 언급 등)",
+   "steps": [
+    "5건 연속 캡처",
+    "failed 된 회의의 error_message 기록",
+    "failed 시 인박스 항목·액션이 부분 저장됐는지 확인"
+   ],
+   "expected": "existingProjectId 가 UUID 가 아니면 uuid.UUID() ValueError 로 전체 파이프라인이 failed 로 떨어지고 error_message 에 원시 예외 문자열. 요약·액션은 이미 저장돼 부분 상태로 남을 수 있음 — 관측 기록",
+   "source": "apps/api/src/meetings/pipeline_service.py:108-127, apps/api/src/meetings/pipeline_service.py:245-252",
+   "priority": "P2",
+   "method": "api"
+  }
+ ],
+ "G3-ux": [
+  {
+   "id": "G3-001",
+   "area": "rag",
+   "title": "[P0 leak 후보] 수동 연결로 private Gamma 에 붙은 회의의 청크가 viewer 의 전역 RAG 에 노출되는지",
+   "role": "viewer",
+   "preconditions": "QA Team. Gamma(private, 멤버=admin+member, viewer 비멤버). '블루펭귄' 문구를 담은 text-capture 회의를 AI 자동확정 임계값 미만으로 만든 뒤 수동 연결(POST projects/{Gamma}/meetings 또는 Inbox classify)로 Gamma 에 붙인다. 시드가 이미 Gamma 연결 회의를 가졌다면 그 회의 사용.",
+   "steps": [
+    "DB: SELECT source_id, project_id FROM embedding_chunks WHERE source_type='meeting' AND source_id=<gamma 회의 id> — project_id 값 기록",
+    "viewer 토큰으로 POST /api/v1/workspaces/{wid}/rag/ask {\"question\":\"블루펭귄 관련 결정 사항 알려줘\"} (projectId/timeRange/sourceType 모두 null)",
+    "SSE search_results.chunks 의 sourceId 목록과 answer token 을 수집",
+    "UI: viewer 로 /search 에서 같은 질문 → 인용 [N] 클릭",
+    "대조군: 같은 질문을 Gamma 노트만 있는 상태에서 반복(G3-002 결과와 비교)"
+   ],
+   "expected": "viewer 응답에 Gamma 회의 sourceId 가 없고 answer 에 '블루펭귄' 이 없다. 의심: 회의 청크 project_id 는 AI 자동확정(confidence>=threshold) 시에만 채워지고(수동 연결/classify 는 청크를 갱신하지 않음, update_project_id 호출자는 notes 뿐), PROJECT_VISIBILITY_FILTER_SQL 은 project_id IS NULL 청크를 전원 통과시키므로 누출된다. 회의 상세는 visibility 게이트라 viewer 는 404 → source viewer 가 snippet 으로만 보여준다.",
+   "source": "apps/api/src/meetings/pipeline_service.py:143",
+   "priority": "P0",
+   "method": "both"
+  },
+  {
+   "id": "G3-002",
+   "area": "rag",
+   "title": "Gamma private 노트의 '블루펭귄' 이 viewer/outsider 전역 RAG 에 안 나온다 (timeRange 없음 = 캐시 경로 포함)",
+   "role": "viewer",
+   "preconditions": "Gamma 에 '블루펭귄' 노트 존재(임베딩 완료). T5 e2e 는 timeRange=1m 으로 캐시를 우회하므로 여기서는 timeRange 를 비운다.",
+   "steps": [
+    "viewer: POST rag/ask {\"question\":\"블루펭귄 프로젝트 코드명이 뭐야\"} timeRange=null",
+    "search_results.chunks 의 sourceType/sourceId 확인",
+    "같은 질문을 member(Gamma 멤버)로 실행해 양성 대조군 확보",
+    "outsider 로 Outsider Co wid 에서 같은 질문"
+   ],
+   "expected": "viewer·outsider 응답에 Gamma 노트 청크 0건, answer 에 '블루펭귄' 없음. member 응답에는 존재(대조군). 근거: private 은 ProjectMember 만 통과(PROJECT_VISIBILITY_FILTER_SQL), 노트는 연결 변경 시 update_project_id 로 청크 project_id 가 갱신된다.",
+   "source": "apps/api/src/common/visibility.py:154",
+   "priority": "P0",
+   "method": "api"
+  },
+  {
+   "id": "G3-003",
+   "area": "rag",
+   "title": "outsider 가 QA Team 워크스페이스에 rag/ask 하면 스트림 시작 전 403",
+   "role": "outsider",
+   "preconditions": "outsider 는 QA Team 비멤버.",
+   "steps": [
+    "outsider 토큰으로 POST /api/v1/workspaces/{QA Team wid}/rag/ask {\"question\":\"블루펭귄\"}",
+    "HTTP status 와 Content-Type 확인"
+   ],
+   "expected": "HTTP 403 JSON(비 text/event-stream). rag/ask 의 유일한 사전 게이트는 require_viewer(워크스페이스 멤버십)다.",
+   "source": "apps/api/src/rag/router.py:24",
+   "priority": "P0",
+   "method": "api"
+  },
+  {
+   "id": "G3-004",
+   "area": "rag",
+   "title": "7일 semantic cache 역할 간 누출 — admin 이 캐시한 Gamma 답변을 viewer 가 받지 않는다",
+   "role": "admin → viewer",
+   "preconditions": "semantic_caches 에 해당 질문 없음. timeRange 비움(시간 필터가 있으면 캐시를 건너뜀).",
+   "steps": [
+    "admin: POST rag/ask {\"question\":\"블루펭귄 일정 요약해줘\"} → done.cached=false 확인(캐시 저장)",
+    "admin: 같은 질문 재실행 → done.cached=true 확인(캐시 동작 증명)",
+    "viewer: 같은 질문 실행 → done.cached 와 sources 확인",
+    "member(Gamma 멤버): 같은 질문 → cached=true 허용"
+   ],
+   "expected": "viewer 는 done.cached=false 이고 Gamma 소스/답변을 받지 않는다. find_similar_cache 는 non-admin 요청자에 대해 ALL_CHUNKS_VISIBLE_SQL anti-join 으로 캐시 소스 전부가 보이는지 재검증하고 하나라도 안 보이면 miss 처리한다. 캐시 TTL 은 7일.",
+   "source": "apps/api/src/embeddings/repository.py:392",
+   "priority": "P0",
+   "method": "api"
+  },
+  {
+   "id": "G3-005",
+   "area": "rag",
+   "title": "sourceType 필터가 캐시 키에 없음 — '노트만' 으로 캐시된 답이 '회의만' 질문에 재사용되는지",
+   "role": "member",
+   "preconditions": "같은 주제가 노트와 회의 양쪽에 있는 데이터. timeRange 비움.",
+   "steps": [
+    "member: rag/ask {question:Q, sourceType:\"note\"} → sources 전부 note, done.cached=false",
+    "member: rag/ask {question:Q, sourceType:\"meeting\"}",
+    "두 번째 응답의 done.cached 와 search_results.sourceType 확인",
+    "UI: /search 필터 '유형' 을 노트→회의로 바꿔 같은 질문"
+   ],
+   "expected": "두 번째 응답의 소스는 전부 meeting 이어야 한다. 의심: 캐시 조회가 source_type 없이 질문/워크스페이스/프로젝트만으로 hit 하고(time_range 만 skip 대상), 필터된 답도 캐시에 저장되므로 note 소스가 반환된다.",
+   "source": "apps/api/src/rag/service.py:74",
+   "priority": "P1",
+   "method": "both"
+  },
+  {
+   "id": "G3-006",
+   "area": "rag",
+   "title": "viewer 가 projectId=Gamma 로 질문 → HTTP 200 + SSE error + done(sourceCount 0)",
+   "role": "viewer",
+   "preconditions": "Gamma project id 확보. UI 에는 프로젝트 범위 선택기가 없으므로 API 로만 재현.",
+   "steps": [
+    "viewer: POST rag/ask {\"question\":\"블루펭귄\",\"projectId\":\"<Gamma id>\"}",
+    "SSE 이벤트 원문 전체를 기록"
+   ],
+   "expected": "HTTP 200 뒤 event:error data 에 'Private 프로젝트는 명시적 멤버만 접근 가능합니다.' 그리고 done{cached:false, sourceCount:0}. search_results/answer 이벤트 없음. 프로젝트 권한 검사는 generator 안에서 실행되므로 HTTP 상태로는 거부가 드러나지 않는다.",
+   "source": "apps/api/src/rag/pipeline_service.py:67",
+   "priority": "P1",
+   "method": "api"
+  },
+  {
+   "id": "G3-007",
+   "area": "rag",
+   "title": "Beta(draft) projectId 질문 — 작성자 member 허용 / viewer 거부 / admin 우회",
+   "role": "member, viewer, admin",
+   "preconditions": "Beta 는 member 가 생성한 draft.",
+   "steps": [
+    "member(작성자): rag/ask projectId=Beta → 정상 스트림",
+    "viewer: 같은 요청 → SSE error 메시지 확인",
+    "admin: 같은 요청 → 정상 스트림"
+   ],
+   "expected": "viewer 는 event:error 'Draft 프로젝트는 작성자만 접근 가능합니다.' + done sourceCount 0. member(작성자)와 admin/owner(visibility 우회)는 정상 답변.",
+   "source": "apps/api/src/rag/pipeline_service.py:21",
+   "priority": "P1",
+   "method": "api"
+  },
+  {
+   "id": "G3-008",
+   "area": "rag",
+   "title": "타 테넌트 projectId 를 넣으면 admin 이라도 차단",
+   "role": "admin",
+   "preconditions": "Outsider Co 프로젝트 id 확보(outsider 계정으로 조회).",
+   "steps": [
+    "QA Team admin: POST /workspaces/{QA Team wid}/rag/ask projectId=<Outsider Co 프로젝트 id>",
+    "SSE 이벤트 확인"
+   ],
+   "expected": "event:error '프로젝트를 찾을 수 없거나 접근 권한이 없습니다.' + done sourceCount 0. admin 우회는 같은 워크스페이스 프로젝트에만 적용된다.",
+   "source": "apps/api/src/rag/pipeline_service.py:93",
+   "priority": "P1",
+   "method": "api"
+  },
+  {
+   "id": "G3-009",
+   "area": "rag",
+   "title": "잘못된 projectId / 미지원 timeRange 입력 처리",
+   "role": "member",
+   "preconditions": "없음",
+   "steps": [
+    "rag/ask {\"question\":\"테스트 질문\",\"projectId\":\"abc\"}",
+    "rag/ask {\"question\":\"테스트 질문\",\"timeRange\":\"2y\"}",
+    "rag/ask {\"question\":\"테스트 질문\",\"sourceType\":\"bogus\"}"
+   ],
+   "expected": "셋 다 422 가 바람직. 의심: projectId='abc' 는 스트림 전 uuid.UUID() ValueError → 전역 핸들러가 500 반환. timeRange '2y' 는 TIME_RANGE_INTERVAL 에 없어 조용히 무시되어 전체 기간 결과(단 캐시는 skip). schemas 의 projectId/timeRange/sourceType 은 검증 없는 str.",
+   "source": "apps/api/src/rag/router.py:28",
+   "priority": "P2",
+   "method": "api"
+  },
+  {
+   "id": "G3-010",
+   "area": "rag",
+   "title": "질문 길이 경계 2~500자 — API 422 와 FE 표시",
+   "role": "member",
+   "preconditions": "/search 페이지",
+   "steps": [
+    "API: question='a' → status",
+    "API: question='  a  ' → status + detail 메시지",
+    "API: question=500자 → 200, 501자 → status",
+    "UI: /search 입력창에 501자 붙여넣고 전송 → 화면 메시지 확인"
+   ],
+   "expected": "1자·공백제외1자·501자는 422(검증 메시지 '질문은 공백 제외 2자 이상이어야 합니다.'), 500자는 200. FE 는 입력 maxLength 가 없고 non-OK 응답을 catch 해 일반 문구 '오류가 발생했습니다. 잠시 후 다시 시도해주세요.' 만 보여준다(원인 미표시 = UX 결함 후보).",
+   "source": "apps/api/src/rag/schemas.py:9",
+   "priority": "P2",
+   "method": "both"
+  },
+  {
+   "id": "G3-011",
+   "area": "rag",
+   "title": "SSE 스트리밍 이벤트 순서와 캐시 플래그",
+   "role": "member",
+   "preconditions": "답변 가능한 질문 Q(Alpha 공개 노트 기반).",
+   "steps": [
+    "curl -N 으로 rag/ask {question:Q} 원문 이벤트 기록",
+    "같은 Q 재실행 → done.cached",
+    "timeRange='1m' 로 같은 Q 2회 → done.cached"
+   ],
+   "expected": "thinking → search_results → answer(토큰 N개) → done{cached,sourceCount} 순서. 두 번째 무필터 호출은 cached=true. timeRange 가 있으면 조회·저장 모두 캐시를 건너뛰어 두 번 다 cached=false.",
+   "source": "apps/api/src/rag/service.py:74",
+   "priority": "P1",
+   "method": "api"
+  },
+  {
+   "id": "G3-012",
+   "area": "rag",
+   "title": "SSE error 이벤트를 FE 가 렌더하지 않음 — 빈 말풍선 + 영구 커서",
+   "role": "member",
+   "preconditions": "Playwright page.route('**/rag/ask') 로 'event: error\\ndata: {\"message\":\"질문을 처리할 수 없습니다. 다시 시도해주세요.\",\"retryAfter\":3}\\n\\nevent: done\\ndata: {\"cached\":false,\"sourceCount\":0}\\n\\n' 를 200 text/event-stream 으로 주입(또는 G3-006 요청을 UI 에서 재현할 방법이 없으므로 mock 필수).",
+   "steps": [
+    "/search 에서 아무 질문 전송",
+    "5초 대기 후 마지막 assistant 말풍선 스크린샷",
+    "console.error 수집"
+   ],
+   "expected": "사용자에게 오류 메시지가 보여야 한다. 의심: hooks.ts 의 이벤트 switch 에 error case 가 없어 무시되고, 플레이스홀더의 isStreaming=true 가 해제되지 않아 content 가 빈 말풍선에 펄스 커서가 영구 표시된다(rag-chat.tsx:130).",
+   "source": "apps/web/src/features/rag/hooks.ts:88",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G3-013",
+   "area": "rag",
+   "title": "답변 완료 후 복사/내보내기(MessageActions)가 나타나는지",
+   "role": "member",
+   "preconditions": "정상 답변이 나오는 질문",
+   "steps": [
+    "/search 에서 질문 → done 까지 대기",
+    "assistant 말풍선 아래 복사/내보내기 버튼 존재 확인",
+    "React DevTools 또는 store 로 마지막 메시지 isStreaming 값 확인"
+   ],
+   "expected": "스트림 종료 후 MessageActions 가 보여야 한다. 의심: 버튼 조건이 !msg.isStreaming && msg.content 인데 메시지별 isStreaming 은 플레이스홀더 생성 시 true 로만 세팅되고 store 어디에서도 false 로 바뀌지 않아(전역 isStreaming 만 해제) 영원히 숨는다.",
+   "source": "apps/web/src/features/rag/components/rag-chat.tsx:140",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G3-014",
+   "area": "rag",
+   "title": "관련 소스 없음 — 빈 결과 안내 문구",
+   "role": "member",
+   "preconditions": "없음",
+   "steps": [
+    "/search 에서 'zzqx 존재하지않는주제 7781' 질문",
+    "말풍선 텍스트와 인용 유무 확인"
+   ],
+   "expected": "answer 토큰 '제공된 소스에서 관련 정보를 찾지 못했습니다.' 가 표시되고 인용 [N] 없음, console.error 0.",
+   "source": "apps/api/src/rag/service.py:158",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G3-015",
+   "area": "rag",
+   "title": "인용 [N] 클릭 → source viewer 가 sourceId 엔티티를 열고 인용 청크를 하이라이트",
+   "role": "member",
+   "preconditions": "답변에 인용이 2개 이상. 인용 청크가 문서 앞 200자 밖에 있는 긴 노트/회의 포함.",
+   "steps": [
+    "/search 질문 → 답변의 [2] 클릭",
+    "data-testid=rag-source-viewer 가 열리고 제목/유형/날짜가 해당 sourceId 와 일치하는지 확인",
+    "하이라이트 위치가 인용 청크 본문인지 문서 첫 부분인지 확인",
+    "다른 메시지의 [1] 클릭 시 activeCitation 전환 확인"
+   ],
+   "expected": "뷰어가 해당 엔티티를 열고 인용 청크를 강조. 의심: toHighlightChunk 가 offset 0..snippet 길이로 만들고 뷰어는 전문(transcript/plainText)을 다시 가져오므로 하이라이트가 문서 앞 ~200자에 떨어진다(스니펫은 [:200] 절단).",
+   "source": "apps/web/src/features/rag/components/rag-chat.tsx:27",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G3-016",
+   "area": "rag",
+   "title": "범위 밖 인용 번호 클릭 (BL-F8 잔여)",
+   "role": "member",
+   "preconditions": "Playwright route mock 으로 sources 2개 + 답변 '...[5]' 주입",
+   "steps": [
+    "[5] 클릭",
+    "화면 변화·console 확인",
+    "source viewer 의 내보내기 버튼 동작 확인(BL-F8 수정분 회귀)"
+   ],
+   "expected": "범위 밖 인용은 비활성 표시 또는 안내가 바람직. 현재 sources?.[num-1] 이 undefined 면 조용히 no-op(결함 잔여). 내보내기 버튼은 동작해야 한다(source-viewer.tsx:203).",
+   "source": "apps/web/src/features/rag/components/rag-chat.tsx:76",
+   "priority": "P2",
+   "method": "ui",
+   "known": "BL-F8"
+  },
+  {
+   "id": "G3-017",
+   "area": "rag",
+   "title": "표/인용구/h4~h6 안의 인용 [N] 도 클릭 가능 (BL-F7 회귀)",
+   "role": "member",
+   "preconditions": "route mock 으로 '| 항목 | 근거 |\\n|---|---|\\n| A | [1] |' + '> 인용 [2]' + '#### 소제목 [1]' 답변 주입",
+   "steps": [
+    "각 [N] 이 버튼/링크로 렌더되는지 확인",
+    "클릭 시 source viewer 열림 확인"
+   ],
+   "expected": "td/th/blockquote/h4~h6 모두 injectCitations 적용되어 클릭 가능.",
+   "source": "apps/web/src/features/rag/components/markdown-message.tsx:104",
+   "priority": "P2",
+   "method": "ui",
+   "known": "BL-F7"
+  },
+  {
+   "id": "G3-018",
+   "area": "rag",
+   "title": "한국어 IME 조합 중 Enter — RAG 입력 중복 전송/글자 잘림",
+   "role": "member",
+   "preconditions": "macOS 한글 입력기(또는 Playwright 에서 compositionstart/keydown isComposing=true 시뮬레이션)",
+   "steps": [
+    "/search 입력창(data-testid=rag-input)에 '블루펭귄 일정' 을 조합 상태로 입력",
+    "조합 종료 전 Enter",
+    "전송된 요청 수와 question 본문 확인(network)"
+   ],
+   "expected": "요청 1회, 마지막 음절 포함 전문 전송. 의심: onKeyDown Enter 처리에 isComposing 검사가 없어 조합 중 Enter 로 부분 문자열 전송 또는 2회 전송.",
+   "source": "apps/web/src/features/rag/components/rag-input.tsx:27",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G3-019",
+   "area": "rag",
+   "title": "검색 범위 선택기 — 기간/유형 필터 동작, 프로젝트 범위 부재",
+   "role": "member",
+   "preconditions": "3개월 이전 생성 데이터와 최근 데이터가 섞여 있음",
+   "steps": [
+    "/search 필터 기간=1개월 선택 후 질문 → 요청 body timeRange='1m' 확인, 소스 날짜 확인",
+    "유형=노트 → sourceType='note', 소스 전부 노트",
+    "유형=전체로 복귀 → sourceType null 전송 확인",
+    "프로젝트 범위 선택 UI 존재 여부 기록"
+   ],
+   "expected": "기간 옵션 전체/1m/3m/6m, 유형 옵션 전체/meeting/note/external_document 만 존재하고 범위는 항상 워크스페이스 전체(주석 명시). 빈 값은 null 로 변환 전송. 프로젝트 범위 UI 는 없다(rag-pipeline.md 는 있다고 서술 — D 항목).",
+   "source": "apps/web/src/features/rag/components/search-scope.tsx:36",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G3-020",
+   "area": "cmdk",
+   "title": "⌘K / Ctrl+K 토글과 Escape 닫기",
+   "role": "member",
+   "preconditions": "/dashboard, 포커스는 body",
+   "steps": [
+    "Meta+K → data-testid=cmdk-panel 표시",
+    "다시 Meta+K → 닫힘",
+    "Ctrl+K(Windows UA) → 표시, Escape → 닫힘",
+    "newbie 로 첫 오픈 시 onboarding-tooltip-search 표시 확인"
+   ],
+   "expected": "Cmd/Ctrl+K 가 팔레트를 토글하고 Escape 로 닫힌다. 팔레트는 OnboardingTooltip page='search' 로 감싸져 첫 방문 툴팁이 뜬다.",
+   "source": "apps/web/src/components/layout/cmd-k.tsx:134",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G3-021",
+   "area": "cmdk",
+   "title": "팔레트에서 '?' 접두 AI 검색 → RAG 오버레이에서 질문 실행",
+   "role": "member",
+   "preconditions": "팔레트 열림",
+   "steps": [
+    "'?블루펭귄 없는 공개 질문' 입력 → AI 모드 표시 확인",
+    "Enter → RAG 오버레이 열림 + rag/ask 요청 발생 확인",
+    "팔레트 밖(body 포커스)에서 '?' 단독 키 → 아무 일도 없음 확인"
+   ],
+   "expected": "'?' 접두 시 AI 검색 모드로 바뀌고 Enter 로 오버레이에서 질문이 실행된다. 전역 '?' 단축키 핸들러는 없다(팔레트 내부 접두만).",
+   "source": "apps/web/src/components/layout/cmd-k.tsx:202",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G3-022",
+   "area": "cmdk",
+   "title": "G 시퀀스(I/P/A/N/S)와 C → /new, 한글 자판 상태에서도 동작",
+   "role": "member",
+   "preconditions": "body 포커스. 일부 반복은 한글 입력 모드(키 'ㅎ','ㅑ' 등)로.",
+   "steps": [
+    "g 후 1초 안에 i → /inbox",
+    "g p → /projects, g a → /actions, g n → /notes, g s → /search",
+    "c → /new",
+    "한글 모드에서 같은 물리 키로 반복(e.key='ㅎ', e.code='KeyG')",
+    "g 후 1.5초 대기 뒤 i → 이동 안 함"
+   ],
+   "expected": "각 경로로 이동. e.code 로 매칭하고 e.key 는 fallback 이라 한글 자판에서도 동작. 시퀀스 타임아웃 후 두 번째 키는 무시.",
+   "source": "apps/web/src/components/layout/cmd-k.tsx:53",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G3-023",
+   "area": "cmdk",
+   "title": "입력 필드·에디터·다이얼로그 안에서는 단축키 무시",
+   "role": "member",
+   "preconditions": "노트 상세(Tiptap contenteditable), 피드백 다이얼로그, RAG 입력창",
+   "steps": [
+    "노트 에디터에 'gi' 입력 → 이동 없음, 글자 입력됨",
+    "피드백 다이얼로그 textarea 에 'c' 입력 → /new 이동 없음",
+    "Select/Popover 가 열린 상태에서 'g p' → 이동 없음",
+    "에디터 포커스 상태에서 Meta+K → 팔레트 열림 여부 기록"
+   ],
+   "expected": "isTypingTarget(input/textarea/contenteditable) 또는 isPopupOpen(열린 dialog, popover-content·data-closed·hidden 제외) 이면 G/C 시퀀스를 무시한다.",
+   "source": "apps/web/src/components/layout/cmd-k.tsx:79",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G3-024",
+   "area": "cmdk",
+   "title": "팔레트 입력창에서 한글 조합 중 Enter",
+   "role": "member",
+   "preconditions": "팔레트 열림, 한글 입력기",
+   "steps": [
+    "'?회의 요약' 을 조합 상태로 입력 후 Enter",
+    "rag/ask 요청의 question 과 요청 횟수 확인"
+   ],
+   "expected": "요청 1회, '회의 요약' 전문. 의심: 팔레트 Enter 처리에도 isComposing 검사가 없어 마지막 음절 누락/중복 실행.",
+   "source": "apps/web/src/components/layout/cmd-k.tsx:282",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G3-025",
+   "area": "cmdk",
+   "title": "팔레트 항목 동작과 헤더 검색 버튼 ⌘K 표기 불일치",
+   "role": "member",
+   "preconditions": "데스크톱 1280px",
+   "steps": [
+    "팔레트에서 '지식 검색 ⌘K' 항목 선택 → 결과 기록",
+    "팔레트에 '프로젝트' 입력 → 항목 필터링 여부 기록 후 Enter",
+    "헤더 검색 버튼 클릭 → 열리는 것이 팔레트인지 RAG 오버레이인지 기록(버튼에 ⌘K kbd 표시됨)"
+   ],
+   "expected": "'지식 검색' 항목은 action 'focus' 로 팔레트를 닫기만 한다(기능 없음). 비-'?' 입력은 항목을 거르지 않고 Enter 는 닫기만 한다. 헤더 버튼은 ⌘K 를 표기하지만 RAG 오버레이를 연다(⌘K 는 팔레트) — 표기 불일치.",
+   "source": "apps/web/src/components/layout/header.tsx:66",
+   "priority": "P3",
+   "method": "ui"
+  },
+  {
+   "id": "G3-026",
+   "area": "memory",
+   "title": "메모 capture → recall 기본 흐름과 경계값",
+   "role": "member",
+   "preconditions": "NEXT_PUBLIC_RECALL_ENABLED=true(사이드바 Memory 노출)",
+   "steps": [
+    "POST /api/v1/workspaces/{wid}/memory {text:'QA 메모 오로라 계획'} → 202, memory_id",
+    "POST text 10001자 → 422, text 와 audio 동시/둘 다 없음 → 422",
+    "/memory 에서 '오' 1자 입력 → 요청 없음, '오로라' → 300ms 뒤 GET /memory/recall?q=오로라",
+    "GET recall?q=a(1자) / 201자 → 422"
+   ],
+   "expected": "capture 는 202(member 이상). recall 은 q 2~200자, UI 는 debounce 300ms 후 trim 2자 이상일 때만 조회. 응답 필드는 snake_case(memory_id, fallback_used 등).",
+   "source": "apps/api/src/memory/router.py:90",
+   "priority": "P1",
+   "method": "both"
+  },
+  {
+   "id": "G3-027",
+   "area": "memory",
+   "title": "viewer 는 메모 capture/promote 불가, recall/metrics 는 가능",
+   "role": "viewer",
+   "preconditions": "없음",
+   "steps": [
+    "viewer: POST memory → status",
+    "viewer: POST memory/{id}/promote → status",
+    "viewer: GET memory/recall?q=오로라, GET memory/metrics → status",
+    "UI: viewer 로 /memory 진입 시 capture 버튼 노출 여부"
+   ],
+   "expected": "capture/promote 는 require_member → 403. recall·metrics·detail 은 require_viewer → 200. UI 가 viewer 에게 capture 진입점을 보이면 403 토스트 확인.",
+   "source": "apps/api/src/memory/router.py:56",
+   "priority": "P1",
+   "method": "both"
+  },
+  {
+   "id": "G3-028",
+   "area": "memory",
+   "title": "[확인 필요] 팀 워크스페이스에서 다른 사람의 '개인' 메모가 recall/RAG 로 보이는지",
+   "role": "viewer",
+   "preconditions": "QA Team 에서 member 가 '민감 메모 코스모스' capture(distill 완료)",
+   "steps": [
+    "viewer: GET memory/recall?q=코스모스",
+    "viewer: rag/ask '코스모스 메모 내용' → search_results 에 sourceType=memory 존재 여부",
+    "viewer: GET memory/{member 메모 id}"
+   ],
+   "expected": "memory/CONTEXT.md 는 '개인 메모리 레이어' 로 정의. 개인 소유라면 viewer 에게 안 보여야 한다. 실제: vector_search 는 workspace_id 만 필터(작성자 필터 없음)하고 memory 청크는 project_id NULL 이라 RAG 필터도 통과 — 제품 의도 확인 필요.",
+   "source": "apps/api/src/memory/repository.py:207",
+   "priority": "P1",
+   "method": "api"
+  },
+  {
+   "id": "G3-029",
+   "area": "memory",
+   "title": "/admin/recall-metrics — founder 만 지표, 나머지는 접근 권한 없음",
+   "role": "owner(founder), admin",
+   "preconditions": "NEXT_PUBLIC_FOUNDER_USER_ID = owner 의 users.id(내부 UUID)",
+   "steps": [
+    "owner 로 /admin/recall-metrics → 지표 표시, 30초 간격 재조회 확인(network)",
+    "admin 으로 같은 URL → 화면 문구",
+    "admin 화면에서 metrics 요청 발생 여부(enabled=false 여야 함)",
+    "admin 토큰으로 GET memory/metrics 직접 호출 → status 기록"
+   ],
+   "expected": "founder 만 지표(refetch 30s). 비-founder 는 h1 '접근 권한 없음' 이고 쿼리 비활성. 단 BE /memory/metrics 는 require_viewer 라 API 로는 누구나 조회 가능(FE 게이트만 존재).",
+   "source": "apps/web/src/app/(app)/admin/recall-metrics/page.tsx:23",
+   "priority": "P2",
+   "method": "both"
+  },
+  {
+   "id": "G3-030",
+   "area": "onboarding",
+   "title": "newbie 첫 방문 툴팁(dashboard, search) 표시 → 닫기 → 재방문 미표시",
+   "role": "newbie",
+   "preconditions": "새 브라우저 컨텍스트(localStorage 비움)",
+   "steps": [
+    "/dashboard → data-testid=onboarding-tooltip-dashboard 표시",
+    "Escape 로 닫기, 새로고침 → 미표시",
+    "Meta+K → onboarding-tooltip-search 표시, X 로 닫기",
+    "localStorage 키 kairos.onboarding.tooltip_shown.dashboard/search 확인",
+    "같은 브라우저에서 member 로 재로그인 → 툴팁 미표시(키가 사용자별이 아님) 기록"
+   ],
+   "expected": "dashboard·search 는 첫 방문 무조건 표시, Esc/X 로 닫히고 재방문 시 미표시. 키가 브라우저 단위라 같은 브라우저의 다른 사용자에게도 안 뜬다(P3 관찰).",
+   "source": "apps/web/src/components/onboarding/onboarding-tooltip.tsx:27",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G3-031",
+   "area": "onboarding",
+   "title": "온보딩 step API 응답 형태와 단계 전이",
+   "role": "newbie",
+   "preconditions": "newbie step 확인 가능",
+   "steps": [
+    "GET /api/v1/users/me/onboarding → {step,totalSteps,onboardedAt,isCompleted}",
+    "프로젝트 생성 → step 2",
+    "회의 처리 완료 → step 3",
+    "rag/ask 성공 1회 → step 4, isCompleted=true, FE 가 onboarding 쿼리 invalidate"
+   ],
+   "expected": "totalSteps 4. step 은 1(가입/워크스페이스) → 2(projects/service) → 3(meetings pipeline) → 4(rag 성공 또는 캐시 hit) 로만 증가.",
+   "source": "apps/api/src/rag/service.py:41",
+   "priority": "P2",
+   "method": "api"
+  },
+  {
+   "id": "G3-032",
+   "area": "onboarding",
+   "title": "조건부 툴팁 — projects(step<2 & 비어 있음), new 툴팁은 어디서도 렌더되지 않음",
+   "role": "newbie",
+   "preconditions": "newbie step 1, 프로젝트 0개, localStorage 비움",
+   "steps": [
+    "/projects → onboarding-tooltip-projects 표시",
+    "프로젝트 생성 후 새 브라우저 컨텍스트로 /projects → 미표시",
+    "/new 진입 → onboarding-tooltip-new 존재 여부"
+   ],
+   "expected": "projects 는 step<2 + empty 에서만 표시. COPY 의 new('회의 음성을 업로드하면 AI 가 자동 요약합니다')는 사용처가 없어 /new 에 뜨지 않는다(죽은 설정).",
+   "source": "apps/web/src/components/onboarding/onboarding-tooltip.tsx:31",
+   "priority": "P3",
+   "method": "ui"
+  },
+  {
+   "id": "G3-033",
+   "area": "feedback",
+   "title": "피드백 FAB 제출 — 별점 + 본문 + 익명",
+   "role": "member",
+   "preconditions": "/dashboard",
+   "steps": [
+    "aria-label '피드백 보내기' FAB 클릭",
+    "별점 4, 본문 입력, 익명 체크 → 제출",
+    "POST /api/v1/feedback 요청 body/응답 확인",
+    "DB feedback 행의 user_id 확인"
+   ],
+   "expected": "201 {id,status:'received',createdAt}, 토스트 '피드백 감사합니다! 더 나은 Kairos 를 만드는 데 큰 힘이 됩니다.' 익명이어도 user_id 가 저장되는지 기록(익명 의미 확인 필요).",
+   "source": "apps/web/src/features/feedback/components/feedback-button.tsx:50",
+   "priority": "P2",
+   "method": "both"
+  },
+  {
+   "id": "G3-034",
+   "area": "feedback",
+   "title": "피드백 검증 — 빈 본문 비활성, rating/body 경계, 임의 workspaceId",
+   "role": "member",
+   "preconditions": "없음",
+   "steps": [
+    "UI: 본문 공백만 → 제출 버튼 disabled",
+    "API: rating 6 → 422, body 5001자 → 422",
+    "API: workspaceId=무작위 UUID → status",
+    "API: workspaceId=Outsider Co wid(비멤버) → status"
+   ],
+   "expected": "빈 본문 disabled, 경계 위반 422. 무작위 UUID 는 FK 위반으로 500 의심(422/404 가 바람직). 비멤버 워크스페이스 id 는 멤버십 검증이 없어 201 로 수용되는지 기록.",
+   "source": "apps/web/src/features/feedback/components/feedback-button.tsx:140",
+   "priority": "P2",
+   "method": "both"
+  },
+  {
+   "id": "G3-035",
+   "area": "feedback",
+   "title": "FAB 가 주요 버튼을 가리지 않는다 (fabSafe) — 375px",
+   "role": "member",
+   "preconditions": "뷰포트 375x812",
+   "steps": [
+    "/search: FAB 와 rag-submit 버튼 bounding box 겹침 계산",
+    "/new, /notes/[id], /inbox, /projects/[id]: 하단 주요 버튼과 FAB 겹침 계산",
+    "BottomNav(56px) 와 FAB 겹침 계산",
+    "1280px 에서도 반복(md:bottom-6)"
+   ],
+   "expected": "FAB 는 fixed right-4, bottom=calc(--bottom-nav-height + 1rem) 로 bottom nav 위. RAG 입력은 fabSafe 패딩으로 전송 버튼과 겹치지 않는다. 다른 페이지 하단 버튼과 교차 0.",
+   "source": "apps/web/src/features/feedback/components/feedback-button.tsx:67",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G3-036",
+   "area": "public",
+   "title": "랜딩 / — 비로그인 200, 로그인 시 /dashboard, 네비 앵커",
+   "role": "anonymous, member",
+   "preconditions": "없음",
+   "steps": [
+    "비로그인 / → h1 1개, lang=ko, #pipe/#shots/#trust 섹션 존재",
+    "375px 에서 '기능'(#pipe) 링크 숨김 확인(sm 이상만)",
+    "랜딩 스크린샷 이미지 로드(4xx 0)",
+    "로그인 상태로 / → /dashboard 리다이렉트"
+   ],
+   "expected": "비로그인 200 + 정상 렌더, 로그인 세션이 있으면 /dashboard 로 redirect.",
+   "source": "apps/web/src/app/(landing)/page.tsx:13",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G3-037",
+   "area": "public",
+   "title": "/pricing — 타이틀, 로그인 리다이렉트, '기능' 앵커가 죽은 링크",
+   "role": "anonymous, member",
+   "preconditions": "데스크톱 1280px",
+   "steps": [
+    "비로그인 /pricing → document.title",
+    "네비 '기능' 클릭 → 이동/스크롤 결과",
+    "로그인 상태로 /pricing → 리다이렉트 여부"
+   ],
+   "expected": "title '가격 — Kairos', 로그인 시 /dashboard. LandingNav 를 재사용해 href='#pipe' 가 /pricing 에는 없는 id 라 아무 일도 없다(결함 후보: '/#pipe' 여야 함).",
+   "source": "apps/web/src/components/landing/landing-nav.tsx:33",
+   "priority": "P3",
+   "method": "ui"
+  },
+  {
+   "id": "G3-038",
+   "area": "public",
+   "title": "/sign-in, /sign-up 렌더와 보호 경로 callbackURL 왕복",
+   "role": "anonymous",
+   "preconditions": "없음",
+   "steps": [
+    "/sign-in, /sign-up 200 + 폼 라벨 존재, document.title 기록",
+    "비로그인 /projects?tab=x → /sign-in?callbackURL=%2Fprojects%3Ftab%3Dx",
+    "외부 URL callbackURL(/sign-in?callbackURL=https://evil.example) 로 로그인 후 이동지 확인(테스트 계정)"
+   ],
+   "expected": "보호 경로는 callbackURL 에 pathname+search 를 담아 /sign-in 으로 redirect. 외부 URL 로는 이동하지 않는다(Better Auth 가 callbackURL 검증). 제목은 공통 'Kairos — 팀의 세컨드 브레인'(페이지별 제목 없음, P3).",
+   "source": "apps/web/src/proxy.ts:39",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G3-039",
+   "area": "public",
+   "title": "/invite/[잘못된 코드] — 사용 불가 안내와 로그인 유도",
+   "role": "anonymous, member",
+   "preconditions": "없음",
+   "steps": [
+    "비로그인 /invite/bad-code-xyz → 화면 문구",
+    "GET /api/v1/invites/bad-code-xyz 응답",
+    "API 를 route mock 으로 500 반환 → '일시적인 오류' + 재시도 버튼",
+    "유효 코드 비로그인 → '로그인하고 참여' 링크 href"
+   ],
+   "expected": "잘못된 코드는 '초대를 사용할 수 없습니다' + 사유('존재하지 않는 초대 링크입니다'). API 는 200 isValid=false. 오류는 일시적 오류 + 재시도. 로그인 링크는 /sign-in?callbackURL=/invite/{code}.",
+   "source": "apps/web/src/app/invite/[code]/page.tsx:209",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G3-040",
+   "area": "responsive",
+   "title": "375px 전 라우트 sweep — 가로 스크롤 0, console.error 0, 4xx/5xx 0",
+   "role": "member",
+   "preconditions": "뷰포트 375x812, 시드 데이터",
+   "steps": [
+    "순회: /dashboard /projects /projects/{Alpha} /meetings/{id} /notes /notes/{id} /inbox /actions /memory /search /new /settings /admin/recall-metrics",
+    "각 페이지 document.documentElement.scrollWidth <= 375 확인",
+    "console.error 및 네트워크 4xx/5xx 수집(401 토큰 갱신 제외)",
+    "각 페이지 스크린샷"
+   ],
+   "expected": "모든 라우트에서 가로 오버플로 0, console.error 0, 4xx/5xx 0. 모바일은 사이드바 대신 BottomNav 가 렌더된다.",
+   "source": "apps/web/src/components/layout/panel-layout.tsx:211",
+   "priority": "P1",
+   "method": "ui"
+  },
+  {
+   "id": "G3-041",
+   "area": "responsive",
+   "title": "모바일 BottomNav 구성과 역할별 노출",
+   "role": "member, viewer",
+   "preconditions": "375px",
+   "steps": [
+    "항목 확인: 홈 /dashboard, 프로젝트, 추가 /new, Inbox, 메모 /notes",
+    "각 탭 이동 후 활성 표시(isActive) 확인, /projects/{id} 에서 '프로젝트' 활성 여부",
+    "viewer 로 '추가' 노출 여부 → 눌러서 /new 에서 무슨 일이 생기는지",
+    "모바일에서 /actions, /memory, /search 진입 경로 존재 여부"
+   ],
+   "expected": "5개 항목, pathname 완전일치일 때만 활성(하위 경로 비활성 = 관찰). '추가' 는 역할 게이트가 없어 viewer 에게도 보인다(사이드바 NAV_BOTTOM 은 hasRole('member') 게이트) — 결함 후보. 모바일에 액션/메모리/검색 탭 없음.",
+   "source": "apps/web/src/components/layout/bottom-nav.tsx:21",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G3-042",
+   "area": "responsive",
+   "title": "RAG 오버레이·source viewer 모바일 폭 (BL-F5 회귀, 320/375px)",
+   "role": "member",
+   "preconditions": "뷰포트 320x640 과 375x812",
+   "steps": [
+    "헤더 검색 버튼으로 RAG 오버레이 열기 → 오버레이 폭 <= 뷰포트",
+    "질문 → 인용 클릭 → source viewer 폭 100%",
+    "닫기 버튼 도달 가능 여부"
+   ],
+   "expected": "오버레이는 maxWidth 100% 로 뷰포트를 넘지 않는다(BL-F5 수정). source viewer 는 모바일에서 폭 100%.",
+   "source": "apps/web/src/components/layout/panel-layout.tsx:166",
+   "priority": "P2",
+   "method": "ui",
+   "known": "BL-F5"
+  },
+  {
+   "id": "G3-043",
+   "area": "responsive",
+   "title": "다크 모드 전환 — 주요 라우트 대비·깜빡임",
+   "role": "member",
+   "preconditions": "헤더 사용자 메뉴의 테마 전환",
+   "steps": [
+    "다크로 전환 후 G3-040 라우트 순회 스크린샷",
+    "새로고침 시 FOUC(밝은 화면 깜빡임) 여부",
+    "RAG 오버레이, 피드백 다이얼로그, 팔레트, 온보딩 툴팁의 배경/글자 대비 확인"
+   ],
+   "expected": "모든 화면이 DESIGN.md 토큰(var(--*))으로 다크 대응, 흰 배경 잔존 0. 새로고침 FOUC 없음.",
+   "source": "apps/web/next.config.ts:12",
+   "priority": "P3",
+   "method": "ui"
+  },
+  {
+   "id": "G3-044",
+   "area": "a11y",
+   "title": "접근 가능한 이름 없는 입력 요소",
+   "role": "member",
+   "preconditions": "axe-core 또는 accessibility snapshot",
+   "steps": [
+    "/search: rag-input textarea, 기간/유형 select 2개의 accessible name",
+    "/memory: 검색 Input 의 accessible name",
+    "팔레트 입력창 accessible name",
+    "각 페이지 h1 개수"
+   ],
+   "expected": "모든 입력에 label 또는 aria-label. 의심: rag-input 은 placeholder '질문을 입력하세요...' 뿐, search-scope select 2개는 label 없음, memory Input 은 placeholder 만, 팔레트 입력 aria-label 없음.",
+   "source": "apps/web/src/features/rag/components/search-scope.tsx:41",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G3-045",
+   "area": "a11y",
+   "title": "상태 필터 pill role=tab 키보드 계약 (BL-UX-6) + 중첩 role=button (BL-UX-1)",
+   "role": "member",
+   "preconditions": "/projects 또는 /actions 상태 필터 pill, /dashboard 검색 버튼",
+   "steps": [
+    "Tab 으로 tablist 진입 → 좌/우 화살표로 탭 이동되는지",
+    "tabindex 로빙(선택 탭만 0) 여부",
+    "/dashboard 검색 버튼 내부 중첩 role=button 여부(axe nested-interactive)"
+   ],
+   "expected": "role=tab 이면 화살표 키 이동 + roving tabindex 가 있어야 한다. 현재 미구현으로 등재됨(BL-UX-6), 대시보드 검색 버튼 role=button 중첩(BL-UX-1). 재현 여부만 기록.",
+   "source": "docs/REFACTORING-BACKLOG.md:48",
+   "priority": "P3",
+   "method": "ui",
+   "known": "BL-UX-6"
+  },
+  {
+   "id": "G3-046",
+   "area": "a11y",
+   "title": "오버레이/다이얼로그 포커스 관리 — RAG 오버레이·source viewer·팔레트 vs 피드백 Dialog",
+   "role": "member",
+   "preconditions": "데스크톱",
+   "steps": [
+    "피드백 Dialog: 열림 시 포커스 이동, Tab 순환(트랩), Esc 닫힘 후 FAB 로 포커스 복귀",
+    "RAG 오버레이: role=dialog/aria-modal 여부, Tab 이 배경으로 빠지는지",
+    "source viewer 열린 상태에서 Escape → 무엇이 닫히는지",
+    "피드백 별점: 스크린리더에 radio 로 읽히는지(role 확인)"
+   ],
+   "expected": "shadcn Dialog 는 포커스 트랩. RAG 오버레이·source viewer·팔레트는 일반 div 라 role=dialog/트랩 없음(결함 후보). Escape 는 RAG 오버레이만 닫고 source viewer 는 닫지 않는다. 별점은 radiogroup 안에 aria-pressed 버튼(role=radio 아님).",
+   "source": "apps/web/src/components/layout/panel-layout.tsx:119",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G3-047",
+   "area": "integrations",
+   "title": "설정 > 연동 탭은 owner 전용",
+   "role": "owner, admin, member",
+   "preconditions": "#194 이후 main",
+   "steps": [
+    "owner /settings → '연동' 탭 노출, ?tab=integrations 로 GoogleDrivePanel 렌더",
+    "admin /settings?tab=integrations → 탭 비노출 + 기본 탭으로 폴백",
+    "admin 토큰 GET /workspaces/{wid}/integrations/google-drive → 403"
+   ],
+   "expected": "탭은 isOwner 일 때만. 비-owner 는 URL 로 들어와도 기본 탭으로 폴백. BE 연동 엔드포인트는 require_owner 라 admin 403.",
+   "source": "apps/api/src/integrations/router.py:192",
+   "priority": "P1",
+   "method": "both"
+  },
+  {
+   "id": "G3-048",
+   "area": "integrations",
+   "title": "로컬 Google OAuth 미설정 — 연결 클릭 시 503 → 토스트, 크래시 없음",
+   "role": "owner",
+   "preconditions": "로컬 FE :3000 / BE :8000, GOOGLE OAuth 환경변수 없음",
+   "steps": [
+    "/settings?tab=integrations → ConnectCard 표시",
+    "연결 버튼 클릭 → POST integrations/google-drive/authorize status/detail",
+    "토스트 문구, console.error, 페이지 유지 확인",
+    "/settings?tab=integrations&variant=A → 프로토타입 흔적 없이 동일 화면"
+   ],
+   "expected": "BE 503 'Google OAuth 설정이 필요합니다', FE 토스트 'Google 인가 URL 을 만들지 못했습니다', 전체 이동 없음, uncaught error 0. variant 파라미터는 무시된다.",
+   "source": "apps/api/src/integrations/router.py:159",
+   "priority": "P1",
+   "method": "both"
+  },
+  {
+   "id": "G3-049",
+   "area": "integrations",
+   "title": "연결 해제·발행 취소에 확인 단계가 없음",
+   "role": "owner",
+   "preconditions": "연결된 상태가 필요 — 로컬 불가면 route mock 으로 connection 응답 주입",
+   "steps": [
+    "mock: GET google-drive → 연결 객체, documents 1건",
+    "'발행 취소' 클릭 → 확인 다이얼로그 여부, DELETE 요청 즉시 발생 여부",
+    "'연결 해제' 클릭 → 확인 여부",
+    "Picker 미설정 빌드에서 '파일 선택' → 안내 문구"
+   ],
+   "expected": "파괴적 동작은 확인이 있어야 하나 현재 없음(TODO 에 등재). Picker 미주입 빌드는 '이 빌드에 Google Picker 설정이 주입되지 않아 선택 창을 열 수 없습니다.' 표시.",
+   "source": "apps/web/src/features/integrations/components/google-drive-panel.tsx:475",
+   "priority": "P2",
+   "method": "ui"
+  },
+  {
+   "id": "G3-050",
+   "area": "prod",
+   "title": "prod 공개 페이지 상태코드와 보호 경로 리다이렉트",
+   "role": "anonymous",
+   "preconditions": "읽기 전용 GET 만",
+   "steps": [
+    "curl -s -o /dev/null -w '%{http_code}' https://kairos.woosung.dev/{'',pricing,sign-in,sign-up,invite/bad-code-xyz}",
+    "curl -sI https://kairos.woosung.dev/dashboard → Location"
+   ],
+   "expected": "공개 5종 200. /dashboard 는 307 → /sign-in?callbackURL=%2Fdashboard (2026-09-26 실측 일치).",
+   "source": "apps/web/src/proxy.ts:16",
+   "priority": "P1",
+   "method": "prod"
+  },
+  {
+   "id": "G3-051",
+   "area": "prod",
+   "title": "prod API health/ready 와 문서 엔드포인트 비노출",
+   "role": "anonymous",
+   "preconditions": "읽기 전용 GET",
+   "steps": [
+    "GET https://kairos-api.woosung.dev/api/v1/health, /api/v1/ready",
+    "GET /api/v1/docs, /api/v1/redoc, /api/v1/openapi.json, /docs, /openapi.json"
+   ],
+   "expected": "health 200 {status:'ok',version:'0.1.0'}, ready 200 {status:'ready',db:'ok'}. 문서 5종 404(production 에서 비활성). 2026-09-26 실측 일치.",
+   "source": "apps/api/src/main.py:79",
+   "priority": "P1",
+   "method": "prod"
+  },
+  {
+   "id": "G3-052",
+   "area": "prod",
+   "title": "prod JWKS — EdDSA/Ed25519 단일 키",
+   "role": "anonymous",
+   "preconditions": "읽기 전용 GET",
+   "steps": [
+    "curl -s https://kairos.woosung.dev/api/auth/jwks | jq '.keys[] | {kty,crv,alg}'"
+   ],
+   "expected": "200, 키 1개 {kty:'OKP', crv:'Ed25519', alg:'EdDSA'} — ADR-031 D6 과 일치(실측 일치).",
+   "source": "docs/adr/031-better-auth-migration.md:101",
+   "priority": "P2",
+   "method": "prod"
+  },
+  {
+   "id": "G3-053",
+   "area": "prod",
+   "title": "prod 보안 헤더 — HSTS·CSP 부재, x-powered-by 노출",
+   "role": "anonymous",
+   "preconditions": "읽기 전용 HEAD/GET",
+   "steps": [
+    "curl -sI https://kairos.woosung.dev/ | grep -iE 'strict-transport|content-security|x-frame|nosniff|referrer|permissions|x-powered'",
+    "curl -s -D - -o /dev/null https://kairos-api.woosung.dev/api/v1/health 로 API 헤더 동일 확인"
+   ],
+   "expected": "next.config.ts 기준 web 은 XFO DENY·nosniff·Referrer·Permissions + Content-Security-Policy-Report-Only 가 나와야 한다. 실측: CSP-Report-Only 없음(= #194/1d2eac0 미배포), HSTS 는 web/API 모두 없음, x-powered-by: Next.js 노출(poweredByHeader 미비활성). API 는 camera=() 로 web 과 다름.",
+   "source": "apps/web/next.config.ts:68",
+   "priority": "P1",
+   "method": "prod"
+  },
+  {
+   "id": "G3-054",
+   "area": "prod",
+   "title": "prod HTTP → HTTPS 리다이렉트",
+   "role": "anonymous",
+   "preconditions": "읽기 전용 HEAD",
+   "steps": [
+    "curl -sI http://kairos.woosung.dev/ → status, Location",
+    "curl -sI http://kairos-api.woosung.dev/api/v1/health → status"
+   ],
+   "expected": "301/308 → https 가 바람직. 실측(2026-09-26): http://kairos.woosung.dev/ 가 리다이렉트 없이 200 을 평문으로 응답(Server: cloudflare), API 도 평문 HTTP 로 응답(405 for HEAD). HSTS 도 없어 다운그레이드 방어가 없다 — Cloudflare 'Always Use HTTPS' 확인 필요.",
+   "source": "deploy/oci/README.md:13",
+   "priority": "P1",
+   "method": "prod"
+  },
+  {
+   "id": "G3-055",
+   "area": "prod",
+   "title": "prod robots.txt/sitemap.xml 과 랜딩 이미지 최적화 (BL-S27c-3)",
+   "role": "anonymous",
+   "preconditions": "읽기 전용 GET",
+   "steps": [
+    "curl -sI https://kairos.woosung.dev/robots.txt, /sitemap.xml",
+    "curl -s -o /dev/null -w '%{http_code} %{content_type}' 'https://kairos.woosung.dev/_next/image?url=%2Flanding%2Fscreenshots%2F<파일>.png&w=1080&q=75'"
+   ],
+   "expected": "robots/sitemap 은 앱에 없고 proxy matcher 가 제외하지 않아 307 → /sign-in(크롤러가 로그인 페이지를 받음, 결함 후보). _next/image 는 200 image/png — BL-S27c-3 의 400 전제는 prod 에서 소멸(실측).",
+   "source": "apps/web/src/proxy.ts:47",
+   "priority": "P3",
+   "method": "prod",
+   "known": "BL-S27c-3"
+  }
+ ],
+ "G3-doc-drift": [
+  {
+   "id": "D-001",
+   "doc": "docs/operations/r2-cleanup-cron.md:8",
+   "claim": "30일 voice 메모 cleanup(POST /api/v1/admin/memory/r2-cleanup) 의 현재 실행 수단은 .github/workflows/r2-cleanup.yml 하나뿐이다",
+   "reality": "r2-cleanup.yml 은 메모리 엔드포인트를 호출하지 않고 `uv run python -m scripts.r2_cleanup --days N $DELETE_FLAG` 를 돌린다(.github/workflows/r2-cleanup.yml:49). 이 스크립트는 uploads/ prefix 의 N일 경과 객체를 나이만으로 전부 지운다(apps/api/scripts/r2_cleanup.py:3,42). 회의 원본도 uploads/{uuid}/{filename} 에 있다(apps/api/src/common/r2.py:61,83). 메모리 cleanup 을 실행할 수단은 없다",
+   "severity": "misleading",
+   "suggested_fix": "r2-cleanup.yml 은 'uploads/ 나이 기준 일괄 삭제(회의 원본 포함)' 라고 명시하고, 메모리 엔드포인트는 현재 실행 수단이 없다고 정정"
+  },
+  {
+   "id": "D-002",
+   "doc": "docs/TODO.md:109",
+   "claim": "BL-OCI-5: 삭제된 회의의 고아 원본을 정리하려면 `gh workflow run r2-cleanup.yml` 을 쓴다(dry-run 먼저)",
+   "reality": "이 워크플로는 고아 여부를 보지 않고 나이만 본다(apps/api/scripts/r2_cleanup.py:42). delete=true 로 돌리면 살아 있는 회의의 원본(uploads/)까지 N일 경과분이 전부 삭제된다(apps/api/src/common/r2.py:61)",
+   "severity": "misleading",
+   "suggested_fix": "BL-OCI-5 에 '현 스크립트는 고아 판별이 없어 활성 원본도 삭제됨 — DB anti-join 기반 스크립트가 필요' 로 경고 추가"
+  },
+  {
+   "id": "D-003",
+   "doc": "docs/operations/r2-cleanup-cron.md:45",
+   "claim": "매일 03:00 KST 실행; 200 외 응답은 GCP Cloud Logging alert (46행); 인증 '(403 외 403)' (18행)",
+   "reality": "같은 문서 34행이 '현재 스케줄러는 없다' 고 적는다. GCP 는 ADR-028 로 철거됐다(docs/adr/028-oci-selfhosting.md). 18행 '(403 외 403)' 은 오타",
+   "severity": "stale",
+   "suggested_fix": "45~46행을 '스케줄 없음·docker logs 로 확인' 으로 바꾸고 18행 오타 수정"
+  },
+  {
+   "id": "D-004",
+   "doc": "README.md:142",
+   "claim": "권한 검증(Layer 0)이 SSE 스트리밍 시작 전에 끝난다",
+   "reality": "스트림 전에는 워크스페이스 멤버십(require_viewer)만 검사한다(apps/api/src/rag/router.py:24). 프로젝트 visibility 검사는 EventSourceResponse generator 안에서 돈다. 그래서 HTTP 200 이 이미 나간 뒤 SSE error + done 으로 거부된다(apps/api/src/rag/pipeline_service.py:67,93)",
+   "severity": "misleading",
+   "suggested_fix": "'멤버십은 스트림 전 403, 프로젝트 권한은 스트림 첫 이벤트(error+done)로 거부' 로 정정"
+  },
+  {
+   "id": "D-005",
+   "doc": "docs/architecture/rag-pipeline.md:79",
+   "claim": "Layer 0: RagPipelineService.ask 진입에서 SSE 시작 *전* 완료. 74행 UI 에 [프로젝트 범위 선택]",
+   "reality": "D-004 와 같다: 검사는 generator 안이다(apps/api/src/rag/pipeline_service.py:93). FE 에는 프로젝트 범위 선택기가 없고, 검색 범위는 항상 워크스페이스 전체다(apps/web/src/features/rag/components/search-scope.tsx:36)",
+   "severity": "misleading",
+   "suggested_fix": "Layer 0 설명을 스트림 내 error 이벤트로 바꾸고 UI 박스에서 프로젝트 범위 선택 제거"
+  },
+  {
+   "id": "D-006",
+   "doc": "docs/architecture/rag-pipeline.md:642",
+   "claim": "embedding_chunks.source_type -- meeting | note | action | external_document",
+   "reality": "허용 목록에는 inbox, memory 도 있다(apps/api/src/embeddings/repository.py:16)",
+   "severity": "minor",
+   "suggested_fix": "source_type 주석에 inbox · memory 추가(655행도 동일)"
+  },
+  {
+   "id": "D-007",
+   "doc": "AGENTS.md:122",
+   "claim": "기술 스택: Whisper + pyannote",
+   "reality": "화자 분리는 구현되지 않았다. 모든 segment 가 speaker='Speaker' 다(apps/api/src/services/transcription.py:100-101). docs/architecture/ai-pipeline.md:11 도 '미적용' 이라고 적는다",
+   "severity": "misleading",
+   "suggested_fix": "'Whisper (화자 분리 미적용)' 으로 수정 — .claude/CLAUDE.md 동일 문구도 함께"
+  },
+  {
+   "id": "D-008",
+   "doc": "apps/api/src/meetings/CONTEXT.md:12",
+   "claim": "STT + 화자 분리 (Whisper API + pyannote). 46행 out 의존 'Whisper + pyannote'. 같은 서술: apps/api/CONTEXT.md:61, docs/architecture/backend-scaffolding.md:92",
+   "reality": "pyannote 의존성도 호출도 없다. speaker 는 고정 문자열이다(apps/api/src/services/transcription.py:100-101)",
+   "severity": "stale",
+   "suggested_fix": "4곳 모두 '화자 분리 미적용(pyannote 후속)' 으로 통일"
+  },
+  {
+   "id": "D-009",
+   "doc": "AGENTS.md:32",
+   "claim": "directory-map 기준 ... FE 16 features",
+   "reality": "apps/web/src/features 에는 17개 디렉터리가 있다(auth 포함). CONTEXT-MAP.md:60 과 docs/architecture/directory-map.md:84 도 17 이다",
+   "severity": "stale",
+   "suggested_fix": "'FE 17 features' 로 수정(.claude/CLAUDE.md 사본 포함)"
+  },
+  {
+   "id": "D-010",
+   "doc": "CONTEXT-MAP.md:78",
+   "claim": "I-3 AI 모델 고정 강제 위치 = core/config.py (apps/api/CONTEXT.md:74 B-4 동일)",
+   "reality": "config 에는 모델 필드가 없다. 모델 문자열은 GEMINI_MODEL 상수로 두 곳에 중복돼 있다(apps/api/src/services/ai_processing.py:27, apps/api/src/memory/service.py:69)",
+   "severity": "stale",
+   "suggested_fix": "강제 위치를 'services/ai_processing.py:27 + memory/service.py:69 (중복)' 으로 정정하거나 단일 상수로 통합 백로그 등재"
+  },
+  {
+   "id": "D-011",
+   "doc": "CONTEXT-MAP.md:91",
+   "claim": "I-16 DB snake_case ↔ API camelCase Pydantic alias 변환 (apps/api/CONTEXT.md:97 동일, memory/CONTEXT.md:36 'snake_case → camelCase 직렬화')",
+   "reality": "memory 응답은 snake_case 그대로다(MemoryCreateOut.memory_id 등 apps/api/src/memory/schemas.py, contracts openapi 동일). FE 도 snake 키로 소비한다",
+   "severity": "misleading",
+   "suggested_fix": "I-16 에 'memory 도메인 예외(snake_case wire)' 명시 + memory/CONTEXT.md:36 정정"
+  },
+  {
+   "id": "D-012",
+   "doc": "README.md:292",
+   "claim": "pytest 125 파일 (293행 vitest 39)",
+   "reality": "main 1d2eac0 기준 pytest 126 파일(#194 가 test_repository_queries.py 추가), vitest 41 파일(#194 +2). e2e 44 는 일치",
+   "severity": "minor",
+   "suggested_fix": "126 / 41 로 갱신(git ls-tree 로 재계수)"
+  },
+  {
+   "id": "D-013",
+   "doc": "README.md:277",
+   "claim": "deploy-preflight 가 진행 중인 작업이 0건인지 확인",
+   "reality": "preflight 는 status IN ('transcribing','analyzing') 이면서 최근 2시간 안에 갱신된 meetings 만 센다(mise.toml:266). uploading 상태, 메모 distill, Drive 동기화 run 은 보지 않는다",
+   "severity": "minor",
+   "suggested_fix": "'최근 2시간 내 transcribing/analyzing 회의 0건 확인' 으로 범위 명시"
+  },
+  {
+   "id": "D-014",
+   "doc": "docs/adr/028-oci-selfhosting.md:57",
+   "claim": "D1 표: kairos-web mem_limit 512m",
+   "reality": "compose 의 web mem_limit 은 768m 이다(deploy/oci/docker-compose.prod.yml:122). migrate 컨테이너(512m, 62행)는 표에 없다. 8행의 부분 개정 노트는 D3/D5 만 다룬다",
+   "severity": "stale",
+   "suggested_fix": "D1 표를 compose 실측(web 768m, migrate 512m 추가)으로 갱신하고 개정 노트에 기록"
+  },
+  {
+   "id": "D-015",
+   "doc": "docs/adr/028-oci-selfhosting.md:75",
+   "claim": "D3. R2 · Clerk · Gemini · OpenAI · Sentry 는 유지 (240행: 새 .env 에 SENTRY_DSN 채울 계획)",
+   "reality": "Sentry 는 제거됐다(apps/api/src/core/config.py:87 주석, pyproject 에 sentry-sdk 없음). ADR-021 은 'Superseded by ADR-028' 이라고 적는다(docs/adr/021-*.md:4). 그런데 ADR-028 본문에는 Sentry 개정 노트가 없다",
+   "severity": "misleading",
+   "suggested_fix": "ADR-028 8행 부분 개정 노트에 'Sentry 제거(ADR-021 Superseded)' 를 추가하고 D3 제목에서 Sentry 삭제"
+  },
+  {
+   "id": "D-016",
+   "doc": "deploy/oci/README.md:59",
+   "claim": "수동 FE 빌드 명령의 --build-arg 는 NEXT_PUBLIC_* 4개",
+   "reality": "Dockerfile 은 NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID 와 NEXT_PUBLIC_GOOGLE_PICKER_API_KEY 도 받는다(apps/web/Dockerfile:36-37). 둘이 빠지면 Picker 가 '이 빌드에 Google Picker 설정이 주입되지 않아…' 로 조용히 비활성된다(apps/web/src/features/integrations/components/google-drive-panel.tsx:368)",
+   "severity": "misleading",
+   "suggested_fix": "수동 빌드 예시에 Google 빌드 인자 2개 추가(또는 build.env 사용으로 통일)"
+  },
+  {
+   "id": "D-017",
+   "doc": "docs/operations/deployment.md:122",
+   "claim": "배포 후 `./scripts/verify-prod.sh https://kairos-api.woosung.dev` 로 검증",
+   "reality": "KAIROS_JWT 없이 돌리면 이 스크립트는 /health 만 6회 보고 끝난다(scripts/verify-prod.sh:62-66). 같은 문서 125행의 '/health 200 은 배포 검증이 아니다' 와 모순된다. JWKS 는 검사하지 않고, 39행에 Cloud Run cold start 문구가 남아 있다",
+   "severity": "misleading",
+   "suggested_fix": "명령에 KAIROS_JWT 필수 표기 + 스크립트에 /api/auth/jwks 체크 추가, Cloud Run 문구 제거"
+  },
+  {
+   "id": "D-018",
+   "doc": "docs/TODO.md:3",
+   "claim": "마지막 갱신 2026-09-06",
+   "reality": "#194(1d2eac0) 가 2026-09-11/09-12 날짜 항목을 추가했다(예: docs/TODO.md:131 '[신규 · 2026-09-12]')",
+   "severity": "minor",
+   "suggested_fix": "마지막 갱신 날짜와 요약을 #194 기준으로 갱신"
+  },
+  {
+   "id": "D-019",
+   "doc": "docs/TODO.md:76",
+   "claim": "PR #102 (Sprint 25) ready review + squash merge 대기",
+   "reality": "이미 머지됐다(커밋 7befb08)",
+   "severity": "stale",
+   "suggested_fix": "Completed 로 이동"
+  },
+  {
+   "id": "D-020",
+   "doc": "docs/TODO.md:77",
+   "claim": "Cloud Run rollout 후 POST /api/v1/users/sync 404 확인",
+   "reality": "Cloud Run 은 ADR-028 로 철거됐다. auth 라우터에는 GET /me 만 있다(apps/api/src/auth/router.py)",
+   "severity": "stale",
+   "suggested_fix": "항목 삭제(전제 소멸)"
+  },
+  {
+   "id": "D-021",
+   "doc": "docs/TODO.md:193",
+   "claim": "S15-T1~T3 미완: personal workspace 자동 시드, 스위처 등",
+   "reality": "구현돼 있다. 첫 로그인에 '{name}의 개인 Kairos' 를 시드한다(apps/api/src/auth/dependencies.py:318-327). WorkspaceSwitcher 도 있다(apps/web/src/features/workspaces/components/WorkspaceSwitcher.tsx). CONTEXT-MAP I-19 도 참고",
+   "severity": "stale",
+   "suggested_fix": "S15-T1~T3 Completed 처리"
+  },
+  {
+   "id": "D-022",
+   "doc": "docs/TODO.md:196",
+   "claim": "S15-T4 ADR-016 작성 필요 (228행 F8: 서비스 경계 ADR 신규 필요)",
+   "reality": "docs/adr/016-personal-team-ia.md 와 docs/adr/014-service-boundary.md 가 이미 있다",
+   "severity": "stale",
+   "suggested_fix": "두 항목을 해당 ADR 링크와 함께 Completed 처리"
+  },
+  {
+   "id": "D-023",
+   "doc": "docs/TODO.md:204",
+   "claim": "S16-T1~T3 'Promote to Team' 액션·모달·BE 미완",
+   "reality": "구현돼 있다: ItemPromoteModal(components/shared), apps/api/src/common/promote_helpers.py, CONTEXT-MAP I-18",
+   "severity": "stale",
+   "suggested_fix": "S16-T1~T3 Completed 처리"
+  },
+  {
+   "id": "D-024",
+   "doc": "docs/TODO.md:212",
+   "claim": "GCP WIF + Secret Manager 9개 이관 — deployment.md §2.5.1 참조",
+   "reality": "GCP 는 ADR-028 로 철거됐다. docs/operations/deployment.md 에는 §2.5.1 이 없다",
+   "severity": "stale",
+   "suggested_fix": "항목 삭제"
+  },
+  {
+   "id": "D-025",
+   "doc": "docs/TODO.md:183",
+   "claim": "DELTA3 재측정에 Cloud Run trace + Sentry 필요, 188행 COLD-START 는 Cloud Run + Neon cold start 진단",
+   "reality": "Cloud Run·Neon(운영)·Sentry 는 모두 철거됐다(AGENTS.md:122, apps/api/src/core/config.py:87)",
+   "severity": "stale",
+   "suggested_fix": "OCI(docker logs) 기준으로 전제를 다시 쓰거나 항목 종결"
+  },
+  {
+   "id": "D-026",
+   "doc": "docs/REFACTORING-BACKLOG.md:86",
+   "claim": "BL-S27c-1 get_current_user lazy seed race 미해결 (P0)",
+   "reality": "ON CONFLICT 로 race-safe 시드가 이미 들어가 있다(apps/api/src/auth/dependencies.py:261,291-301)",
+   "severity": "stale",
+   "suggested_fix": "BL-S27c-1 종결 표시(해결 커밋 링크)"
+  },
+  {
+   "id": "D-027",
+   "doc": "docs/REFACTORING-BACKLOG.md:112",
+   "claim": "BL-S27c-3 랜딩 스크린샷 3건 _next/image 400",
+   "reality": "2026-09-26 prod 실측에서 /_next/image?url=/landing/screenshots/*.png 가 w=640/1080/3840 모두 200 image/png 이다. 원본 /landing/screenshots/*.png 도 200",
+   "severity": "stale",
+   "suggested_fix": "BL-S27c-3 종결(prod 실측 근거 기록)"
+  },
+  {
+   "id": "D-028",
+   "doc": "docs/REFACTORING-BACKLOG.md:122",
+   "claim": "BL-S27c-4 실패 회의 retry UI 부재 / 130행 BL-S27c-5 실패 문구 불일치",
+   "reality": "FailedMeetingView 가 '분석에 실패했습니다' 와 '다시 업로드' 링크를 제공한다(apps/web/src/features/meetings/components/meeting-detail.tsx:90-118)",
+   "severity": "stale",
+   "suggested_fix": "BL-S27c-4/5 종결 또는 남은 차이(자동 재시도 부재)만 남기도록 재기술"
+  },
+  {
+   "id": "D-029",
+   "doc": "docs/REFACTORING-BACKLOG.md:138",
+   "claim": "BL-S27c-6 /inbox empty state UI 부재 / 144행 BL-S27c-7 /actions 라우트 404",
+   "reality": "빈 상태 '처리할 항목이 없습니다' 가 있다(apps/web/src/features/inbox/components/smart-inbox.tsx:154). /actions 라우트도 있다(apps/web/src/app/(app)/actions/page.tsx)",
+   "severity": "stale",
+   "suggested_fix": "BL-S27c-6/7 종결"
+  },
+  {
+   "id": "D-030",
+   "doc": "docs/REFACTORING-BACKLOG.md:1366",
+   "claim": "BL-073 Inbox handleConfirm 이 BE classify 미연결",
+   "reality": "inbox-item-card 가 classify 뮤테이션을 호출한다(apps/web/src/features/inbox/components/inbox-item-card.tsx:9,46,109)",
+   "severity": "stale",
+   "suggested_fix": "BL-073 종결"
+  },
+  {
+   "id": "D-031",
+   "doc": "docs/REFACTORING-BACKLOG.md:1478",
+   "claim": "BL-F5 모바일 RAG 오버레이 오버플로 / 1484행 BL-F7 표·인용구 citation 미커버 (open)",
+   "reality": "둘 다 해결됐다. BL-F5 는 오버레이에 maxWidth 100% 가 들어갔다(apps/web/src/components/layout/panel-layout.tsx:166-168). BL-F7 은 td/th/blockquote/h4-h6 에 injectCitations 가 적용됐다(apps/web/src/features/rag/components/markdown-message.tsx:104-123)",
+   "severity": "stale",
+   "suggested_fix": "BL-F5/F7 종결"
+  },
+  {
+   "id": "D-032",
+   "doc": "docs/REFACTORING-BACKLOG.md:1487",
+   "claim": "BL-F8 out-of-range no-op + SourceViewer 내보내기 dead button",
+   "reality": "내보내기 버튼은 동작한다(apps/web/src/features/sources/components/source-viewer.tsx:203). out-of-range no-op 만 남았다(apps/web/src/features/rag/components/rag-chat.tsx:76)",
+   "severity": "minor",
+   "suggested_fix": "BL-F8 범위를 out-of-range 인용 처리로 축소"
+  },
+  {
+   "id": "D-033",
+   "doc": "docs/REFACTORING-BACKLOG.md:181",
+   "claim": "BL-S27e-3 CSP 는 의도적 SKIP; 남은 외부 도메인은 폰트와 R2",
+   "reality": "Content-Security-Policy-Report-Only 가 이미 선언돼 있고 Google Picker 도메인도 포함한다(apps/web/next.config.ts:26-48,68). R2 는 브라우저 origin 이 아니다(프록시 경유, next.config.ts:10)",
+   "severity": "stale",
+   "suggested_fix": "현 상태를 'Report-Only 도입(#194), enforcing 전환 대기' 로 갱신하고 R2 삭제"
+  },
+  {
+   "id": "D-034",
+   "doc": "docs/REFACTORING-BACKLOG.md:198",
+   "claim": "BL-S27e-F: audit 도메인 신설 → BE 17 모듈 (현재 16)",
+   "reality": "integrations 추가로 이미 17 모듈이다(docs/architecture/directory-map.md:120). audit 신설 시 18 이 된다",
+   "severity": "minor",
+   "suggested_fix": "'→ BE 18 모듈 (현재 17)' 로 수정"
+  },
+  {
+   "id": "D-035",
+   "doc": "docs/REFACTORING-BACKLOG.md:208",
+   "claim": "BL-S27e-H: pyproject 17 dependencies 중 ... sentry-sdk; Fix 후보 (a) uv sync --frozen",
+   "reality": "dependencies 는 15개이고 sentry-sdk 는 없다(apps/api/pyproject.toml). (a) 는 이미 적용됐다(apps/api/Dockerfile:18, mise.toml:45, .github/workflows/test.yml:76)",
+   "severity": "stale",
+   "suggested_fix": "현 상태를 15 deps·--frozen 적용 완료로 갱신하거나 종결"
+  },
+  {
+   "id": "D-036",
+   "doc": "docs/REFACTORING-BACKLOG.md:1001",
+   "claim": "BL-059 Sentry observability 후속 / 985·1020행 BL-058·BL-060 OnboardingBanner A/B·progress assertion",
+   "reality": "Sentry 는 제거됐다(apps/api/src/core/config.py:87). OnboardingBanner 도 제거됐다(apps/web/e2e/tests/home.spec.ts:27 에 제거 명시)",
+   "severity": "stale",
+   "suggested_fix": "세 항목을 '전제 소멸' 로 종결"
+  },
+  {
+   "id": "D-037",
+   "doc": "docs/REFACTORING-BACKLOG.md:152",
+   "claim": "BL-S27c-9/S27c-10, BL-024(688), BL-025(721), BL-NEW-BE-PERF-COLD-START(1265), BL-NEW-CLOUD-RUN-MIN-INSTANCES(1328) — Cloud Run/Neon 전제",
+   "reality": "운영은 OCI 단일 VM + 셀프호스팅 Postgres 다(AGENTS.md:122, ADR-028). Cloud Run min-instances·cold start 전제가 소멸했다",
+   "severity": "stale",
+   "suggested_fix": "각 항목을 OCI 전제로 재기술하거나 종결"
+  },
+  {
+   "id": "D-038",
+   "doc": "apps/api/src/auth/CONTEXT.md:30",
+   "claim": "clerk_id 레거시 — ADR-031 컷오버 +7일 뒤 DROP 예정 (deploy/oci/.env.example:50-52 '+7일 롤백 창까지 CLERK_* 유지')",
+   "reality": "컷오버 +7일(2026-08-24)에서 한 달이 지났지만 컬럼이 그대로 있다(apps/api/src/auth/models.py:20)",
+   "severity": "stale",
+   "suggested_fix": "DROP 을 실행하거나 BL 로 재등재해 새 기한을 기재; .env.example 주석 갱신"
+  },
+  {
+   "id": "D-039",
+   "doc": "apps/web/CONTEXT.md:44",
+   "claim": "§3 features 목록(16개)과 §5 표에 auth/ 누락; 92행 home 'ActivityFeed', 99행 onboarding 'step progression', 101행 rag 'ask-input, answer-card'",
+   "reality": "features/auth 가 있다(17개). 실제 rag 컴포넌트는 rag-input·rag-chat·markdown-message·search-scope 다(apps/web/src/features/rag/components). ActivityFeed 와 onboarding step progression 컴포넌트는 없다",
+   "severity": "stale",
+   "suggested_fix": "§3/§5 에 auth 추가하고 컴포넌트 이름을 실제 파일명으로 교체"
+  },
+  {
+   "id": "D-040",
+   "doc": "apps/web/CONTEXT.md:103",
+   "claim": "upload/ — upload-dropzone (presigned URL), useRecording",
+   "reality": "features/upload 에는 components 가 없다. 업로드는 BE 프록시 경유다(POST /upload/file, apps/api/src/upload/router.py:67; ADR-028 D4, next.config.ts:10 'R2 직접 업로드는 없다')",
+   "severity": "stale",
+   "suggested_fix": "'BE 프록시 업로드 훅 + useRecording' 으로 수정"
+  },
+  {
+   "id": "D-041",
+   "doc": "DESIGN.md:117",
+   "claim": "RAG: Desktop/Compact = Cmd+K 슬라이드 오버레이 (101·127행 동일)",
+   "reality": "Cmd/Ctrl+K 는 커맨드 팔레트를 토글한다(apps/web/src/components/layout/cmd-k.tsx:134). RAG 오버레이는 헤더 검색 버튼(apps/web/src/components/layout/header.tsx:66-67) 또는 팔레트의 '?' 접두로 열린다",
+   "severity": "misleading",
+   "suggested_fix": "'Cmd+K = 팔레트, 오버레이는 헤더 검색/팔레트 ? 모드' 로 정정"
+  },
+  {
+   "id": "D-042",
+   "doc": "DESIGN.md:177",
+   "claim": "Workspace Switcher 전환: setActiveWorkspaceId(id) + queryClient.clear() + router.refresh()",
+   "reality": "workspaces.list 만 남기는 predicate invalidateQueries 로 바뀌었고 router.refresh() 는 제거됐다(apps/web/src/features/workspaces/components/WorkspaceSwitcher.tsx:41-63, Sprint 23 D1)",
+   "severity": "stale",
+   "suggested_fix": "Switch behavior 를 predicate invalidate 로 갱신"
+  },
+  {
+   "id": "D-043",
+   "doc": "DESIGN.md:248",
+   "claim": "RECALL flag true 시 사이드바 /memory 메뉴 = Mic icon (187행 memory 검색바 'input + Cmd+K hint')",
+   "reality": "아이콘은 Brain 이다(apps/web/src/components/layout/sidebar.tsx:47). /memory 검색 Input 에는 placeholder 만 있고 Cmd+K 힌트는 없다(apps/web/src/app/(app)/memory/page.tsx:62)",
+   "severity": "minor",
+   "suggested_fix": "Brain 아이콘으로 수정하고 187행 힌트 제거"
+  },
+  {
+   "id": "D-044",
+   "doc": "apps/web/src/features/workspaces/components/google-drive-prototype.NOTES.md:5",
+   "claim": "개발 환경에서 /settings?tab=integrations&variant=A 로 프로토타입을 시작한다",
+   "reality": "#194 가 프로토타입 컴포넌트를 지웠다. 실제 패널은 features/integrations/components/google-drive-panel.tsx 이고 variant 파라미터는 쓰지 않는다. NOTES 파일만 고아로 남았다",
+   "severity": "stale",
+   "suggested_fix": "NOTES 파일 삭제(필요한 결정은 ADR-026 으로 이관)"
+  },
+  {
+   "id": "D-045",
+   "doc": "apps/api/src/main.py:197",
+   "claim": "/ready docstring: Cloud Run startup probe",
+   "reality": "Cloud Run 은 철거됐다. /ready 를 호출하는 곳은 mise deploy-status 다(mise.toml:390). compose 의 api healthcheck 는 /health 를 쓴다(deploy/oci/docker-compose.prod.yml:84-85)",
+   "severity": "minor",
+   "suggested_fix": "docstring 을 deploy-status 용 readiness 로 수정"
+  }
+ ]
+}

@@ -119,7 +119,7 @@ async def get_memory(
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryDetailOut:
     """단일 메모 조회 — distilled_json / embedding_chunk_id / status 확인."""
-    return await service.get_memory(memory_id, workspace_id)
+    return await service.get_memory(memory_id, workspace_id, member.user_id)
 
 
 @router.post(

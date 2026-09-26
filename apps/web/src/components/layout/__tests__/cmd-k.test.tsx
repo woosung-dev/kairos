@@ -9,14 +9,14 @@ import { CmdK } from "../cmd-k";
 // (2) 수정키 단독 keydown(Shift 등) 은 pending 시퀀스를 지우면 안 된다.
 // (3) 다이얼로그·combobox·menu 가 열려 있을 때 문자 키 단축키가 발화하면 안 된다 (WCAG 2.1.4).
 
-const { push } = vi.hoisted(() => ({ push: vi.fn() }));
+const { push, ask } = vi.hoisted(() => ({ push: vi.fn(), ask: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, replace: vi.fn(), prefetch: vi.fn(), back: vi.fn() }),
 }));
 
 vi.mock("@/features/rag/hooks", () => ({
-  useRagStream: () => ({ ask: vi.fn() }),
+  useRagStream: () => ({ ask }),
 }));
 
 vi.mock("@/components/onboarding/onboarding-tooltip", () => ({
@@ -189,5 +189,21 @@ describe("CmdK 전역 단축키", () => {
     keyDown(document.querySelector('[role="combobox"]')!, { key: "c", code: "KeyC" });
 
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe("CmdK 입력창 — IME 조합 (G3-018)", () => {
+  it("조합 중 Enter 는 질문을 보내지 않고, 조합이 끝난 뒤 Enter 한 번에 보낸다", () => {
+    useUIStore.setState({ cmdKOpen: true });
+    const { getByPlaceholderText } = render(<CmdK />);
+    const input = getByPlaceholderText(/검색하거나 명령 입력/);
+
+    fireEvent.change(input, { target: { value: "?블루펭귄 일정" } });
+    keyDown(input, { key: "Enter", code: "Enter", isComposing: true, keyCode: 229 });
+    expect(ask).not.toHaveBeenCalled();
+
+    keyDown(input, { key: "Enter", code: "Enter" });
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(ask).toHaveBeenCalledWith("블루펭귄 일정");
   });
 });

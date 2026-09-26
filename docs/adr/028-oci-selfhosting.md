@@ -72,6 +72,9 @@ Neon 이 기본 설치했던 `pg_session_jwt` 는 코드 사용처가 0건이라
 **백업은 이번 범위에서 의도적으로 제외한다** — 아직 개발 단계이고, 운영 전환 시점에 착수한다(BL-OCI-1).
 그때까지 `docker compose down -v` 는 금지다.
 
+> 2026-09-27 갱신 — 백업 스크립트가 생겼다 (`deploy/oci/backup/`, 절차 `docs/operations/runbooks/db-backup-restore.md`).
+> 남은 것은 서버 cron 등록 · R2 lifecycle · `.env` 별도 보관이다 (BL-OCI-1). `down -v` 금지는 그대로다.
+
 ### D3. R2 · Clerk · Gemini · OpenAI · Sentry 는 유지
 
 이전 범위는 **컴퓨트 + DB** 다. R2 는 egress 무료이고 presigned/cleanup/CORS 회귀 테스트가 이미

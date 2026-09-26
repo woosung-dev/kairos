@@ -33,11 +33,17 @@ class WorkspaceRepository:
         )).one_or_none()
 
     async def find_by_user(self, user_id: uuid.UUID) -> list[Workspace]:
-        """사용자가 속한 워크스페이스 목록."""
+        """사용자가 속한 워크스페이스 목록.
+
+        C-001 (2026-09-26 정검): ORDER BY 가 없어 순서가 플랜에 따라 바뀌었고, FE 가
+        목록 첫 항목을 기본 워크스페이스로 쓰면서 초대 수락 직후 엉뚱한 WS 에 착지했다.
+        생성 순서로 고정한다 (id 는 동률 타이브레이크).
+        """
         return list((await self.session.exec(
             select(Workspace)
             .join(WorkspaceMember, WorkspaceMember.workspace_id == Workspace.id)
             .where(WorkspaceMember.user_id == user_id)
+            .order_by(Workspace.created_at, Workspace.id)
         )).all())
 
     async def get_member_count(self, workspace_id: uuid.UUID) -> int:

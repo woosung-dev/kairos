@@ -130,6 +130,7 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 | `dogfood_smoke.py` | 일일 dogfood 자동 검증 (JWT 직접 입력 패턴) | manual |
 | `reindex_vectors.py` | EmbeddingService 통한 청크 재인덱싱 | manual |
 | `samples/` | Sprint 15 Day 0 음성 sample (gitignore) | manual upload |
+| `r2_cleanup.py` | R2 Kairos prefix(`uploads/`·`memory/`) 미참조 객체 정리 — DB 의 `meetings.file_key`·`memory_items.r2_audio_key` 와 대조해 고아만 후보로 잡는다. `--inventory` = 개수·용량만(키 미출력, GitHub Actions 용) | 서버에서 `docker exec -i kairos-api python - --days 30 < scripts/r2_cleanup.py` (dry-run) → `--delete`. `docs/operations/r2-cleanup-cron.md` §2 |
 | `seed_qa_fixtures.py` | Multi-Agent QA 시드 fixture 생성 + cleanup (Sprint 18 → 19) | `--env <credentials.env> --out <fixtures.json>` / `--dry-run-cleanup` / `--cleanup` |
 
 **seed_qa_fixtures.py 안전망**:

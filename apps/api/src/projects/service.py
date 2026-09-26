@@ -20,8 +20,10 @@ from src.common.visibility import (
 )
 from src.projects.exceptions import (
     CrossWorkspaceMemberError,
+    ProjectArchiveForbiddenError,
     ProjectHasContentError,
     ProjectNotFoundError,
+    ProjectVisibilityChangeForbiddenError,
     WorkspaceMismatchError,
 )
 from src.projects.models import Project
@@ -257,11 +259,56 @@ class ProjectService:
         status: str | None = None,
         visibility: str | None = None,
         tags: list[str] | None = None,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
-        """프로젝트 수정 (Codex F-1)."""
-        project = await self.repo.find_by_id(project_id, workspace_id)
+        """프로젝트 수정 (Codex F-1).
+
+        C-017 (2026-09-26 정검): requester 를 넘기면 GET 과 같은 visibility 판정을 먼저 한다
+        (안 보이는 프로젝트 = 404, 빈 PATCH 로 메타데이터를 읽는 경로 포함).
+        권한 규칙 (값이 실제로 바뀔 때만 검사 — 같은 값 재전송은 허용):
+        - visibility: admin/owner 또는 프로젝트 작성자 (2026-09-27 사용자 결정)
+        - status 의 archived 진입·해제: admin/owner 만 (`/archive` 우회 차단)
+        requester_role 미전달(None) = 내부 호출 (archive_project) → 게이트 skip.
+        """
+        if requester_role is None:
+            project = await self.repo.find_by_id(project_id, workspace_id)
+        else:
+            project = await self.repo.find_visible_by_id(
+                project_id, workspace_id, requester_user_id, requester_role
+            )
         if project is None:
             raise ProjectNotFoundError()
+
+        if requester_role is not None and requester_role not in ADMIN_BYPASS_ROLES:
+            is_creator = (
+                requester_user_id is not None
+                and project.created_by_id == requester_user_id
+            )
+            if (
+                visibility is not None
+                and visibility != project.visibility
+                and not is_creator
+            ):
+                raise ProjectVisibilityChangeForbiddenError()
+            if (
+                status is not None
+                and status != project.status
+                and "archived" in (status, project.status)
+            ):
+                raise ProjectArchiveForbiddenError()
+
+        # 작성자가 직접 private 으로 바꿀 때만 자신을 ProjectMember 로 보장 — 스스로 잠기는 것 방지
+        # (private 필터에는 creator 분기가 없다, L-6). admin 전환은 기존 동작 유지: 멤버 구성은
+        # admin 이 정하고, WS 를 떠난 작성자가 orphan ProjectMember 로 되살아나지 않는다 (E1-10).
+        # add_member 는 ON CONFLICT 멱등.
+        if (
+            visibility == "private"
+            and project.visibility != "private"
+            and requester_user_id is not None
+            and project.created_by_id == requester_user_id
+        ):
+            await self.repo.add_member(project.id, workspace_id, requester_user_id)
 
         if title is not None:
             project.title = title
@@ -307,15 +354,49 @@ class ProjectService:
         """프로젝트 아카이브 (status → archived)."""
         return await self.update_project(workspace_id, project_id, status="archived")
 
+    async def _verify_link_access(
+        self,
+        workspace_id: uuid.UUID,
+        meeting_id: uuid.UUID,
+        project_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None,
+        requester_role: str | None,
+    ) -> None:
+        """C-018 (2026-09-26 정검): 링크 변경은 회의와 대상 프로젝트를 **둘 다** 볼 때만.
+
+        테넌트만 검사하면 member 가 (a) 숨겨진 회의의 private 링크를 끊거나 (b) 그 회의를
+        public 프로젝트에 붙여 회의 전문을 전원에게 공개할 수 있었다. 안 보이면 404
+        (존재 여부 비노출). requester_role=None 내부 호출은 tenant 검증만.
+        """
+        from src.meetings.exceptions import MeetingNotFoundError
+
+        await self._verify_secondary_fks(workspace_id, meeting_id=meeting_id)
+        if requester_role is None:
+            return
+        if self.meeting_repo is None:
+            raise RuntimeError("meeting_repo 필수 (C-018 링크 가시성 검증)")
+        if not await self.meeting_repo.is_visible(
+            meeting_id, workspace_id, requester_user_id, requester_role
+        ):
+            raise MeetingNotFoundError()
+        if await self.repo.find_visible_by_id(
+            project_id, workspace_id, requester_user_id, requester_role
+        ) is None:
+            raise ProjectNotFoundError()
+
     async def add_meeting_project(
         self,
         workspace_id: uuid.UUID,
         meeting_id: uuid.UUID,
         project_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
         """회의-프로젝트 연결 (Codex F-1/F-2/F-3: meeting + project 둘 다 tenant 검증)."""
-        # F-2 secondary FK: meeting tenant 검증 (fail-closed)
-        await self._verify_secondary_fks(workspace_id, meeting_id=meeting_id)
+        # F-2 secondary FK + C-018 visibility (fail-closed)
+        await self._verify_link_access(
+            workspace_id, meeting_id, project_id, requester_user_id, requester_role
+        )
         # F-1/F-3: project tenant 검증 (repo.add_meeting_link 안에서도 한 번 더)
         link = await self.repo.add_meeting_link(meeting_id, project_id, workspace_id)
         await self.repo.commit()
@@ -330,9 +411,13 @@ class ProjectService:
         workspace_id: uuid.UUID,
         meeting_id: uuid.UUID,
         project_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> None:
-        """회의-프로젝트 연결 해제 (Codex F-1/F-2/F-3)."""
-        await self._verify_secondary_fks(workspace_id, meeting_id=meeting_id)
+        """회의-프로젝트 연결 해제 (Codex F-1/F-2/F-3 + C-018 visibility)."""
+        await self._verify_link_access(
+            workspace_id, meeting_id, project_id, requester_user_id, requester_role
+        )
         await self.repo.remove_meeting_link(meeting_id, project_id, workspace_id)
         await self.repo.commit()
 

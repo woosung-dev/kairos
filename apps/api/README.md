@@ -103,7 +103,7 @@ apps/api/
 | 경로 | 인증 | 용도 |
 |---|---|---|
 | `GET /api/v1/workspaces/{workspace_id}/memory/metrics` | workspace viewer 이상 (`require_viewer`) | FE `admin/recall-metrics` 데이터. founder 제한은 `NEXT_PUBLIC_FOUNDER_USER_ID`를 비교하는 FE 표시 게이트이며 API 인가 경계가 아니다 |
-| `POST /api/v1/admin/memory/r2-cleanup` | `CRON_SECRET_TOKEN` (`verify_cron_token`) | 음성 메모 R2 객체 30일 정리 (`memory/admin_router.py`). 정기 호출 주체는 레포 안에 없다 — GitHub Actions `r2-cleanup.yml` 은 `uploads/` 정리용 `scripts/r2_cleanup.py` 를 직접 실행한다 |
+| `POST /api/v1/admin/memory/r2-cleanup` | `CRON_SECRET_TOKEN` (`verify_cron_token`) | 음성 메모 R2 객체 30일 정리 (`memory/admin_router.py`). 정기 호출 주체는 레포 안에 없다 (수동 curl — `docs/operations/r2-cleanup-cron.md` §1). GitHub Actions `r2-cleanup.yml` 은 2026-09-27 부터 **읽기 전용 인벤토리**(`scripts/r2_cleanup.py --inventory`)만 돈다 — 미참조 `uploads/` 정리는 서버에서 DB 참조를 확인하고 실행한다 (같은 문서 §2) |
 | `GET /api/v1/workspaces/{workspace_id}/audit/promotions` | workspace admin/owner (`require_admin`) | promote 감사 trail 조회 — Settings 의 Audit 탭 (`common/audit_router.py`) |
 
 ## 환경변수

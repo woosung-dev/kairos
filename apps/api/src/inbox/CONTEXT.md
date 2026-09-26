@@ -83,6 +83,8 @@ POST   /inbox/{id}/dismiss     → 사용자가 무시 (is_processed=true, proje
 | IB-6 | **헌법 I-9 (Sprint 19 PR #1, Codex F-1)** — service / repository 모든 메서드 workspace_id 필수. find_by_id(inbox_id, workspace_id), classify(inbox_id, workspace_id, project_ids), dismiss(inbox_id, workspace_id) 시그니처 |
 | IB-7 | **Codex F-2 Critical secondary FK** — classify 의 project_ids 모두 같은 workspace 내인지 ProjectRepository.find_by_id + project.workspace_id 검증. cross-workspace 거부 → 404 (ProjectNotFoundError). add_meeting_link 시그니처 자체 변경은 후속 (PR #2 BUG-C01-EXT-FK alembic) |
 | IB-8 | **헌법 I-18 promote = 복제 + tombstone (Sprint 23 D4)** — `POST /inbox/{id}/promote` 는 원본 InboxItem 보존 + target ws 복제본 신규 + `ItemPromotionAudit(item_type='inbox')` row. source != target / target.type='team' / promoter 가 target ws 멤버 검증. `ai_suggested_project_id`=None reset (composite FK fk_inbox_suggested_project_workspace 제약, target ws orphan). `is_processed`=False reset (복제본은 사용자 재분류 대기). `source_id`/`ai_suggested_project_title`/`ai_suggested_tags`/`ai_confidence` 는 메타로 보존. InboxItem 임베딩 ledger 부재 → audit.embedding_status='n/a' + status='completed' (notes/meetings 와 차이) |
+| IB-9 | **원본 회의 가시성 게이트 (C-015, 2026-09-26 정검)** — `source_type='meeting'` 항목의 요약은 회의 내용 그 자체다. 목록·total·`find_by_id`(classify/dismiss/promote)가 requester 를 받아 `common/visibility.meeting_access_clause` 로 원본 회의를 볼 수 있는 항목만 돌려준다 (안 보이면 404). `attachment`(promote 사본) 등 그 외 source_type 은 통과. admin/owner 우회, role=None 내부호출 skip |
+| IB-10 | **classify 대상 프로젝트 가시성 (C-018)** — `project_ids` 는 tenant 뿐 아니라 requester 가 볼 수 있어야 한다 (`ProjectRepository.find_visible_by_id`). 숨겨진 회의를 public 프로젝트에 붙여 전원 공개하는 우회 차단. 거부 시 404, 항목은 미처리 유지 |
 
 ---
 

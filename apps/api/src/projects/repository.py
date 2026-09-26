@@ -45,6 +45,25 @@ class ProjectRepository:
             )
         )).one_or_none()
 
+    async def find_visible_by_id(
+        self,
+        project_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None,
+        requester_role: str | None,
+    ) -> Project | None:
+        """tenant + visibility 를 한 쿼리로 — 안 보이면 None (caller 가 404).
+
+        C-017/C-018 (2026-09-26 정검): 링크·PATCH 경로가 GET 과 같은 판정을 쓰게 한다.
+        규칙은 목록과 같은 `_apply_visibility_filter` (admin/owner 우회).
+        """
+        stmt = select(Project).where(
+            Project.id == project_id,
+            Project.workspace_id == workspace_id,
+        )
+        stmt = self._apply_visibility_filter(stmt, requester_user_id, requester_role)
+        return (await self.session.exec(stmt)).one_or_none()
+
     async def find_by_workspace(
         self,
         workspace_id: uuid.UUID,

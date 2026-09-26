@@ -62,14 +62,21 @@ class InboxService:
         is_processed: bool | None = None,
         page: int = 1,
         page_size: int = 20,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
-        """워크스페이스 Inbox 목록 (페이지네이션)."""
+        """워크스페이스 Inbox 목록 (페이지네이션).
+
+        C-015 (2026-09-26 정검): 원본 회의를 볼 수 없는 항목은 목록·total 에서 제외.
+        """
         offset = to_offset(page, page_size)
         items = await self.inbox_repo.find_by_workspace(
-            workspace_id, is_processed=is_processed, offset=offset, limit=page_size
+            workspace_id, is_processed=is_processed, offset=offset, limit=page_size,
+            requester_user_id=requester_user_id, requester_role=requester_role,
         )
         total = await self.inbox_repo.count_by_workspace(
-            workspace_id, is_processed=is_processed
+            workspace_id, is_processed=is_processed,
+            requester_user_id=requester_user_id, requester_role=requester_role,
         )
         return build_page(
             [self._to_dict(item) for item in items], total, page, page_size
@@ -80,27 +87,33 @@ class InboxService:
         inbox_id: uuid.UUID,
         workspace_id: uuid.UUID,
         project_ids: list[uuid.UUID],
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
         """Inbox 아이템을 프로젝트에 연결 확정.
 
         헌법 I-9 (Codex F-1): workspace_id 필수.
         Codex F-2 Critical: project_ids 모두 같은 workspace 내인지 사전 검증.
+        C-018 (2026-09-26 정검): requester 가 항목(=원본 회의)과 대상 프로젝트를 모두 볼 수
+        있어야 한다. 아니면 404 — 링크로 숨겨진 회의를 공개 프로젝트에 붙이는 우회 차단.
         """
-        item = await self.inbox_repo.find_by_id(inbox_id, workspace_id)
+        item = await self.inbox_repo.find_by_id(
+            inbox_id, workspace_id, requester_user_id, requester_role
+        )
         if item is None:
             raise InboxItemNotFoundError()
 
         # Codex F-2 Critical: project_ids 모두 같은 workspace 인지 사전 검증
         # (add_meeting_link 가 cross-workspace meeting/project 링크 생성하는 것 차단)
-        # Sprint 19 PR #1 C9 (Codex F-1 cascade): find_by_id 시그니처 workspace_id 강제
+        # C-018: 같은 조회에 visibility 규칙까지 적용 (안 보이는 프로젝트 = 404)
         verified_projects: list = []
         for project_id in project_ids:
-            verified_projects.append(
-                await require_in_workspace(
-                    self.project_repo, project_id, workspace_id,
-                    not_found=ProjectNotFoundError, repo_label="project_repo",
-                )
+            project = await self.project_repo.find_visible_by_id(
+                project_id, workspace_id, requester_user_id, requester_role
             )
+            if project is None:
+                raise ProjectNotFoundError()
+            verified_projects.append(project)
 
         item.is_processed = True
         item.updated_at = datetime.utcnow()
@@ -135,10 +148,19 @@ class InboxService:
         return result
 
     async def dismiss(
-        self, inbox_id: uuid.UUID, workspace_id: uuid.UUID
+        self,
+        inbox_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
-        """Inbox 아이템 무시 처리. 헌법 I-9 workspace_id 필수 (Codex F-1)."""
-        item = await self.inbox_repo.find_by_id(inbox_id, workspace_id)
+        """Inbox 아이템 무시 처리. 헌법 I-9 workspace_id 필수 (Codex F-1).
+
+        C-015: 볼 수 없는 항목은 404 (목록과 같은 규칙).
+        """
+        item = await self.inbox_repo.find_by_id(
+            inbox_id, workspace_id, requester_user_id, requester_role
+        )
         if item is None:
             raise InboxItemNotFoundError()
 
@@ -159,6 +181,7 @@ class InboxService:
         target_workspace_id: uuid.UUID,
         promoted_by_user_id: uuid.UUID,
         background_tasks: BackgroundTasks,
+        requester_role: str | None = None,
     ) -> InboxPromoteOut:
         """1-button promote: 원본 보존 + target ws InboxItem 복제 + audit.
 
@@ -197,7 +220,10 @@ class InboxService:
             raise TargetWorkspaceInvalidError() from exc
 
         # 2. 원본 InboxItem fetch (I-9 workspace_id 강제)
-        source = await self.inbox_repo.find_by_id(inbox_id, source_workspace_id)
+        # C-015: 볼 수 없는 항목(숨겨진 회의 요약)을 다른 워크스페이스로 복제하는 우회 차단.
+        source = await self.inbox_repo.find_by_id(
+            inbox_id, source_workspace_id, promoted_by_user_id, requester_role
+        )
         if source is None:
             raise InboxItemNotFoundError()
 

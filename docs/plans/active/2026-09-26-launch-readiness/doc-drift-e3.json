@@ -1,0 +1,339 @@
+{
+ "doc_items": [
+  {
+   "id": "D-001",
+   "verdict": "MISLEADING",
+   "impact": "high",
+   "evidence": "r2-cleanup.yml:38-49 는 `python -m scripts.r2_cleanup` 만 실행하고 admin endpoint 를 호출하지 않는다. scripts/r2_cleanup.py:123-126 기본 prefix='uploads/'. voice 메모 키는 memory/{wid}/...wav (memory/service.py:629-637) 라 워크플로 대상이 아니다. POST /admin/memory/r2-cleanup(memory/admin_router.py:27-36)을 호출하는 곳은 레포에 0건 → voice 30일 TTL 은 실행 수단이 없다. 반대로 워크플로를 delete=true 로 돌리면 회의 원본(uploads/)이 지워진다",
+   "correction": "r2-cleanup.yml 은 voice 메모 cleanup 이 아니라 uploads/ prefix 를 나이만으로 지우는 별도 스크립트다. voice 메모 TTL endpoint 는 현재 호출 주체가 없다 (cron·workflow 둘 다 없음)."
+  },
+  {
+   "id": "D-002",
+   "verdict": "MISLEADING",
+   "impact": "high",
+   "evidence": "scripts/r2_cleanup.py:64-97 는 DB 참조 여부를 보지 않고 LastModified<cutoff 인 uploads/ 객체를 전부 삭제. 회의 음성 키=uploads/{uuid}/{filename} (common/r2.py:61,83 ← upload/router.py:102), meetings.file_key 로 참조(meetings/models.py:20), promote 복제본도 같은 키를 공유(meetings/service.py:495). TODO.md:109 명령에는 --repo 도 없다(r2-cleanup-cron.md:38 에는 있음)",
+   "correction": "r2-cleanup.yml 은 '삭제된 회의의 고아'만 고르지 못한다. delete=true 로 돌리면 N일 지난 **살아 있는 회의 원본까지** 삭제된다. 고아만 지우려면 meetings.file_key 대조가 필요하다 (BL-OCI-5 는 미해결)."
+  },
+  {
+   "id": "D-003",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "같은 문서 :34 '현재 스케줄러는 없다', :37 'cron 미설정', r2-cleanup.yml:5-16 workflow_dispatch 전용. GCP Cloud Logging 은 ADR-028 로 철거(:6-7 문서 자체 정정문). :18 '(403 외 403)' 은 의미 없는 오타",
+   "correction": "§3 의 '매일 03:00 KST' · 'Cloud Logging alert' 두 줄을 삭제하고, :18 은 '토큰 불일치·누락 시 403' 으로 고친다."
+  },
+  {
+   "id": "D-004",
+   "verdict": "MISLEADING",
+   "impact": "low",
+   "evidence": "rag/router.py:30-42 — pipeline.ask 는 EventSourceResponse 의 generator 안에서 돈다. HTTP 200 + SSE 헤더가 먼저 나가고, project 권한 거부는 스트림 안의 error+done 이벤트로 전달(rag/pipeline_service.py:25-30,93-110). 스트림 전에 끝나는 것은 workspace 멤버십(require_viewer, router.py:24)뿐이다. 또 FE 는 projectId 를 보내지 않으므로(features/rag/components/search-scope.tsx:9-10, hooks.ts:59) UI 트래픽의 visibility 필터는 스트림 안의 RagService 검색 단계(rag/service.py:58-59,123-143)에서 적용된다",
+   "correction": "'workspace 멤버십은 스트림 전에, 프로젝트/visibility 검증은 스트림 첫 이벤트 전(검색·LLM 호출 전)에 끝난다. 거부는 200 응답 안의 error+done 이벤트다.'"
+  },
+  {
+   "id": "D-005",
+   "verdict": "MISLEADING",
+   "impact": "low",
+   "evidence": "D-004 와 같은 근거(rag/router.py:30-42). UI 의 [프로젝트 범위 선택]은 제거됨: search-scope.tsx:9-10 ('현재 프로젝트' 탭 제거, projectId 는 store 에만 남음), SearchScope 는 timeRange/sourceType 만 설정(search-scope.tsx:44-67)",
+   "correction": "Layer 0 은 'SSE 응답 시작 후, 첫 데이터 이벤트 전' 에 끝난다. UI 박스의 [프로젝트 범위 선택]을 지우고 시간·소스 필터만 남긴다."
+  },
+  {
+   "id": "D-006",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "쓰는 곳 기준 source_type: meeting(embeddings/service.py:147,169) · note(:221,238, notes/service.py:512,530) · external_document(:298,313) · memory(memory/pipeline_service.py:62). 'action' 은 whitelist(embeddings/repository.py:17-19)에만 있고 쓰는 곳이 0건. 컬럼은 HALFVEC(1536)(embeddings/models.py:42-45)이며 workspace_id·project_id·chunk_level·parent_chunk_id·metadata_json 이 DDL 에 빠져 있다. 로컬 DB: note 18 / meeting 18 / memory 1",
+   "correction": "source_type = meeting | note | memory | external_document (whitelist 에는 action·inbox 도 있지만 쓰는 곳 없음). embedding 은 halfvec(1536)."
+  },
+  {
+   "id": "D-007",
+   "verdict": "MISLEADING",
+   "impact": "low",
+   "evidence": "pyannote 는 의존성·코드 어디에도 없다(pyproject.toml dependencies 15개). services/transcription.py:100-101 '화자 분리 없음 — speaker=\"Speaker\". pyannote 추가 예정', :146,:209 speaker 고정. FE transcript-viewer.tsx:23 '화자별 트랜스크립트' 문구도 같은 오해를 만든다",
+   "correction": "'Whisper (whisper-1, 화자 분리 미구현)'."
+  },
+  {
+   "id": "D-008",
+   "verdict": "MISLEADING",
+   "impact": "low",
+   "evidence": "D-007 과 같은 근거: services/transcription.py:100-101,146,209 / chunked_transcription.py 에도 diarization 없음. 같은 서술: meetings/CONTEXT.md:12,46 · apps/api/CONTEXT.md:61 · backend-scaffolding.md:92 (backend-scaffolding.md:93 의 services/embedding.py 도 존재하지 않음)",
+   "correction": "네 곳 모두 'Whisper STT (화자 분리 없음 — 모든 segment speaker=\"Speaker\")' 로 고친다."
+  },
+  {
+   "id": "D-009",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "git ls-tree HEAD apps/web/src/features = 17 (auth 포함). CONTEXT-MAP.md:60 과 directory-map.md:55,84 는 17 이라고 적었다. AGENTS.md 는 .claude/CLAUDE.md 심볼릭 링크라 모든 에이전트 세션에 16 이 주입된다",
+   "correction": "'FE 17 features (auth 는 ADR-031 로 신설)'. 개수는 CONTEXT-MAP §4.3 만 적는 쪽이 드리프트가 덜 난다."
+  },
+  {
+   "id": "D-010",
+   "verdict": "MISLEADING",
+   "impact": "low",
+   "evidence": "core/config.py 에는 모델 설정이 없다(:79 gemini_api_key 만 있음). 모델 고정은 상수 2곳에 중복돼 있다: services/ai_processing.py:27 · memory/service.py:69 (config.py 에 있었던 이력도 없음 — git log -S 결과 0건). memory/CONTEXT.md:75 는 service.py:64 라고 적었다(실제 :69)",
+   "correction": "I-3/B-4 강제 위치 = services/ai_processing.py:27 + memory/service.py:69 의 GEMINI_MODEL 상수(중복 — 한 곳으로 모을 후보)."
+  },
+  {
+   "id": "D-011",
+   "verdict": "MISLEADING",
+   "impact": "low",
+   "evidence": "memory/schemas.py:10-80 응답 모델에는 alias 가 없다(MemoryPromoteIn 1개만 alias) → snake_case 로 직렬화. contracts/openapi/v1/openapi.json 49 스키마 중 11개가 snake_case 속성(MemoryDetailOut: created_at·distilled_json·r2_audio_key…, 5개 *PromoteOut, PresignedUrlRequest). 전역 alias_generator 없음",
+   "correction": "I-16 은 memory 도메인과 *PromoteOut 에서 지켜지지 않는다. memory/CONTEXT.md:36 은 'snake_case 그대로 직렬화(I-16 예외)' 로 고치거나 스키마를 고친다."
+  },
+  {
+   "id": "D-012",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "git ls-tree HEAD: apps/api/tests test_*.py = 126, apps/web/src *.test/spec.ts(x) = 41 (vitest include=src/**, vitest.config:12). PR #194(1d2eac0)가 pytest 1개(test_repository_queries.py)·vitest 2개를 추가했고 README 는 #191 이후 갱신되지 않았다. e2e 44 · alembic 25 는 맞다",
+   "correction": "'pytest 126 파일' / 'vitest 41'."
+  },
+  {
+   "id": "D-013",
+   "verdict": "MISLEADING",
+   "impact": "low",
+   "evidence": "mise.toml:257-269 deploy-preflight 는 meetings 가 transcribing/analyzing 이고 최근 2시간 안에 갱신된 건만 센다. 숫자를 출력만 하고 exit code 로 막지 않는다. memory capture(status processing/transcription_pending, memory/service.py:116,168), Drive import/sync run(integrations/pipeline_service.py:94,488), promote 임베딩(common/promote_models.py:53)은 세지 않는다",
+   "correction": "'deploy-preflight 가 진행 중인 **회의 처리** 건수(최근 2h)를 출력한다. 0 인지는 사람이 확인하고, memory·Drive 작업은 세지 않는다.'"
+  },
+  {
+   "id": "D-014",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "deploy/oci/docker-compose.prod.yml:120-122 web mem_limit 768m ('512m → 768m', 9e7dcf8 PR #177 ADR-031). ADR-028:8-10 부분 개정 배너에는 이 변경이 없다. 표에 kairos-migrate(512m, :62)도 없다",
+   "correction": "D1 표의 kairos-web 캡을 768m 으로 고치고 'ADR-031 로 상향' 개정 배너를 추가한다."
+  },
+  {
+   "id": "D-015",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "같은 날 Sentry 전면 제거(02651ea 2026-08-14). ADR-021:4 'Superseded by ADR-028', core/config.py:87 'Sentry 는 ADR-028 로 제거', pyproject/package.json 에 sentry 없음, deploy/oci/.env.example 에 SENTRY_DSN 없음. ADR-028:8-10 개정 배너는 Clerk 만 다루고 Sentry 는 빠져 있다(:240 DSN 채울 계획도 폐기)",
+   "correction": "배너에 'D3 의 Sentry 유지와 :240 SENTRY_DSN 계획은 같은 날 Sentry 제거(ADR-021 Superseded)로 무효' 를 추가한다."
+  },
+  {
+   "id": "D-016",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "apps/web/Dockerfile:28-37 ARG 6개(+NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID, NEXT_PUBLIC_GOOGLE_PICKER_API_KEY — 1d2eac0 에서 추가). mise.toml:279-284 deploy-build 는 6개를 넘긴다. deploy/oci/README.md:59-63 수동 명령은 4개 → 이 명령대로 빌드하면 빌드는 성공하고 Picker 만 조용히 죽는다(#194 커밋 본문의 경고)",
+   "correction": "수동 명령에 Google 2개 --build-arg 를 추가하거나 `mise run deploy-build` 로 대체한다."
+  },
+  {
+   "id": "D-017",
+   "verdict": "MINOR",
+   "impact": "low",
+   "evidence": "scripts/verify-prod.sh 가 있고 기본 URL 도 같다(:15). 다만 KAIROS_JWT 가 없으면 /health 만 확인하고 exit 0(:30-66). deployment.md:124 자체가 '/health 200 은 배포 검증이 아니다' 라고 적고 있다. :39 문구는 Cloud Run cold start 전제",
+   "correction": "'verify-prod.sh 는 KAIROS_JWT·WORKSPACE_ID 를 줘야 인증 경로까지 확인한다' 를 덧붙인다."
+  },
+  {
+   "id": "D-018",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "git log docs/TODO.md: 마지막 변경은 1d2eac0 (2026-09-15). 같은 커밋이 2026-09-11/12 날짜 항목(Drive OAuth 클라이언트, CSP enforcing, BL-EXT-DISCONNECT-*)을 추가했지만 헤더(:3)는 고치지 않았다",
+   "correction": "'마지막 갱신: 2026-09-15 (ADR-026 Drive 해제 경로 — PR #194)'."
+  },
+  {
+   "id": "D-019",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "gh pr view 102 --repo woosung-dev/kairos → state MERGED, mergedAt 2026-05-21T15:04:47Z",
+   "correction": "항목 삭제(완료)."
+  },
+  {
+   "id": "D-020",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "Cloud Run 은 ADR-028 로 철거(AGENTS.md:122, deployment.md:144-155). /users/sync 와 SyncResponse 는 ADR-031 에서 삭제(auth/schemas.py:32). PR #102 는 이미 머지돼 post-merge 검증 대상도 없다",
+   "correction": "항목 삭제(완료·전제 소멸)."
+  },
+  {
+   "id": "D-021",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "S15-T1: auth/dependencies.py:257-345 personal workspace lazy seed(ON CONFLICT uq_workspaces_owner_personal). S15-T2: features/workspaces/components/WorkspaceSwitcher.tsx 가 header.tsx:62 에 있다. S15-T3: workspaces/invite_service.py:59-60,171-175 personal 초대 차단(I-19), workspaces/service.py:133-139 personal 삭제 차단",
+   "correction": "S15-T1~T3 를 완료로 옮긴다(Sprint 15)."
+  },
+  {
+   "id": "D-022",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "docs/adr/016-personal-team-ia.md 존재(상태 Accepted, :4). F8 의 서비스 경계 ADR 도 docs/adr/014-service-boundary.md 로 존재",
+   "correction": "S15-T4·F8 을 완료로 옮긴다(ADR-016, ADR-014)."
+  },
+  {
+   "id": "D-023",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "promote 라우트 5개: meetings/router.py:147 · notes/router.py:167 · actions/router.py:89 · inbox/router.py:60 · memory/router.py:126. FE components/shared/ItemPromoteModal.tsx. I-18 은 CONTEXT-MAP.md:93 에 신설됨. S16-T4~T6 음성 메모도 memory 도메인(memory/service.py:142 capture_voice)으로 구현됨",
+   "correction": "S16-T1~T6 을 완료로 옮긴다(I-18 · memory 도메인)."
+  },
+  {
+   "id": "D-024",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "deployment.md 에 §2.5.1 이 없다(헤딩: 아키텍처/배포/롤백/환경변수/데이터베이스/검증/알려진 함정/부록). 부록 :144-155 는 WIF·Artifact Registry·deploy.yml 을 '2026-08-14 철거'로 적고 있다",
+   "correction": "항목 삭제(ADR-028 로 전제 소멸). 비밀 관리 정본은 서버 ~/kairos/.env (docs/development/secrets.md)."
+  },
+  {
+   "id": "D-025",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "Cloud Run 철거(ADR-028), Sentry 제거(ADR-021:4 Superseded, core/config.py:87). 관측은 docker logs 뿐(AGENTS.md:122, main.py:133)",
+   "correction": "DELTA3 재측정 전제를 'OCI + docker logs 기반'으로 다시 쓰고, COLD-START(:188)는 폐기한다(Cloud Run·Neon 없음)."
+  },
+  {
+   "id": "D-026",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "auth/dependencies.py:292-310 User INSERT 가 이미 'ON CONFLICT (auth_user_id) DO NOTHING' + 재조회다. 457c994 (2026-05-23, PR #107 'Sprint 27c P0 fix bundle (race + landing)') 에서 해소. backlog :88 가 인용한 dependencies.py:160-169 는 지금 verify_bearer_token 이다",
+   "correction": "BL-S27c-1 을 RESOLVED(PR #107) 로 닫는다."
+  },
+  {
+   "id": "D-027",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "프로덕션 공개 GET: https://kairos.woosung.dev/_next/image?url=/landing/screenshots/screenshot-{dashboard,meeting-summary,rag-answer}.png&w=640/1200/1920 → 모두 200 image/png. 파일은 apps/web/public/landing/screenshots/ 에 있고 product-shots-section.tsx:88-100 next/image 로 렌더",
+   "correction": "BL-S27c-3 을 RESOLVED 로 닫는다(OCI standalone 에서 재현 안 됨; 457c994 'landing' fix 로 추정 [가정])."
+  },
+  {
+   "id": "D-028",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "BL-S27c-5 해소: meeting-detail.tsx:88-117 FailedMeetingView('분석에 실패했습니다'), :293-295 failed 이면 요약 탭 대신 렌더(app/(app)/meetings/[id]/page.tsx 가 MeetingDetail 을 렌더). BL-S27c-4 는 절반만 맞다 — 같은 회의 retry 는 없고 '다시 업로드' 링크(/new, :106)만 있음. BE 에도 retry 라우트 없음(meetings/router.py)",
+   "correction": "S27c-5 는 RESOLVED(S28b). S27c-4 는 '재업로드 링크만 있음, 동일 회의 재처리 없음' 으로 범위를 좁혀 유지한다."
+  },
+  {
+   "id": "D-029",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "/inbox 빈 상태: features/inbox/components/smart-inbox.tsx:146-160 ('처리할 항목이 없습니다'). /actions: app/(app)/actions/page.tsx → ActionBoard (PR #189)",
+   "correction": "BL-S27c-6·7 을 RESOLVED 로 닫는다."
+  },
+  {
+   "id": "D-030",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "features/inbox/components/inbox-item-card.tsx:109-122 handleConfirm 이 classifyMutation.mutate 를 호출하고 실패하면 롤백. :44-46 'S28b ... classify mutation wire'",
+   "correction": "BL-073 을 RESOLVED(S28b) 로 닫는다."
+  },
+  {
+   "id": "D-031",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "BL-F5: components/layout/panel-layout.tsx:165-168 RAG 오버레이 maxWidth:'100%' ('BL-F5' 주석). BL-F7: features/rag/components/markdown-message.tsx:104-121 h4-h6·blockquote·td/th 에도 injectCitations 적용('BL-F7' 주석)",
+   "correction": "BL-F5·F7 을 RESOLVED 로 닫는다."
+  },
+  {
+   "id": "D-032",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "내보내기 dead button 은 해소: features/sources/components/source-viewer.tsx:203 ('BL-F8 ... fix — 마크다운 다운로드'). out-of-range 는 여전히 조용히 무시된다: features/rag/components/rag-chat.tsx:76-82 (sources[num-1] 이 없으면 무반응, 토스트·가드 없음)",
+   "correction": "BL-F8 을 'out-of-range 가드만 남음'으로 범위를 좁힌다."
+  },
+  {
+   "id": "D-033",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "apps/web/next.config.ts:68 가 Content-Security-Policy-Report-Only 를 이미 보낸다(1d2eac0). 외부 origin 에 Google 이 추가됐다: script-src apis/accounts.google.com, connect-src googleapis·content.googleapis·docs.google.com, frame-src (:29-43). R2 는 FE origin 이 아니다(:10 '업로드는 프록시 경유')",
+   "correction": "'CSP 는 Report-Only 로 도입됨(PR #194). 남은 일 = enforcing 전환 + nonce/strict-dynamic. 외부 도메인 = 폰트 3종 + Google Picker/GIS 5종.'"
+  },
+  {
+   "id": "D-034",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "git ls-tree HEAD apps/api/src = 17 디렉터리(actions auth common core embeddings feedback inbox integrations meetings memory notes onboarding projects rag services upload workspaces), audit/ 없음. directory-map.md:179 는 이미 'audit 추가 시 18' 로 적고 있다",
+   "correction": "'audit 도메인 신설 → BE 18 모듈 (현재 17)'."
+  },
+  {
+   "id": "D-035",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "apps/api/pyproject.toml dependencies 15개, sentry-sdk 없음(02651ea 제거). Fix (a) 는 이미 적용됨: apps/api/Dockerfile:18 'uv sync --frozen --no-dev', test.yml:76,170,247, nightly-e2e.yml:60, r2-cleanup.yml:36, mise.toml:45",
+   "correction": "'15 dependencies (sentry-sdk 제거됨). (a) uv sync --frozen 은 적용 완료 — 남은 선택지는 (b)/(c)'."
+  },
+  {
+   "id": "D-036",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "BL-059: Sentry 제거(ADR-021:4 Superseded, config.py:87). BL-058/060: OnboardingBanner 는 Sprint 24 Wave 2 T-OBN-05 로 폐기(e2e home.spec.ts:27, first-project.spec.ts:20, mobile-responsive.spec.ts:60-62). apps/web/src 에 컴포넌트 0건",
+   "correction": "BL-058·059·060 을 OBSOLETE 로 닫는다."
+  },
+  {
+   "id": "D-037",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "Cloud Run·Neon 운영 전제는 ADR-028(2026-08-14)로 소멸: DB 는 OCI 셀프호스팅 pgvector(docker-compose.prod.yml:23), API 는 상시 기동 컨테이너(restart unless-stopped)라 cold start·min-instances 개념이 없다. BL-S27c-10 의 secret 도 서버 .env",
+   "correction": "해당 6건을 OBSOLETE(ADR-028) 로 닫거나 OCI 전제로 다시 쓴다. BL-024 는 pg_prewarm 을 셀프호스팅 PG 재기동 관점으로 다시 볼 여지가 있다."
+  },
+  {
+   "id": "D-038",
+   "verdict": "STALE",
+   "impact": "high",
+   "evidence": "ADR-031 컷오버는 2026-08-17(9e7dcf8), +7일 = 2026-08-24 인데 34일이 지났다. clerk_id 는 남아 있고(auth/models.py:20) DROP 리비전도 없다(clerk_id 는 16e55f466791·c1a7e0b5d3f2 에만 등장). 같은 '+7일' 트리거에 걸린 TODO.md:73 T-SEC-CLERK-ROTATE(노출된 dev CLERK_SECRET_KEY 무효화 = Clerk dev 인스턴스 삭제)와 서버 .env CLERK_* 정리도 미완. 레포는 PUBLIC(gh repo view)",
+   "correction": "'+7일 롤백 창은 2026-08-24 에 종료. clerk_id DROP · CLERK_* 제거 · Clerk dev 인스턴스 삭제가 대기 중' 으로 바꾼다. 실행 여부는 [확인 필요]."
+  },
+  {
+   "id": "D-039",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "features 는 17개인데 §3 트리(:44-46)와 §5 표(:89-104)에 auth/ 가 없다(auth/components/auth-form.tsx, hooks.ts). home/ 에는 dashboard-suggestions.tsx 뿐이고 ActivityFeed 는 레포 전체에 0건. onboarding/ 에는 components 가 없다(api/hooks/schemas). rag/ 에는 ask-input·answer-card 가 없다(실제 rag-input·rag-chat·rag-sources·search-scope, RAGPanel 은 components/layout/rag-panel.tsx)",
+   "correction": "auth/ 행 추가(auth-form — Better Auth 로그인/가입). home=dashboard-suggestions, onboarding=api/hooks 만(컴포넌트 없음), rag=rag-chat·rag-input·rag-sources·search-scope·markdown-message."
+  },
+  {
+   "id": "D-040",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "features/upload/ = hooks.ts·types.ts·useRecording.ts 뿐이고 upload-dropzone 은 0건. usePresignedUpload 는 이름과 달리 multipart 프록시 POST /workspaces/{wid}/upload/file 를 쓴다(hooks.ts:22-27,56-57; BL-OCI-2 'R2 CORS 미설정')",
+   "correction": "'upload/ — usePresignedUpload(이름과 달리 백엔드 프록시 multipart 업로드), useRecording'."
+  },
+  {
+   "id": "D-041",
+   "verdict": "MISLEADING",
+   "impact": "low",
+   "evidence": "Cmd+K 는 명령 팔레트를 연다(components/layout/cmd-k.tsx:134-137 toggleCmdK). RAG 슬라이드 오버레이는 헤더 검색 버튼 클릭(header.tsx:66-67, ⌘K 힌트 표시)이나 팔레트 '?' RAG 모드 제출(cmd-k.tsx:208-216)로만 열린다. 모바일에서도 헤더 '검색' 버튼이 같은 오버레이를 연다(header.tsx:66-80)",
+   "correction": "'RAG: 헤더 검색바 클릭 → 380px 슬라이드 오버레이. Cmd+K = 명령 팔레트(? 접두사로 RAG 질의 → 오버레이)'."
+  },
+  {
+   "id": "D-042",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "features/workspaces/components/WorkspaceSwitcher.tsx:41-64 — Sprint 23 D1 에서 queryClient.clear() 대신 workspaces.list 만 남기는 predicate invalidateQueries 로 바꾸고 router.refresh() 는 뺐다",
+   "correction": "'setActiveWorkspaceId(id) + workspaces.list 제외 전 쿼리 invalidate (router.refresh 없음)'."
+  },
+  {
+   "id": "D-043",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "components/layout/sidebar.tsx:46-47 /memory 아이콘은 Brain(Mic 아님). app/(app)/memory/page.tsx:59-67 검색바는 Search 아이콘 + Input 뿐이고 Cmd+K 힌트가 없다. DESIGN.md:118 의 BottomNav '[메모]' 칸은 /notes 다(bottom-nav.tsx:23)",
+   "correction": "'Brain icon + \"Memory\" 라벨' / '[search bar: input (Cmd+K 힌트 없음)]'."
+  },
+  {
+   "id": "D-044",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "프로토타입 컴포넌트는 1d2eac0 에서 삭제됐다(git log --diff-filter=D). variant 쿼리를 읽는 코드가 0건이고, settings?tab=integrations 는 실제 GoogleDrivePanel 을 렌더(owner 만, settings/page.tsx:21,26,83-86). NOTES.md 는 짝 잃은 파일",
+   "correction": "NOTES.md 를 삭제한다(문서 :11 의 '프로토타입과 함께 삭제' 조건 충족). 결정 기록은 ADR-026 으로."
+  },
+  {
+   "id": "D-045",
+   "verdict": "STALE",
+   "impact": "low",
+   "evidence": "Cloud Run 은 철거됐다. 운영 healthcheck 는 /health 를 쓴다(deploy/oci/docker-compose.prod.yml api healthcheck: '/ready 를 쓰면 DB 일시 장애에 unhealthy 연쇄' 주석). /ready 를 probe 로 쓰는 곳은 없다",
+   "correction": "'Readiness 수동 점검용 — DB SELECT 1. compose healthcheck 는 의도적으로 /health 사용'."
+  }
+ ],
+ "ops": [
+  {
+   "id": "OPS-1",
+   "verdict": "CONFIRMED",
+   "evidence": "scripts/r2_cleanup.py:64-97 (LastModified<now-days 이면 DB 참조와 무관하게 전부 delete_objects), :123-126 기본 prefix='uploads/', r2-cleanup.yml:49 prefix 인자 없음. 회의 원본 키=uploads/{uuid}/{filename} (common/r2.py:61,83 ← upload/router.py:102; meetings/models.py:20 file_key; promote 복제본도 같은 키를 공유 meetings/service.py:495). 워크플로 트리거: workflow_dispatch 만 있음(r2-cleanup.yml:5-16), gh workflow list = 'R2 Cleanup active'(활성화돼 있지만 schedule 없음), gh run list 실행 이력 0건. delete 기본값 false(r2-cleanup.yml:12-16) + 스크립트 기본 DRY RUN(r2_cleanup.py:127-131), days 기본 30. 대상 버킷=secrets.R2_BUCKET_NAME(r2-cleanup.yml:43). nightly-e2e.yml:72,85 와 같은 시크릿이고 nightly-e2e.yml:3 이 이를 'R2 prod bucket' 으로 부른다",
+   "note": "시크릿 값은 읽을 수 없어 버킷이 실제로 프로덕션인지는 문서 근거로만 확인된다 [가정: prod]. 자동 실행이 없어 지금 당장 위험은 없다. 다만 TODO.md:109·r2-cleanup-cron.md:39 가 '고아 정리'로 delete=true 실행을 안내하므로, 그대로 따르면 30일 넘은 회의 원본이 전부 삭제된다(전사·요약은 DB 에 남지만 재처리·원본 보존 불가). voice 메모(memory/ prefix)는 대상이 아니다. 앱 레벨 정리(POST /admin/memory/r2-cleanup)는 호출 주체가 0건이다. 관련: 워크스페이스 삭제는 R2 정리를 'r2-cleanup cron'에 위임하는데(workspaces/repository.py:107) 그 cron 은 존재하지 않는다"
+  },
+  {
+   "id": "OPS-2",
+   "verdict": "CONFIRMED",
+   "evidence": "#194 가 GET /workspaces/{wid}/integrations/google-drive/documents 와 DELETE /integrations/google-drive 를 추가했다(git show 1d2eac0 router.py). 그 전에는 같은 경로에 POST 만 있었다. 공개 GET(인증 없음, wid=임의 UUID): prod api /integrations/google-drive/documents → 405 Method Not Allowed(POST 만 있는 #194 이전 코드), 대조: prod /integrations/google-drive → 401(#143 은 배포됨), 없는 경로 → 404, /health 200. 같은 요청을 로컬 main(1d2eac0)에 보내면 401. FE 도 미배포: #194 가 추가한 Content-Security-Policy-Report-Only 헤더(next.config.ts:68; 부모 커밋에는 0건)가 prod https://kairos.woosung.dev/ 응답에 없다(다른 보안 헤더 4종은 있음). 로컬 main FE 에는 있다",
+   "note": "BE·FE 모두 #194 이전 이미지다. 로그인·POST 없이 판정했다. Cloudflare 가 CSP 헤더만 벗겼을 가능성은 BE 405 증거가 따로 있어 결론을 바꾸지 않는다"
+  },
+  {
+   "id": "OPS-3",
+   "verdict": "CONFIRMED",
+   "evidence": "API 는 워크스페이스 범위다: memory/router.py:42 prefix=/workspaces/{wid}/memory. capture 는 require_member(:56), recall·get 은 require_viewer(:94,:118). 검색은 workspace_id 만 거르고 user_id 는 거르지 않는다(repository.py vector_search 'WHERE ec.workspace_id=:wid AND source_type=memory', service.py:259-276 의 user_id 는 이벤트 기록용). 팀 워크스페이스에서는 viewer 도 다른 멤버의 메모를 recall 한다. promote 는 target 만 team 이면 되고 source 가 personal 일 필요는 없다(service.py:417,441-442). FE 도 personal 로 제한하지 않는다(app/(app)/memory/page.tsx, sidebar.tsx:46-47). 'personal' 로 서술하는 문서 위치: (1) apps/api/src/memory/CONTEXT.md:13 'Memory 도메인은 개인 메모리 레이어를 담당' ← 핵심 (2) apps/api/src/memory/CONTEXT.md:19 'Promote: Personal → Team' (3) apps/api/src/memory/CONTEXT.md:73 I-19 'Personal에 capture는 1 user만' (memory 가 personal 전용이라는 함의) (4) DESIGN.md:248 RECALL flag 설명을 'Personal workspace seed 자동 시드'와 묶음 (5) docs/requirements/prd.md:496 tagline 'Personal memory layer for people who think out loud.' (6) docs/requirements/prd.md:60,92,157 '음성 메모…개인 영역에 축적' (7) docs/adr/016-personal-team-ia.md:207 · docs/TODO.md:211 S16-T6 'Personal에서 음성 메모 첫 진입' (8) docs/requirements/second-brain.md:69-72 'Layer 1 개인 지식 베이스 … 본인의 RAG에서만 검색됨'(Memory 이전 비전 문서, 약한 해당)",
+   "note": "반대로 DESIGN.md:192,196 ('single feed + active workspace context')와 ADR-010:48 ('개인 GPT memory와 달리 팀 공통 공유 자산')은 코드와 맞는다. 문서끼리도 모순이다. 가장 큰 위험은 (1): 팀 워크스페이스에서 '개인 메모'라고 믿고 캡처한 내용이 viewer 포함 전 멤버에게 recall 된다(프라이버시 기대 불일치). 제품 결정이 필요하다 [확인 필요]: 문서를 '워크스페이스 범위'로 고칠지, recall 에 user_id 필터를 넣을지"
+  }
+ ]
+}

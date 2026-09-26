@@ -192,6 +192,7 @@ erDiagram
         string r2_audio_key "voice 메모 R2 객체 키, 30일 TTL"
         uuid embedding_chunk_id FK "source_type=memory chunk"
         enum status "processing | transcription_pending | embedding_pending | embedding_failed | active | archived"
+        bool is_shared "promote 사본만 true — 그 외 작성자 전용 (I-24)"
         timestamp created_at
         timestamp updated_at
         timestamp deleted_at
@@ -368,6 +369,7 @@ erDiagram
 - `embedding_chunk_id`: EmbeddingChunk와 1:1 (source_type='memory'). embedding 실패 시 NULL.
 - status state machine: `processing → transcription_pending (voice만) → embedding_pending → active` / `embedding_failed`. archived = soft delete.
 - 불변식: I-9 workspace 격리 + I-18 promote 복제 + I-19 personal 1인 격리.
+- `is_shared` (2026-09-27, alembic `a9c4e2f7b1d0`): 메모는 작성자 전용(I-24). "팀으로 올리기" 복제본만 `true` 로 대상 워크스페이스 전원에게 보인다. 과거 promote 사본은 `memory_events` 로 backfill.
 
 ### PromotionAudit (I-18 강제)
 - Promote 1-button (Sprint 15 R6 1차) + Sprint 16+ 정식 build의 감사 row.

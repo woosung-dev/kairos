@@ -13,6 +13,8 @@ export interface Project extends Timestamped {
   visibility: ProjectVisibility;
   tags: string[];
   sortOrder: number;
+  /** 작성자 내부 user id (users.id) — 작성자는 member 여도 visibility 를 바꿀 수 있다 (2026-09-27 결정) */
+  createdById: UUID;
 }
 
 export interface CreateProjectRequest {

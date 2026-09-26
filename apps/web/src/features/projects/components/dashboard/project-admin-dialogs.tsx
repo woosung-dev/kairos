@@ -26,6 +26,7 @@ export function ProjectAdminDialogs({
   wid,
   projectId,
   project,
+  canArchive,
   visibilityDialogOpen,
   onVisibilityDialogOpenChange,
   editDialogOpen,
@@ -38,6 +39,8 @@ export function ProjectAdminDialogs({
   wid: string | undefined;
   projectId: string;
   project: Project;
+  /** admin/owner — 편집 다이얼로그의 "보관" 상태 전환 허용 여부 */
+  canArchive: boolean;
   visibilityDialogOpen: boolean;
   onVisibilityDialogOpenChange: (open: boolean) => void;
   editDialogOpen: boolean;
@@ -62,7 +65,12 @@ export function ProjectAdminDialogs({
         onConfirm={(next) => {
           updateProject.mutate(
             { id: projectId, data: { visibility: next } },
-            { onSuccess: () => onVisibilityDialogOpenChange(false) }
+            {
+              onSuccess: () => onVisibilityDialogOpenChange(false),
+              // 권한 밖(403)·안 보임(404) 등 BE 거부를 조용히 삼키지 않는다
+              onError: (err) =>
+                toast.error(err instanceof Error ? err.message : "공개 범위 변경에 실패했습니다"),
+            }
           );
         }}
       />
@@ -73,6 +81,7 @@ export function ProjectAdminDialogs({
           onOpenChange={onEditDialogOpenChange}
           workspaceId={wid}
           project={project}
+          canArchive={canArchive}
         />
       )}
 

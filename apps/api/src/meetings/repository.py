@@ -2,15 +2,14 @@
 """Meeting Repository — AsyncSession 유일 보유자. 헌법 I-9 workspace_id 필수 (Sprint 19 PR #1)."""
 import uuid
 
-from sqlalchemy.orm import aliased
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, exists, func, or_, select
+from sqlmodel import func, select
 
 from src.common.promote_models import ItemPromotionAudit
-from src.common.visibility import ADMIN_BYPASS_ROLES, project_access_clause
+from src.common.visibility import ADMIN_BYPASS_ROLES, meeting_access_clause
 from src.embeddings.models import EmbeddingChunk
 from src.meetings.models import Meeting, MeetingSummary, TranscriptSegment
-from src.projects.models import MeetingProjectLink, Project
+from src.projects.models import MeetingProjectLink
 
 
 def _meeting_visibility_filter(
@@ -36,24 +35,8 @@ def _meeting_visibility_filter(
         return stmt
     if requester_role in ADMIN_BYPASS_ROLES:
         return stmt
-
-    mpl_exists = aliased(MeetingProjectLink)
-    mpl_link = aliased(MeetingProjectLink)
-
-    # 회의에 링크가 하나도 없으면 통과 (워크스페이스 레벨).
-    no_links = ~exists().where(mpl_exists.meeting_id == Meeting.id)
-
-    # 링크된 project 중 접근 가능한 것이 하나라도 있으면 통과.
-    # 코어 규칙은 common/visibility.py SSOT (CAND-B flatten EXISTS 포함) —
-    # N:M 링크 shape(aliased MPL + no_links)만 meetings 도메인 소유.
-    has_accessible_link = exists().where(
-        and_(
-            mpl_link.meeting_id == Meeting.id,
-            mpl_link.project_id == Project.id,
-            project_access_clause(requester_user_id),
-        )
-    )
-    return stmt.where(or_(no_links, has_accessible_link))
+    # 규칙(N:M 링크 shape 포함)은 common/visibility.py SSOT — 청크·인박스·액션과 공유.
+    return stmt.where(meeting_access_clause(Meeting.id, requester_user_id))
 
 
 class MeetingRepository:
@@ -75,6 +58,24 @@ class MeetingRepository:
                 Meeting.workspace_id == workspace_id,
             )
         )).one_or_none()
+
+    async def is_visible(
+        self,
+        meeting_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None,
+        requester_role: str | None,
+    ) -> bool:
+        """회의가 같은 workspace 에 있고 requester 가 볼 수 있는지 (C-018 링크 API 게이트).
+
+        LIST 와 같은 `_meeting_visibility_filter` 를 쓴다 — 상세·목록·링크 판정이 한 규칙.
+        """
+        stmt = select(Meeting.id).where(
+            Meeting.id == meeting_id,
+            Meeting.workspace_id == workspace_id,
+        )
+        stmt = _meeting_visibility_filter(stmt, requester_user_id, requester_role)
+        return (await self.session.exec(stmt)).one_or_none() is not None
 
     async def find_by_workspace(
         self,

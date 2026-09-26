@@ -1,0 +1,50 @@
+### T-32 — plain python (Python 3.14.7)
+── dry-run against fake listing (DB referenced = 2 meeting originals + 1 voice memo) ──
+=== R2 cleanup — bucket=nexus-core-storage prefixes=['uploads/', 'memory/'] older_than=30d (before 2026-08-28T00:00:00+00:00)
+  referenced keys from DB db:5432/kairos: 3
+  scanned=6 protected(referenced)=3 too_young=1 candidates=2 [DRY RUN]
+  → uploads/44444444-4444-4444-4444-444444444444/deleted-meeting.m4a  (90d old, 1000000B)
+  → memory/33333333-3333-3333-3333-333333333333/bbbb-deleted.wav  (90d old, 200000B)
+
+✅ would_delete=2 (dry run — 삭제 0건)
+──────────────────────────────────────────────────────────────────────
+PASS test_days_below_minimum_is_rejected
+PASS test_delete_errors_exit_nonzero
+PASS test_delete_removes_only_unreferenced_old_keys
+PASS test_delete_requires_production_env
+PASS test_dry_run_never_lists_referenced_keys
+PASS test_empty_reference_set_aborts_before_listing
+PASS test_inventory_and_delete_are_mutually_exclusive
+PASS test_inventory_needs_no_db_and_prints_no_keys
+PASS test_missing_database_url_refuses_cleanup
+PASS test_other_project_prefixes_are_never_listed
+PASS test_prefix_outside_allowlist_is_rejected
+PASS test_randomized_referenced_keys_are_never_selected
+
+12 passed, 0 failed
+exit=0
+
+### T-32 — pytest via apps/api venv
+............                                                             [100%]
+12 passed in 0.03s
+
+### T-32 (real DB refs): fetch_referenced_keys against kairos-qa-db (read-only txn) + fake bucket
+QA DB referenced keys: 2
+   ref: uploads/00000000-0000-0000-0000-000000000000/none.mp3
+   ref: uploads/a3e294c1-2835-46e7-bca5-c810e9835c75/beta-meeting.m4a
+=== R2 cleanup — bucket=nexus-core-storage prefixes=['uploads/', 'memory/'] older_than=30d (before 2026-08-28T00:00:00+00:00)
+  referenced keys from DB 127.0.0.1:5436/kairos_qa: 2
+  scanned=4 protected(referenced)=2 too_young=0 candidates=2 [DELETE]
+  → uploads/deadbeef-0000-0000-0000-000000000000/orphan.m4a  (90d old, 1B)
+  → memory/deadbeef/orphan.wav  (90d old, 1B)
+
+✅ deleted=2
+RESULT: deleted=['uploads/deadbeef-0000-0000-0000-000000000000/orphan.m4a', 'memory/deadbeef/orphan.wav'] ∩ referenced = ∅  → PASS
+exit=0
+
+### mutation check — reference guard + pre-delete overlap check removed (= old age-only behaviour)
+FAIL test_delete_errors_exit_nonzero: AssertionError()
+FAIL test_delete_removes_only_unreferenced_old_keys: AssertionError()
+FAIL test_dry_run_never_lists_referenced_keys: AssertionError('참조 키가 dry-run 목록에 나왔다: uploads/11111111-1111-1111-1111-111111111111/weekly-sync.m4a')
+FAIL test_randomized_referenced_keys_are_never_selected: AssertionError()
+8 passed, 4 failed

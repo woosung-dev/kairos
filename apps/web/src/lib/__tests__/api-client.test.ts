@@ -118,3 +118,60 @@ describe("createApiClient", () => {
     await expect(apiNull.getToken()).rejects.toBeInstanceOf(AuthRequiredError);
   });
 });
+
+// C-025 회귀 가드 — FastAPI 422 의 detail 은 객체 배열이다. 예전엔 new Error(배열) 이 되어
+// 화면에 "[object Object]" 가 떴다 (/new 텍스트 캡처 실측, probe G2-004).
+describe("createApiClient — 422 validation detail 을 읽을 수 있는 한국어로", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function errorFor(body: unknown, status: number): Promise<ApiError> {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(body, status));
+    const api = createApiClient(async () => "tok-123");
+    return (await api.fetch("/workspaces/ws-1/meetings/capture").catch((e: unknown) => e)) as ApiError;
+  }
+
+  it("string_too_short → 최소 글자 수 + 필드명, [object Object] 아님", async () => {
+    const error = await errorFor(
+      {
+        detail: [
+          {
+            type: "string_too_short",
+            loc: ["body", "transcriptText"],
+            msg: "String should have at least 50 characters",
+            input: "😀".repeat(25),
+            ctx: { min_length: 50 },
+          },
+        ],
+      },
+      422,
+    );
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.status).toBe(422);
+    expect(error.message).toBe("최소 50자 이상 입력해 주세요 (transcriptText)");
+    expect(error.message).not.toContain("[object Object]");
+  });
+
+  it("string_too_long → 최대 글자 수", async () => {
+    const error = await errorFor(
+      { detail: [{ type: "string_too_long", loc: ["body", "name"], msg: "x", ctx: { max_length: 60 } }] },
+      422,
+    );
+    expect(error.message).toBe("최대 60자까지 입력할 수 있습니다 (name)");
+  });
+
+  it("알 수 없는 validation type 은 일반 문구 + 필드명 (영어 msg 를 노출하지 않는다)", async () => {
+    const error = await errorFor(
+      { detail: [{ type: "value_error", loc: ["body", "name"], msg: "Value error, blank" }] },
+      422,
+    );
+    expect(error.message).toBe("입력값을 확인해 주세요 (name)");
+  });
+
+  it("문자열이 아닌 객체 detail 도 [object Object] 로 새지 않는다", async () => {
+    const error = await errorFor({ detail: { code: "SOMETHING" } }, 409);
+    expect(error.message).toBe("요청을 처리하지 못했습니다 (HTTP 409)");
+  });
+});

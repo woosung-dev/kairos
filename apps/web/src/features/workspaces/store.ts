@@ -16,6 +16,12 @@ interface WorkspaceState {
    * 403 이 나던 문제 방어.
    */
   ensureOwner: (userId: string) => void;
+  /**
+   * 소유자와 활성 워크스페이스를 **함께** 확정한다 (C-001).
+   * 활성 ws 만 바꾸면 빈 저장소(ownerUserId=null)에서 panel-layout 의 ensureOwner 가 "다른 계정" 으로
+   * 판정해 방금 고른 ws 를 지우고, self-heal 이 목록 첫 ws 로 덮어쓴다 — 초대 수락 직후 엉뚱한 ws 착지.
+   */
+  activateWorkspaceForUser: (userId: string, workspaceId: string) => void;
 
   /** 현재 워크스페이스에서의 사용자 역할 (메모리만, persist 안 함) */
   workspaceRole: WorkspaceRole | null;
@@ -45,6 +51,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             ? state
             : { ownerUserId: userId, activeWorkspaceId: null }
         ),
+      activateWorkspaceForUser: (userId: string, workspaceId: string) =>
+        set({ ownerUserId: userId, activeWorkspaceId: workspaceId }),
 
       workspaceRole: null,
       setWorkspaceRole: (role: WorkspaceRole | null) =>

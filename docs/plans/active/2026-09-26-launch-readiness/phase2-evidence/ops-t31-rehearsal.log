@@ -1,0 +1,94 @@
+### T-31 rehearsal 2026-09-27T02:02:38+0900 — repo HEAD 1d2eac0 + working tree
+### source = kairos-qa-db (127.0.0.1:5436, db kairos_qa) — pg_dump/SELECT only
+### step 0 (negative): nonexistent DB container → exit 1
+[2026-09-27T02:02:38+0900] ⛔ DB 컨테이너 'no-such-db' 가 실행 중이 아니다
+exit=1
+### step 1: --dry-run
+[2026-09-27T02:02:38+0900] 백업 시작 mode=dry-run db=kairos-qa-db → $SCRATCH/ops-evidence/backups/kairos-20260926T170238Z.dump
+[2026-09-27T02:02:38+0900] [dry-run] docker exec kairos-qa-db pg_dump -Fc → $SCRATCH/ops-evidence/backups/kairos-20260926T170238Z.dump.partial
+[2026-09-27T02:02:38+0900] [dry-run] pg_restore --list 로 목차 검증 (필수 테이블: alembic_version users auth_user auth_account workspaces meetings)
+[2026-09-27T02:02:38+0900] [dry-run] ⚠ 업로드 컨테이너 'kairos-api' 가 실행 중이 아니다 — 실제 실행이면 업로드 단계에서 실패한다
+[2026-09-27T02:02:38+0900] [dry-run] 종료 — 변경 0건
+exit=0
+### step 2: --local-only backup
+[2026-09-27T02:02:38+0900] 백업 시작 mode=local-only db=kairos-qa-db → $SCRATCH/ops-evidence/backups/kairos-20260926T170238Z.dump
+[2026-09-27T02:02:39+0900] ✅ 덤프 검증 통과 — 256579 bytes · 목차 239개 · sha256=6fc8a29d365456f13a754ea6ec42d16f165c49bf6f46747163cb047051143b36
+[2026-09-27T02:02:39+0900] ℹ R2 업로드 건너뜀 (--local-only)
+[2026-09-27T02:02:39+0900] 보존 정리 — 14일 초과 0개 파일 삭제, 보관 중 덤프 1개
+[2026-09-27T02:02:39+0900] 완료
+exit=0
+   total 520
+   -rw-------@ 1 woosung  wheel  256579 Sep 27 02:02 kairos-20260926T170238Z.dump
+   -rw-------@ 1 woosung  wheel      95 Sep 27 02:02 kairos-20260926T170238Z.dump.sha256
+   -rw-------@ 1 woosung  wheel      93 Sep 27 02:02 last-success
+kairos-20260926T170238Z.dump: OK
+### step 3: restore into throwaway container + row-count compare with kairos-qa-db
+[2026-09-27T02:02:39+0900] 임시 컨테이너 기동 — kairos-restore-test (pgvector/pgvector:0.8.0-pg17, mem 512m, 포트 publish 없음)
+[2026-09-27T02:02:40+0900] ✅ 복원 완료 (0초)
+[2026-09-27T02:02:40+0900] 확장: pg_trgm 1.6, plpgsql 1.0, vector 0.8.0
+[2026-09-27T02:02:40+0900] alembic_version: b3d5f8a1c2e4
+table                                  source     restored  result
+action_items                               17           17  OK
+alembic_version                             1            1  OK
+auth_account                                6            6  OK
+auth_jwks                                   1            1  OK
+auth_session                               22           22  OK
+auth_user                                   6            6  OK
+auth_verification                           0            0  OK
+embedding_chunks                           37           37  OK
+external_documents                          0            0  OK
+feedback_entries                            0            0  OK
+inbox_items                                 7            7  OK
+integration_connections                     0            0  OK
+integration_oauth_states                    0            0  OK
+integration_sync_runs                       0            0  OK
+item_promotion_audit                        2            2  OK
+meeting_project_links                       5            5  OK
+meeting_summaries                           9            9  OK
+meetings                                   10           10  OK
+memory_ai_calls                             2            2  OK
+memory_events                               6            6  OK
+memory_items                                1            1  OK
+memory_query_embedding_cache                1            1  OK
+notes                                       6            6  OK
+project_members                             3            3  OK
+projects                                   20           20  OK
+promotion_audit                             0            0  OK
+semantic_caches                             2            2  OK
+transcript_segments                        14           14  OK
+users                                       6            6  OK
+workspace_invites                           9            9  OK
+workspace_members                          16           16  OK
+workspaces                                 10           10  OK
+[2026-09-27T02:02:41+0900] ✅ 테이블 32개 row count 전부 일치 · alembic_version 일치 (b3d5f8a1c2e4)
+[2026-09-27T02:02:41+0900] 임시 컨테이너 제거: kairos-restore-test (익명 볼륨 포함)
+exit=0
+### step 4 (negative): truncated dump → pg_restore must fail
+[2026-09-27T02:02:41+0900] 임시 컨테이너 기동 — kairos-restore-test (pgvector/pgvector:0.8.0-pg17, mem 512m, 포트 publish 없음)
+pg_restore: error: could not read from input file: end of file
+[2026-09-27T02:02:42+0900] ⛔ pg_restore 실패
+[2026-09-27T02:02:42+0900] 임시 컨테이너 제거: kairos-restore-test (익명 볼륨 포함)
+exit=1
+### step 5 (negative): compare against a copy with 1 row deleted → MISMATCH exit 1
+DELETE 1
+semantic_caches                             1            2  MISMATCH
+[2026-09-27T02:02:46+0900] ⛔ row count 불일치 — 위 MISMATCH 행 확인. 원본에 백업 이후 쓰기가 있었다면 그 테이블만 다를 수 있다
+[2026-09-27T02:02:47+0900] 임시 컨테이너 제거: kairos-restore-test (익명 볼륨 포함)
+exit=1
+removed kairos-restore-test-b
+### step 6: leftovers
+   restore containers: 0
+   new dangling volumes: 0
+
+### step 7: R2 upload snippet (extracted verbatim from pg-backup.sh) against a stub boto3 — no network
+-- A: valid key, full stream
+uploaded 256579 bytes
+exit=0
+-- B: key outside backups/kairos/ refused
+refuse: key outside backups/kairos/
+exit=1
+-- C: remote size mismatch detected
+size mismatch: local=256579 r2=256578
+exit=1
+-- real boto3/botocore 1.40.61 (= image lockfile) accepts the R2 checksum Config:
+   boto3 1.40.61 client ok, checksum= when_required
