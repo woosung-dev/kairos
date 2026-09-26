@@ -1,0 +1,17 @@
+### G3-018 mutation check 2026-09-27T03:27:13+0900 — apps/web vitest
+-- guard present
+ Test Files  2 passed (2)
+      Tests  16 passed (16)
+-- guard removed from rag-input.tsx and cmd-k.tsx (mutation)
+src/features/rag/components/rag-input.tsx:0
+src/components/layout/cmd-k.tsx:0
+     × 조합 중 Enter 는 전송하지 않고, 조합이 끝난 뒤 Enter 한 번에 전문을 보낸다
+     × 조합 중 Enter 는 질문을 보내지 않고, 조합이 끝난 뒤 Enter 한 번에 보낸다
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  2 failed (2)
+      Tests  2 failed | 14 passed (16)
+-- restored
+src/features/rag/components/rag-input.tsx:1
+src/components/layout/cmd-k.tsx:1
+ Test Files  2 passed (2)
+      Tests  16 passed (16)

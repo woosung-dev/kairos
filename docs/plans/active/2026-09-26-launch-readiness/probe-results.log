@@ -1,0 +1,124 @@
+# QAPROBE:: ID | ROLE | EXPECTED= | GOT= | VERDICT=
+QAPROBE:: SWEEP-owner | owner | 23 routes render, 0 console.error, 0 4xx | 23/23 render, cerr=0, http4xx=0, founder /admin/recall-metrics renders "메모리 메트릭" | VERDICT=PASS
+QAPROBE:: SWEEP-admin | admin | all team routes; founder route denied; integrations tab owner-only | 23/23, cerr=0; recall-metrics "접근 권한 없음"; ?tab=integrations falls back to 멤버 tab | VERDICT=PASS
+QAPROBE:: SWEEP-member | member | Gamma(project member)+Beta(own draft) visible; invites/audit admin-only | visible; invites/audit panels show admin-only text; cerr=0 | VERDICT=PASS (C-007 minor)
+QAPROBE:: SWEEP-viewer | viewer | private Gamma + draft Beta note/project → 404; /new blocked; nav hides 빠른메모/+추가 | notes 404, projects 404 w/ proper message, /new "Member 이상 권한이 필요" | VERDICT=PASS (C-006 UX)
+QAPROBE:: SWEEP-outsider | outsider | all QA Team note/meeting/project IDs → 404 | 9/9 BE 404, no data rendered | VERDICT=PASS (C-006 UX)
+QAPROBE:: INVITE-UI-admin | admin | invite link → login → return → join → land in QA Team | joined OK but active ws = personal | VERDICT=FAIL (C-001)
+QAPROBE:: INVITE-UI-member | member | same | same as above | VERDICT=FAIL (C-001)
+QAPROBE:: WS-CREATE-UI | owner | create "QA Team" via switcher | created, switched, cerr=0 | VERDICT=PASS
+QAPROBE:: AUDIO-UPLOAD-UI | member | m4a upload → 201 fileKey → 202 → completed, summary+actions | completed ≤2s after upload returned; summary+2 actions; transcript partial (TTS) | VERDICT=PASS
+QAPROBE:: TEXT-CAPTURE-API | owner/admin/outsider | 202 → completed | 3/3 completed | VERDICT=PASS
+QAPROBE:: CLASSIFY-public | owner | Alpha meeting → auto-link Alpha (conf≥0.9) | linked, conf 1.0 | VERDICT=PASS
+QAPROBE:: CLASSIFY-private | admin | Gamma meeting → Gamma or visible inbox suggestion | swallowed new-project suggestion, unlinked | VERDICT=FAIL (C-002/C-003)
+QAPROBE:: RAG-LEAK-private-note | viewer,outsider | Gamma private note f236 never a source | viewer 0/2 runs, outsider 0 | VERDICT=PASS
+QAPROBE:: RAG-LEAK-unlinked-meeting | viewer | (by design) unlinked meeting visible | viewer receives Gamma meeting "블루펭귄 90일" (consequence of C-002) | VERDICT=FAIL (C-002 impact)
+QAPROBE:: RAG-CACHE-leak | member | admin-built cache with Delta private note not served to non-project-member | member cached=false, no Delta | VERDICT=PASS
+QAPROBE:: RAG-CACHE-degrade | member,admin | entitled user gets complete answer | got viewer-built cached answer missing f236/14ea | VERDICT=FAIL (C-008, P3)
+QAPROBE:: RAG-xtenant | outsider | QA Team content never returned | only Outsider Co sources | VERDICT=PASS
+QAPROBE:: AUTH-RATELIMIT | anon | 4th wrong-password sign-in within 10s from same IP → 429 | same IP 429 on 4th; rotating single XFF bypass (local only); no/multi XFF → shared global bucket | VERDICT=FAIL (C-009 config, prod verify needed)
+QAPROBE:: ONBOARDING-first-visit | newbie | tooltips once per route | dashboard+projects shown once, /new+/search none | VERDICT=CHECK (C-010)
+QAPROBE:: PROD-public-pages | anon | 200 | / /pricing /sign-in 200 (0.8–2.0s) | VERDICT=PASS
+QAPROBE:: PROD-protected-redirect | anon | /dashboard → sign-in?callbackURL | 307 OK | VERDICT=PASS
+QAPROBE:: PROD-health | anon | health/ready 200, db ok | OK | VERDICT=PASS
+QAPROBE:: PROD-openapi-hidden | anon | /docs /openapi.json 404 | 404 | VERDICT=PASS
+QAPROBE:: PROD-https-enforced | anon | http→https 301 + HSTS | http 200, no HSTS | VERDICT=FAIL (C-011)
+QAPROBE:: PROD-robots | anon | robots.txt public | 307 to sign-in | VERDICT=FAIL (C-012, P3)
+QAPROBE:: G2-002 | viewer | EXPECTED=403 member 이상 | GOT=403 {"detail": "member 이상 권한이 필요합니다"} | VERDICT=PASS
+QAPROBE:: G2-004 | member | EXPECTED=BE 422 (25 codepoints<50) | GOT=422 {"detail": [{"type": "string_too_short", "loc": ["body", "transcriptText"], "msg": "String should have at least 50 characters", "input": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀", "ctx": {"min_length": 50}}]} | VERDICT=PASS
+QAPROBE:: G1-003 | anon | EXPECTED=401 same code for wrong pw & unknown email | GOT=401 {"message": "Invalid email or password", "code": "INVALID_EMAIL_OR_PASSWORD"} / 401 {"message": "Invalid email or password", "code": "INVALID_EMAIL_OR_PASSWORD"} | VERDICT=PASS
+QAPROBE:: G1-007 | anon | EXPECTED=403 INVALID_CALLBACK_URL | GOT=403 {"message": "Invalid callbackURL", "code": "INVALID_CALLBACK_URL"} | VERDICT=PASS
+QAPROBE:: G1-010 | anon | EXPECTED=401/401 | GOT=401 {"detail": "인증이 필요합니다"} / 401 {"detail": "유효하지 않은 토큰입니다"} | VERDICT=PASS
+QAPROBE:: G1-013 | anon | EXPECTED=401 for alg=none / HS256 / tampered payload | GOT=[401, 401, 401] | VERDICT=PASS
+QAPROBE:: G1-008 | member | EXPECTED=/api/auth/token JWT EdDSA iss/aud localhost:3000, exp≈15m | GOT=alg=EdDSA iss=http://localhost:3000 aud=http://localhost:3000 ttl=900s | VERDICT=PASS
+QAPROBE:: G1-020 | owner | EXPECTED=61→422, blank→422, {}→422, valid→200 | GOT=422,422,422,200 | VERDICT=PASS
+QAPROBE:: G1-021 | admin | EXPECTED=403 | GOT=403 {"detail": "owner 이상 권한이 필요합니다"} | VERDICT=PASS
+QAPROBE:: G1-024 | admin | EXPECTED=403 | GOT=403 {"detail": "owner 이상 권한이 필요합니다"} | VERDICT=PASS
+QAPROBE:: G1-026 | outsider | EXPECTED=403 no ws info leak | GOT=403 {"detail": "워크스페이스 멤버가 아닙니다"} | VERDICT=PASS
+QAPROBE:: G1-039/023b | owner | EXPECTED=personal ws invite 403, delete 403 | GOT=403 {"detail": "개인 워크스페이스에는 초대를 수행할 수 없습니다"} / 403 {"detail": "개인 워크스페이스에는 워크스페이스 삭제를 수행할 수 없습니다"} | VERDICT=PASS
+QAPROBE:: G1-041 | viewer/outsider | EXPECTED=viewer 200 no id leak; outsider 403 | GOT=200 keys=['id', 'userId', 'email', 'displayName', 'role'] leak=[] / 403 | VERDICT=PASS
+QAPROBE:: G1-042/043 | admin/owner | EXPECTED=admin role change 403; owner demote/remove 403; promote-to-owner 422 | GOT=403,403,403,422 {"detail": [{"type": "string_pattern_mismatch", "loc": ["body", "role"], "msg":  | VERDICT=PASS
+QAPROBE:: G1-030 | admin | EXPECTED=exp31→422 owner→422 maxUses0→422 valid→201 code12 | GOT=422,422,422,201 code=3Cl7aEFWBaBt len=12 url=http://localhost:3000/invite/3Cl7aEFWBaBt | VERDICT=PASS
+QAPROBE:: G1-031/032a | member,viewer | EXPECTED=create 403, list 403 | GOT=create=[403, 403] list=[403, 403] | VERDICT=PASS
+QAPROBE:: G1-032b/035 | admin,newbie | EXPECTED=deactivate 200/204; accept deactivated → 410 | GOT=204 / 410 {"detail": "비활성화된 초대 링크입니다"} | VERDICT=PASS
+QAPROBE:: G1-036 | member | EXPECTED=409 already member | GOT=409 {"detail": "이미 워크스페이스 멤버입니다"} | VERDICT=PASS
+QAPROBE:: G1-037 | newbie,outsider | EXPECTED=1st 200 join, 2nd 410 limit | GOT=200 {"workspaceId": "58012f5a-3054-4fe9-818e-ee94039e788f", "memberId": "89b36ce2-b957-4004-93 / 410 {"detail": "비활성화된 초대 링크입니다"} | VERDICT=PASS
+QAPROBE:: G1-044 | admin,member | EXPECTED=member remove 403; admin 204; removed user 403 | GOT=member=403 admin=204 newbie-after=403 | VERDICT=PASS
+QAPROBE:: G1-038 | newbie x2,outsider | EXPECTED=no 500; newbie one 2xx one 409; membership=1 each | GOT=[('newbie', 200), ('newbie', 409), ('outsider', 200)] counts={'qa-newbie@kairos.test': 1, 'qa-outsider@kairos.test': 1} | VERDICT=PASS
+QAPROBE:: G1-048 | all | EXPECTED=viewer 403, others 201 | GOT={'viewer': 403, 'member': 201, 'admin': 201, 'owner': 201} | VERDICT=PASS
+QAPROBE:: G1-049 | all | EXPECTED=viewer 403, others 200 | GOT={'viewer': 403, 'member': 200, 'admin': 200, 'owner': 200} | VERDICT=PASS
+QAPROBE:: G1-050 | all | EXPECTED=viewer/member 403, admin/owner 200 | GOT={'viewer': 403, 'member': 403, 'admin': 200, 'owner': 200} | VERDICT=PASS
+QAPROBE:: G1-052 | viewer,member,admin | EXPECTED=403,403,201 | GOT={'viewer': 403, 'member': 403, 'admin': 201} | VERDICT=PASS
+QAPROBE:: G1-045/046 | admin→viewer | EXPECTED=admin routes 403 immediately; member-write (note create) may pass ≤15s (known) | GOT=visibility=403 invite=403 note-create=403 | VERDICT=PASS
+QAPROBE:: G1-051 | all | EXPECTED=archive/delete viewer,member 403; admin delete empty 204 | GOT=archive={'viewer': 403, 'member': 403} delete={'viewer': 403, 'member': 403} admin=204 | VERDICT=PASS
+QAPROBE:: G1-053a | all | EXPECTED=create viewer 403 else 201 | GOT={'viewer': 403, 'member': 201, 'admin': 201, 'owner': 201} | VERDICT=PASS
+QAPROBE:: G1-053b/G2-040 | all | EXPECTED=update viewer 403 else 200; delete viewer 403, member other 403, own 204, admin 204 | GOT=update={'viewer': 403, 'member': 200, 'admin': 200, 'owner': 200} delete={'viewer': 403, 'member(other)': 403, 'member(own)': 204, 'admin(other)': 204} | VERDICT=PASS
+QAPROBE:: G1-055a | all | EXPECTED=create viewer 403 else 201 | GOT={'viewer': (403, '{"detail": "member 이상 권한이 필요합니다"}'), 'member': (201, ''), 'admin': (201, ''), 'owner': (201, '')} | VERDICT=PASS
+QAPROBE:: G1-055b | all | EXPECTED=update viewer 403 else 200 | GOT={'viewer': 403, 'member': 200, 'admin': 200, 'owner': 200} | VERDICT=PASS
+QAPROBE:: G1-056 | viewer | EXPECTED=list 200; classify/dismiss 403 | GOT=classify=403 dismiss=403 | VERDICT=PASS
+QAPROBE:: G1-059 | all | EXPECTED=audit viewer/member 403, admin/owner 200 | GOT={'viewer': 403, 'member': 403, 'admin': 200, 'owner': 200} | VERDICT=PASS
+QAPROBE:: G1-060 | all | EXPECTED=viewer/member/admin 403; owner proceeds (503 if OAuth unset) | GOT={'viewer': 403, 'member': 403, 'admin': 403, 'owner': 503} | VERDICT=PASS
+QAPROBE:: G1-062 | all | EXPECTED=public Alpha 200 all | GOT={'viewer': 200, 'member': 200, 'admin': 200, 'owner': 200} | VERDICT=PASS
+QAPROBE:: G1-063 | all | EXPECTED=draft Beta(member-created): viewer 404, member/admin/owner 200 | GOT={'viewer': 404, 'member': 200, 'admin': 200, 'owner': 200} | VERDICT=PASS
+QAPROBE:: G1-064 | all | EXPECTED=private Gamma(member is PM): viewer 404 others 200; Delta: viewer/member 404 | GOT=gamma={'viewer': 404, 'member': 200, 'admin': 200, 'owner': 200} delta={'viewer': 404, 'member': 404, 'admin': 200, 'owner': 200} | VERDICT=PASS
+QAPROBE:: G1-062b | viewer,member | EXPECTED=list: viewer no Beta/Gamma/Delta; member no Delta | GOT=viewer=['Alpha', 'Done', 'Old', '💡 아이디어', '📋 회의록', '🚀 시작하기'] member=['Alpha', 'Beta', 'Done', 'Gamma', 'Old', '💡 아이디어', '📋 회의록', '🚀 시작하기'] | VERDICT=PASS
+QAPROBE:: G1-065 | all | EXPECTED=Gamma note detail/export: viewer 404; Delta note: viewer/member 404; lists consistent | GOT=detail/export/delta={'viewer': (404, 404, 404), 'member': (200, 200, 404), 'admin': (200, 200, 200), 'owner': (200, 200, 200)} viewerList∩secret=[] memberList∩delta=[] | VERDICT=PASS
+QAPROBE:: G1-066 | all | EXPECTED=Gamma-linked meeting detail/status/export: viewer 404, others 200 | GOT={'viewer': (404, 404, 404), 'member': (200, 200, 200), 'admin': (200, 200, 200), 'owner': (200, 200, 200)} | VERDICT=PASS
+QAPROBE:: G1-069 | viewer | EXPECTED=project-scoped ask on private Gamma → error, no answer | GOT=200 event: error
+data: {"message": "Private 프로젝트는 명시적 멤버만 접근 가능합니다."}
+
+event: done
+data: {"cached": false, "sourceCount": 0}
+
+ | VERDICT=PASS
+QAPROBE:: G1-072 | outsider | EXPECTED=team ws path → 403 all | GOT={'project': 403, 'note': 403, 'meeting': 403, 'inbox': 403, 'actions': 403, 'members': 403} | VERDICT=PASS
+QAPROBE:: G1-073 | member | EXPECTED=outsider resource ids via own ws path → 404 | GOT={'note': 404, 'meeting': 404, 'project': 404, 'meeting-export': 404} | VERDICT=PASS
+QAPROBE:: G1-074 | member | EXPECTED=outsider ws_id in path → 403 | GOT={'ws': 403, 'projects': 403, 'note': 403} | VERDICT=PASS
+QAPROBE:: G1-075 | member | EXPECTED=note create/update with foreign projectId → 404 | GOT=404 {"detail": "프로젝트을(를) 찾을 수 없습니다"} / 404 {"detail": "프로젝트을(를) 찾을 수 없습니다"} | VERDICT=PASS
+QAPROBE:: G1-076 | member | EXPECTED=classify with foreign projectId → 404, item stays unprocessed | GOT=404 {"detail": "프로젝트을(를) 찾을 수 없습니다"} | VERDICT=PASS
+QAPROBE:: G1-077 | member | EXPECTED=action foreign assignee/project/meeting → 404 | GOT=404,404,404 {"detail": "워크스페이스 멤버을(를) 찾을 수 없습니다"} | VERDICT=PASS
+QAPROBE:: G1-078 | admin | EXPECTED=RAG foreign projectId → error, no 레드여우 content | GOT=200 event: error
+data: {"message": "프로젝트를 찾을 수 없거나 접근 권한이 없습니다."}
+
+event: done
+data: {"cached": false, "sourceCount": 0}
+
+ | VERDICT=PASS
+QAPROBE:: G1-079 | admin | EXPECTED=foreign member id mutate via own ws → 404/403 | GOT=403,404 | VERDICT=PASS
+QAPROBE:: G1-087 | admin | EXPECTED=add non-ws-member to project → 403/404 | GOT=403 {"detail": "해당 사용자가 워크스페이스 멤버가 아닙니다"} | VERDICT=PASS
+QAPROBE:: G1-092 | member | EXPECTED=link foreign meeting / foreign project → 404 | GOT=404,404 | VERDICT=PASS
+QAPROBE:: G1-067 | viewer,member | EXPECTED=action with projectId=Gamma hidden from viewer; Delta action hidden+unpatchable for member | GOT=viewer_sees_gamma=False member_sees_delta=False member_patch_delta=404 | VERDICT=PASS
+QAPROBE:: G1-071 | viewer | EXPECTED=delete invisible draft note → 403 (role) or 404, note survives | GOT=403 survive=200 | VERDICT=PASS
+QAPROBE:: G1-080 | outsider | EXPECTED=403 | GOT=403 | VERDICT=PASS
+QAPROBE:: G1-088 | member | EXPECTED=member can create private? creator can still see it (no self-lockout) | GOT=create=201 vis=private get=200 | VERDICT=PASS
+QAPROBE:: G1-093 | viewer | EXPECTED=meetings?projectId=Gamma → 404/empty, no titles | GOT=200 {"items": [], "total": 0, "page": 1, "pageSize": 20, "hasNext": false} | VERDICT=PASS
+QAPROBE:: G1-061 | viewer | EXPECTED=[design check] memory recall scope: other member personal memory visible? | GOT=viewer 200 contains_치과=True | VERDICT=CHECK
+QAPROBE:: G1-085 | all | EXPECTED=[design check] BE metrics gate vs FE founder-only page | GOT={'viewer': 200, 'member': 200, 'admin': 200, 'outsider': 403} | VERDICT=CHECK
+QAPROBE:: G3-003 | outsider | EXPECTED=403 before stream | GOT=403 {"detail": "워크스페이스 멤버가 아닙니다"} | VERDICT=PASS
+QAPROBE:: G3-005 | member | EXPECTED=sourceType=note then meeting: 2nd not served from note cache; sources match filter | GOT=note: cached=false types={'note'} | meeting: cached=true types={'note'} | VERDICT=FAIL
+QAPROBE:: G3-007 | member,viewer,admin | EXPECTED=Beta draft projectId: member ok, viewer SSE error, admin ok | GOT={'member': (200, False, {'note'}), 'viewer': (200, True, set()), 'admin': (200, False, {'note'})} | VERDICT=PASS
+QAPROBE:: G3-011 | member | EXPECTED=event order thinking→search_results→answer*→done | GOT=['thinking', 'search_results', 'answer']...['done'] n=5 cached=false | VERDICT=PASS
+QAPROBE:: G3-027 | viewer | EXPECTED=memory capture 403 | GOT=403 | VERDICT=PASS
+QAPROBE:: G3-020 | member | EXPECTED=Meta+K/Ctrl+K open, Esc close | GOT=both open palette (shot U-cmdk-ctrlK; earlier 0 = selector miss, palette has no role=dialog) | VERDICT=PASS
+QAPROBE:: G3-021 | member | EXPECTED='?' prefix routes to RAG ask | GOT=rag request fired | VERDICT=PASS
+QAPROBE:: G3-022 | member | EXPECTED=g-sequences navigate, Korean IME e.code ok, timeout no-nav | GOT=gi/gp/ga/gn/gs/c ok, korean ok, timeout no nav | VERDICT=PASS
+QAPROBE:: G3-023 | member | EXPECTED=shortcuts ignored in textarea | GOT=url stayed /dashboard, textarea value cgp | VERDICT=PASS
+QAPROBE:: G3-040 | member-mobile | EXPECTED=13 routes scrollWidth<=375, BottomNav, 0 console.error | GOT=all sw=375, bnav=true, cerr=0 | VERDICT=PASS
+QAPROBE:: G1-011 | member | EXPECTED=401 expired | GOT=401 {"detail":"토큰이 만료되었습니다"} (expired 294s ago) | VERDICT=PASS
+QAPROBE:: G2-011 | member | EXPECTED=failed status, UI FailedMeetingView, no raw internals | GOT=UI ok (generic copy + 다시 업로드, no leak; shot U-G2-011-failed-meeting) BUT API errorMessage (GET /meetings/{id} + /status, viewer+) returns raw httpx error incl. R2 presigned URL (account endpoint, bucket, X-Amz-Credential access key id, signature) | VERDICT=FAIL(C-023)
+QAPROBE:: G1-002 | newbie(anon) | EXPECTED=Korean '이미 가입된 이메일입니다' | GOT=API 422 USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL; UI shows English 'User already exists. Use another email.' (toKoreanError maps USER_ALREADY_EXISTS only) | VERDICT=FAIL(C-024)
+QAPROBE:: G3-047 | owner/admin/+ | EXPECTED=integrations tab owner-only; BE require_owner | GOT=UI owner tab 연동 visible, admin no tab + fallback 멤버; API {owner:200, admin:403, member:403, viewer:403, outsider:403} | VERDICT=PASS
+QAPROBE:: G3-048 | owner | EXPECTED=connect → 503 toast, no nav, no crash | GOT=503 "Google OAuth 설정이 필요합니다", toast "Google 인가 URL 을 만들지 못했습니다", url unchanged, only browser-native 503 console line; variant=A same screen | VERDICT=PASS
+QAPROBE:: G2-004 | member | EXPECTED=FE counter matches BE rule; readable error | GOT=counter "50자" (UTF-16 length) → button enabled → BE 422 string_too_short (25 code points) → UI error box "[object Object]" (api-client.ts:53 passes array detail to Error). No meeting created. shot U-G2-004-emoji | VERDICT=FAIL(C-025)
+QAPROBE:: G2-007 | member | EXPECTED=dblclick → 1 POST, 1 meeting | GOT=POST /meetings/capture 1회, meetings with title = 1 | VERDICT=PASS
+QAPROBE:: G2-038 | member | EXPECTED=edits kept when leaving note within debounce | GOT=control (wait 2.5s) PATCH 1 persisted; explicit 저장 후 닫기 PATCH 1 persisted; type→leave after 250ms PATCH 0, text lost (note-detail.tsx:89-93 unmount clears timers without flush) | VERDICT=FAIL(C-026)
+QAPROBE:: G2-048 | member | EXPECTED=confirm → toast, removed, meeting linked to suggested project | GOT=POST /inbox/a14ff325/classify, toast '프로젝트에 연결되었습니다', removed from list, meeting links={"projects": [{"id": "5adcc865-6580-4cd8-af92-a555093cd529", "title": "📋 회의록", "status": "active", "visibility": "public. NOTE: meeting is about Beta but AI suggestion = 📋 회의록 (Beta draft invisible to classifier, C-003 UI impact) | VERDICT=PASS
+QAPROBE:: G2-050 | member | EXPECTED=dismiss persists; undo reverts server state | GOT=dismiss POST /dismiss + toast '항목을 무시했습니다', gone after reload (PASS). 되돌리기 after confirm: handleRevert = setStatus('idle') only (inbox-item-card.tsx:138-140), no API; card unmounts ~1s later on refetch so button vanishes (undoCount=0). Fake undo affordance | VERDICT=FAIL(C-027,P3)
+QAPROBE:: G2-061 | member | EXPECTED='내 액션만' = assigneeId match; tab counts consistent | GOT='내 액션만' → 0 items (all 11 actions assigneeId null; AI extraction never assigns). tabs 할 일 10·진행 중 0·완료 1 = list 11 | VERDICT=PASS(as-designed; UX gap noted)
+QAPROBE:: G2-062 | member/viewer | EXPECTED=member toggle persists; viewer disabled+title; network fail toast | GOT=member PATCH 200 → [('c90822de', 'done', '이서연: 사용자 인터뷰 일정 조율', None)]; abort → toast '액션 상태 변경에 실패했습니다'; viewer 10 checkboxes disabled title 'Member 이상만 변경할 수 있습니다' | VERDICT=PASS
+QAPROBE:: G2-032 | member | EXPECTED=promote 202; same-ws 400; non-member ws 403; repeat → duplicate? | GOT=[('team#1', 202, '{"new_meeting_id": "330d6a67-873a-4c31-b4b9-4345ee066a7a", "audit_id": "819735fd-6c0d-4dc4-84b0-e5b55b587e05",'), ('team#2', 202, '{"new_meeting_id": "3258d60d-34a8-4c11-a8c8-92efcb86657e", "audit_id": "661fe200-aeaa-4609-b104-06f151323547",'), ('same-ws', 400, '{"detail": "같은 워크스페이스로는 promote 할 수 없습니다"}'), ('outsider-ws', 403, '{"detail": "대상 워크스페이스가 유효하지 않습니다"}')]; team copies=2 | VERDICT=FAIL(C-028 dup copies)
+QAPROBE:: G2-057 | admin/member | EXPECTED=Alpha delete 409 toast + dialog stays; empty E 204; member 403 | GOT=UI 409 toast '이 프로젝트에 노트 1개, 액션 0개가 연결되어 있습니다…', alertdialog stays open (shot U-G2-057-delete-409); API empty E 204; member DELETE E2 403 'admin 이상 권한이 필요합니다' | VERDICT=PASS
+QAPROBE:: G1-014 | owner | EXPECTED=logout clears session, protected route redirects | GOT=menu 로그아웃 → /api/auth/token 401, /projects → /sign-in?callbackURL=%2Fprojects | VERDICT=PASS
+QAPROBE:: G1-029 | owner→outsider | EXPECTED=stale owner wid reset for new user | GOT=ls ownerUserId switched to outsider, active ws = outsider personal, 0 4xx, 0 console errors | VERDICT=PASS
+QAPROBE:: G1-028 | outsider | EXPECTED=inaccessible wid → switch + toast, no 403 loop | GOT=toast '접근할 수 없어 “QA outsider의 개인 Kairos” 워크스페이스로 전환했습니다', 0 4xx, empty state rendered | VERDICT=PASS
+QAPROBE:: G1-033 | newbie | EXPECTED=after accept active ws = joined ws | GOT=cold browser (no kairos-workspace in storage) accept Outsider Lab → landed on Outsider Co (oldest ws; shot U-C001-cold); warm browser (dashboard visited first) accept Outsider Lab2 → Lab2 (shot U-C001-warm); first run accept Outsider Co → Outsider Co (correct only because it is the oldest) | VERDICT=FAIL(C-001 root cause confirmed)

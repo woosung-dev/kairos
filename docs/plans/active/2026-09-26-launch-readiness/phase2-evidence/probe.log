@@ -1,0 +1,80 @@
+QAPROBE:: T-01 | viewer | EXPECTED=F1 src 0, answer no 90일 | GOT=src=0 ans90=0 cached=false | VERDICT=PASS
+QAPROBE:: T-02 | viewer | EXPECTED=F2 src 0, answer no 30% | GOT=src=0 ans30=0 cached=false | VERDICT=PASS
+QAPROBE:: T-03 | viewer | EXPECTED=F5 src 0, answer no 90일 | GOT=src=0 ans90=0 cached=false | VERDICT=PASS
+QAPROBE:: T-04 | member | EXPECTED=F1 src ≥1 | GOT=src=1 cached=false | VERDICT=PASS
+QAPROBE:: T-05 | viewer | EXPECTED=Gamma-linked inbox items (F1,F2,F5) 0 across default/processed/unprocessed | GOT=count=0 | VERDICT=PASS
+QAPROBE:: T-06 | member | EXPECTED=Gamma-linked inbox items visible | GOT=count=6 | VERDICT=PASS
+QAPROBE:: T-07 | viewer | EXPECTED=actions from F1/F2/F5 = 0 | GOT=count=0 | VERDICT=PASS
+QAPROBE:: T-08 | member | EXPECTED=actions from F1/F2/F5 visible | GOT=count=6 | VERDICT=PASS
+QAPROBE:: T-09 | member | EXPECTED=POST hidden F3→Alpha 404; viewer GET F3 404 | GOT=post=404 viewerGet=404 | VERDICT=PASS
+QAPROBE:: T-10 | member | EXPECTED=DELETE F3/Delta 404; admin sees link | GOT=del=404 adminLinks=["Delta"] | VERDICT=PASS
+QAPROBE:: T-11 | member | EXPECTED=POST visible M_ALPHA→hidden Delta 404 | GOT=post=404 adminLinks=["Alpha"] | VERDICT=PASS
+QAPROBE:: T-12 | member | EXPECTED=classify F4 inbox→Delta 404, item unprocessed, no Delta link | GOT=classify=404 isProcessed=false links=["Alpha","Gamma"] | VERDICT=PASS
+QAPROBE:: T-13 | member | EXPECTED=visible M_ALPHA↔visible Beta POST 201 / DELETE 204 | GOT=post=201 del=204 | VERDICT=PASS
+QAPROBE:: T-14 | member | EXPECTED=PATCH Delta desc 404, unchanged | GOT=patch=404 same=yes | VERDICT=PASS
+QAPROBE:: T-15 | member | EXPECTED=PATCH Delta {} 404, no metadata | GOT=code=404 body={"detail":"프로젝트을(를) 찾을 수 없습니다"} | VERDICT=PASS
+QAPROBE:: T-16 | member | EXPECTED=PATCH Alpha archived 403, status stays | GOT=code=403 status=active | VERDICT=PASS
+QAPROBE:: T-17 | admin | EXPECTED=PATCH status zzz 422 | GOT=code=422 status=active | VERDICT=PASS
+QAPROBE:: T-18c | member | EXPECTED=own Beta→private 200, GET 200, restore 200; Alpha→private 403 | GOT=orig=draft beta:private=200 get=200 restore=200 alpha=403 alphaVis=public | VERDICT=PASS
+QAPROBE:: T-18 | viewer·member·owner | EXPECTED=recall 0, GET 404, owner RAG memory src 0; author admin recall≥1 GET 200 | GOT= viewer=recall0/get404 member=recall0/get404 owner=recall0/get404 | admin=recall1/get200 | ownerRAG memSrc=0 ans3시=0 | VERDICT=PASS
+QAPROBE:: T-19 | admin | EXPECTED=new-project suggestion stays in inbox (isProcessed=false) regardless of confidence | GOT=F1 inbox: aiSuggestedProjectId=null title='은빛여우 프로젝트' conf=0.95 isProcessed=false (also F3 conf 0.95) | VERDICT=PASS
+QAPROBE:: T-21 | member | EXPECTED=failed meeting errorMessage has no r2.cloudflarestorage / X-Amz | GOT=status=failed errorMessage='회의 처리 중 오류가 발생했습니다. 다시 시도하거나 관리자에게 문의하세요. (HTTPStatusError)' | VERDICT=PASS
+QAPROBE:: T-22 | admin | EXPECTED=Phase 1 failed meeting scrubbed by migration b3d5f8a1c2e4 | GOT=errorMessage='회의 처리 중 오류가 발생했습니다. 다시 시도하거나 관리자에게 문의하세요.' (DB pre-upgrade leak rows=1, post=0) | VERDICT=PASS
+QAPROBE:: T-23 | — | EXPECTED=next ≥16.3.3 + pnpm build OK | GOT=next=16.3.6 build=EXIT0 (scratchpad fe-build.log — 현재 빌드는 phase2-results §1) | VERDICT=PASS
+QAPROBE:: R-01 | viewer | EXPECTED=F6 (0 links) visible: detail 200, inbox≥1, actions≥1, RAG src≥1 | GOT=d=200 ib=1 act=2 rag=1 | VERDICT=PASS
+QAPROBE:: R-02 | viewer | EXPECTED=F4 (Alpha+Gamma) visible everywhere | GOT=d=200 ib=1 act=2 rag=1 | VERDICT=PASS
+QAPROBE:: R-03 | viewer | EXPECTED=Phase 1 Alpha meeting visible | GOT=d=200 ib=1 act=3 rag=1 | VERDICT=PASS
+QAPROBE:: R-04 | admin·owner | EXPECTED=F1~F6 all visible (detail/inbox/actions) + owner RAG sees F3 (Delta-only) | GOT= admin/F1(d=200 ib=1 act=2) admin/F2(d=200 ib=1 act=2) admin/F3(d=200 ib=1 act=3) admin/F4(d=200 ib=1 act=2) admin/F5(d=200 ib=1 act=2) admin/F6(d=200 ib=1 act=2) owner/F1(d=200 ib=1 act=2) owner/F2(d=200 ib=1 act=2) owner/F3(d=200 ib=1 act=3) owner/F4(d=200 ib=1 act=2) owner/F5(d=200 ib=1 act=2) owner/F6(d=200 ib=1 act=2) ownerRAG_F3=1 | VERDICT=PASS
+QAPROBE:: SWEEP-owner | owner | EXPECTED=23 routes render, 0 console.error, 0 4xx | GOT=23/23, cerr=0, 4xx=0 (build 2026-09-27 02:33, shots sweep-owner-*) | VERDICT=PASS
+QAPROBE:: SWEEP-admin | admin | EXPECTED=all team routes; founder route denied | GOT=22 routes cerr=0 4xx=0; /admin/recall-metrics 권한 없음 문구 | VERDICT=PASS
+QAPROBE:: SWEEP-member | member | EXPECTED=Gamma+Beta visible; Delta/F-3 hidden | GOT=sidebar=E2,Gamma,Beta,Alpha(no Delta); P_DELTA·F3 404 only(cerr=네트워크 404 로그뿐); 그 외 cerr=0 | VERDICT=PASS
+QAPROBE:: SWEEP-viewer | viewer | EXPECTED=Gamma/Beta/Delta note·project·meeting 404; /new blocked; nav hides 빠른메모/+추가 | GOT=7 hidden 전부 404, /new 차단 문구, 사이드바에 빠른 메모·+추가 없음, 그 외 cerr=0 | VERDICT=PASS
+QAPROBE:: T-24 | newbie | EXPECTED=빈 스토리지 → UI 로그인 → 초대 수락 3회(oldest/middle/newest) 모두 수락한 팀 착지 | GOT=3/3 activeWorkspaceId==수락 팀, sign-in URL callbackURL 유지 (shots t24-*) | VERDICT=PASS
+QAPROBE:: T-25 | newbie | EXPECTED=쓰던 브라우저에서 수락 → 수락한 팀 | GOT=(Evaluator #3 지적으로 실제 실행) 로그인 후 /dashboard 로 스토어가 기존 WS 를 가리키는 상태 → 새 임시 팀 초대 수락 → active=수락한 팀 · 전환 메뉴 'P2 T-25 임시 팀' · cerr 0. 임시 팀은 DELETE 204 로 정리 (shot t25-used-browser-accept) | VERDICT=PASS
+QAPROBE:: T-26 | new-account | EXPECTED=초대 링크 → 가입하고 참여 → 가입 → 초대 페이지 복귀 → 참여 → 초대 팀 착지 | GOT=backToInvite=true, landed=Outsider Lab, console.error 0 (shots t26-*) | VERDICT=PASS
+QAPROBE:: T-27 | anon | EXPECTED=/sign-in?callbackURL=/invite/<code> 의 가입 링크가 callbackURL 유지 | GOT=/sign-up?callbackURL=%2Finvite%2F<code> | VERDICT=PASS
+QAPROBE:: T-28 | anon | EXPECTED="이미 가입된 이메일입니다" | GOT="이미 가입된 이메일입니다. 로그인해 주세요." (shot t28-duplicate-signup) | VERDICT=PASS
+QAPROBE:: G1-086 | new-account | EXPECTED=첫 호출 동시 요청 500 0건 | GOT=users 0행 상태에서 12 동시 호출 전부 200, users 1 · personal WS 1 | VERDICT=PASS
+QAPROBE:: T-20 | member | EXPECTED=Gamma 뿐인 회의에 Alpha(public) 연결 → 확인 대화상자 → POST 201 → Alpha 칩 | GOT=chips0=[Gamma] dialog=true postBeforeConfirm=0 POST=201 chips1=[Gamma,Alpha] (shot t20-confirm-public-link) | VERDICT=PASS
+QAPROBE:: T-20b | member | EXPECTED=링크 2개 중 해제는 확인 없이 DELETE · 마지막 링크 해제는 확인 대화상자(취소 시 유지) | GOT=DELETE=204 noDialogOnNonLast=true lastDialog=true chipsAfterCancel=[Gamma] (shot t20-confirm-last-unlink) | VERDICT=PASS
+QAPROBE:: T-29 | member | EXPECTED=기준 미달 입력은 버튼 비활성 또는 읽을 수 있는 한국어 오류 | GOT=disabled=true counter="25자 (25자 더 필요)" | VERDICT=PASS
+QAPROBE:: G2-007 | member | EXPECTED=dblclick → POST 1회 | GOT=POST /meetings* = 1 → /meetings/78fb64a7-… | VERDICT=PASS
+QAPROBE:: G3-020 | member | EXPECTED=Meta+K/Ctrl+K 열림, Esc 닫힘 | GOT=1차 meta=true esc=false ctrl=false esc=true — 첫 Esc 는 첫 방문 온보딩 Popover 가 소비(비모달 안내 닫힘), 툴팁 본 상태에서는 Esc 1회로 팔레트 닫힘 → 결함 아님(테스트 아티팩트) | VERDICT=PASS
+QAPROBE:: G3-021 | member | EXPECTED='?' 접두 → AI 모드 · Enter 로 rag/ask 1회(질문에서 ? 제거) | GOT=ask=true body.question="알파 온보딩 회의에서 정한 일정" | VERDICT=PASS
+QAPROBE:: G3-022 | member | EXPECTED=g i/p/a/n/s 이동 · 한글 IME(e.code) · c → /new · 1.5초 뒤 i 무시 | GOT=gi=/inbox gp=/projects ga=/actions gn=/notes gs=/search imeGi=/inbox c=/new timeout=/dashboard | VERDICT=PASS
+QAPROBE:: G3-023 | member | EXPECTED=textarea 안에서 g i 는 이동 없이 입력 | GOT=url=/notes value="gi" | VERDICT=PASS
+QAPROBE:: G2-036 | member | EXPECTED=빈 입력 '제목 또는 내용을 입력해주세요' · 저장 '메모가 저장되었습니다' · 목록 상단 | GOT=toast1/toast2 문구 일치, 첫 카드="P2 빠른메모 75669" | VERDICT=PASS
+QAPROBE:: G2-061 | member | EXPECTED='내 액션' 필터 적용·해제 시 목록이 바뀌고 돌아온다 | GOT=all=36 mine=0 back=36 (AI 추출 액션은 assignee 없음) | VERDICT=PASS
+QAPROBE:: G2-062 | member | EXPECTED=member 토글 PATCH 200·새로고침 후 유지 · 실패 시 "액션 상태 변경에 실패했습니다" 토스트 | GOT=PATCH=200 failToast 일치. UI persisted=false 는 동명 액션 2건(93ca2c1b·e4be11d3) 선택자 충돌 — BE 로그 PATCH 200 + DB status=done 확인 → 결함 아님, 두 건 todo 로 원복 | VERDICT=PASS
+QAPROBE:: G2-030 | member | EXPECTED=md 내보내기 '내보내기 완료' · 뒤로가기 목적지 · /meetings 404 | GOT=download="Alpha 온보딩 개선 회의.md" toast=내보내기 완료 back=/projects/<Alpha> meetingsIndex404=true (console 404 1건 = 의도한 /meetings 방문) | VERDICT=PASS
+QAPROBE:: G3-018 | member | EXPECTED=한글 조합 중 Enter 는 전송 안 함 · 조합 후 Enter 1회 · 전문 포함 | GOT=1차 FAIL: duringComposition=1, body="루펭귄 일정"(isComposing 가드 없음, 4 핸들러) → 가드 적용·재빌드 후 재검증: /search during=0 total=1 "블루펭귄 일정" · ⌘K during=0 열림유지 total=1 "회의 결정 사항" · cerr=0 (shots g3-018-*-retest) | VERDICT=PASS
+QAPROBE:: T-31 | Claude | EXPECTED=최신 덤프를 새 컨테이너에 복원 → 주요 테이블 row count 원본과 일치 | GOT=pg-backup.sh --local-only 덤프(목차 239 · sha256 검증) → pg-restore-check.sh 임시 컨테이너 복원 → 32 테이블 row count 전부 일치 + alembic_version 일치(b3d5f8a1c2e4). 음성 대조: 없는 컨테이너 exit1 · 잘린 덤프 pg_restore 실패 exit1 · 1행 삭제 사본 MISMATCH exit1 · 잔여 컨테이너/볼륨 0 (ops-t31-rehearsal.log) | VERDICT=PASS
+QAPROBE:: T-32 | Claude | EXPECTED=dry-run 삭제 목록 ∩ meetings.file_key = ∅ | GOT=scripts/tests/test_r2_cleanup.py 12 pass · 실제 QA DB 참조 키 2개를 가짜 버킷에 두고 실행 → 삭제 2개(고아만) ∩ 참조 = ∅. 참조 가드 제거 mutation → 4 FAIL (ops-t32-r2-cleanup-tests.log) | VERDICT=PASS
+QAPROBE:: T-34 | anon | EXPECTED=프로덕션 GET drive documents 401 · CSP-Report-Only 헤더 | GOT=405 · CSP 헤더 없음 = 프로덕션이 #194 이전 코드. 로컬 main 빌드는 CSP-Report-Only 있음 → 배포(0-14, 사용자 승인) 후 재확인 (ops-t34-prod.log) | VERDICT=PENDING-DEPLOY
+QAPROBE:: T-33 | 사용자 | EXPECTED=http → 301 · HSTS 1줄 | GOT=현재 http://kairos.woosung.dev/ → 200, HSTS 없음 (Cloudflare 설정 전 — 사용자 작업 0-13) | VERDICT=USER-PENDING
+QAPROBE:: T-36 | Claude(리허설) | EXPECTED=runbook 대로 재설정 → 새 비밀번호 로그인 | GOT=로컬 QA 스택 · 버리는 계정(T-26 가입 계정): 기존 세션 present → reset(NOTICE password updated=1, sessions revoked=3) → 기존 세션 null · 이전 비밀번호 401 · 새 비밀번호 200 → JWT → BE /users/me 200. run 1 은 zsh 인자 분리 하네스 오류로 세션 판독 무효(로그에 기록) (ops-t36-live-rehearsal.log). 프로덕션 실행은 사용자 | VERDICT=PASS
+QAPROBE:: T-35·T-37~T-40 | 사용자 | EXPECTED=checklist 0-15 · 0-17 ~ 0-20 | GOT=사용자 계정·대시보드·프로덕션 서버 권한이 필요 — PR 본문 "사용자 작업" 에 명령과 함께 기재 | VERDICT=USER-PENDING
+QAPROBE:: G2-062#UI-viewer | viewer | EXPECTED=액션 체크박스 전부 비활성 · title 'Member 이상만 변경할 수 있습니다' | GOT=28개 전부 disabled · title 1종 일치 (shot g2-062-viewer-actions) | VERDICT=PASS
+QAPROBE:: G2-043#UI | viewer | EXPECTED=노트 목록에 Gamma 노트 없음 · 상세 직접 진입해도 본문 없음 | GOT=목록 3건 중 '감사 준비 노트' 없음 · 상세 "노트를 불러오지 못했습니다"(404 1건 = 의도) (shot g2-043-viewer-gamma-note) | VERDICT=PASS
+QAPROBE:: G1-084 | member·viewer | EXPECTED=recall-metrics '접근 권한 없음' · metrics 호출 0 | GOT=두 역할 모두 '접근 권한 없음 · 이 페이지는 운영자 전용' · metrics 호출 0 (shots g1-084-*) | VERDICT=PASS
+QAPROBE:: T-30 | member | EXPECTED=다른 422 화면(/memory 검색어 200자 상한)에서 읽을 수 있는 문구 | GOT=코드 포인트 201(이모지 101+한글 100) → '검색어는 200자 이하로 입력해 주세요.' · recall 요청 0 / 200자 → 요청 1 · [object Object] 0 (shot t30-memory-long-query) | VERDICT=PASS
+QAPROBE:: G2-048#UI | member | EXPECTED=인박스 확정 → 토스트 · 확인 필요 목록에서 제거 · 회의 링크 | GOT=REG 사내 교육 일정 카드 확정 → classify 200 · '프로젝트에 연결되었습니다' · 새로고침 후 미표시 · DB meeting_project_links(332c46b6 → 📋 회의록) 생성 (shot g2-048-inbox-confirm) | VERDICT=PASS
+QAPROBE:: G1-082 | owner·admin | EXPECTED=owner 탭 5종 + 일반 탭 이름 폼·임계값 / admin 연동 탭 없음 · owner 전용 폼 없음 | GOT=owner [멤버,초대,일반,연동,Audit] nameForm·threshold 있음 / admin [멤버,초대,일반,Audit] nameForm·threshold 없음 (shot g1-082-owner-general) | VERDICT=PASS
+QAPROBE:: G3-047#UI | owner·admin | EXPECTED=연동 탭 owner 전용 · admin ?tab=integrations 폴백 | GOT=owner 연동 선택 + 연결 버튼 / admin 폴백 '멤버' 선택 (shot g3-047-admin-fallback) | VERDICT=PASS
+QAPROBE:: G3-048#UI | owner | EXPECTED=연결 클릭 → 토스트 · 이동 없음 · 크래시 없음 | GOT=503(로컬 OAuth 미설정) · 'Google 인가 URL 을 만들지 못했습니다' · URL 그대로 · 크래시 없음. console 은 브라우저 기본 503 1줄뿐 (shot g3-048-owner-connect) | VERDICT=PASS
+QAPROBE:: WS-CREATE-UI | owner | EXPECTED=전환 메뉴 → 새 워크스페이스 → Enter → 생성·전환 | GOT=POST 201 · active=새 WS · 전환 메뉴에 이름 (IME 가드 적용 Enter 핸들러 정상). 정리: 위험 구역에서 DELETE 204 (shot ws-create-ui) | VERDICT=PASS
+QAPROBE:: G1-014#UI | owner | EXPECTED=계정 메뉴 로그아웃 → 토큰 401 · 보호 라우트 sign-in | GOT=/api/auth/token 401 · /projects → /sign-in?callbackURL=%2Fprojects | VERDICT=PASS
+QAPROBE:: G2-057#UI | admin | EXPECTED=Alpha 삭제 409 · 사유 토스트 · 대화상자 유지 | GOT=DELETE 409 · '이 프로젝트에 노트 1개, 액션 3개가 연결되어 있습니다…' · alertdialog 유지 → 취소 (shot g2-057-admin-delete-409) | VERDICT=PASS
+QAPROBE:: G1-028#UI | outsider | EXPECTED=접근 불가 wid → 전환 + 토스트, 403 루프 없음 | GOT='접근할 수 없어 “QA outsider의 개인 Kairos” 워크스페이스로 전환했습니다' · 403/404 0건 (shot g1-028-outsider-switch) | VERDICT=PASS
+QAPROBE:: SWEEP-outsider#UI | outsider | EXPECTED=QA Team 리소스 URL 직접 진입 → 데이터 렌더 없음 | GOT=프로젝트 2 · 회의 1 · 노트 2 → 200 응답 0 · 제목 렌더 0 (console 404 = 의도) | VERDICT=PASS
+QAPROBE:: G1-029 | owner→outsider | EXPECTED=owner 가 쓰던 브라우저에서 outsider 로그인 → 상태 초기화 | GOT=ownerUserId=outsider · active≠QA Team · 4xx 0 · console.error 0 | VERDICT=PASS
+QAPROBE:: G1-006#UI | anon | EXPECTED=위조 세션 쿠키 → 틀만, /api/v1 전부 401 · 데이터 없음 | GOT=/dashboard 틀 렌더 · /api/auth/token 401 · /api/v1 호출 0 · QA Team 데이터 없음 (shot g1-006-forged-cookie) | VERDICT=PASS
+QAPROBE:: G3-040 | member-mobile | EXPECTED=13 라우트 scrollWidth ≤ 375 · BottomNav · console.error 0 | GOT=13/13 sw=375 · BottomNav · cerr=0 | VERDICT=PASS
+QAPROBE:: AUDIO-UPLOAD-UI | member | EXPECTED=m4a 업로드 → 201 fileKey → 202 → completed, 요약+액션 | GOT=upload 201 · create 202 · 12초 만에 completed · 요약 렌더 · 액션 2 · cerr 0. R2 키 uploads/68be2290-9a8a-4f69-a379-a3b7634ef2af/beta-meeting.m4a (shot audio-upload-completed) | VERDICT=PASS
+QAPROBE:: G2-012 | member | EXPECTED=관측 status ⊂ {uploading, transcribing, analyzing, completed} | GOT=[uploading, transcribing, analyzing, completed] | VERDICT=PASS
+QAPROBE:: T-18-rag | viewer | EXPECTED=RAG 출처에 memory 0 · 답변에 admin 메모 원문 없음 (cached=false) | GOT=status=200 cached=False sources=10 memorySrc=0 leak=False errors=[] | VERDICT=PASS
+QAPROBE:: T-18-rag | member | EXPECTED=RAG 출처에 memory 0 · 답변에 admin 메모 원문 없음 (cached=false) | GOT=status=200 cached=False sources=10 memorySrc=0 leak=False errors=[] | VERDICT=PASS
+QAPROBE:: T-18-rag-control | admin(작성자) | EXPECTED=대조군: 작성자 admin 은 같은 주제 RAG 에서 memory 출처 ≥1 | GOT=status=200 cached=False sources=10 memorySrc=1 | VERDICT=PASS
+QAPROBE:: T-05#UI | viewer | EXPECTED=/inbox UI 에 F-1 · F-2 · F-5 항목 없음 | GOT=세 항목 모두 미표시 · 대조군(볼 수 있는 F-4/F-6) 표시 · cerr 0 (shot t05-viewer-inbox) | VERDICT=PASS
+QAPROBE:: T-07#UI | viewer | EXPECTED=/actions UI 에 F-1 · F-5 추출 액션 없음 | GOT=행 30 중 F-1·F-5 액션 4종 미표시 · cerr 0 (shot t07-viewer-actions) | VERDICT=PASS
+QAPROBE:: T-18c#UI | member | EXPECTED=UI 에서도 작성자 Beta 는 변경 가능 · 남의 Alpha 는 불가 | GOT=Beta 배지 활성 → 비공개 PATCH 200 · 배지 '비공개' · 재진입 렌더(/projects/<Beta>/members 200) · 작업 중으로 원복 200 / Alpha 배지 disabled · 관리 메뉴 없음 · PATCH 0 (shots t18c-*) | VERDICT=PASS

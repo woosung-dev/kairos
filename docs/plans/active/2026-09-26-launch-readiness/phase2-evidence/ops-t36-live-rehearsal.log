@@ -1,0 +1,26 @@
+### T-36 live rehearsal 2026-09-27T02:56:42+0900 — account = T-26 signup (throwaway), db = kairos-qa-db
+-- 1. old password sign-in (creates the 'existing browser' session): 200
+-- 1b. existing session before reset: session=null
+-- 2. apply runbook §3 (local rehearsal form)
+ℹ SQL 을 stdout 으로 냈다 (대상 qa-p2-signup-1790444481@kairos.test). psql 출력의 NOTICE 'kairos-reset: ...' 줄로 결과를 확인한다.
+NOTICE:  kairos-reset: password updated = 1 row, sessions revoked = 2 for <signup-email>
+DO
+   psql exit=
+-- 3a. existing session after reset: session=null
+-- 3b. old password sign-in: 401
+-- 3c. new password sign-in: 200
+-- 3d. new session → JWT → BE /users/me: 401
+-- 4. runbook §5 new-session count (last 1h): 1
+-- creds file updated with the new password (scratchpad only)
+
+### T-36 live rehearsal — run 2 (harness fix: zsh 에서 ${3:+-c $3} 가 분리되지 않아 run 1 의 쿠키 jar 가 저장되지 않았다. run 1 의 1b/3a/3d 는 무효, NOTICE·401·200 은 유효) 2026-09-27T02:57:20+0900
+-- 1. current password sign-in = 'existing browser': 200
+-- 1b. existing session before reset: session=present · token_len=450 /users/me=200
+-- 2. runbook §3:
+   NOTICE:  kairos-reset: password updated = 1 row, sessions revoked = 3 for <signup-email>
+   DO
+-- 3a. existing session after reset: session=null
+-- 3b. previous password sign-in: 401
+-- 3c. new password sign-in: 200
+-- 3d. new session: session=present · token_len=450 /users/me=200
+-- creds file updated with the new password (scratchpad only)

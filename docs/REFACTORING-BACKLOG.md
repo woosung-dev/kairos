@@ -62,6 +62,90 @@ null 이라 액션 보드의 프로젝트 칩·프로젝트 필터, 프로젝트
 시드(project_id 직접 삽입)에서만 살아 있던 셈. FE 에도 액션의 프로젝트를 바꾸는 UI 가 없다(BE PATCH `projectId` 는 있음).
 방향: (1) 추출 시 회의가 이미 프로젝트에 연결돼 있으면 상속 (2) `add_meeting_link` 시 그 회의의 `project_id IS NULL` 액션을 일괄 갱신 (3) 액션 행에서
 프로젝트 지정 UI. 회의 1개 = 프로젝트 N개(MeetingProjectLink) 인 경우의 규칙(첫 링크? 미배정 유지?) 은 사용자 결정 필요.
+**★보안 영향 (2026-09-26 정검 C-016)**: `project_id IS NULL` 액션은 목록 가시성 필터를 통과하므로, private 프로젝트 회의에서 추출된 액션이
+비멤버 viewer 에게 보인다. 기능 결함이 아니라 **P0 누수**다 → BL-LR-1 에서 함께 처리.
+
+---
+
+## 2026-09-26 실사용 준비 정검 (BL-LR-N)
+
+> Generator 3 + Evaluator 3 + codex 교차검증으로 확정한 결함이다. 재현 절차·file:line·판정 기록은
+> [`plans/active/2026-09-26-launch-readiness/report.md`](plans/active/2026-09-26-launch-readiness/report.md) 에 있다.
+> 게이트별 순서는 같은 폴더의 `checklist.md` 를 따른다.
+
+### BL-LR-1 — 회의 가시성이 파생 데이터(RAG 청크·인박스·추출 액션)에 적용되지 않는다 (P0, 보안) `[C-014 · C-015 · C-016]` ✅ **완료 (2026-09-27 launch-readiness Gate 0 PR, Phase 2 재테스트 PASS)**
+private 프로젝트에 연결된 회의를 비멤버가 상세에서 열면 404 인데, 같은 회의의 RAG 청크(`project_id` NULL 로 남음)·인박스 요약·추출 액션은 그대로 보인다.
+청크 `project_id` 는 파이프라인 자동 확정 때만 설정되고, 수동 링크·인박스 확정은 갱신하지 않는다. `project_id IS NULL` 은 필터를 통과한다.
+방향: 컬럼을 동기화하기보다 검색·목록 필터를 `meeting_project_links` 기준(회의 가시성 규칙과 동일)으로 바꾼다. Gate 0 차단.
+
+### BL-LR-2 — 회의↔프로젝트 링크 API 와 프로젝트 PATCH 에 가시성 검사가 없다 (P0/P1, 보안) `[C-018 · C-017 · C-019]` ✅ **C-018 · C-017 완료 (2026-09-27 launch-readiness Gate 0 PR, Phase 2 재테스트 PASS)** · C-019(멤버 목록 게이트)는 Gate 1(1-8) 로 남음
+`POST/DELETE /meetings/{mid}/projects` 가 테넌트만 검사한다. member 가 숨겨진 회의를 public 프로젝트에 연결하거나 private 연결을 끊으면 회의 전문이 공개된다.
+`PATCH /projects/{id}` 도 비멤버 member 의 수정(status 임의 문자열 포함)을 허용하고, 프로젝트 멤버 목록은 404 프로젝트에도 200 을 준다. Gate 0 차단(멤버 목록은 Gate 1).
+
+### BL-LR-3 — 새 프로젝트 제안이 인박스에서 사라지고, UI 에서 회의를 링크할 경로가 없다 (P1, 기능) `[C-002 · C-003 · C-004]` ✅ **C-002 완료 (2026-09-27 launch-readiness Gate 0 PR, Phase 2 재테스트 PASS)** · C-003 · C-004 는 Gate 1(1-8) 로 남음
+신뢰도가 임계값 이상인 새 프로젝트 제안은 `is_processed=true` 로 저장되지만 링크는 없다. FE `addMeetingProject` 는 PUT 을 보내고 BE 는 POST 만 받는다(호출부 0).
+분류기 후보는 public 프로젝트뿐이고(archived 포함), 생성 API 에는 projectId 가 없다.
+
+### BL-LR-4 — Memory 범위와 문서 불일치 (P0, 보안) `[C-020]` — 2026-09-27 사용자 결정 **(a) 작성자 전용** ✅ **완료 (2026-09-27 launch-readiness Gate 0 PR, Phase 2 재테스트 PASS)**
+recall·GET 이 워크스페이스 범위라 팀 WS 의 "개인 메모" 를 viewer 도 원문까지 읽는다. 문서 8곳은 "개인 메모리 레이어" 라고 서술한다.
+결정 (a): 팀 WS 여도 메모는 작성자만 본다 (I-24). recall·GET·promote 원본·RAG memory 청크·RAG 캐시 재검증에 같은 규칙, admin 우회 없음.
+promote 사본은 `memory_items.is_shared=true` 로 팀 공유 `[확인 필요]` (decisions-log M-1).
+
+### BL-LR-5 — 초대 → 가입 → 참여 흐름 (P2, 온보딩) `[C-001 · E2-X01 · C-024 · C-025]` ✅ **완료 (2026-09-27 launch-readiness Gate 0 PR, Phase 2 재테스트 PASS)**
+빈 브라우저에서 초대를 수락하면 목록 첫 WS 로 착지한다(`ensureOwner` 초기화 + ORDER BY 없음). 가입 전환 링크가 `callbackURL` 을 버린다.
+중복 가입 문구가 영어 원문으로 뜨고, 422 는 "[object Object]" 로 표시된다.
+
+### BL-LR-6 — 실패 회의 errorMessage 가 R2 서명 URL 을 노출한다 (P2, 보안) `[C-023]` ✅ **완료 (2026-09-27 launch-readiness Gate 0 PR, Phase 2 재테스트 PASS)**
+`error_message=str(e)` 를 그대로 저장하고 viewer 이상에게 반환한다. 계정 endpoint·버킷명·access key id·서명 URL 이 담긴다.
+
+### BL-LR-7 — `r2-cleanup.yml` 삭제 모드가 살아 있는 회의 원본을 지운다 (P1, 운영 · 잠재 유실) `[D-001 · D-002]` ✅ **D-002 완료 (2026-09-27 launch-readiness Gate 0 PR, Phase 2 재테스트 PASS)** — 스크립트는 DB 참조 대조, 워크플로는 읽기 전용 인벤토리. voice 메모 TTL 실행 수단(D-001)은 Gate 1(1-12) 로 남음
+`scripts/r2_cleanup.py` 는 DB 참조 없이 `uploads/` 를 나이만으로 삭제한다. `docs/TODO.md` BL-OCI-5 의 "고아 정리" 안내대로 `delete=true` 로 실행하면 30일 넘은 원본이 전부 사라진다.
+voice 메모 TTL(`POST /admin/memory/r2-cleanup`)은 호출 주체가 없다. **수정 전까지 delete=true 실행 금지.**
+
+### BL-LR-8 — 데이터 보존 UX 결함 묶음 (P2) `[C-026 · C-027 · C-028 · E1-N1 · C-022]`
+노트 자동저장 디바운스 안에 이탈하면 유실된다 · 인박스 되돌리기가 로컬 전용이다 · promote 반복 시 사본이 중복된다 · 생성 직후 삭제한 노트의 고아 청크가 남는다 ·
+RAG 캐시 키가 sourceType 을 무시한다.
+
+### BL-LR-9 — 전송·헤더·rate limit 하드닝 (P2/P3, 인프라) `[C-011 · C-009 · C-012 · C-013]`
+프로덕션이 평문 HTTP 200 을 주고 HSTS 가 없다 · Better Auth IP 판정 설정이 없다 · robots/sitemap 이 로그인으로 리다이렉트된다 · x-powered-by 가 노출되고 CSP 는 Report-Only 다.
+
+### BL-LR-10 — 프로젝트 범위 RAG 가 회의 청크를 `chunk.project_id` 로 판정한다 (P2, 기능 정확도) ⏳ **미착수**
+BL-LR-1 수정으로 **가시성**은 `meeting_project_links` 기준이 됐지만, `scope=project` 의 **범위 필터**는 여전히 `embedding_chunks.project_id = :pid` 다.
+수동 링크·인박스 확정으로 연결된 회의는 청크 `project_id` 가 NULL 이라 그 프로젝트 범위 검색에서 빠진다(누수가 아니라 누락).
+방향: 범위 필터도 회의 청크는 링크 테이블로 판정하거나, 링크 생성·해제 시 청크 `project_id` 를 동기화한다. 회의 1개 = 프로젝트 N개라 전자가 맞다.
+근거: `apps/api/src/rag/CONTEXT.md` R-16 알려진 한계.
+
+### BL-LR-11 — `users.clerk_id` 2단계 DROP (P3, 정리) ⏳ **프로덕션 데이터 확인 대기** `[D-038 · 0-17]`
+Better Auth 컷오버(ADR-031) 뒤 `clerk_id` 는 쓰기 경로가 없다. 다만 모델 주석상 **레거시 행 식별의 유일한 단서**다.
+순서: ① 프로덕션에서 `SELECT count(*) FROM users WHERE clerk_id IS NOT NULL AND auth_user_id IS NULL` `[확인 필요]`
+② 0 이면 읽기 경로 제거 배포 → ③ 다음 배포에서 DROP (`docs/development/migrations.md` §6 2단계 원칙). 0 이 아니면 매핑부터.
+
+### BL-LR-12 — 비공개 프로젝트를 지우면 그 프로젝트에만 연결된 회의가 워크스페이스 전체 공개가 된다 (P2, 보안) ⏳ **미착수** `[E1-06]` `[확인 필요]`
+회의 가시성은 "링크 0개 = 전원 공개" 다. admin 이 private 프로젝트를 삭제하면 링크가 CASCADE 로 사라져 그 회의(전사·인박스 요약·RAG 청크)가 viewer 에게까지 열린다.
+추출 액션은 `project_id` 가 NULL 이라 삭제 409 게이트(BL-S27e-5)에 안 걸린다. 규칙을 글자 그대로 따른 결과이고 main 에서도 같다.
+권장: 회의의 **유일한** 링크가 삭제 대상 프로젝트면 409 로 막고 "회의를 먼저 다른 프로젝트로 옮기거나 삭제" 를 안내 (notes/actions 409 와 같은 모양). 제품 규칙 결정이라 사용자 확인 후 착수.
+
+### BL-LR-13 — 가시성 잠재 결함 묶음 (P3, 지금은 도달 경로 없음) ⏳ **미착수** `[E1-04 · E1-08 · E1-09 · E1-11]`
+- E1-04: 캐시 재검사에서 admin/owner 는 행이 없는 청크를 위반으로 보지 않는다. 메모 청크를 hard-delete 하는 경로가 생기면 남의 메모로 만든 캐시가 owner 에게 HIT (I-24 위반). 메모 삭제 기능을 만들 때 같이 고친다.
+- E1-09: `action`·`inbox` source_type 이 화이트리스트에 있지만 insert 경로가 없다. 회의 파생 청크를 이 타입으로 넣는 순간 "그 외" 분기의 `project_id IS NULL` 통과로 C-014 가 다시 열린다 — 넣을 때 meeting 분기로 보낸다.
+- E1-08: RAG `projectId=<숨은 프로젝트>` 의 SSE 오류 문구가 draft/private/없음으로 갈려 숨은 프로젝트의 존재·visibility 가 드러난다 (FE 문자열 계약 D5 때문에 유지 중).
+- E1-11: `projects/service.py` `get_meeting_projects` 는 호출자 0 이고 테넌트만 검사한다. 라우터에 붙이면 C-018 이 재발한다 — 삭제하거나 `_verify_link_access` 를 거친다.
+
+### BL-LR-14 — FE 권한·UX 후속 (P3) ⏳ **미착수** `[E-FE E-7 · E-9 · Phase 2 FE Generator]`
+- 작성자(member)는 자기 private 프로젝트의 visibility 는 바꿀 수 있지만 ProjectMember 추가는 못 한다 (`ProjectMembersPanel` 은 `canManage` 만 본다). BE 규칙부터 정해야 한다 `[확인 필요]`.
+- `useClassifyInbox` 성공 시 회의 목록·상세 키를 무효화하지 않는다 — 인박스에서 확정한 링크가 회의 상세에 새로고침 전까지 안 보인다.
+- 422 문구 끝에 wire 필드명 camelCase 가 붙는다 (`… (transcriptText)`) — 한국어 라벨 맵 또는 hint 제거.
+- 앱 안에서 WS 를 바꾸면 새 WS 멤버 목록을 불러오는 동안 이전 WS 의 role 이 남아 편집 버튼이 잠깐 보인다 (BE 403 으로 막힘). 로딩 중 role 을 null 로 (fail-closed).
+- Gate 0 가시성 수정(체크리스트 0-1)의 **e2e spec 이 없다**. 검증은 pytest 통합 테스트 + 라이브 Playwright 탐침(scratchpad, 커밋 안 됨)으로 했다. `apps/web/e2e/` 에 viewer 가 private 회의의 인박스 요약·추출 액션·RAG 출처를 못 보는 spec 1건을 추가한다.
+
+### BL-LR-15 — 운영 후속 (P3) ⏳ **미착수** `[Phase 2 Ops]`
+- DB 덤프에 세션 토큰·Google OAuth 토큰·비밀번호 해시가 들어 있고 nexus-core 와 공유하는 버킷에 올라간다 → R2 토큰 prefix 제한 또는 덤프 암호화.
+- 로컬 dev·QA 도 같은 버킷 `uploads/` 에 쓴다 → 운영 cleanup 이 이들을 고아 후보로 본다 (dry-run 결과를 사람이 확인하는 이유).
+- `scripts/tests/` 는 어떤 CI job 도 돌리지 않는다 → `test.yml` 에 추가.
+- 세션 revoke 뒤에도 이미 발급된 JWT 는 최대 15분 유효하다 (jwt plugin 기본값). 수동 비밀번호 재설정 runbook 에 명시돼 있다.
+- 메모 AI 호출 실패 시 `memory_ai_calls.error_message` 에 `str(exc)` 가 저장된다 (API 노출 0건, E2-08). 회의 파이프라인처럼 정제할지 결정.
+- 데이터 마이그레이션이 `ADD COLUMN` 락을 backfill UPDATE 끝까지 잡는다 (E2-06). 도그푸딩 규모에선 ms 단위 — 행이 커지면 `lock_timeout` 또는 분리.
+- **(P1 · Gate 0 차단 — 이 항목만 등급이 높다) nightly e2e 워크플로가 Better Auth 이전 구성이다 (체크리스트 0-18)**. `nightly-e2e.yml` 은 FE build/start 에 `BETTER_AUTH_SECRET`·`BETTER_AUTH_URL` 을, BE 에 `AUTH_JWKS_URL`·`AUTH_JWT_ISSUER` 를 넘기지 않는다 → secret 을 등록해도 "default secret" 실패가 계속된다. `test.yml` e2e job(:315·:324 의 `E2E_AUTH_SECRET`) 구성을 이식하고 `workflow_dispatch` 로 확인한다.
 
 ## BL-S29-1 — `mise run docs-check` 게이트 신설 (규칙 재중복 방지) ⏳ **미착수**
 

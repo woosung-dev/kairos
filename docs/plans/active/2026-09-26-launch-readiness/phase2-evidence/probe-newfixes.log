@@ -1,0 +1,25 @@
+QAPROBE:: NF-E1-05a | member | EXPECTED=404 (숨은 회의로 create) | GOT=404 {"detail": "회의을(를) 찾을 수 없습니다"} | VERDICT=PASS
+QAPROBE:: NF-E1-05b | member | EXPECTED=숨은 회의와 없는 회의가 같은 응답 (404 == 404) | GOT=404 vs 404 | VERDICT=PASS
+QAPROBE:: NF-E1-05c | member | EXPECTED=404 (숨은 프로젝트로 create) | GOT=404 {"detail": "프로젝트을(를) 찾을 수 없습니다"} | VERDICT=PASS
+QAPROBE:: NF-E1-05d | member | EXPECTED=201 (볼 수 있는 회의·프로젝트 — 과잉 차단 없음) | GOT=201 | VERDICT=PASS
+QAPROBE:: NF-E1-05e | member | EXPECTED=404 (PATCH 로 숨은 회의 재지정) | GOT=404 {"detail": "회의을(를) 찾을 수 없습니다"} | VERDICT=PASS
+QAPROBE:: NF-E1-05f | member | EXPECTED=200 (일반 PATCH 는 그대로) | GOT=200 | VERDICT=PASS
+QAPROBE:: NF-E1-05g | admin | EXPECTED=201 (Delta 멤버 admin 은 허용) | GOT=201 | VERDICT=PASS
+QAPROBE:: NF-E1-01-setup | admin | EXPECTED=201 | GOT=201 | VERDICT=PASS
+QAPROBE:: NF-E1-01-md | member | EXPECTED=200 + Delta 액션 미포함 | GOT=200 seen=False | VERDICT=PASS
+QAPROBE:: NF-E1-01-json | member | EXPECTED=200 + Delta 액션 미포함 | GOT=200 seen=False | VERDICT=PASS
+QAPROBE:: NF-E1-01-md | viewer | EXPECTED=200 + Delta 액션 미포함 | GOT=200 seen=False | VERDICT=PASS
+QAPROBE:: NF-E1-01-json | viewer | EXPECTED=200 + Delta 액션 미포함 | GOT=200 seen=False | VERDICT=PASS
+QAPROBE:: NF-E1-01-md | admin | EXPECTED=200 + Delta 액션 포함 | GOT=200 seen=True | VERDICT=PASS
+QAPROBE:: NF-E1-01-json | admin | EXPECTED=200 + Delta 액션 포함 | GOT=200 seen=True | VERDICT=PASS
+QAPROBE:: NF-E1-01-list | member | EXPECTED=목록에도 미포함 (기존 A-8) | GOT=200 seen=False | VERDICT=PASS
+QAPROBE:: NF-E2-03-setup | viewer | EXPECTED=202 | GOT=202 | VERDICT=PASS
+QAPROBE:: NF-E2-03 | viewer | EXPECTED=422 (대상 WS viewer 는 promote 불가) | GOT=422 {"detail": "대상 워크스페이스가 유효하지 않습니다"} | VERDICT=PASS
+QAPROBE:: NF-E2-03-nocopy | viewer | EXPECTED=대상 WS 에 사본 0 | GOT=0 | VERDICT=PASS
+QAPROBE:: NF-E2-07-setup | member | EXPECTED=202 | GOT=202 | VERDICT=PASS
+QAPROBE:: NF-E2-07-promote | member | EXPECTED=2xx + 사본 id | GOT=202 {"new_memory_id": "a500dd5f-d6c2-492f-a12f-1f04078d9e17", "audit_id": "6ef96a7a-9802-45c0-9c9b-6218d90a7b11", "status":  | VERDICT=PASS
+QAPROBE:: NF-E2-07-shared | member | EXPECTED=is_shared=t | GOT=t | VERDICT=PASS
+QAPROBE:: NF-E2-07-read | viewer | EXPECTED=200 (팀 WS viewer 도 공유 사본을 읽는다) | GOT=200 | VERDICT=PASS
+QAPROBE:: NF-E2-02 | admin | EXPECTED=403 (작성자 아닌 사람의 공유 사본 재promote) | GOT=403 {"detail": "메모는 작성자만 다른 워크스페이스로 올릴 수 있습니다"} | VERDICT=PASS
+QAPROBE:: NF-E2-07-orig | member | EXPECTED=200 (원본은 작성자에게 그대로) | GOT=200 | VERDICT=PASS
+QAPROBE:: G1-086 | new-account | EXPECTED=12 동시 첫 호출 500 0건 · users 1행 · personal WS 1개 | GOT=signup=200 users_before_first_call=0 codes=[200] users=1 personal_ws=1 | VERDICT=PASS

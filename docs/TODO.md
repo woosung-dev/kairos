@@ -82,6 +82,13 @@
 
 > 사용자 결정이 필요한 항목.
 
+- [ ] **promote 사본의 공개 범위** `[신규 · 2026-09-27 실사용 준비 Gate 0]` 결정 (a) "메모는 작성자 전용" 을 적용하면서,
+  "팀으로 올리기"(promote) 로 만든 **사본**은 `memory_items.is_shared=true` 로 대상 WS 전원에게 보이게 했다 (원본은 작성자 전용).
+  사본도 작성자 전용이어야 하면 `memory/service.py promote` 의 `is_shared=True` 1줄을 지운다.
+  근거: `docs/plans/active/2026-09-26-launch-readiness/decisions-log.md` M-1.
+- [ ] **프로덕션 `users.clerk_id` 레거시 행 수 확인** `[신규 · 2026-09-27]` `SELECT count(*) FROM users WHERE clerk_id IS NOT NULL AND auth_user_id IS NULL`
+  결과가 0 이면 BL-LR-11 의 2단계 DROP 을 진행한다. 서버 DB 접근이 필요해 사용자 실행.
+
 - [x] ~~레포 public/private 여부~~ — **2026-08-16 public 전환 확정.** 따라서:
   - `.github/SECURITY.md` 는 형식적이 아니라 **실효**다. ★Settings → Security 에서
     **private vulnerability reporting 을 켜야** `ISSUE_TEMPLATE/config.yml` 의 advisories 링크가 동작한다
@@ -103,10 +110,11 @@
 
 ### 운영 · 인프라 (ADR-027/028 후속)
 - [ ] **BL-OCI-1** (P1) **DB 백업 자동화.** 오라클 셀프호스팅 DB 에 백업이 없다. 개발 단계라 의도적으로 제외했고, 운영 전환 시 착수한다(일 1회 `pg_dump` → R2). 그때까지 **`docker compose down -v` 금지** — `-v` 가 `db-data` 볼륨을 지운다. 현재 안전망은 Neon 원본(오라클 DB 가 그 복사본)뿐이므로 **Neon 프로젝트를 지우지 말 것.**
+  → 2026-09-27: 백업 스크립트 완료 (`deploy/oci/backup/`, 절차 `docs/operations/runbooks/db-backup-restore.md`, 로컬 복원 리허설 통과). **남은 것 = 사용자 cron 등록 + R2 lifecycle + `.env`(BETTER_AUTH_SECRET·INTEGRATIONS_ENCRYPTION_KEY) 별도 보관.**
 - [ ] **BL-OCI-2** (P3) **presigned URL 업로드 전환.** Cloudflare Free/Pro 는 요청 바디를 100MB 에서 자른다. 운영 실측 최대 파일이 5MB 라 지금은 무해하고, `MAX_UPLOAD_BYTES=90MB` + FE 사전 가드로 막아 뒀다. 100MB 초과 파일이 실제로 필요해지면 착수(약 5시간). BL-070(500MB RAM 적재)도 함께 해소된다. 2026-05 기각 사유는 "R2 버킷 CORS 미설정"이었고 여전히 미설정이다.
 - [ ] **BL-OCI-3** (P3) **GitHub Actions 자동 배포.** 진입 조건 = 수동 배포 3회 연속 성공 + 컷오버 후 7일 무사고 + 장시간 오디오 1건 end-to-end 완주. GH 러너가 amd64 라 arm64 빌드에 QEMU 가 붙는 문제를 먼저 풀어야 한다.
 - [ ] **BL-OCI-4** (P2) **stuck 상태 복구 경로.** `BackgroundTasks` 는 재시도가 없어 프로세스 재시작 시 진행 중이던 회의가 `transcribing`/`analyzing` 으로 영구 정지한다. 2026-08-14 에 그렇게 좌초한 8건(E2E 6 + uploading 2)을 수동 삭제했다. `mise run deploy-preflight` 가 최근 2시간만 검사하도록 우회했을 뿐 근본 해결이 아니다.
-- [ ] **BL-OCI-5** (P3) **R2 고아 파일 정리.** 삭제된 회의의 원본이 버킷에 남는다. `r2-cleanup.yml` 은 `workflow_dispatch` 전용(cron 미설정)이라 수동 실행이 필요하다. 현재 잔여량은 수십 KB 수준이라 급하지 않다. CI 복구(2026-08-16)로 실행 가능 — `gh workflow run r2-cleanup.yml -f delete=false` dry-run 먼저.
+- [ ] **BL-OCI-5** (P3) **R2 고아 파일 정리.** 삭제된 회의의 원본이 버킷에 남는다. `r2-cleanup.yml` 은 `workflow_dispatch` 전용(cron 미설정)이라 수동 실행이 필요하다. 현재 잔여량은 수십 KB 수준이라 급하지 않다. → 2026-09-27: `r2-cleanup.yml` 은 읽기 전용 인벤토리로 바뀌었고 `delete` 입력은 없어졌다. 정리는 서버에서 DB 참조를 확인하고 실행한다 — `docs/operations/r2-cleanup-cron.md` §2.
 - [ ] **BL-OCI-6** (P2) **dev 와 prod 가 같은 Neon DB(`neondb`) 를 쓰고 있었다.** 로컬 개발이 운영 데이터를 직접 건드리는 구조. 오라클 이전으로 prod 는 분리됐지만 로컬 개발 DB 분리는 미해결.
 - [ ] **BL-ADR027-OASDIFF** (P3) OpenAPI breaking-change 게이트(oasdiff). 트리거: 외부/모바일 API 소비자 첫 등장. 현재는 FE·BE 가 같은 PR 원자 변경 → `api.gen.ts` diff + FE typecheck 이 그 역할 대행 (ADR-027 D5).
 - [ ] **BL-ADR027-NX** (P4) Nx/Turborepo 도입. 트리거: 지속적 CI 병목(>15분) 또는 영향도 계산 수동 유지 불가. test.yml change-detection(2026-08-13 도입)을 먼저 소진 (ADR-027 D5).
@@ -260,6 +268,7 @@
   이메일/비밀번호 사용자가 비밀번호를 잊으면 복구 경로가 없다. 현재는 사인인 화면에 "Google 로그인을
   쓰거나 운영자 문의" 안내만 노출한다. 도그푸딩 규모에서는 수동 처리로 버티되, 외부 사용자 확대 전에
   Resend 등 발송 수단 + `sendResetPassword` 배선이 필요하다. **컷오버와 같은 창에서 하지 않는다.**
+  → 2026-09-27: 수동 처리 절차 = `docs/operations/runbooks/manual-password-reset.md` (Gate 0 은 이것으로 충분 — 사용자 결정). 비밀번호 변경 UI 가 없어 임시 비밀번호가 그대로 영구 비밀번호가 되는 점은 Gate 1 과제로 남는다.
 - [ ] **Clerk dev 인스턴스 삭제** `[ADR-031 종료 조건 · 컷오버 +7일]` git 히스토리 675 커밋에
   Clerk dev secret 이 남아 있고 레포가 public 이다. 전환 완료로 키가 무의미해지는 것과, 키가
   **실제로 무효화되는 것**은 다르다 — 인스턴스 삭제까지가 종료 조건이다.
