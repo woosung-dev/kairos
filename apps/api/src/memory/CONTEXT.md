@@ -73,6 +73,8 @@ apps/api/src/memory/
 | **I-19** | Personal workspace 1인 격리 — Personal에 capture는 1 user만 가능 (auth/dependencies 시드) | `auth/dependencies.py` lazy seed |
 | I-3 (Gemini 모델) | `gemini-3.1-flash-lite` (ADR-019 Phase B 적용 완료, 2026-05-15. 이전: `gemini-2.5-flash` EOL 2026-06-17) | `service.py:64` `GEMINI_MODEL` |
 | I-4 (프롬프트 중앙 관리) | distill prompt = `common/prompts.py` 상수 (인라인 금지) | Sprint 15 R1 lock-in |
+| **I-24** (작성자 전용) | **메모는 작성자 전용** (C-020 결정 (a), 2026-09-27) — 팀 워크스페이스에서도 recall·`GET /memory/{id}`·promote·RAG 검색·RAG 캐시는 `user_id == requester` 인 메모만 돌려준다. **admin/owner 도 우회 없음**. 예외는 "팀으로 올리기"(promote) 로 만든 사본뿐 — 복제본은 `is_shared=true` 로 대상 워크스페이스 전원에게 보인다 (alembic `a9c4e2f7b1d0` 이 과거 promote 사본을 `memory_events` 로 backfill). 남의 메모는 존재 여부도 숨긴다 (404) | `repository.py` get_by_id/vector_search/search_keyword · `common/visibility.py` raw SQL |
+| **I-25** (promote 권한) | **promote 는 원본 작성자만 (E2-02, 2026-09-27)** — `is_shared` 사본은 대상 WS 전원이 읽지만, 그걸 다시 다른 WS 로 올리는 건 `source.user_id == requester` 일 때만 (아니면 403 `MemoryPromoteForbiddenError`). 대상 WS 검증은 4 도메인과 같은 `common/promote_helpers.validate_promote_target` — 같은 WS·비멤버·**대상 WS viewer**·personal 거부 (E2-01/03, 이전엔 viewer 가 통과했다) | `service.py:promote` |
 
 ---
 
@@ -97,7 +99,7 @@ archived         (cleanup 30일 또는 사용자 요청)
 |--------|----------|-------|
 | FE `/memory` page | `POST/GET /api/v1/workspaces/{ws_id}/memory*` | router.py |
 | Founder admin page | `GET /api/v1/workspaces/{ws_id}/memory/metrics` | router.py (admin gate FE-side) |
-| GCP Cloud Scheduler | `POST /api/v1/admin/memory/r2-cleanup` | admin_router.py (Cron secret token) |
+| (호출자 없음 — ADR-028 로 GCP Cloud Scheduler 철거) | `POST /api/v1/admin/memory/r2-cleanup` | admin_router.py (Cron secret token). 음성 메모 30일 TTL 을 돌리려면 수동 curl — `docs/operations/r2-cleanup-cron.md` §1 |
 
 ---
 

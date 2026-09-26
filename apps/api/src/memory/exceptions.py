@@ -44,6 +44,16 @@ class MemoryNotFoundError(HTTPException):
         super().__init__(status_code=404, detail="메모를 찾을 수 없습니다")
 
 
+class MemoryPromoteForbiddenError(HTTPException):
+    """공유 사본을 작성자가 아닌 사람이 다른 WS 로 다시 올리는 것 차단 (C-020 (a), 2026-09-27 E2-02)."""
+
+    def __init__(self):
+        super().__init__(
+            status_code=403,
+            detail="메모는 작성자만 다른 워크스페이스로 올릴 수 있습니다",
+        )
+
+
 class WorkspaceMembershipError(HTTPException):
     def __init__(self):
         super().__init__(

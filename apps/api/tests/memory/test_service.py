@@ -94,7 +94,7 @@ async def test_get_memory_not_found_raises(
     """존재하지 않는 ID → MemoryNotFoundError."""
     service = _make_service(integration_session)
     with pytest.raises(MemoryNotFoundError):
-        await service.get_memory(uuid.uuid4(), personal_ws.id)
+        await service.get_memory(uuid.uuid4(), personal_ws.id, auth_user.id)
 
 
 @pytest.mark.asyncio

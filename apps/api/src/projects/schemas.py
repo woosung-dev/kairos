@@ -5,6 +5,8 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 VisibilityLiteral = Literal["public", "draft", "private"]
+# C-017 (2026-09-26 정검): 임의 문자열 저장 차단 — models.Project.status 3값과 일치
+ProjectStatusLiteral = Literal["active", "completed", "archived"]
 
 
 class CreateProjectRequest(BaseModel):
@@ -20,7 +22,7 @@ class CreateProjectRequest(BaseModel):
 class UpdateProjectRequest(BaseModel):
     title: str | None = None
     description: str | None = None
-    status: str | None = None
+    status: ProjectStatusLiteral | None = None
     visibility: VisibilityLiteral | None = None
     tags: list[str] | None = None
 

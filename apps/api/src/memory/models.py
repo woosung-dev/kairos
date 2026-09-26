@@ -48,6 +48,11 @@ class MemoryItem(SQLModel, table=True):
     # processing | transcription_pending | embedding_pending |
     # embedding_failed | active | archived
     status: str = Field(default="processing", nullable=False)
+    # C-020 결정 (a) (2026-09-27): 메모는 작성자 전용. 팀으로 올린(promote) 사본만 True →
+    # 대상 워크스페이스 전원이 recall·상세·RAG 로 볼 수 있다. 직접 캡처한 메모는 False.
+    is_shared: bool = Field(
+        default=False, nullable=False, sa_column_kwargs={"server_default": "false"}
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     deleted_at: datetime | None = None

@@ -88,6 +88,37 @@ class ActionItemService:
             if member is None:
                 raise NotFoundError("워크스페이스 멤버")
 
+    async def _verify_target_visibility(
+        self,
+        workspace_id: uuid.UUID,
+        project_id: uuid.UUID | None,
+        meeting_id: uuid.UUID | None,
+        requester_user_id: uuid.UUID | None,
+        requester_role: str | None,
+    ) -> None:
+        """새로 연결할 회의·프로젝트를 요청자가 볼 수 있어야 한다 (2026-09-27 E1-05).
+
+        tenant 검증(_verify_secondary_fks)만으로는 숨겨진 회의/프로젝트 id 의 존재를 확인하고
+        그 아래에 액션을 끼워 넣을 수 있다 → 안 보이면 없는 것과 같은 404.
+        role=None = 내부 호출 skip, admin/owner 우회.
+        """
+        if requester_role is None or requester_role in ADMIN_BYPASS_ROLES:
+            return
+        if meeting_id is not None:
+            if self.meeting_repo is None:
+                raise RuntimeError("meeting_repo 필수 (E1-05 visibility 검증)")
+            if not await self.meeting_repo.is_visible(
+                meeting_id, workspace_id, requester_user_id, requester_role
+            ):
+                raise MeetingNotFoundError()
+        if project_id is not None:
+            if self.project_repo is None:
+                raise RuntimeError("project_repo 필수 (E1-05 visibility 검증)")
+            if await self.project_repo.find_visible_by_id(
+                project_id, workspace_id, requester_user_id, requester_role
+            ) is None:
+                raise ProjectNotFoundError()
+
     async def create_action_item(
         self,
         workspace_id: uuid.UUID,
@@ -98,9 +129,14 @@ class ActionItemService:
         assignee_id: uuid.UUID | None = None,
         due_date: date | None = None,
         priority: str = "medium",
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
     ) -> dict:
         """액션 아이템 생성. Codex F-2: 3 secondary FK 검증 후 INSERT."""
         await self._verify_secondary_fks(workspace_id, project_id, meeting_id, assignee_id)
+        await self._verify_target_visibility(
+            workspace_id, project_id, meeting_id, requester_user_id, requester_role
+        )
         item = ActionItem(
             workspace_id=workspace_id,
             title=title,
@@ -175,6 +211,14 @@ class ActionItemService:
             return
         if requester_role in ADMIN_BYPASS_ROLES:
             return
+        # C-016 (2026-09-26 정검): 원본 회의가 안 보이면 그 액션도 404 (목록 필터와 같은 규칙).
+        if item.meeting_id is not None:
+            if self.meeting_repo is None:
+                raise RuntimeError("meeting_repo 필수 (C-016 visibility 검증)")
+            if not await self.meeting_repo.is_visible(
+                item.meeting_id, item.workspace_id, requester_user_id, requester_role
+            ):
+                raise ActionItemNotFoundError()
         if item.project_id is None:
             return
         if self.project_repo is None:
@@ -221,6 +265,9 @@ class ActionItemService:
 
         # Codex F-2: 3 secondary FK 변경 요청 시 cross-workspace 거부
         await self._verify_secondary_fks(workspace_id, project_id, meeting_id, assignee_id)
+        await self._verify_target_visibility(
+            workspace_id, project_id, meeting_id, requester_user_id, requester_role
+        )
 
         if title is not None:
             item.title = title
@@ -254,6 +301,7 @@ class ActionItemService:
         target_workspace_id: uuid.UUID,
         promoted_by_user_id: uuid.UUID,
         background_tasks: BackgroundTasks,
+        requester_role: str | None = None,
     ) -> ActionPromoteOut:
         """1-button promote: 원본 보존 + target ws ActionItem 복제 + audit.
 
@@ -301,6 +349,8 @@ class ActionItemService:
         source = await self.repo.find_by_id(action_id, source_workspace_id)
         if source is None:
             raise ActionItemNotFoundError()
+        # 2026-09-26 정검: 볼 수 없는 액션을 다른 워크스페이스로 복제하는 우회 차단.
+        await self._verify_action_visibility(source, promoted_by_user_id, requester_role)
 
         # 3. 복제 ActionItem (id 새로 발급, workspace_id=target).
         # I-18: 원본 보존 — source 미변경.

@@ -332,7 +332,11 @@ class MeetingService:
         # 액션 아이템 조회 (actions 도메인 workspace 격리는 Phase 5 commit C4 에서 강제)
         actions = []
         if self.action_repo:
-            actions = await self.action_repo.find_by_meeting(meeting_id)
+            actions = await self.action_repo.find_by_meeting(
+                meeting_id,
+                requester_user_id=requester_user_id,
+                requester_role=requester_role,
+            )
 
         if fmt == "md":
             content = self._to_markdown(meeting, summary, segments, actions)
@@ -550,6 +554,8 @@ class MeetingService:
             target_workspace_id=target_workspace_id,
             target_project_id=None,
             session=self.repo.session,
+            requester_user_id=promoted_by_user_id,
+            requester_role=requester_role,
         )
         if cloned_action_count > 0:
             new_meeting.action_item_count = cloned_action_count

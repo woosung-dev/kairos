@@ -29,6 +29,16 @@ from src.services.transcription import TranscriptionService
 
 logger = logging.getLogger(__name__)
 
+# C-023 (2026-09-26 정검): 실패 원문(str(e))에는 R2 endpoint·버킷·access key id·서명 URL 이
+# 들어 있었고 viewer 이상에게 그대로 반환됐다. DB 에는 분류명 + 일반 문구만 남기고,
+# 원문은 logger.exception 으로만 남긴다 (docker logs).
+PIPELINE_FAILURE_MESSAGE = "회의 처리 중 오류가 발생했습니다. 다시 시도하거나 관리자에게 문의하세요."
+
+
+def _public_error_message(error: Exception) -> str:
+    """사용자에게 보여도 되는 실패 사유 — 예외 클래스명만 덧붙인다 (원문·URL 제외)."""
+    return f"{PIPELINE_FAILURE_MESSAGE} ({type(error).__name__})"
+
 
 class MeetingPipelineService:
     """STT → 요약 → 액션 추출 → Inbox 적재 → 자동 확정 → 임베딩 파이프라인."""
@@ -109,6 +119,9 @@ class MeetingPipelineService:
         suggested = actions_data.get("suggestedProject", {})
         confidence = suggested.get("confidence", 0.0)
         existing_project_id_str = suggested.get("existingProjectId")
+        is_auto_confirmed = bool(
+            confidence >= auto_confirm_threshold and existing_project_id_str
+        )
 
         inbox_item = InboxItem(
             workspace_id=meeting.workspace_id,
@@ -122,11 +135,14 @@ class MeetingPipelineService:
             ai_suggested_project_title=suggested.get("newProjectTitle"),
             ai_suggested_tags=actions_data.get("suggestedTags", []),
             ai_confidence=confidence,
-            is_processed=confidence >= auto_confirm_threshold,
+            # C-002 (2026-09-26 정검): 자동 확정은 "기존 프로젝트에 연결" 할 때만이다.
+            # 새 프로젝트 제안은 링크가 안 생기므로, 신뢰도가 높아도 처리됨으로 두면
+            # 인박스에서 사라지고 회의는 미연결로 남는다 → 사람이 판단하도록 미처리 유지.
+            is_processed=is_auto_confirmed,
         )
         await inbox_repo.save(inbox_item)
 
-        if confidence >= auto_confirm_threshold and existing_project_id_str:
+        if is_auto_confirmed:
             # Sprint 19 PR #1 C9 (Codex F-1/F-3): workspace_id 명시 전달
             await project_repo.add_meeting_link(
                 meeting.id,
@@ -141,9 +157,7 @@ class MeetingPipelineService:
         # 임베딩 (비치명적 — 실패해도 파이프라인은 완료)
         try:
             project_id = (
-                uuid.UUID(existing_project_id_str)
-                if (confidence >= auto_confirm_threshold and existing_project_id_str)
-                else None
+                uuid.UUID(existing_project_id_str) if is_auto_confirmed else None
             )
             chunk_count = await embedding_service.embed_meeting(
                 meeting_id=meeting.id,
@@ -247,7 +261,8 @@ class MeetingPipelineService:
                 try:
                     await session.rollback()
                     await meeting_repo.update_status(
-                        meeting_id, workspace_id, "failed", error_message=str(e)
+                        meeting_id, workspace_id, "failed",
+                        error_message=_public_error_message(e),
                     )
                     await meeting_repo.commit()
                 except Exception as rollback_err:
@@ -305,7 +320,8 @@ class MeetingPipelineService:
                 try:
                     await session.rollback()
                     await meeting_repo.update_status(
-                        meeting_id, workspace_id, "failed", error_message=str(e)
+                        meeting_id, workspace_id, "failed",
+                        error_message=_public_error_message(e),
                     )
                     await meeting_repo.commit()
                 except Exception as rollback_err:

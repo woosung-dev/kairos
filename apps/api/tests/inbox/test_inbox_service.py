@@ -73,7 +73,8 @@ class TestListInbox:
         assert result["hasNext"] is True  # 2 * 20 = 40 < 55
         assert len(result["items"]) == 3
         inbox_repo.find_by_workspace.assert_awaited_once_with(
-            ws_id, is_processed=None, offset=20, limit=20
+            ws_id, is_processed=None, offset=20, limit=20,
+            requester_user_id=None, requester_role=None,
         )
 
     @pytest.mark.asyncio
@@ -97,7 +98,8 @@ class TestListInbox:
 
         await service.list_inbox(ws_id, is_processed=True)
         inbox_repo.find_by_workspace.assert_awaited_once_with(
-            ws_id, is_processed=True, offset=0, limit=20
+            ws_id, is_processed=True, offset=0, limit=20,
+            requester_user_id=None, requester_role=None,
         )
 
 

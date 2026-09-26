@@ -203,6 +203,81 @@ async def test_pipeline_auto_confirm():
 
 
 @pytest.mark.asyncio
+async def test_pipeline_new_project_suggestion_stays_in_inbox():
+    """C-002 (2026-09-26 정검): 새 프로젝트 제안은 신뢰도가 높아도 인박스에 남는다.
+
+    자동 확정은 기존 프로젝트 링크를 만들 때만이다. 이전에는 confidence >= threshold 면
+    is_processed=True 로 저장해 링크 없이 인박스에서 사라졌다.
+    """
+    from src.meetings.pipeline_service import MeetingPipelineService
+
+    meeting_id = uuid.uuid4()
+    workspace_id = uuid.uuid4()
+
+    mock_meeting_repo = AsyncMock()
+    mock_meeting = MagicMock()
+    mock_meeting.id = meeting_id
+    mock_meeting.workspace_id = workspace_id
+    mock_meeting.title = "신규 사업 킥오프"
+    mock_meeting.file_key = "uploads/test/audio.mp3"
+    mock_meeting_repo.find_by_id.return_value = mock_meeting
+
+    mock_r2 = AsyncMock()
+    mock_r2.get_download_url.return_value = "https://r2.example.com/audio.mp3"
+    mock_transcription = AsyncMock()
+    segments = [
+        TranscriptSegment(speaker="Speaker", start_sec=0.0, end_sec=10.0, text="신규 사업"),
+    ]
+    mock_transcription.download_audio.return_value = b"fake_audio"
+    mock_transcription.transcribe_with_chunking.return_value = (segments, 10.0)
+
+    mock_ai = AsyncMock()
+    mock_ai.summarize.return_value = {"summary": "킥오프 요약", "key_decisions": [], "topics": []}
+    mock_ai.extract_actions_and_link.return_value = {
+        "actionItems": [],
+        "suggestedProject": {
+            "existingProjectId": None,
+            "newProjectTitle": "신규 사업",
+            "confidence": 0.95,
+        },
+        "suggestedTags": [],
+    }
+    mock_project_repo = AsyncMock()
+    mock_project_repo.find_by_workspace.return_value = []
+    mock_inbox_repo = AsyncMock()
+    mock_workspace_repo = AsyncMock()
+    mock_workspace = MagicMock()
+    mock_workspace.inbox_threshold = 0.9
+    mock_workspace_repo.find_by_id.return_value = mock_workspace
+    mock_embedding_service = AsyncMock()
+    mock_embedding_service.embed_meeting.return_value = 1
+
+    with (
+        patch("src.meetings.pipeline_service.MeetingRepository", return_value=mock_meeting_repo),
+        patch("src.meetings.pipeline_service.ProjectRepository", return_value=mock_project_repo),
+        patch("src.meetings.pipeline_service.ActionItemRepository", return_value=AsyncMock()),
+        patch("src.meetings.pipeline_service.InboxRepository", return_value=mock_inbox_repo),
+        patch("src.meetings.pipeline_service.WorkspaceRepository", return_value=mock_workspace_repo),
+        patch("src.meetings.pipeline_service.EmbeddingRepository", return_value=AsyncMock()),
+        patch("src.meetings.pipeline_service.EmbeddingService", return_value=mock_embedding_service),
+    ):
+        pipeline = MeetingPipelineService(
+            session_factory=_make_session_factory(),
+            r2_service=mock_r2,
+            transcription_service=mock_transcription,
+            ai_service=mock_ai,
+        )
+        await pipeline.process_meeting(meeting_id, workspace_id)
+
+    inbox_call = mock_inbox_repo.save.call_args[0][0]
+    assert inbox_call.is_processed is False
+    assert inbox_call.ai_suggested_project_title == "신규 사업"
+    mock_project_repo.add_meeting_link.assert_not_called()
+    # 청크도 project_id 없이 저장 (링크가 없으므로)
+    assert mock_embedding_service.embed_meeting.call_args.kwargs["project_id"] is None
+
+
+@pytest.mark.asyncio
 async def test_pipeline_failure_sets_failed():
     """파이프라인 실패 시 status: failed + error_message 저장."""
     from src.meetings.pipeline_service import MeetingPipelineService
@@ -254,7 +329,9 @@ async def test_pipeline_failure_sets_failed():
     error_msg = last_call.kwargs.get("error_message", "")
     if not error_msg and len(last_call.args) > 3:
         error_msg = last_call.args[3]
-    assert "네트워크 오류" in error_msg
+    # C-023 (2026-09-26 정검): 원문(str(e))은 저장하지 않는다 — 일반 문구 + 예외 클래스명만.
+    assert "네트워크 오류" not in error_msg
+    assert error_msg.startswith("회의 처리 중 오류가 발생했습니다")
 
 
 @pytest.mark.asyncio

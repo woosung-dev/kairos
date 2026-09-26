@@ -171,9 +171,15 @@ class EmbeddingRepository:
 
     @staticmethod
     def _visibility_filter_sql() -> str:
-        """ADR-014 R-10: 검색 결과에서 requester 가 접근 불가한 project chunks 제외.
+        """ADR-014 R-10: 검색 결과에서 requester 가 접근 불가한 chunks 제외.
 
-        chunk 의 project_id 가:
+        2026-09-26 정검 (C-014 / C-020 (a)) 이후 source_type 별 규칙:
+        - memory : 작성자 본인 또는 팀으로 올린 공유 사본만 (admin/owner 도 우회 없음)
+        - meeting : 회의 링크 규칙 — 링크 0개 통과 / 접근 가능한 링크 1개 이상 통과.
+          chunk.project_id 는 수동 연결·인박스 확정을 따라가지 않아 판정에 쓰지 않는다.
+        - 그 외 (note / external_document) : 아래 project 규칙
+
+        project 규칙 (chunk 의 project_id 가):
         - NULL : 프로젝트 미연결 chunk → 통과
         - admin/owner role : 모든 visibility 통과
         - public project : 통과
@@ -387,17 +393,20 @@ class EmbeddingRepository:
             return None
 
         # BL-041 + BL-042: cache hit 시 sources visibility 검증.
-        # - admin/owner : 모든 visibility 통과
+        # - admin/owner : project/meeting 규칙은 우회. 단 memory 작성자 규칙(C-020 (a))은
+        #   역할 우회가 없으므로 admin 도 anti-join 을 거친다 (남의 메모로 만든 캐시 답 차단).
         # - 비-admin : _all_chunks_visible anti-join 으로 chunk 별 검증
         is_admin = requester_role in ("admin", "owner")
-        if not is_admin:
-            sources = row._mapping["sources"] or []
-            chunk_ids = [s["id"] for s in sources if isinstance(s, dict) and "id" in s]
-            if not chunk_ids:
+        sources = row._mapping["sources"] or []
+        chunk_ids = [s["id"] for s in sources if isinstance(s, dict) and "id" in s]
+        if not chunk_ids:
+            if not is_admin:
                 return None
-            if not await self._all_chunks_visible(chunk_ids, requester_user_id):
-                # 누출 위험 — cache miss 처리. hit_count 증가도 skip.
-                return None
+        elif not await self._all_chunks_visible(
+            chunk_ids, requester_user_id, requester_role
+        ):
+            # 누출 위험 — cache miss 처리. hit_count 증가도 skip.
+            return None
 
         await self.session.execute(
             text("UPDATE semantic_caches SET hit_count = hit_count + 1 WHERE id = :id"),
@@ -472,21 +481,19 @@ class EmbeddingRepository:
         self,
         chunk_ids: list[str],
         requester_user_id: uuid.UUID,
+        requester_role: str,
     ) -> bool:
         """BL-041: cache sources 의 모든 chunk 가 requester 에게 visibility 통과하는지.
 
         한 chunk 라도 fail → False 반환 → 호출자가 cache miss 처리.
         행이 없는 chunk id 도 위반으로 처리한다.
-        visibility 규칙은 _visibility_filter_sql 와 동일 (ADR-014):
-        - chunk.project_id IS NULL → 통과
-        - project.visibility = 'public' → 통과
-        - project.visibility = 'draft' AND created_by_id = requester → 통과
-        - project.visibility = 'private' AND ProjectMember 매핑 + 현 워크스페이스 멤버 → 통과
+        visibility 규칙은 _visibility_filter_sql 와 동일 (검색 필터와 같은 결과):
+        - memory chunk : 작성자 본인 또는 공유 사본 (admin 포함 전원 적용, C-020 (a))
+        - meeting chunk : 회의 링크 규칙 (링크 0개 통과 / 접근 가능한 링크 1개 이상 통과)
+        - 그 외 : project_id IS NULL 통과, 아니면 project 규칙 (CAND-B 가드 포함)
+        - admin/owner : meeting/project 규칙 우회
 
-        CAND-B fix — private 분기에 workspace_members EXISTS 가드를 추가해
-        _visibility_filter_sql 와 동일하게 유지 (orphan ProjectMember 잔재 차단).
-
-        규칙 정의는 common/visibility.py SSOT — 문자열 byte 보존 이동 (스냅샷 게이트).
+        규칙 정의는 common/visibility.py SSOT (스냅샷 게이트).
         """
         if not chunk_ids:
             return True
@@ -499,6 +506,7 @@ class EmbeddingRepository:
             {
                 "chunk_ids": [str(cid) for cid in chunk_ids],
                 "req_uid": str(requester_user_id),
+                "req_role": requester_role,
             },
         )
         violation = result.first()

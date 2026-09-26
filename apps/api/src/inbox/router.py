@@ -30,6 +30,9 @@ async def list_inbox(
         is_processed=is_processed,
         page=page,
         page_size=page_size,
+        # C-015: 회의 가시성 게이트 (숨겨진 회의 요약 누출 차단)
+        requester_user_id=member.user_id,
+        requester_role=member.role,
     )
 
 
@@ -42,7 +45,10 @@ async def classify_inbox(
     service: InboxService = Depends(get_inbox_service),
 ):
     project_ids = [uuid.UUID(pid) for pid in data.project_ids]
-    return await service.classify(inbox_id, workspace_id, project_ids)
+    return await service.classify(
+        inbox_id, workspace_id, project_ids,
+        requester_user_id=member.user_id, requester_role=member.role,
+    )
 
 
 @router.post("/{inbox_id}/dismiss")
@@ -52,7 +58,10 @@ async def dismiss_inbox(
     member: WorkspaceMember = Depends(require_member),
     service: InboxService = Depends(get_inbox_service),
 ):
-    return await service.dismiss(inbox_id, workspace_id)
+    return await service.dismiss(
+        inbox_id, workspace_id,
+        requester_user_id=member.user_id, requester_role=member.role,
+    )
 
 
 # Sprint 23 D4 Task 2 Step 2.4: inbox promote — I-18 복제 + audit (BG embedding 없음).
@@ -81,4 +90,5 @@ async def promote_inbox(
         target_workspace_id=body.target_workspace_id,
         promoted_by_user_id=member.user_id,
         background_tasks=background_tasks,
+        requester_role=member.role,
     )

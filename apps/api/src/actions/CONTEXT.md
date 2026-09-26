@@ -58,6 +58,8 @@
 | A-6 | **헌법 I-9 (Sprint 19 PR #1, Codex F-1)** — service / repository 모든 메서드 workspace_id 필수. find_by_id(action_id, workspace_id), update_action_item(action_id, workspace_id, ...) 시그니처 |
 | A-7 | **Codex F-2 Critical 3 secondary FK** — create / update 시 project_id / meeting_id / assignee_id 모두 같은 workspace 검증. project = ProjectRepository.find_by_id + project.workspace_id, meeting = MeetingRepository.find_by_id(meeting_id, workspace_id), assignee = WorkspaceRepository.find_member(workspace_id, assignee_id). 거부 시 모두 404 |
 | A-8 | **owning project visibility 게이트 (F1/F2, 2026-06-23 fullsweep; notes CAND-A 정합)** — `list_action_items`(repo `_action_visibility_filter`) + `update_action_item`(`_verify_action_visibility`) 이 requester_user_id/requester_role 로 게이트. private = ProjectMember 만, draft = project.created_by_id 만, admin/owner 우회, project_id=None/public 통과. requester_role=None(내부/파이프라인) = skip. 비-멤버 list 제외 / update 404 |
+| A-9 | **원본 회의 가시성 게이트 (C-016, 2026-09-26 정검)** — 회의에서 추출된 액션은 `project_id` 가 NULL 이라 A-8 게이트를 통과했다. 목록(`_action_visibility_filter` = project 게이트 ∘ `apply_fk_meeting_visibility`)·수정·promote(`_verify_action_visibility`) 모두 `meeting_id` 가 있으면 원본 회의를 볼 수 있어야 한다. `meeting_id` NULL 통과, admin/owner 우회, role=None skip |
+| A-10 | **회의 쪽에서 액션을 꺼낼 때·만들 때도 A-8/A-9 (E1-01/02/05, 2026-09-27)** — 회의 export(`find_by_meeting(requester)`)와 회의 promote 의 액션 복제(`clone_action_items_for_promote` → `apply_fk_project_visibility`)는 요청자 기준 project 게이트를 적용한다 — 복제본은 `project_id=None` 이라 대상 WS 전원에게 보이므로 원본에서 못 보던 액션을 복제하면 누수다. create·PATCH 는 대상 `meetingId`·`projectId` 를 요청자가 볼 수 있어야 한다 (`_verify_target_visibility`, 안 보이면 404 — 숨은 회의에 액션을 끼워 넣거나 존재를 떠보는 경로 차단). admin/owner 우회, role=None skip |
 
 ---
 

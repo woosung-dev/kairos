@@ -20,9 +20,11 @@ from src.common.visibility import (
     PROJECT_VISIBILITY_FILTER_SQL,
     Access,
     RequesterContext,
+    apply_fk_meeting_visibility,
     apply_fk_project_visibility,
     apply_project_visibility,
     decide_project_access,
+    meeting_access_clause,
 )
 from src.embeddings.repository import EmbeddingRepository
 from src.notes.models import Note
@@ -109,7 +111,6 @@ def test_apply_project_visibility_admin_and_role_none_modes() -> None:
     ("model", "col_name", "legacy_fn"),
     [
         (Note, "project_id", _note_visibility_filter),
-        (ActionItem, "project_id", _action_visibility_filter),
     ],
 )
 def test_apply_fk_project_visibility_equals_legacy(model, col_name, legacy_fn) -> None:
@@ -125,6 +126,35 @@ def test_apply_fk_project_visibility_equals_legacy(model, col_name, legacy_fn) -
             base, getattr(model, col_name), RequesterContext(OTHER, None)
         )
     ) == _compile(legacy_fn(base, OTHER, None))
+
+
+def test_action_filter_is_project_gate_then_meeting_gate() -> None:
+    """C-016 (2026-09-26 정검): 액션 필터 = project FK 게이트 ∘ 회의 FK 게이트.
+
+    회의에서 추출된 액션은 project_id 가 NULL 이라 project 게이트만으론 통과했다.
+    """
+    base = select(ActionItem).where(ActionItem.workspace_id == WID)
+    ctx = RequesterContext(OTHER, "member")
+    expected = apply_fk_meeting_visibility(
+        apply_fk_project_visibility(base, ActionItem.project_id, ctx),
+        ActionItem.meeting_id,
+        ctx,
+    )
+    assert _compile(_action_visibility_filter(base, OTHER, "member")) == _compile(expected)
+    # 내부호출 skip · admin 우회는 두 게이트 모두 no-op
+    for role in (None, "admin", "owner"):
+        assert _compile(_action_visibility_filter(base, OTHER, role)) == _compile(base)
+
+
+def test_meeting_filter_delegates_to_meeting_access_clause() -> None:
+    """meetings LIST 필터와 파생 데이터(액션·인박스)가 같은 회의 술어를 쓴다."""
+    from src.meetings.models import Meeting
+    from src.meetings.repository import _meeting_visibility_filter
+
+    base = select(Meeting).where(Meeting.workspace_id == WID)
+    assert _compile(_meeting_visibility_filter(base, OTHER, "member")) == _compile(
+        base.where(meeting_access_clause(Meeting.id, OTHER))
+    )
 
 
 # ── 3. raw SQL 상수 — 기존 사이트와 byte 일치 + 코어 술어 토큰 일치 ───────────

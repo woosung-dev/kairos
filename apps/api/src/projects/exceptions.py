@@ -41,3 +41,23 @@ class WorkspaceMismatchError(HTTPException):
             status_code=404,
             detail="프로젝트가 해당 워크스페이스에 속하지 않습니다",
         )
+
+
+class ProjectVisibilityChangeForbiddenError(HTTPException):
+    """visibility 변경은 admin 이상 또는 프로젝트 작성자만 (2026-09-27 결정)."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=403,
+            detail="공개 범위는 관리자 또는 프로젝트를 만든 사람만 바꿀 수 있습니다.",
+        )
+
+
+class ProjectArchiveForbiddenError(HTTPException):
+    """보관(archived) 전환·해제는 admin 이상만 — `/archive` 우회 차단 (C-017)."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=403,
+            detail="프로젝트 보관·보관 해제는 관리자만 할 수 있습니다.",
+        )

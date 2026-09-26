@@ -120,7 +120,9 @@ async def test_insert_halfvec_and_cosine_search(integration_session):
             EmbeddingChunk(
                 workspace_id=workspace_id,
                 source_id=uuid.uuid4(),
-                source_type="memory",
+                # note: memory 청크는 2026-09-27 부터 작성자 memory_items 행이 있어야 검색된다
+                # (C-020 (a)). 이 테스트의 목적은 halfvec cosine 정합이라 규칙 없는 타입을 쓴다.
+                source_type="note",
                 chunk_text=f"chunk {i}",
                 chunk_index=i,
                 chunk_level=2,
@@ -287,6 +289,7 @@ async def test_memory_repository_vector_search_applies_hnsw_params(
         workspace_id=workspace_id,
         query_embedding=_make_vec(seed=99),
         top_k=10,
+        requester_user_id=uuid.uuid4(),
     )
     ef = await integration_session.execute(text("SHOW hnsw.ef_search"))
     assert ef.scalar_one() == "40"

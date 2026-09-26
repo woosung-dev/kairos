@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import bindparam, select, text, update
+from sqlmodel import bindparam, or_, select, text, update
 
 from src.memory.models import (
     MemoryAICall,
@@ -43,13 +43,27 @@ class MemoryRepository:
         return item
 
     async def get_by_id(
-        self, memory_id: uuid.UUID, workspace_id: uuid.UUID
+        self,
+        memory_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None = None,
     ) -> MemoryItem | None:
+        """requester_user_id 를 넘기면 C-020 (a) 작성자 전용 규칙 적용 — 본인 메모 또는
+        팀으로 올린 공유 사본만. 역할 우회 없음 (admin/owner 도 남의 메모를 못 본다).
+        None = 내부 호출 (BG task) → workspace 격리만.
+        """
         stmt = select(MemoryItem).where(
             MemoryItem.id == memory_id,
             MemoryItem.workspace_id == workspace_id,
             MemoryItem.deleted_at.is_(None),
         )
+        if requester_user_id is not None:
+            stmt = stmt.where(
+                or_(
+                    MemoryItem.user_id == requester_user_id,
+                    MemoryItem.is_shared.is_(True),
+                )
+            )
         return (await self.session.exec(stmt)).one_or_none()
 
     # I-9: update/delete 는 workspace_id WHERE 강제 (PK-only → cross-ws mutation 차단 defense-in-depth).
@@ -190,8 +204,11 @@ class MemoryRepository:
         workspace_id: uuid.UUID,
         query_embedding: list[float],
         top_k: int,
+        requester_user_id: uuid.UUID,
     ) -> list[tuple]:
         """pgvector cosine similarity (A7 typed bind). I-9 workspace_id 강제.
+
+        C-020 (a): 본인 메모 + 팀으로 올린 공유 사본만 (역할 우회 없음).
 
         Sprint 16 ADR-020 — halfvec 컬럼 + HNSW 인덱스 사용.
         I-21: 트랜잭션 진입 시 SET LOCAL ef_search/iterative_scan/max_scan_tuples.
@@ -207,6 +224,7 @@ class MemoryRepository:
             WHERE ec.workspace_id = :wid
               AND ec.source_type = 'memory'
               AND mi.deleted_at IS NULL
+              AND (mi.user_id = :uid OR mi.is_shared)
             ORDER BY ec.embedding <=> :qvec
             LIMIT :limit
             """
@@ -218,6 +236,7 @@ class MemoryRepository:
             {
                 "qvec": query_embedding,
                 "wid": workspace_id,
+                "uid": requester_user_id,
                 "limit": top_k,
             },
         )
@@ -228,14 +247,20 @@ class MemoryRepository:
         workspace_id: uuid.UUID,
         tokens: list[str],
         limit: int,
+        requester_user_id: uuid.UUID,
     ) -> list[tuple[MemoryItem, int]]:
         """O-B: token overlap count fallback. raw_content + distilled_json 텍스트 ILIKE 합산.
 
         BM25는 Sprint 17+ defer. workspace_id 필터 강제 (I-9).
+        C-020 (a): 본인 메모 + 팀으로 올린 공유 사본만 (vector_search 와 같은 규칙).
         """
         if not tokens:
             return []
-        params: dict[str, Any] = {"wid": workspace_id, "limit": limit}
+        params: dict[str, Any] = {
+            "wid": workspace_id,
+            "uid": requester_user_id,
+            "limit": limit,
+        }
         cases: list[str] = []
         for i, t in enumerate(tokens):
             tok_key = f"tok{i}"
@@ -253,6 +278,7 @@ class MemoryRepository:
             WHERE mi.workspace_id = :wid
               AND mi.deleted_at IS NULL
               AND mi.status = 'active'
+              AND (mi.user_id = :uid OR mi.is_shared)
               AND ({sum_expr}) > 0
             ORDER BY overlap DESC, mi.created_at DESC
             LIMIT :limit

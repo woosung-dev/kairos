@@ -1611,6 +1611,11 @@
           "status": {
             "anyOf": [
               {
+                "enum": [
+                  "active",
+                  "completed",
+                  "archived"
+                ],
                 "type": "string"
               },
               {

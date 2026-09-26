@@ -67,6 +67,10 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 `WorkspaceInvite.default_project_visibility` = 초대 가입 사용자 기본값.
 
+**visibility 변경 권한** (2026-09-27 사용자 결정): admin/owner **또는 프로젝트 작성자**(member 여도 자기 프로젝트는 가능). archived 전환·해제는 admin/owner 만. 상세 `projects/CONTEXT.md` P-11.
+
+**회의 가시성** = 링크 0개면 워크스페이스 전체, 링크가 있으면 접근 가능한 프로젝트 링크가 1개 이상일 때만 (N:M, `MeetingProjectLink`). **회의에서 파생된 데이터(RAG 청크 · 인박스 요약 · 추출 액션)는 원본 회의보다 넓게 보이면 안 된다** (I-23). 링크 변경 API 는 회의와 대상 프로젝트를 모두 볼 수 있을 때만 허용 (링크 = 가시성 변경).
+
 > **SSOT (2026-07-13 visibility 통합 리팩토링)**: 규칙 구현은 `apps/api/src/common/visibility.py` 단일 파일 (decide_project_access + ORM clause + raw SQL 상수). 과거 6 도메인 13 사이트 복붙 → 사본별 보안 버그 독립 재발 이력. 사본 재발은 arch gate `tests/architecture/test_visibility_single_source.py` 가 CI 차단. admin/owner·내부호출 우회 분기만 사이트 소유 (D1/D6 — 사이트별 fail 방향 상이).
 
 ## 6. 핵심 불변식 (위반 즉시 중단)
@@ -95,6 +99,8 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 | I-20 | 벡터 컬럼 `halfvec(1536)` 고정 (ADR-020). `EmbeddingChunk.embedding` + `SemanticCache.question_embedding`. `Vector(1536)` 금지. 인덱스 = HNSW (m=16, ef_construction=64), ivfflat 금지. cosine `<=>` 유지 | `embeddings/models.py` + alembic |
 | I-21 | 벡터 검색 세션 변수 강제 (ADR-020): `hnsw.ef_search=40 + iterative_scan='relaxed_order' + max_scan_tuples=20000` 을 트랜잭션 로컬로(단일 왕복) 강제 — `_apply_hnsw_session_params(session)` 헬퍼. pgvector ≥0.8 서버 + Python ≥0.4.2 | `embeddings/repository.py:_apply_hnsw_session_params` |
 | I-22 | FE wire 타입 SSOT = 계약 생성물 `apps/web/src/types/api.gen.ts` (openapi-typescript ← `contracts/openapi/v1/openapi.json`). 수기 wire interface 신규 작성 금지, 재생성 = `mise run contracts` (ADR-027 D2) | CI `contract-check` (`.github/workflows/test.yml`) |
+| I-23 | **파생 데이터 가시성 = 원본 가시성** (2026-09-26 정검 C-014/015/016/018): 회의에서 파생된 RAG 청크·InboxItem(`source_type='meeting'`)·ActionItem(`meeting_id`) 은 원본 회의가 안 보이면 안 보인다. RAG 청크·InboxItem 은 회의 규칙만으로 판정하고, ActionItem 은 자기 `project_id` 규칙(A-8)을 추가로 AND 한다 (더 좁아질 수는 있어도 넓어지지 않는다). 규칙은 `common/visibility.meeting_access_clause`(ORM) · `PROJECT_VISIBILITY_FILTER_SQL`/`ALL_CHUNKS_VISIBLE_SQL`(raw SQL) 한 곳. `chunk.project_id` 같은 사본 컬럼을 판정에 쓰지 않는다 (N:M 링크가 진실 원천) | `tests/integration/test_launch_readiness_visibility_idor.py` + 스냅샷 게이트 |
+| I-24 | **MemoryItem 작성자 전용** (C-020 결정 (a), 2026-09-27): 팀 워크스페이스에서도 메모는 작성자만 본다 (admin/owner 우회 없음). "팀으로 올리기" 사본(`is_shared`)만 공유 | `memory/CONTEXT.md` I-24 |
 
 > **2026-08-16 ID 정정**: `I-20` 이 두 행에 부여돼 있었다 (AGENTS.md §5 "부여된 ID 는 변경·재사용 금지" 위반).
 > 원 부여인 halfvec(ADR-020, 2026-05, 외부 인용 14곳)을 **보존**하고, 후발로 번호를 재사용한

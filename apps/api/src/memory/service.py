@@ -28,6 +28,7 @@ from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.common.promote_helpers import PromoteValidationError, validate_promote_target
 from src.common.prompts import (
     MEMORY_DISTILL_PROMPT,
     MemoryDistilledResult,
@@ -41,6 +42,7 @@ from src.memory.exceptions import (
     CannotPromoteToSameWorkspaceError,
     EmptyMemoryError,
     MemoryNotFoundError,
+    MemoryPromoteForbiddenError,
     TargetWorkspaceInvalidError,
 )
 from src.memory.models import (
@@ -233,10 +235,16 @@ class MemoryService:
         return deleted
 
     async def get_memory(
-        self, memory_id: uuid.UUID, workspace_id: uuid.UUID
+        self,
+        memory_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        requester_user_id: uuid.UUID,
     ) -> MemoryDetailOut:
-        """단일 메모 조회 — polling endpoint."""
-        item = await self.repo.get_by_id(memory_id, workspace_id)
+        """단일 메모 조회 — polling endpoint.
+
+        C-020 (a): 작성자 본인 또는 공유 사본만. 남의 메모는 존재 여부도 숨긴다 (404).
+        """
+        item = await self.repo.get_by_id(memory_id, workspace_id, requester_user_id)
         if not item:
             raise MemoryNotFoundError()
         return MemoryDetailOut(
@@ -273,7 +281,7 @@ class MemoryService:
         vector_rows: list[tuple] = []
         if query_embedding:
             vector_rows = await self.repo.vector_search(
-                workspace_id, query_embedding, top_k
+                workspace_id, query_embedding, top_k, requester_user_id=user_id
             )
 
         vector_sources: list[MemoryRecallSource] = []
@@ -313,7 +321,9 @@ class MemoryService:
 
         # 2. Keyword fallback (O-B)
         tokens = self._tokenize_query(query)
-        rows = await self.repo.search_keyword(workspace_id, tokens, limit=top_k)
+        rows = await self.repo.search_keyword(
+            workspace_id, tokens, limit=top_k, requester_user_id=user_id
+        )
         keyword_sources: list[MemoryRecallSource] = []
         for item, cnt in rows:
             distilled = item.distilled_json or {}
@@ -430,21 +440,32 @@ class MemoryService:
             )
 
         # 1. 원본 fetch (workspace_id 강제 필터로 I-9 격리)
-        source = await self.repo.get_by_id(memory_id, source_workspace_id)
+        # C-020 (a): 볼 수 있는 메모(본인 것 또는 공유 사본)만 올릴 수 있다.
+        source = await self.repo.get_by_id(
+            memory_id, source_workspace_id, promoted_by_user_id
+        )
         if source is None:
             raise MemoryNotFoundError()
+        # 공유 사본은 팀이 볼 수 있지만, 다른 WS 로 공유 범위를 넓히는 건 작성자만 (E2-02).
+        if source.user_id != promoted_by_user_id:
+            raise MemoryPromoteForbiddenError()
 
-        # 2. target workspace 검증 — WorkspaceRepository API 사용 (Codex F-4)
-        target = await self.workspace_repo.find_by_id(target_workspace_id)
-        if target is None:
-            raise TargetWorkspaceInvalidError()
-        if getattr(target, "type", "team") == "personal":
-            raise CannotPromoteToPersonalError()
-        member = await self.workspace_repo.find_member(
-            target_workspace_id, promoted_by_user_id
-        )
-        if member is None:
-            raise TargetWorkspaceInvalidError()
+        # 2. target workspace 검증 — 다른 도메인과 같은 헬퍼 (2026-09-27 E2-01/E2-03):
+        # 멤버 확인을 type 확인보다 먼저 하고(비멤버에게 WS type 비노출), 대상 WS viewer 는 거부.
+        # 사본은 is_shared 라 대상 WS 전원에게 보이므로 write 권한(member 이상)이 필요하다.
+        try:
+            await validate_promote_target(
+                source_workspace_id=source_workspace_id,
+                target_workspace_id=target_workspace_id,
+                promoted_by_user_id=promoted_by_user_id,
+                workspace_repo=self.workspace_repo,
+            )
+        except PromoteValidationError as exc:
+            if exc.code == "same_workspace":
+                raise CannotPromoteToSameWorkspaceError() from exc
+            if exc.code == "target_personal":
+                raise CannotPromoteToPersonalError() from exc
+            raise TargetWorkspaceInvalidError() from exc
 
         # 3. 복제본 MemoryItem 신규 (원본은 그대로 보존)
         duplicate = MemoryItem(
@@ -455,6 +476,8 @@ class MemoryService:
             distilled_json=source.distilled_json,
             r2_audio_key=source.r2_audio_key,
             status="embedding_pending",
+            # "팀으로 올리기" = 명시적 공유 → 대상 워크스페이스 전원에게 보인다 (C-020 (a) 예외)
+            is_shared=True,
         )
         await self.repo.save_item(duplicate)
 

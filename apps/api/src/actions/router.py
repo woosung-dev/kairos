@@ -55,6 +55,8 @@ async def create_action_item(
         assignee_id=uuid.UUID(data.assignee_id) if data.assignee_id else None,
         due_date=data.due_date,
         priority=data.priority,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
     )
 
 
@@ -110,4 +112,5 @@ async def promote_action(
         target_workspace_id=body.target_workspace_id,
         promoted_by_user_id=member.user_id,
         background_tasks=background_tasks,
+        requester_role=member.role,
     )

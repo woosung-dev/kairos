@@ -7,7 +7,11 @@ from sqlmodel import func, select, update
 
 from src.actions.models import ActionItem
 from src.common.promote_models import ItemPromotionAudit
-from src.common.visibility import RequesterContext, apply_fk_project_visibility
+from src.common.visibility import (
+    RequesterContext,
+    apply_fk_meeting_visibility,
+    apply_fk_project_visibility,
+)
 
 
 def _action_visibility_filter(
@@ -21,9 +25,11 @@ def _action_visibility_filter(
     (notes._note_visibility_filter 와 동일 계보, project_id IS NULL 통과 /
     role=None 내부호출 skip / admin·owner 우회 / CAND-B flatten EXISTS).
     """
-    return apply_fk_project_visibility(
-        stmt, ActionItem.project_id, RequesterContext(requester_user_id, requester_role)
-    )
+    ctx = RequesterContext(requester_user_id, requester_role)
+    stmt = apply_fk_project_visibility(stmt, ActionItem.project_id, ctx)
+    # C-016 (2026-09-26 정검): 회의에서 추출된 액션은 project_id 가 NULL 이라 위 게이트를
+    # 통과한다. 원본 회의가 안 보이면 액션도 안 보인다 (meeting_id IS NULL 은 통과).
+    return apply_fk_meeting_visibility(stmt, ActionItem.meeting_id, ctx)
 
 
 class ActionItemRepository:
@@ -91,13 +97,23 @@ class ActionItemRepository:
         stmt = _action_visibility_filter(stmt, requester_user_id, requester_role)
         return (await self.session.exec(stmt)).one()
 
-    async def find_by_meeting(self, meeting_id: uuid.UUID) -> list[ActionItem]:
-        """회의에서 추출된 액션 아이템 조회."""
+    async def find_by_meeting(
+        self,
+        meeting_id: uuid.UUID,
+        requester_user_id: uuid.UUID | None = None,
+        requester_role: str | None = None,
+    ) -> list[ActionItem]:
+        """회의에서 추출된 액션 아이템 조회.
+
+        requester 를 넘기면 목록과 같은 가시성 필터를 건다 — 회의는 보여도 private 프로젝트로
+        분류된 액션은 export 에서도 빠진다 (2026-09-27 E1-01). role=None = 내부 호출 skip.
+        """
         stmt = (
             select(ActionItem)
             .where(ActionItem.meeting_id == meeting_id)
             .order_by(ActionItem.created_at.desc())
         )
+        stmt = _action_visibility_filter(stmt, requester_user_id, requester_role)
         return list((await self.session.exec(stmt)).all())
 
     async def cancel_todo_by_project(self, project_id: uuid.UUID) -> int:

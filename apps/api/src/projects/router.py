@@ -6,7 +6,7 @@ Sprint 19 PR #1 C9 (Codex F-1/F-3/F-4/F-6):
 """
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from src.auth.rbac import (
@@ -110,9 +110,7 @@ async def update_project(
     member: WorkspaceMember = Depends(require_member_fresh),
     service: ProjectService = Depends(get_project_service),
 ):
-    # BE-T15: visibility 변경은 admin 이상 강제 (L-7)
-    if data.visibility is not None and member.role not in ("admin", "owner"):
-        raise HTTPException(status_code=403, detail="visibility 변경은 admin 이상만 가능합니다.")
+    # visibility(admin 또는 작성자)·archived(admin) 권한 판정은 프로젝트가 필요해 service 소유
     return await service.update_project(
         workspace_id=workspace_id,
         project_id=project_id,
@@ -121,6 +119,8 @@ async def update_project(
         status=data.status,
         visibility=data.visibility,
         tags=data.tags,
+        requester_user_id=member.user_id,
+        requester_role=member.role,
     )
 
 
@@ -199,7 +199,8 @@ async def add_meeting_project(
     service: ProjectService = Depends(get_project_service),
 ):
     return await service.add_meeting_project(
-        workspace_id, meeting_id, uuid.UUID(data.project_id)
+        workspace_id, meeting_id, uuid.UUID(data.project_id),
+        requester_user_id=member.user_id, requester_role=member.role,
     )
 
 
@@ -211,4 +212,7 @@ async def remove_meeting_project(
     member: WorkspaceMember = Depends(require_member),
     service: ProjectService = Depends(get_project_service),
 ):
-    await service.remove_meeting_project(workspace_id, meeting_id, project_id)
+    await service.remove_meeting_project(
+        workspace_id, meeting_id, project_id,
+        requester_user_id=member.user_id, requester_role=member.role,
+    )
