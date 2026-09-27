@@ -94,14 +94,16 @@ SELECT count(*) FROM meetings WHERE status IN ('transcribing','analyzing');
 
 ## 롤백
 
-`.env` 의 태그 두 줄을 이전 값으로 되돌리고 `up -d`.
+`.env` 의 태그 두 줄을 이전 값으로 되돌리고 **api·web 만** 다시 띄운다 (`--no-deps` — migrate 를 돌리지 않는다).
+구 이미지의 migrate 는 DB 의 새 리비전을 몰라 실패하고, 그러면 api·web 이 기동하지 않는다 (`docs/operations/deployment.md` 롤백 절).
+롤백 상태에서는 plain `up -d` 를 쓰지 않는다 — 다음 정방향 배포는 `mise run deploy-ship`.
 서버에 남는 것은 **운영중 + 직전 1개** 뿐이다 (`mise run deploy-gc` 가 매 배포마다 강제).
 그보다 오래된 태그는 서버에 없으므로 재빌드 후 재전송해야 한다.
 
 ```bash
 ssh truewords-oracle "bash -lc 'cd ~/kairos && \
-  sed -i \"s/^KAIROS_API_TAG=.*/KAIROS_API_TAG=<이전>/\" .env && \
-  docker compose -f docker-compose.prod.yml up -d api'"
+  sed -i \"s/^KAIROS_API_TAG=.*/KAIROS_API_TAG=<이전>/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=<이전>/\" .env && \
+  docker compose -f docker-compose.prod.yml up -d --no-deps api web'"
 ```
 
 마이그레이션은 자동 롤백되지 않는다. 스키마 변경은 expand-then-contract 로만 한다.

@@ -66,11 +66,25 @@ mise run deploy-status         # 컨테이너 상태 + /ready + 서버 자원 (�
 
 ## 롤백
 
-`~/kairos/.env` 의 태그 두 줄을 이전 값으로 되돌리고 `up -d`.
+`~/kairos/.env` 의 태그 두 줄을 이전 값으로 되돌리고 **api·web 만** 다시 띄운다 (`up -d --no-deps api web`).
 
 ```bash
 mise run deploy-rollback <이전TAG>
 ```
+
+**migrate 를 다시 돌리지 않는 이유.** migrate 는 api 와 같은 이미지(`kairos-api:${KAIROS_API_TAG}`)를 쓴다.
+전체 `up -d` 로 되돌리면 migrate 가 구 이미지로 재생성되는데, 구 이미지의 alembic 은 DB 에 이미 올라간
+새 리비전을 몰라 `Can't locate revision` 으로 실패한다. api·web 은 `service_completed_successfully` 를
+기다리므로 **기동하지 않는다 — 롤백이 장애를 만든다** (2026-09-27 토이 compose 재현, BL-LR-16).
+`--no-deps` 는 migrate 가 exit 0 · exit 1(정방향 배포 실패 직후) · 컨테이너 없음 어느 상태여도 api·web 을 띄운다.
+그래서 예전의 긴급 우회(`alembic stamp` 로 리비전을 내렸다가 다음 배포 전에 다시 올리기)는 필요 없다.
+
+★**롤백 상태에서는 plain `up -d` 를 쓰지 않는다.** `.env` 가 migrate 도 구 태그로 고정하므로 migrate 가
+다시 실패하고 명령이 exit 1 로 끝난다 (api·web 은 설정이 같아 재생성되지 않고 계속 돈다 — 실측).
+다음 정방향 배포는 `deploy-ship` 으로 한다. 새 마이그레이션이 있는 태그로 올릴 때 `deploy-rollback` 을 쓰면
+마이그레이션이 빠진다.
+
+RTO 는 약 2분이다. 진행 중인 BackgroundTasks 가 있으면 api 의 `stop_grace_period: 900s` 만큼 최대 15분 걸린다.
 
 서버에 **운영중 + 직전 1개** 태그를 남긴다 (`deploy-gc` 가 매 배포마다 강제한다 —
 직전 태그는 `deploy-ship` 이 `.env` 를 덮어쓰기 전에 읽어 GC 에 넘긴다).

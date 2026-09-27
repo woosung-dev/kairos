@@ -147,6 +147,15 @@ Better Auth 컷오버(ADR-031) 뒤 `clerk_id` 는 쓰기 경로가 없다. 다�
 - 데이터 마이그레이션이 `ADD COLUMN` 락을 backfill UPDATE 끝까지 잡는다 (E2-06). 도그푸딩 규모에선 ms 단위 — 행이 커지면 `lock_timeout` 또는 분리.
 - **(P1 · Gate 0 차단 — 이 항목만 등급이 높다) nightly e2e 워크플로가 Better Auth 이전 구성이다 (체크리스트 0-18)**. `nightly-e2e.yml` 은 FE build/start 에 `BETTER_AUTH_SECRET`·`BETTER_AUTH_URL` 을, BE 에 `AUTH_JWKS_URL`·`AUTH_JWT_ISSUER` 를 넘기지 않는다 → secret 을 등록해도 "default secret" 실패가 계속된다. `test.yml` e2e job(:315·:324 의 `E2E_AUTH_SECRET`) 구성을 이식하고 `workflow_dispatch` 로 확인한다.
 
+### BL-LR-16 — `deploy-rollback` 이 새 리비전 뒤에서 장애를 만든다 (P1, 운영) ✅ **2026-09-27 해소** `[Gate 0 인계 Evaluator]`
+`deploy-rollback` 이 전체 `up -d` 를 돌려 migrate 를 구 이미지로 재생성했다. 구 이미지(예: `884a145`)의 alembic 은 운영 DB 의 `b3d5f8a1c2e4` 를 몰라
+`Can't locate revision` 으로 실패하고, api·web 은 `service_completed_successfully` 대기로 기동하지 않는다. 같은 결함이 `deploy/oci/README.md` 수동 레시피
+(API 태그만 되돌리고 `up -d api`)와 `.env.example` 주석에도 있었다.
+수정: 롤백은 `up -d --no-deps api web` (migrate 생략). 토이 compose(v5.5.1)로 4 시나리오 확인 — ① 현행 `up -d` → api `created`(미기동) 재현
+② migrate exit 0 ③ migrate exit 1 ④ migrate 없음 세 경우 모두 `--no-deps` 로 구 태그 api 기동. 롤백 상태의 plain `up -d` 는 exit 1 이지만 api 는 계속 돈다.
+대안 `KAIROS_MIGRATE_TAG` 분리(migrate 는 최신 이미지 유지)는 "새 migrate 가 실패해서 롤백" 하는 경우에 migrate 가 또 실패해 기각.
+`[확인 필요: 서버 docker compose 버전이 로컬 v5.5.1 과 같은 동작인지 — 사용자가 `docker compose version` 1줄 확인]`
+
 ## BL-S29-1 — `mise run docs-check` 게이트 신설 (규칙 재중복 방지) ⏳ **미착수**
 
 **배경**: [ADR-029](adr/029-ai-rules-relocation.md) §2.2 가 「`apps/*/AGENTS.md` 는 `B-NN`·`F-NN`·`I-NN` 불변식을
