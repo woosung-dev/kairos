@@ -145,7 +145,7 @@ Better Auth 컷오버(ADR-031) 뒤 `clerk_id` 는 쓰기 경로가 없다. 다�
 - 세션 revoke 뒤에도 이미 발급된 JWT 는 최대 15분 유효하다 (jwt plugin 기본값). 수동 비밀번호 재설정 runbook 에 명시돼 있다.
 - 메모 AI 호출 실패 시 `memory_ai_calls.error_message` 에 `str(exc)` 가 저장된다 (API 노출 0건, E2-08). 회의 파이프라인처럼 정제할지 결정.
 - 데이터 마이그레이션이 `ADD COLUMN` 락을 backfill UPDATE 끝까지 잡는다 (E2-06). 도그푸딩 규모에선 ms 단위 — 행이 커지면 `lock_timeout` 또는 분리.
-- **(P1 · Gate 0 차단 — 이 항목만 등급이 높다) nightly e2e 워크플로가 Better Auth 이전 구성이다 (체크리스트 0-18)**. `nightly-e2e.yml` 은 FE build/start 에 `BETTER_AUTH_SECRET`·`BETTER_AUTH_URL` 을, BE 에 `AUTH_JWKS_URL`·`AUTH_JWT_ISSUER` 를 넘기지 않는다 → secret 을 등록해도 "default secret" 실패가 계속된다. `test.yml` e2e job(:315·:324 의 `E2E_AUTH_SECRET`) 구성을 이식하고 `workflow_dispatch` 로 확인한다.
+- ~~**(P1 · Gate 0 차단) nightly e2e 워크플로가 Better Auth 이전 구성이다 (체크리스트 0-18)**~~ ✅ **2026-09-27 이식** (`fix/nightly-e2e-better-auth`). `test.yml` e2e job 의 Better Auth env(`LOCAL_AUTH_*`·`E2E_AUTH_SECRET`·`AUTH_JWT_*`·`BETTER_AUTH_*`)를 그대로 옮겼다. 같은 PR 에서 결정 3건 반영: 주기 매일 → **주 1회 + 배포 전 수동 dispatch** · CI R2 는 **전용 버킷** secret `E2E_R2_*` (repo-level `R2_*` 는 `r2-cleanup.yml` 운영 인벤토리 몫이라 유지) · 테스트 postgres **pg16 → `0.8.0-pg17`** (운영과 동일, test.yml·nightly·pytest 6곳).
 
 ## BL-S29-1 — `mise run docs-check` 게이트 신설 (규칙 재중복 방지) ⏳ **미착수**
 

@@ -1,7 +1,7 @@
 # Sprint 19 PR #2 — SQLModel.metadata vs alembic head schema drift detection.
 """alembic 의 autogenerate diff 알고리즘으로 schema drift 검출.
 
-Codex v2 F-3 fix: pgvector/pgvector:pg16 image + Config 절대 경로 + env.py 외부 URL 우선.
+Codex v2 F-3 fix: pgvector/pgvector:pg16 image (현재 0.8.0-pg17 — 운영과 동일) + Config 절대 경로 + env.py 외부 URL 우선.
 Codex v2 F-4 fix: alembic.compare_metadata 사용 — column order / referred columns / UQ / nullable / indexes 전수 비교.
 
 본 test 의 의미:
@@ -186,7 +186,7 @@ def _do_compare(sync_conn):
 async def test_alembic_upgrade_matches_sqlmodel_metadata():
     """빈 DB 에 alembic upgrade head → SQLModel.metadata 와 schema diff = 0."""
     # pgvector 확장 필수 (기존 migration b2c3d4e5f6a7 의 HNSW + halfvec)
-    with PostgresContainer("pgvector/pgvector:pg16") as pg:
+    with PostgresContainer("pgvector/pgvector:0.8.0-pg17") as pg:
         sync_url = pg.get_connection_url()  # postgresql+psycopg2://...
         async_url = sync_url.replace("+psycopg2", "+asyncpg")
 

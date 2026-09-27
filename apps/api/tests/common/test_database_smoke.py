@@ -25,8 +25,8 @@ from src.common.database import (
 
 @pytest.fixture(scope="module")
 def _postgres_smoke_container():
-    """smoke 전용 PostgresContainer — pgvector 불필요."""
-    with PostgresContainer("postgres:16-alpine") as pg:
+    """smoke 전용 PostgresContainer — pgvector 는 안 쓰지만 이미지는 다른 테스트와 같게 (pull 1회)."""
+    with PostgresContainer("pgvector/pgvector:0.8.0-pg17") as pg:
         yield pg
 
 
