@@ -399,11 +399,20 @@ ssh {{vars.oci_host}} "bash -lc 'cd {{vars.oci_dir}} && {{vars.oci_compose}} log
 
 # 롤백 — 이전 태그로 되돌린다. 마이그레이션은 자동 롤백되지 않는다.
 # ★스키마가 가산/완화형이라 구 이미지가 새 스키마 위에서 그대로 동작한다 (ADR-031 D7, 실측).
+# ★migrate 를 다시 돌리지 않는다 (`--no-deps api web`). 전체 `up -d` 는 migrate 를 구 이미지로
+#   재생성하는데, 구 이미지의 alembic 은 DB 의 새 리비전을 몰라("Can't locate revision") 실패하고,
+#   api·web 은 `service_completed_successfully` 대기에 걸려 기동하지 않는다 — 롤백이 장애를 만든다
+#   (2026-09-27 토이 compose 재현). `--no-deps` 는 migrate 가 exit 0·exit 1·없음 어느 상태여도
+#   api·web 을 띄운다. 새 마이그레이션이 있는 태그로 올릴 때는 이 task 가 아니라 deploy-ship 을 쓴다.
+# ★이미지가 서버에 있는지 먼저 본다. 없는 태그(오타·GC 된 태그)로 `.env` 를 먼저 바꾸면 `up` 만 실패하고
+#   `.env` 는 가짜 태그로 남는다 — 다음 deploy-ship 이 그 값을 "직전 태그"로 읽어 GC 에 넘기므로
+#   실제로 돌던 이미지가 지워진다 (2026-09-27 리뷰).
 [tasks.deploy-rollback]
-description = "이미지 태그를 이전 값으로 되돌린다 (RTO 약 2분)"
+description = "이미지 태그를 이전 값으로 되돌린다 — migrate 생략 (RTO 약 2분, 진행 중 BG 작업이 있으면 최대 15분)"
 usage = 'arg "<tag>" help="되돌릴 이미지 태그"'
 run = '''
 ssh {{vars.oci_host}} "bash -lc 'cd {{vars.oci_dir}} && \
+  docker image inspect kairos-api:$usage_tag kairos-web:$usage_tag >/dev/null && \
   sed -i \"s/^KAIROS_API_TAG=.*/KAIROS_API_TAG=$usage_tag/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=$usage_tag/\" .env && \
-  {{vars.oci_compose}} up -d'"
+  {{vars.oci_compose}} up -d --no-deps api web'"
 '''

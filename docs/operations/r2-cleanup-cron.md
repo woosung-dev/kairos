@@ -23,7 +23,7 @@ R2 버킷 `nexus-core-storage` 는 **다른 프로젝트와 공유**한다 (nexu
 - **Query**: `?days=30` (기본 30, 1~365)
 - **Response**: `{"deleted_count": N, "ttl_days": 30}` — 30일 지난 메모의 R2 객체 삭제 + `r2_audio_key` NULL
 
-토큰 발급: `openssl rand -hex 32` → 서버 `~/kairos/.env` 의 `CRON_SECRET_TOKEN=` → `docker compose -f docker-compose.prod.yml up -d api`.
+토큰 발급: `openssl rand -hex 32` → 서버 `~/kairos/.env` 의 `CRON_SECRET_TOKEN=` → `docker compose -f docker-compose.prod.yml up -d --no-deps api` (`--no-deps` — 롤백 상태에서도 migrate 를 건드리지 않는다, `deployment.md` 롤백 절).
 
 수동 실행 (서버에서 — 토큰을 argv 에 싣지 않도록 헤더를 stdin 으로 넘긴다):
 
