@@ -154,7 +154,9 @@ Better Auth 컷오버(ADR-031) 뒤 `clerk_id` 는 쓰기 경로가 없다. 다�
 수정: 롤백은 `up -d --no-deps api web` (migrate 생략). 토이 compose(v5.5.1)로 4 시나리오 확인 — ① 현행 `up -d` → api `created`(미기동) 재현
 ② migrate exit 0 ③ migrate exit 1 ④ migrate 없음 세 경우 모두 `--no-deps` 로 구 태그 api 기동. 롤백 상태의 plain `up -d` 는 exit 1 이지만 api 는 계속 돈다.
 대안 `KAIROS_MIGRATE_TAG` 분리(migrate 는 최신 이미지 유지)는 "새 migrate 가 실패해서 롤백" 하는 경우에 migrate 가 또 실패해 기각.
-`[확인 필요: 서버 docker compose 버전이 로컬 v5.5.1 과 같은 동작인지 — 사용자가 `docker compose version` 1줄 확인]`
+서버는 v5.3.1 이다. `--no-deps` 경로는 두 버전이 같다 — CLI `cmd/compose/up.go:68-70` 의 `WithSelectedServices(services, IgnoreDependencies)` 동일,
+`pkg/compose/convergence.go` 무변경, compose-go v2.13.0→v2.15.0 의 `WithSelectedServices` 본문 무변경. 그 사이 바뀐 것은 `required: false` 의존성
+정리(`WithoutUnresolvedOptionalDependencies`)와 `--wait-timeout` 수정(#14105)뿐이고, 운영 compose 의 `migrate` 의존은 기본값 `required: true` 라 해당 없다.
 
 ## BL-S29-1 — `mise run docs-check` 게이트 신설 (규칙 재중복 방지) ⏳ **미착수**
 
