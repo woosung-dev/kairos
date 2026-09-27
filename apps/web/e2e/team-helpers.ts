@@ -1,5 +1,5 @@
 // 멀티계정 팀 spine e2e 회귀: 공용 인증/시드/SSE 헬퍼 (owner+member 2계정, 실 RBAC 관통, mock 금지)
-import type { Page, APIResponse } from "@playwright/test";
+import type { Page, APIResponse, BrowserContext } from "@playwright/test";
 
 export const API_URL = process.env.E2E_API_URL ?? "http://localhost:8000";
 
@@ -99,13 +99,40 @@ export async function getMe(page: Page): Promise<MeInfo> {
   return (await res.json()) as MeInfo;
 }
 
+/** 만료 이 시간 전부터는 새로 받는다 — FE `src/lib/use-api-client.ts` 와 같은 값. */
+const TOKEN_REFRESH_MARGIN_MS = 60_000;
+
+/** 세션 쿠키는 컨텍스트 단위라 캐시도 컨텍스트 단위다. 컨텍스트가 닫히면 같이 사라진다. */
+const tokenCache = new WeakMap<BrowserContext, { token: string; expiresAtMs: number }>();
+
+/** JWT payload 의 exp 를 읽는다. 디코드 실패 = 0 (캐시하지 않음). */
+function readExpiryMs(token: string): number {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return 0;
+    const exp = (JSON.parse(Buffer.from(payload, "base64url").toString()) as { exp?: number }).exp;
+    return typeof exp === "number" ? exp * 1000 : 0;
+  } catch {
+    return 0;
+  }
+}
+
 /** JWT 발급 (ADR-031).
  *
  * 예전에는 `window.Clerk.session` 이 비동기 hydrate 되기를 기다린 뒤 SDK 로 뽑았고,
  * 토큰 수명이 60초라 "hoist 금지" 주석이 붙어 있었다. 이제는 서버 라우트를 직접 부르므로
  * hydrate 대기가 필요 없고, 기본 만료도 15분이라 호출 타이밍에 예민하지 않다.
+ *
+ * ★컨텍스트별로 캐시한다. Better Auth 는 production 모드(`next start`)에서 IP+경로당
+ *   10초 100회 레이트리밋이 기본으로 켜진다. `api()` 가 호출마다 재발급하던 시절 nightly 의
+ *   team spec 6건이 `/api/auth/token → 429` 로 떨어졌다 (run 36319077465). FE 는 같은 이유로
+ *   `use-api-client.ts` 에 캐시가 있다.
  */
 export async function getToken(page: Page): Promise<string> {
+  const cached = tokenCache.get(page.context());
+  if (cached && Date.now() < cached.expiresAtMs - TOKEN_REFRESH_MARGIN_MS) {
+    return cached.token;
+  }
   // ★상대 경로를 쓰지 않는다. team 프로젝트의 컨텍스트는 `browser.newContext()` 로 직접
   //   만들어져 config 의 `use.baseURL` 상속이 보장되지 않는다. 페이지가 실제로 열려 있는
   //   origin 에서 절대 URL 을 만들면 프로젝트 구성과 무관하게 성립한다.
@@ -115,10 +142,11 @@ export async function getToken(page: Page): Promise<string> {
   }
   const { token } = (await res.json()) as { token?: string };
   if (!token) throw new Error("토큰 응답에 token 필드가 없습니다.");
+  tokenCache.set(page.context(), { token, expiresAtMs: readExpiryMs(token) });
   return token;
 }
 
-/** 실 RBAC 관통 인증 요청 (Bearer + JSON, --disable-web-security CORS). 토큰 매번 재발급. */
+/** 실 RBAC 관통 인증 요청 (Bearer + JSON, --disable-web-security CORS). 토큰은 컨텍스트별 캐시. */
 export async function api(
   page: Page,
   method: ApiMethod,
