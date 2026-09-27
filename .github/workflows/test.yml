@@ -197,11 +197,11 @@ jobs:
       ${{ !failure() && !cancelled() && vars.E2E_ENABLED == 'true' &&
       (needs.changes.outputs.api == 'true' || needs.changes.outputs.web == 'true') }}
 
-    # Postgres + pgvector + halfvec (pg16) service container — local BE 백킹.
+    # Postgres + pgvector + halfvec (pg17 — 운영 0.8.0-pg17 과 동일) service container — local BE 백킹.
     # prod Cloud Run BE 의존 제거 (cold start 503 회귀 차단).
     services:
       postgres:
-        image: pgvector/pgvector:pg16
+        image: pgvector/pgvector:0.8.0-pg17
         env:
           POSTGRES_USER: kairos
           POSTGRES_PASSWORD: kairos
@@ -255,10 +255,11 @@ jobs:
           APP_ENV: test
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # CI 전용 버킷 (E2E_R2_*). repo-level R2_* 는 r2-cleanup.yml 의 운영 인벤토리 몫이다.
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_ACCESS_KEY_ID: ${{ secrets.E2E_R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.E2E_R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.E2E_R2_BUCKET_NAME }}
         run: uv run alembic upgrade head
 
       - name: Start backend (uvicorn background)
@@ -269,9 +270,9 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_ACCESS_KEY_ID: ${{ secrets.E2E_R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.E2E_R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.E2E_R2_BUCKET_NAME }}
           CORS_ORIGINS: http://localhost:3003
           FRONTEND_URL: http://localhost:3003
           # 토큰 발급자는 로컬 Next — 기본값(:3000)을 그대로 두면 issuer 불일치 401 이다.

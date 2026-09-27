@@ -145,7 +145,12 @@ Better Auth 컷오버(ADR-031) 뒤 `clerk_id` 는 쓰기 경로가 없다. 다�
 - 세션 revoke 뒤에도 이미 발급된 JWT 는 최대 15분 유효하다 (jwt plugin 기본값). 수동 비밀번호 재설정 runbook 에 명시돼 있다.
 - 메모 AI 호출 실패 시 `memory_ai_calls.error_message` 에 `str(exc)` 가 저장된다 (API 노출 0건, E2-08). 회의 파이프라인처럼 정제할지 결정.
 - 데이터 마이그레이션이 `ADD COLUMN` 락을 backfill UPDATE 끝까지 잡는다 (E2-06). 도그푸딩 규모에선 ms 단위 — 행이 커지면 `lock_timeout` 또는 분리.
-- **(P1 · Gate 0 차단 — 이 항목만 등급이 높다) nightly e2e 워크플로가 Better Auth 이전 구성이다 (체크리스트 0-18)**. `nightly-e2e.yml` 은 FE build/start 에 `BETTER_AUTH_SECRET`·`BETTER_AUTH_URL` 을, BE 에 `AUTH_JWKS_URL`·`AUTH_JWT_ISSUER` 를 넘기지 않는다 → secret 을 등록해도 "default secret" 실패가 계속된다. `test.yml` e2e job(:315·:324 의 `E2E_AUTH_SECRET`) 구성을 이식하고 `workflow_dispatch` 로 확인한다.
+- ~~**(P1 · Gate 0 차단) nightly e2e 워크플로가 Better Auth 이전 구성이다 (체크리스트 0-18)**~~ ✅ **2026-09-27 이식** (`fix/nightly-e2e-better-auth`). `test.yml` e2e job 의 Better Auth env(`LOCAL_AUTH_*`·`E2E_AUTH_SECRET`·`AUTH_JWT_*`·`BETTER_AUTH_*`)를 그대로 옮겼다. 같은 PR 에서 결정 3건 반영: 주기 매일 → **주 1회 + 배포 전 수동 dispatch** · CI R2 는 **전용 버킷** secret `E2E_R2_*` (repo-level `R2_*` 는 `r2-cleanup.yml` 운영 인벤토리 몫이라 유지) · 테스트 postgres **pg16 → `0.8.0-pg17`** (운영과 동일, test.yml·nightly·pytest 6곳).
+  dispatch 결과: 2차(run 36319077465) heavy ✅ · team 34/40 — 5건 `GET /api/auth/token → 429` (Better Auth 레이트리밋이 production 모드에서 IP+경로당 10초 100회, `team-helpers.ts api()` 가 호출마다 재발급) → 토큰을 BrowserContext 별 캐시로 수정. 3차(run 36321851599) heavy ✅ · **team 38/40**, 429 0건.
+- **(P1 · 체크리스트 0-18 잔여) nightly team spec 2건이 실패한다 (2026-09-27 run 36321851599, 각 3/3 재시도 실패)**. 0-18 은 이 2건이 풀릴 때까지 `[ ]`. ① T15 `t15-rag-citation-viewer.spec.ts:7` — 실 Gemini 답변에 `[N]` 인용 번호가 없어 `LIVE 프롬프트가 [N] 번호 인용 생성` 단언 실패. 2차에서는 통과 → LLM 비결정성. 단언을 완화할지 프롬프트를 고칠지 결정 필요. ② T20 `t20-create-visibility.spec.ts:48` — member 의 `/projects` 가 목록까지 렌더됐는데 `create-project-button` 이 없다(스크린샷). 버튼은 `useWorkspaceStore.hasRole("member")` 에 걸려 있다(`projects/page.tsx:39`). 앞선 spec 이 member 를 강등했다가 `ensureMemberBaseline` 이 되돌린 직후라 FE 가 받은 역할이 stale 한 것으로 추정 `[가정]` — 역할 공급 경로(`setWorkspaceRole` 호출부) 확인이 첫 단계. 2차에서는 `:48` 이 통과했다 (2차의 `:83` 실패는 429 여파라 별개일 수 있다).
+  순서 의존 정황: team 프로젝트는 직렬(`fullyParallel: false`)이고 파일 순서가 `t17 → t18 → t19 → t2 → t20` 이다. `t18` 이 member 를 제거한다(`t18-invite-validation.spec.ts:20`).
+  2차에서는 t17·t18 이 429 로 도중에 끝났고 3차에서는 끝까지 돌았다. 또 `memberPage` 픽스처는 테스트 본문의 `ensureMemberBaseline()` **보다 먼저** `/dashboard` 를 연다(`fixtures/team.ts`).
+  ★제품 결함일 수도 있다 — "제거됐다가 재초대 수락한 멤버가 새로 고침 뒤에도 생성 권한 UI 를 못 받는다"면 실사용 경로다. 재현부터 한다.
 
 ### BL-LR-16 — `deploy-rollback` 이 새 리비전 뒤에서 장애를 만든다 (P1, 운영) ✅ **2026-09-27 해소** `[Gate 0 인계 Evaluator]`
 `deploy-rollback` 이 전체 `up -d` 를 돌려 migrate 를 구 이미지로 재생성했다. 구 이미지(예: `884a145`)의 alembic 은 운영 DB 의 `b3d5f8a1c2e4` 를 몰라

@@ -37,7 +37,7 @@ from tests.fixtures.composite_fk import *  # noqa: F401, F403
 @pytest.fixture(scope="module")
 def postgres_container():
     """pgvector 확장 포함 PostgreSQL 컨테이너 (module-scoped, 동기)."""
-    with PostgresContainer("pgvector/pgvector:pg16") as pg:
+    with PostgresContainer("pgvector/pgvector:0.8.0-pg17") as pg:
         yield pg
 
 

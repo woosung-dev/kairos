@@ -71,7 +71,7 @@ def _jsonb(payload: str | None) -> str:
 
 @pytest.mark.asyncio
 async def test_is_shared_backfill_and_error_scrub():
-    with PostgresContainer("pgvector/pgvector:pg16") as pg:
+    with PostgresContainer("pgvector/pgvector:0.8.0-pg17") as pg:
         url = pg.get_connection_url().replace("+psycopg2", "+asyncpg")
         engine = create_async_engine(url)
         cfg = Config(str(ALEMBIC_INI))

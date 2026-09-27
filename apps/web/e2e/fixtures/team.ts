@@ -65,7 +65,7 @@ export interface TeamFixtures {
   ownerPersonalWsId: string;
   ownerPersonalProjectId: string;
   ragFixtures: RagFixtures;
-  /** 실 RBAC 관통 인증 요청 (토큰 매번 재발급). */
+  /** 실 RBAC 관통 인증 요청 (토큰은 컨텍스트별 캐시 — team-helpers.ts getToken). */
   api: (page: Page, method: ApiMethod, p: string, body?: unknown) => Promise<import("@playwright/test").APIResponse>;
   getToken: (page: Page) => Promise<string>;
   /** member 의 현재 WorkspaceMember.id (email 매칭, remove/재초대로 변하므로 동적 해소). null=멤버 아님. */

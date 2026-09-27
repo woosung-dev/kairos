@@ -62,6 +62,17 @@ mise run deploy-status         # 컨테이너 상태 + /ready + 서버 자원 (�
 `BackgroundTasks` 는 재시도가 없다. 처리 중인 회의가 있는 상태로 컨테이너를 교체하면
 그 회의는 `transcribing` 으로 영구 정지한다. `mise run deploy-preflight` 가 이걸 검사한다.
 
+Heavy e2e(실제 Whisper·Gemini + 회의 업로드 + 팀 spine)는 PR CI 에 없다. `nightly-e2e.yml` 은
+주 1회만 돌기 때문에, 배포할 커밋에서 한 번 수동으로 돌려 success 를 확인한다:
+
+```bash
+gh workflow run nightly-e2e.yml --ref main --repo woosung-dev/kairos
+```
+
+`deploy-build` 는 **로컬 작업 트리**를 빌드하고 dispatch 는 원격 `main` 을 검증한다. 둘이 같은 커밋일 때만 의미가 있으므로
+배포는 `origin/main` 과 같은 clean `main` 에서 한다. 결과는 기다려서 본다:
+`gh run list --workflow nightly-e2e.yml --repo woosung-dev/kairos --limit 1`.
+
 ---
 
 ## 롤백
