@@ -21,7 +21,8 @@
 #     업로드는 api 컨테이너 안의 R2_* 를 쓴다 → 앱과 같은 자격증명·같은 boto3 로 올리고,
 #     시크릿이 이 스크립트의 환경·로그·argv 어디에도 나타나지 않는다.
 #   - 필요한 도구는 docker CLI 하나다 (compose 플러그인 · aws-cli · 호스트 psql 불필요).
-#   - R2 버킷(nexus-core-storage)은 다른 프로젝트와 공유한다. 이 스크립트는 R2 에서
+#   - R2 버킷(kairos-prod, ADR-033)에는 회의·메모 원본도 있다. 버킷은 api 컨테이너의 R2_BUCKET_NAME 을
+#     따라가므로 서버 .env 의 R2 전환 뒤에만 실행한다 (런북 §1). 이 스크립트는 R2 에서
 #     **아무것도 지우지 않는다.** 원격 보존 기간은 R2 lifecycle 규칙(prefix backups/kairos/)으로 건다.
 #   - 맥(bash 3.2 · BSD 도구)에서도 로컬 리허설이 되도록 bash 4 전용 문법과 GNU 전용 옵션을 쓰지 않는다.
 set -euo pipefail
@@ -33,7 +34,7 @@ DB_CONTAINER="${DB_CONTAINER:-kairos-db}"
 UPLOAD_CONTAINER="${UPLOAD_CONTAINER:-kairos-api}"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/kairos/backups}"
 KEEP_DAYS="${KEEP_DAYS:-14}"
-# 고정값 — 공유 버킷이라 환경변수로 바꿀 수 없게 둔다. 업로드 코드도 이 prefix 밖으로는 거부한다.
+# 고정값 — 원본과 같은 버킷이라 환경변수로 바꿀 수 없게 둔다. 업로드 코드도 이 prefix 밖으로는 거부한다.
 R2_PREFIX="backups/kairos"
 # 덤프 목차에 반드시 있어야 하는 테이블 데이터 (없으면 잘못된 DB 이거나 잘린 덤프다)
 REQUIRED_TABLES="alembic_version users auth_user auth_account workspaces meetings"

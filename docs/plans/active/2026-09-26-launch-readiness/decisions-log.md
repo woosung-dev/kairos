@@ -53,13 +53,13 @@
 
 | # | 판단 | 근거 | 상태 |
 |---|---|---|---|
-| M-1 | promote 로 만든 **사본**은 팀 공유 (`memory_items.is_shared=true`) | (a) 를 그대로 적용하면 "팀으로 올리기" 가 올린 사람에게만 보이는 무의미한 동작이 된다. 원본은 작성자 전용 유지 | `[확인 필요]` — 사본도 작성자 전용이어야 하면 `is_shared` 를 쓰지 않도록 1줄 변경 |
+| M-1 | promote 로 만든 **사본**은 팀 공유 (`memory_items.is_shared=true`) | (a) 를 그대로 적용하면 "팀으로 올리기" 가 올린 사람에게만 보이는 무의미한 동작이 된다. 원본은 작성자 전용 유지 | ✅ 2026-09-27 사용자 확정: **유지** (Gate 0 인계 인터뷰 Q4) |
 | M-2 | 기존 promote 사본 backfill — `memory_events(event_type='promote')` 의 `new_memory_id` 가 가리키는 사본 중 **원본 작성자가 직접 올린 것만** `is_shared=true` (E2-05 반영) | 마이그레이션 `a9c4e2f7b1d0`. 수정 전에는 남의 메모도 올릴 수 있었으므로(E2-02) 그 사본까지 공유로 확정하면 I-24 를 과거 데이터로 우회한다. 이벤트가 없거나 원본이 사라진 사본은 작성자 전용으로 남는다 | `test_launch_readiness_data_migrations.py` (직전 리비전에 행을 심고 head 로 올려 행 단위로 확인 · downgrade 왕복) |
 | M-3 | 값이 **실제로 바뀔 때만** visibility/status 권한을 검사 | 편집 다이얼로그가 변경하지 않은 필드도 함께 보낸다. 같은 값 재전송을 403 으로 막으면 제목 수정조차 실패한다 | 테스트 `test_non_creator_member_cannot_change_visibility` · `test_member_cannot_archive_via_patch` (재전송 분기) |
 | M-4 | action·inbox **promote** 에도 가시성 게이트 | 숨겨진 원본을 다른 WS 로 복사해 우회하는 경로 차단. codex/E1 보고 범위 밖이지만 같은 규칙 | — |
 | M-5 | RAG 캐시: admin 은 소스 삭제 청크(`ec.id IS NULL`)를 위반으로 보지 않고, memory 규칙은 admin 에게도 적용 | 기존 N4 정책(`test_cache_hit_deleted_sources_for_admin`) 보존 + I-24 는 admin 우회가 없다 | — |
 | M-6 | 0-17 의 `clerk_id` DROP 은 **보류** | 모델 주석상 레거시 행 식별 유일 단서. 프로덕션에 `clerk_id IS NOT NULL AND auth_user_id IS NULL` 행 수 확인 전 DROP 은 2단계 배포 원칙(migrations.md §6) 위반 | BL-LR-11 로 등재, `[확인 필요]` |
-| M-7 | 공유 사본(`is_shared`)의 **재promote 는 원본 작성자만** — 다른 멤버가 다시 올리면 403 | 결정 (a) "메모는 작성자 전용" 의 보수적 해석. 허용하면 X 가 팀 A 에만 공유한 내용이 Y 를 거쳐 팀 B 로 퍼진다 (E2-02). 사본 소유자(`user_id`)는 promote 한 사람이라 사본 소유권으로는 막을 수 없어 `source.user_id` 를 본다 | `[확인 필요]` — 재공유를 허용하려면 이 검사만 뺀다 |
+| M-7 | 공유 사본(`is_shared`)의 **재promote 는 원본 작성자만** — 다른 멤버가 다시 올리면 403 | 결정 (a) "메모는 작성자 전용" 의 보수적 해석. 허용하면 X 가 팀 A 에만 공유한 내용이 Y 를 거쳐 팀 B 로 퍼진다 (E2-02). 사본 소유자(`user_id`)는 promote 한 사람이라 사본 소유권으로는 막을 수 없어 `source.user_id` 를 본다 | ✅ 2026-09-27 사용자 확정: **유지** (Q5). 팀→팀 promote 정책 전반은 Gate 1 BL 로 (`REFACTORING-BACKLOG.md` BL-LR-17) |
 
 ## Gate 0 수정 검증 — codex 교차검증 (P0 SQL, 2026-09-27)
 
