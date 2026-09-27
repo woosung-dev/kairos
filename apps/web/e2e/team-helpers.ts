@@ -102,7 +102,9 @@ export async function getMe(page: Page): Promise<MeInfo> {
 /** 만료 이 시간 전부터는 새로 받는다 — FE `src/lib/use-api-client.ts` 와 같은 값. */
 const TOKEN_REFRESH_MARGIN_MS = 60_000;
 
-/** 세션 쿠키는 컨텍스트 단위라 캐시도 컨텍스트 단위다. 컨텍스트가 닫히면 같이 사라진다. */
+/** 세션 쿠키는 컨텍스트 단위라 캐시도 컨텍스트 단위다. 컨텍스트가 닫히면 같이 사라진다.
+ *  ★같은 컨텍스트에서 계정을 바꾸는 spec(재로그인·쿠키 교체)을 추가하면 이 캐시를 비우는 export 도 같이 만든다 —
+ *  안 그러면 최대 14분간 이전 사용자의 토큰이 붙는다. 현재는 owner·member 가 컨텍스트를 따로 쓴다. */
 const tokenCache = new WeakMap<BrowserContext, { token: string; expiresAtMs: number }>();
 
 /** JWT payload 의 exp 를 읽는다. 디코드 실패 = 0 (캐시하지 않음). */

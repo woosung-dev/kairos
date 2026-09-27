@@ -6,8 +6,9 @@ name: Nightly Heavy E2E
 
 on:
   schedule:
-    # 주 1회 월요일 KST 03:00 (일요일 UTC 18:00) — 매 실행이 실제 Whisper·Gemini 를 호출한다
-    - cron: "0 18 * * 0"
+    # 주 1회 월요일 KST 03:17 (일요일 UTC 18:17) — 매 실행이 실제 Whisper·Gemini 를 호출한다.
+    # 정시(:00)를 피한다 — GitHub 스케줄은 정시에 몰려 지연·누락되고, 주 1회라 한 번 빠지면 2주 공백이다.
+    - cron: "17 18 * * 0"
   workflow_dispatch: {}
 
 jobs:
