@@ -157,6 +157,11 @@ Better Auth 컷오버(ADR-031) 뒤 `clerk_id` 는 쓰기 경로가 없다. 다�
 서버는 v5.3.1 이다. `--no-deps` 경로는 두 버전이 같다 — CLI `cmd/compose/up.go:68-70` 의 `WithSelectedServices(services, IgnoreDependencies)` 동일,
 `pkg/compose/convergence.go` 무변경, compose-go v2.13.0→v2.15.0 의 `WithSelectedServices` 본문 무변경. 그 사이 바뀐 것은 `required: false` 의존성
 정리(`WithoutUnresolvedOptionalDependencies`)와 `--wait-timeout` 수정(#14105)뿐이고, 운영 compose 의 `migrate` 의존은 기본값 `required: true` 라 해당 없다.
+리뷰에서 추가 확인: 롤백 상태에서 `.env` 를 고친 뒤 `up -d api`(`--no-deps` 없음) 를 돌리면 api 가 `Created` 로 멈춘다(토이 실측) → `deployment.md`·`deploy/oci/README.md`
+경고를 "`--no-deps` 없는 모든 `up -d`" 로 넓히고 `r2-cleanup-cron.md` 의 토큰 교체 절차를 `up -d --no-deps api` 로 바꿨다.
+같은 리뷰(Claude·Codex 교차)에서 반영: `.env` 를 바꾸기 전에 `docker image inspect` 로 이미지 존재 확인(없는 태그가 `.env` 에 남으면 다음
+deploy-ship 의 GC 가 실제 운영 이미지를 지운다) · 롤백 뒤 `deploy-status` 로 `/ready` 확인 · 보안 수정 이전 태그로의 롤백 경고 · revert 롤포워드 시 리비전 파일 유지.
+**후속 (P3)**: archify `docs/architecture/diagrams/deploy-workflow.*` 의 롤백 간선 라벨이 아직 "이전 태그로 up -d" (→ migrate 를 거치는 것처럼 그려짐). 다음 다이어그램 재생성 때 `--no-deps api web` 로.
 
 ## BL-S29-1 — `mise run docs-check` 게이트 신설 (규칙 재중복 방지) ⏳ **미착수**
 

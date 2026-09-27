@@ -96,7 +96,7 @@ SELECT count(*) FROM meetings WHERE status IN ('transcribing','analyzing');
 
 `.env` 의 태그 두 줄을 이전 값으로 되돌리고 **api·web 만** 다시 띄운다 (`--no-deps` — migrate 를 돌리지 않는다).
 구 이미지의 migrate 는 DB 의 새 리비전을 몰라 실패하고, 그러면 api·web 이 기동하지 않는다 (`docs/operations/deployment.md` 롤백 절).
-롤백 상태에서는 plain `up -d` 를 쓰지 않는다 — 다음 정방향 배포는 `mise run deploy-ship`.
+롤백 상태에서는 `--no-deps` 없는 `up -d` 를 쓰지 않는다 (`up -d api` 도 — `.env` 를 바꾼 뒤면 api 가 멈춘다). 다음 정방향 배포는 `mise run deploy-ship`.
 서버에 남는 것은 **운영중 + 직전 1개** 뿐이다 (`mise run deploy-gc` 가 매 배포마다 강제).
 그보다 오래된 태그는 서버에 없으므로 재빌드 후 재전송해야 한다.
 
