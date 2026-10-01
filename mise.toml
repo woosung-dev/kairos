@@ -320,7 +320,8 @@ ssh {{vars.oci_host}} "bash -lc 'cd {{vars.oci_dir}} && \
   sed -i \"s/^KAIROS_API_TAG=.*/KAIROS_API_TAG=$usage_tag/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=$usage_tag/\" .env && \
   {{vars.oci_compose}} up -d'"
 mise run deploy-verify-env
-mise run deploy-gc "${prev_tag:-__none__}"
+# 배포는 여기서 이미 끝났다 — GC 실패로 deploy-ship 전체를 실패 처리하지 않고 경고만 남긴다.
+mise run deploy-gc "${prev_tag:-__none__}" || echo "⚠ 이미지 정리 실패 — 배포는 완료. 위 docker rmi 오류를 확인" >&2
 '''
 
 # 컨테이너에 런타임 env 가 실제로 주입됐는지 확인한다.
@@ -350,6 +351,14 @@ ssh {{vars.oci_host}} 'bash -lc "docker exec kairos-api env | grep -q \"^AUTH_JW
 #
 # repo:tag 로 지운다(이미지 ID 아님). 한 이미지에 태그가 여럿이면(예: rc1 == 7107a95)
 # docker 는 마지막 태그가 아닌 한 untag 만 하므로 보존 태그가 같이 날아가지 않는다.
+#
+# ★실패는 종료 코드로 남긴다. 예전 `xargs ... docker rmi || true` 는 `|| true` 만 지워도
+#   소용이 없었다 — 이 heredoc 에는 `-e` 가 없고 마지막 명령이 `df` 라 종료 코드가 늘 0 이었다.
+#   그래서 rmi 마다 rc 를 쌓고 맨 끝에서 `exit $rc` 한다.
+# ★목록은 `--format` 으로 받는다. 기본 출력은 Docker 29 의 트리 뷰라 첫 열 형식에 기대게 된다.
+#   `--format` 은 예전 형식(생성일 내림차순)이지만, 위 원칙대로 순서에는 여전히 기대지 않는다.
+#   run 안의 `{{"{{"}}` · `{{"}}"}}` 는 Tera 이스케이프다 — mise 가 run 문자열을 템플릿으로 렌더하므로
+#   docker 의 Go 템플릿 중괄호를 그대로 쓰면 렌더가 깨진다. 원격에는 `--format '<중괄호>.Repository...'` 로 도착한다.
 [tasks.deploy-gc]
 description = "서버 구버전 kairos 이미지 정리 (.env 현재 태그 + 인자 태그만 보존)"
 usage = 'arg "<keep>" help="추가 보존 태그 (롤백 대상. 없으면 __none__)"'
@@ -357,6 +366,7 @@ run = '''
 ssh {{vars.oci_host}} "bash -ls -- '$usage_keep'" <<'REMOTE'
 set -uo pipefail
 keep_extra="${1:-__none__}"
+rc=0
 for repo in kairos-api kairos-web; do
   # ★리포마다 자기 태그를 읽는다. API 태그 하나로 web 보존을 판정하면
   #   두 값이 갈라진 상태(수동 롤백 등)에서 운영중인 web 이미지가 삭제 대상이 된다.
@@ -372,14 +382,19 @@ for repo in kairos-api kairos-web; do
     exit 1
   fi
   echo "$repo 보존: $cur (운영중), $keep_extra (롤백용)"
-  docker images "$repo" | tail -n +2 | cut -d' ' -f1 \
-    | grep -vx -e "$repo:$cur" -e "$repo:$keep_extra" \
-    | xargs -r -n1 docker rmi || true
+  while read -r ref; do
+    docker rmi "$ref" || rc=1
+  done < <(docker images "$repo" --format '{{"{{"}}.Repository{{"}}"}}:{{"{{"}}.Tag{{"}}"}}' \
+             | grep -vx -e "$repo:$cur" -e "$repo:$keep_extra" -e "$repo:<none>")
 done
 echo "── 잔여 kairos 이미지 ──"
 docker images | grep '^kairos-' || true
 echo "── 서버 디스크 ──"
 df -h / | tail -1
+if [ "$rc" -ne 0 ]; then
+  echo "ERROR: 일부 이미지를 지우지 못했다 — 위 docker rmi 오류를 확인" >&2
+fi
+exit $rc
 REMOTE
 '''
 

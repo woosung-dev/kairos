@@ -53,7 +53,12 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
 RUN BETTER_AUTH_SECRET=build-time-placeholder-not-used-at-runtime pnpm build
 
 # ── runner: standalone 산출물만 ────────────────────────────────────────────
-FROM base AS runner
+# base 를 상속하지 않는다 — pnpm 은 런타임에 쓰지 않는다 (CMD 는 node server.js).
+# ★node 버전을 올릴 때 맨 위 base 의 FROM 과 이 줄을 같이 바꾼다.
+#   `mise run toolchain-check` 는 `^FROM node:<ver>-alpine` 이 한 줄만 맞아도 통과하므로 이 줄의 드리프트를 못 잡는다.
+FROM node:22-alpine AS runner
+# GHCR 이 이미지를 이 레포에 연결하고, 공유 호스트에서 kairos 이미지만 골라 정리할 때 쓰는 표식이다.
+LABEL org.opencontainers.image.source="https://github.com/woosung-dev/kairos"
 WORKDIR /app
 
 ENV NODE_ENV=production \

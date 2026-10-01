@@ -19,6 +19,8 @@ RUN uv sync --frozen --no-dev --no-cache
 
 # ── runtime: ffmpeg + venv + 소스 ─────────────────────────────────────────
 FROM python:3.12-slim
+# GHCR 이 이미지를 이 레포에 연결하고, 공유 호스트에서 kairos 이미지만 골라 정리할 때 쓰는 표식이다.
+LABEL org.opencontainers.image.source="https://github.com/woosung-dev/kairos"
 
 # 시스템 의존성 (ffmpeg: 카카오톡 m4a 변환용)
 RUN apt-get update && \
