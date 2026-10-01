@@ -8,6 +8,9 @@
 > **부분 개정 (2026-08-16, [ADR-031](031-better-auth-migration.md)):** D3 의 "Clerk 유지" 와
 > D5 의 "API 의 문은 Clerk JWT 다" 는 대체됐다. 인증은 Better Auth 로 자체 호스팅되고
 > JWKS 는 compose 내부망에서 가져온다. 본문은 당시 기록이라 수정하지 않는다.
+>
+> **부분 개정 (2026-09-27, [ADR-033](033-kairos-dedicated-r2-buckets.md)):** D3 의 "R2 유지" 는 그대로지만
+> 버킷은 nexus-core 공유 `nexus-core-storage` 에서 Kairos 전용 `kairos-prod`·`kairos-dev` 로 나눈다.
 
 ---
 
@@ -45,6 +48,10 @@ quantbridge · truewords 를 돌리는 오라클 서버가 있으므로 **개인
 
 ### D1. 기존 `truewords-oracle` 공유 (신규 인스턴스 아님)
 
+> 2026-10-02: 이 서버의 SSH 별칭을 프로젝트 중립 이름 **`oci-tokyo`** 로 바꿨다. 서버·IP 는 그대로이고,
+> 옛 별칭 `truewords-oracle` 은 truewords · quant-bridge 호환용으로 같은 `Host` 줄에 남긴다
+> (`deploy/oci/README.md` §배치). 이 ADR 본문의 옛 이름은 결정 당시 기록이라 고치지 않는다.
+
 무료 한도가 이미 소진돼 신규 A1 은 과금이다. 실측 여유(available 7.7GB / load 0.19)가 Kairos 상시
 요구(~500MB)를 크게 웃돈다. 유일한 실질 리스크는 ffmpeg chunk 병렬이 2 OCPU 를 순간 점유해 같은
 호스트의 quantbridge 소크를 굶기는 것 → `cpus: 1.5` 하드 캡으로 격리한다.
@@ -74,6 +81,7 @@ Neon 이 기본 설치했던 `pg_session_jwt` 는 코드 사용처가 0건이라
 
 > 2026-09-27 갱신 — 백업 스크립트가 생겼다 (`deploy/oci/backup/`, 절차 `docs/operations/runbooks/db-backup-restore.md`).
 > 남은 것은 서버 cron 등록 · R2 lifecycle · `.env` 별도 보관이다 (BL-OCI-1). `down -v` 금지는 그대로다.
+> 2026-09-27 후반 — R2 lifecycle 은 `kairos-prod` 의 `backups-14d` 로 설정했다 (ADR-033). cron 은 R2 전환 뒤 (`docs/TODO.md` "Gate 0 잔여" R4).
 
 ### D3. R2 · Clerk · Gemini · OpenAI · Sentry 는 유지
 
@@ -164,17 +172,30 @@ D7 의 `docker save | ssh | docker load` 는 배포마다 서버에 이미지 2�
 `[tasks.deploy-gc]` 를 신설해 `deploy-ship` 끝에 연결했다. 설계 제약 둘:
 
 1. **정렬에 의존하지 않는다.** 이 서버는 Docker 29 + containerd 이미지 스토어라
-   `docker images` 가 생성일순이 아니라 **태그 알파벳순**으로 나온다. "최신 N개만 남긴다" 류의
+   `docker images` 기본 출력(트리 뷰)이 생성일순이 아니라 **태그 알파벳순**으로 나온다. "최신 N개만 남긴다" 류의
    `tail -n +3` 은 운영중 태그(`a7c0b98`)를 삭제 대상에 넣었다. 그래서 **보존 태그를 명시**한다 —
    서버 `.env` 의 현재 태그 + `deploy-ship` 이 `.env` 를 덮어쓰기 전에 읽어 넘긴 직전 태그.
 2. **`docker system prune` 계열 금지.** D1 대로 이 호스트는 quantbridge·truewords 와 공유한다.
    `kairos-api` / `kairos-web` 리포지토리로 한정하고, `repo:tag` 로 지운다(이미지 ID 아님 —
    한 이미지에 태그가 여럿이면 docker 가 untag 만 하므로 보존 태그가 함께 사라지지 않는다).
+3. **실패는 종료 코드로 남긴다** (2026-10-02 보강). 초판의 `xargs ... docker rmi || true` 는
+   `|| true` 만 지워도 소용이 없었다 — 원격 heredoc 에 `-e` 가 없고 마지막 명령이 `df` 라
+   종료 코드가 늘 0 이었다. `rmi` 마다 `rc` 를 쌓아 `exit $rc` 로 끝내고, `deploy-ship` 은 이
+   실패를 경고로만 출력한다(배포는 이미 끝난 뒤다). 목록은 `--format '{{.Repository}}:{{.Tag}}'`
+   로 받는다 — 기본 트리 뷰는 untagged 를 숨기고 첫 열 형식에 기대게 만든다. `--format` 은 예전
+   형식(생성일 내림차순)이라 출력 형식만으로 순서가 바뀐다 → 1번 원칙이 그대로 유효하다.
 
 부수 작업으로 `apps/api/Dockerfile` 을 multi-stage 로 바꿨다. 단일 스테이지라
 `chown -R /app`(overlayfs copy-up 으로 venv 재복제, 206MB) · uv 바이너리(45.5MB) ·
 uv 캐시가 최종 이미지에 남아 있었다. 이미지는 **약 1,030MB → 735MB**. 레지스트리 없이
 이미지를 통째로 SSH 전송하는 구조라 이미지 크기가 곧 배포 시간이다.
+
+2026-10-02 에는 web 도 같은 방향으로 줄였다. runner 스테이지가 `FROM base` 라 런타임에 쓰지 않는
+`corepack prepare pnpm` 층(15.2MB)을 물려받고 있었다 → runner 를 `FROM node:22-alpine` 으로 분리
+(243MB → 227MB, 같은 빌드 인자로 실측). `apps/web/.dockerignore` 에는 api 쪽처럼 `**/` 패턴을 넣고
+테스트·도구 설정·문서를 뺐다 — 테스트만 고쳐도 builder 의 `COPY . .` 캐시가 깨져 `pnpm build` 가
+처음부터 다시 돌던 것을 막는다. 두 Dockerfile 의 런타임 스테이지에는 `org.opencontainers.image.source`
+LABEL 을 붙였다(레지스트리 연결·범위 한정 정리의 표식).
 
 `deploy-status` 에 `df -h /` 를 추가했다 — 그전에는 `uptime`/`free -h` 만 봐서 디스크가
 관측 밖이었다.

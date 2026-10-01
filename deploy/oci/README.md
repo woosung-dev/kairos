@@ -4,9 +4,19 @@ ADR-028. Vercel(FE) + GCP Cloud Run(BE) + Neon(DB) → 오라클 단일 VM 셀�
 
 ## 배치
 
-서버 `truewords-oracle` (Ampere A1 aarch64, 2 OCPU / 12GB, 도쿄, Ubuntu 22.04)를
+서버 `oci-tokyo` (Ampere A1 aarch64, 2 OCPU / 12GB, 도쿄, Ubuntu 22.04)를
 quantbridge · truewords 와 **공유**한다. 인바운드는 SSH 22 만 열려 있고, 공개 경로는
 Cloudflare Tunnel 이다.
+
+`oci-tokyo` 는 맥 `~/.ssh/config` 의 별칭이다 (`mise.toml` 의 `oci_host`). 옛 별칭 `truewords-oracle` 을
+같은 `Host` 줄에 남겨 둔다 — truewords · quant-bridge 레포의 스크립트가 아직 그 이름을 쓴다(2026-10-02 개명).
+
+```
+Host oci-tokyo truewords-oracle
+  HostName <서버 공인 IP>
+  User ubuntu
+  IdentityFile <키 경로>
+```
 
 | 서비스 | 컨테이너 | 호스트 포트 | 공개 주소 |
 |---|---|---|---|
@@ -21,7 +31,7 @@ Cloudflare Tunnel 이다.
 ## 최초 부트스트랩
 
 ```bash
-ssh truewords-oracle
+ssh oci-tokyo
 mkdir -p ~/kairos
 ```
 
@@ -68,15 +78,15 @@ docker buildx build --platform linux/arm64 -t kairos-web:$TAG --load \
 #   서버 파일이 최초 부트스트랩 버전이라 ADR-031 이 추가한 web.environment 5줄이 없었고
 #   BETTER_AUTH_SECRET 이 빈 문자열로 주입됐다(environment: 치환은 미설정도 조용히 통과한다).
 #   `mise run deploy-ship` 은 이걸 선행 의존으로 자동 수행한다.
-scp deploy/oci/docker-compose.prod.yml truewords-oracle:~/kairos/docker-compose.prod.yml
-ssh truewords-oracle 'bash -lc "cd ~/kairos && docker compose -f docker-compose.prod.yml config -q"'
+scp deploy/oci/docker-compose.prod.yml oci-tokyo:~/kairos/docker-compose.prod.yml
+ssh oci-tokyo 'bash -lc "cd ~/kairos && docker compose -f docker-compose.prod.yml config -q"'
 
 # 전송
-docker save kairos-api:$TAG | gzip -1 | ssh truewords-oracle 'gunzip | docker load'
-docker save kairos-web:$TAG | gzip -1 | ssh truewords-oracle 'gunzip | docker load'
+docker save kairos-api:$TAG | gzip -1 | ssh oci-tokyo 'gunzip | docker load'
+docker save kairos-web:$TAG | gzip -1 | ssh oci-tokyo 'gunzip | docker load'
 
 # 태그 교체 후 기동
-ssh truewords-oracle "bash -lc \"cd ~/kairos && \
+ssh oci-tokyo "bash -lc \"cd ~/kairos && \
   sed -i 's/^KAIROS_API_TAG=.*/KAIROS_API_TAG=$TAG/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=$TAG/' .env && \
   docker compose -f docker-compose.prod.yml up -d\""
 ```
@@ -101,7 +111,7 @@ SELECT count(*) FROM meetings WHERE status IN ('transcribing','analyzing');
 그보다 오래된 태그는 서버에 없으므로 재빌드 후 재전송해야 한다.
 
 ```bash
-ssh truewords-oracle "bash -lc 'cd ~/kairos && \
+ssh oci-tokyo "bash -lc 'cd ~/kairos && \
   sed -i \"s/^KAIROS_API_TAG=.*/KAIROS_API_TAG=<이전>/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=<이전>/\" .env && \
   docker compose -f docker-compose.prod.yml up -d --no-deps api web'"
 ```
@@ -134,7 +144,7 @@ mise run deploy-gc <롤백용_태그>
 설치·cron 줄·복원 절차는 [`docs/operations/runbooks/db-backup-restore.md`](../../docs/operations/runbooks/db-backup-restore.md).
 
 ```bash
-scp -r deploy/oci/backup truewords-oracle:~/kairos/     # 맥에서. 이후 서버에서 런북 §2 대로 crontab 등록
+scp -r deploy/oci/backup oci-tokyo:~/kairos/     # 맥에서. 이후 서버에서 런북 §2 대로 crontab 등록
 ```
 
 ## 함정

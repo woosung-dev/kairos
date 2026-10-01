@@ -13,8 +13,9 @@
 > | 수단 | `POST /api/v1/admin/memory/r2-cleanup` (앱이 지우고 키를 NULL 처리) | `apps/api/scripts/r2_cleanup.py` (서버에서 수동) |
 > | 현재 호출 주체 | **없음** — cron·workflow 둘 다 없다 | 운영자 수동 |
 
-R2 버킷 `nexus-core-storage` 는 **다른 프로젝트와 공유**한다 (nexus-core 는 루트 키 + `db-backups/`, Kairos DB 백업은
-`backups/kairos/`). **로컬 개발·QA 도 같은 버킷의 `uploads/` 를 쓴다.** 둘 다 §2 의 안전 규칙이 전제한다.
+운영 버킷은 Kairos 전용 `kairos-prod` 로 옮긴다 (ADR-033, 2026-09-27). CI 는 `kairos-dev` 를 쓴다 (#198). 로컬 개발도 `kairos-dev` 로 옮긴다 (⏳ 로컬 `.env` 교체 전까지는 옛 버킷). 같은 버킷 안의 DB 백업은 `backups/kairos/` 다.
+⏳ 서버 `.env` 전환 전까지 운영은 nexus-core 와 공유하는 `nexus-core-storage` 이고, 로컬·CI 의 옛 업로드도 그 `uploads/` 에 섞여 있다
+(절차 `docs/TODO.md` Blocked "Gate 0 잔여"). 이전은 `uploads/` 를 통째로 복사하므로 그 옛 업로드도 `kairos-prod` 로 넘어온다 (BL-LR-18).
 
 ## §1. 음성 메모 30일 TTL (admin endpoint)
 
@@ -46,13 +47,13 @@ unset T
    (읽기 전용 트랜잭션). promote 복제본은 원본과 같은 키를 공유하므로 사본 하나만 남아도 보호된다.
    **참조 0건이면 중단** — 잘못된 DB 나 조회 실패를 "전부 고아" 로 읽지 않는다.
 2. 참조 키는 나이와 무관하게 후보가 되지 않는다. 삭제 직전에 한 번 더 교차 검사한다.
-3. prefix 는 `uploads/` · `memory/` 만. 공유 버킷의 다른 prefix 는 목록 조회조차 하지 않는다.
+3. prefix 는 `uploads/` · `memory/` 만. 다른 prefix(`backups/kairos/` 등)는 목록 조회조차 하지 않는다.
 4. `--days` 최소 7 (기본 30) — 업로드 직후 ~ 회의 생성 사이의 객체를 보호한다.
-5. `--delete` 는 `APP_ENV=production` 에서만. 로컬 개발도 같은 버킷을 쓰므로, 개발 DB 기준으로 돌리면
-   운영 원본이 전부 "미참조" 로 보인다.
+5. `--delete` 는 `APP_ENV=production` 에서만. 개발 DB 기준으로 운영 버킷을 돌리면 운영 원본이 전부 "미참조" 로 보인다
+   (버킷이 나뉜 뒤에도 잘못된 `.env` 조합을 막는 마지막 벽이라 유지한다).
 6. R2 키를 담는 컬럼이 새로 생기면 스크립트의 `REFERENCED_KEYS_SQL` 에 추가해야 한다 (빠뜨리면 그 객체가 후보가 된다).
 
-⚠ 운영 DB 기준이므로 **로컬 개발·QA 가 올린 `uploads/` 객체도 후보가 된다** (운영 DB 가 참조하지 않으므로).
+⚠ 이전 때 넘어온 옛 로컬·CI 업로드는 운영 DB 가 참조하지 않으므로 후보가 된다 (BL-LR-18).
 dry-run 목록에서 확인한 뒤 `--delete` 한다.
 
 ### 실행 — 운영 서버의 api 컨테이너 안에서
@@ -62,10 +63,10 @@ api 컨테이너에 `R2_*` · `DATABASE_URL` · `APP_ENV` · aioboto3 · asyncpg
 
 ```bash
 # 1) dry-run — 후보 목록 + protected(referenced)/too_young/candidates 요약. 삭제 0건
-ssh truewords-oracle 'bash -lc "docker exec -i kairos-api python - --days 30"' < apps/api/scripts/r2_cleanup.py
+ssh oci-tokyo 'bash -lc "docker exec -i kairos-api python - --days 30"' < apps/api/scripts/r2_cleanup.py
 
 # 2) 목록을 눈으로 확인한 뒤 실제 삭제
-ssh truewords-oracle 'bash -lc "docker exec -i kairos-api python - --days 30 --delete"' < apps/api/scripts/r2_cleanup.py
+ssh oci-tokyo 'bash -lc "docker exec -i kairos-api python - --days 30 --delete"' < apps/api/scripts/r2_cleanup.py
 ```
 
 종료 코드: 0 정상 · 1 안전 규칙 거부 또는 삭제 실패 · 2 인자 오류.

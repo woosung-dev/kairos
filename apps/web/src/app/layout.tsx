@@ -1,21 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { ServiceWorkerRegistrar } from "@/components/layout/service-worker-registrar";
 import { QueryProvider } from "@/lib/query-client";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-// Sprint 28 PERF-10 — Geist Mono self-host (next/font/google).
-// Satoshi (Fontshare) + Pretendard (jsdelivr) 는 next/font/google 미지원
-// → 별도 sprint local woff2 다운로드 후 next/font/local (BL-S27e-D carry).
-// 본 fix: Geist Mono 만 self-host → 외부 fonts.googleapis.com / fonts.gstatic.com
-// preconnect 제거 가능 (LCP 부분 회복).
-const geistMono = Geist_Mono({
-  subsets: ["latin"],
+// Geist Mono — 레포에 둔 woff2 를 next/font/local 로 self-host (2026-10-02).
+// next/font/google 은 빌드 때 Google Fonts 를 내려받는데, CI frontend-build 에서
+// 그 다운로드가 간헐 실패했다 (같은 커밋 재실행은 통과). 빌드가 네트워크에 기대지 않게 한다.
+// 파일 = Google Fonts 가 400·500 에 같이 내주는 latin 서브셋 가변 폰트 (wght 축). 라이선스 OFL.txt.
+// Satoshi (Fontshare) + Pretendard (jsdelivr) 는 아직 외부 CDN (BL-S27e-D carry).
+const geistMono = localFont({
+  src: "./fonts/GeistMono-latin-wght.woff2",
   display: "swap",
   variable: "--font-geist-mono",
-  weight: ["400", "500"],
+  weight: "400 500",
 });
 
 export const metadata: Metadata = {
@@ -45,7 +45,7 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning className={geistMono.variable}>
       <head>
-        {/* Sprint 28 PERF-10 partial — Geist Mono 는 next/font/google 적용 (self-host).
+        {/* Sprint 28 PERF-10 partial — Geist Mono 는 next/font/local 로 self-host.
             Satoshi + Pretendard 는 BL-S27e-D carry (next/font/local woff2 다운로드 필요). */}
         <link rel="preconnect" href="https://api.fontshare.com" />
         <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="anonymous" />

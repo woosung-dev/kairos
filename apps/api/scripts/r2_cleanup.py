@@ -9,19 +9,19 @@
   1. 참조 키는 실행 시점에 DB 에서 직접 읽는다 (meetings.file_key ∪ memory_items.r2_audio_key,
      읽기 전용 트랜잭션). 참조 0건이면 중단한다 — 잘못된 DB 나 조회 실패를 "전부 고아" 로 읽지 않는다.
   2. 참조 키는 나이와 무관하게 절대 후보가 되지 않는다. 삭제 직전에 한 번 더 교차 검사한다.
-  3. 대상 prefix 는 Kairos 가 쓰는 uploads/ · memory/ 뿐이다. 버킷(nexus-core-storage)은 다른
-     프로젝트와 공유하므로 다른 prefix 는 목록 조회조차 하지 않는다.
+  3. 대상 prefix 는 uploads/ · memory/ 뿐이다. 같은 버킷(kairos-prod, ADR-033)의 backups/kairos/ 등
+     다른 prefix 는 목록 조회조차 하지 않는다.
   4. --days 최소 7 — 업로드 직후 ~ 회의 생성 사이의 객체를 보호한다.
-  5. --delete 는 APP_ENV=production 에서만 — 로컬 개발도 같은 버킷을 쓴다. 개발 DB 를 기준으로
-     돌리면 운영 원본이 전부 "미참조" 로 보인다.
+  5. --delete 는 APP_ENV=production 에서만 — 개발 DB 를 기준으로 운영 버킷을 돌리면 운영 원본이
+     전부 "미참조" 로 보인다 (버킷이 나뉜 뒤에도 잘못된 .env 조합을 막는 벽).
   6. --inventory 는 DB 없이 prefix 별 개수·용량만 출력한다. 키를 출력하지 않는다
      (공개 레포의 GitHub Actions 로그는 누구나 읽는다 — 회의 파일명이 키에 들어 있다).
 
 실행 — 운영 서버의 api 컨테이너 안에서 돈다 (R2_* · DATABASE_URL · aioboto3 · asyncpg 가 전부 있다).
 레포 체크아웃이 있는 맥에서 스크립트를 stdin 으로 흘려보낸다 (서버에 파일을 두지 않는다):
 
-  ssh truewords-oracle 'bash -lc "docker exec -i kairos-api python - --days 30"' < apps/api/scripts/r2_cleanup.py
-  ssh truewords-oracle 'bash -lc "docker exec -i kairos-api python - --days 30 --delete"' < apps/api/scripts/r2_cleanup.py
+  ssh oci-tokyo 'bash -lc "docker exec -i kairos-api python - --days 30"' < apps/api/scripts/r2_cleanup.py
+  ssh oci-tokyo 'bash -lc "docker exec -i kairos-api python - --days 30 --delete"' < apps/api/scripts/r2_cleanup.py
 
 인벤토리 (DB 불필요, 키 미출력): python -m scripts.r2_cleanup --inventory
 런북: docs/operations/r2-cleanup-cron.md

@@ -11,7 +11,7 @@
 |---|---|---|
 | §1 Gate 0-A 권한 누수 (T-01 ~ T-23, T-18c 포함, T-18b 제외) | **24/24 PASS** | API 와 UI 둘 다 봤다. T-05/T-07 UI · T-18 viewer·member RAG(+작성자 대조군) · T-18c UI 는 Evaluator 지적으로 보강 실행 |
 | §2 Gate 0-B 초대 → 첫 사용 (T-24 ~ T-30) | **7/7 PASS** | T-25 는 처음에 추론으로 적었다가 Evaluator 지적으로 실제 실행했다 |
-| §3 Gate 0-C 운영 (T-31 ~ T-40) | **PASS 3** · 배포 대기 1 · 사용자 5 · Claude 코드 1 | T-31 · T-32 PASS · T-36 은 로컬 리허설 PASS (0-16 검증 기준 = 로컬 1회. 프로덕션 재설정은 요청이 올 때 runbook 으로) / T-34 = 배포 후 / T-38 = nightly 워크플로 이식(Claude) 뒤 사용자 dispatch / T-33 · T-35 · T-37 · T-39 · T-40 = 사용자 |
+| §3 Gate 0-C 운영 (T-31 ~ T-40) | **PASS 3** · 배포 대기 1 · 사용자 5 · Claude 코드 1 → 2026-09-27 **PASS 5** (+T-34 · T-39) · 부분 1 (T-38) · Gate 1 이동 1 (T-33) · 사용자 3 (T-35 · T-37 · T-40) | T-31 · T-32 PASS · T-36 은 로컬 리허설 PASS (0-16 검증 기준 = 로컬 1회. 프로덕션 재설정은 요청이 올 때 runbook 으로) / T-34 = 배포 후 / T-38 = nightly 워크플로 이식(Claude) 뒤 사용자 dispatch / T-33 · T-35 · T-37 · T-39 · T-40 = 사용자 |
 | §4.1 과잉 차단 대조군 (R-01 ~ R-04) | **4/4 PASS** | |
 | §4.2 Phase 1 PASS 재실행 (92) | **92/92 PASS** · FAIL 0 | API 79 + UI 13 + 섞인 탐침의 UI 부분 9 |
 | §5 Phase 1 미실행 P0/P1 (14) | **14/14 PASS** | G1-086 은 새 계정 가입으로 실행 |
@@ -20,6 +20,8 @@
 **Gate 0 판정: 코드 조건 충족 · 운영 조건 미충족 → 현재 NO-GO.**
 - 조건 "§1 · §2 · §4.1 전부 PASS, §4.2 FAIL 0" 은 충족했다.
 - 조건 "§3 전부 PASS" 는 아직이다. 남은 것은 배포(0-14) · 사용자 작업 5건(계정·대시보드·서버 권한) · Claude 코드 작업 1건(T-38, nightly 워크플로를 Better Auth 구성으로 이식 — BL-LR-15) 이다 (§5).
+- **2026-09-27 갱신 — 여전히 NO-GO.** 해소: 0-14 배포(T-34 PASS) · 0-19 ruleset(T-39 PASS) · 0-18 부분(워크플로 이식 #198, team 38/40) · 롤백 경로 결함(BL-LR-16, #197). 0-13 은 사용자 결정으로 Gate 1(1-17)로 이동.
+  남은 사유: **0-11 · 0-17 · 0-20** (운영자 작업 — `docs/TODO.md` Blocked "Gate 0 잔여") · **0-15** (Google 테스트 사용자, 사용자 준비 대기) · **0-18** (T15·T20 2건, BL-LR-15 P1).
 
 ## 1. 검증 증거 (AGENTS.md §4 표준)
 
@@ -40,10 +42,11 @@
 
 | T | 사유 |
 |---|---|
-| T-34 | 프로덕션이 #194 이전 빌드다 (drive documents 405 · CSP-Report-Only 헤더 없음). 로컬 main 빌드는 헤더가 있다. 배포(0-14) 후 같은 명령으로 재확인 |
-| T-33 | Cloudflare "Always Use HTTPS" + HSTS 설정 전 (http → 200). 사용자 작업 0-13 |
-| T-35 · T-37 · T-39 · T-40 | Google 콘솔 · Clerk 대시보드 · GitHub ruleset · 프로덕션 서버 권한 필요 (0-15 · 0-17 · 0-19 · 0-20) |
-| T-38 | nightly-e2e.yml 이 Better Auth 이전 구성이라 secret 등록만으로는 안 된다. 워크플로 이식(Claude, 후속 PR) → 사용자 dispatch (0-18 · BL-LR-15) |
+| T-34 | ✅ **2026-09-27 PASS** — `2694847` 배포 후 같은 명령: documents 비인증 GET 401 · FE `content-security-policy-report-only` 있음 (0-14) |
+| T-33 | ↪ 0-13 을 Gate 1(1-17)로 옮겼다 (2026-09-27 사용자 결정). 여전히 http → 200 |
+| T-35 · T-37 · T-40 | Google 콘솔 · Clerk 대시보드 · 프로덕션 서버 권한 필요 (0-15 · 0-17 · 0-20). T-37·T-40 절차 = `docs/TODO.md` Blocked "Gate 0 잔여" |
+| T-38 | ◐ 2026-09-27 이식(#198) → dispatch 3차 heavy ✅ · team 38/40. 남은 2건 T15·T20 (0-18 · BL-LR-15 P1) |
+| T-39 | ✅ **2026-09-27 PASS** — ruleset `main-protection` (id 24073517) (0-19) |
 
 ## 4. 새 결함
 
@@ -63,7 +66,7 @@
 
 ## 6. 정리 · 잔여물
 
-- **R2 업로드 2건** (공유 버킷 `nexus-core-storage`, 사용자가 삭제한다):
+- **R2 업로드 2건** (공유 버킷 `nexus-core-storage`, 사용자가 삭제한다 — R2 이전 전에 지운다, `docs/TODO.md` "Gate 0 잔여" R1):
   - Phase 1: `uploads/a3e294c1-2835-46e7-bca5-c810e9835c75/beta-meeting.m4a`
   - Phase 2: `uploads/68be2290-9a8a-4f69-a379-a3b7634ef2af/beta-meeting.m4a` (AUDIO-UPLOAD-UI · 회의 `324b09b7`)
   - 삭제 예: `aws s3 rm "s3://nexus-core-storage/<키>" --endpoint-url "https://<ACCOUNT_ID>.r2.cloudflarestorage.com"`

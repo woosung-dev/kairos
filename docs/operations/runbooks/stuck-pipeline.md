@@ -26,7 +26,7 @@ DB 의 status 만 중간 상태로 남는다.
 printf "SELECT id, status, updated_at FROM meetings \
 WHERE status IN ('transcribing','analyzing') \
 AND updated_at < now() - interval '2 hours' ORDER BY updated_at;" \
-| ssh truewords-oracle 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -tA"'
+| ssh oci-tokyo 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -tA"'
 ```
 
 2시간 **이내**인 것은 정상 진행 중일 수 있으니 건드리지 않는다.
@@ -37,7 +37,7 @@ AND updated_at < now() - interval '2 hours' ORDER BY updated_at;" \
 관측 수단은 `docker logs` 다 (Sentry 는 ADR-028 로 제거됨).
 
 ```bash
-ssh truewords-oracle 'bash -lc "docker logs --tail 300 kairos-api"'
+ssh oci-tokyo 'bash -lc "docker logs --tail 300 kairos-api"'
 ```
 
 `transcription` / `ai_processing` / circuit breaker(`ai_resilience`) 관련 예외를 찾는다.

@@ -46,7 +46,7 @@ kairos/
 각 앱은 `AGENTS.md`(스택 함정) + `CONTEXT.md`(불변식 B-NN / F-NN) + `CLAUDE.md`(둘을 `@` import)
 를 갖는다 (ADR-029).
 
-**배포 워크플로는 없다.** 배포는 CI 가 아니라 로컬 `mise.toml` → SSH(`truewords-oracle`) →
+**배포 워크플로는 없다.** 배포는 CI 가 아니라 로컬 `mise.toml` → SSH(`oci-tokyo`) →
 `docker save | ssh docker load` → compose up 이다 (ADR-028, 레지스트리 미사용).
 
 규칙: 독립 실행·배포되면 `apps/`, 언어를 넘는 계약이면 `contracts/`, 라이브러리 공유 패키지(`packages/`)는

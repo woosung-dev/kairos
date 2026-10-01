@@ -14,7 +14,7 @@
 브라우저
   └─ Cloudflare (엣지 TLS)
        └─ Cloudflare Tunnel  ── 인바운드 포트 0개
-            └─ 오라클 A1 (truewords-oracle, aarch64, 도쿄)
+            └─ 오라클 A1 (oci-tokyo, aarch64, 도쿄)
                  ├─ kairos-web   127.0.0.1:3100   Next.js standalone
                  ├─ kairos-api   127.0.0.1:8200   FastAPI
                  └─ kairos-db    127.0.0.1:5434   PostgreSQL 17 + pgvector 0.8
@@ -24,9 +24,9 @@
 |---|---|
 | FE | https://kairos.woosung.dev |
 | API | https://kairos-api.woosung.dev |
-| 서버 | `ssh truewords-oracle` (quantbridge · truewords 와 **공유**) |
+| 서버 | `ssh oci-tokyo` (quantbridge · truewords 와 **공유**) |
 | 배포 디렉토리 | `~/kairos` (compose · `.env` · initdb) |
-| 오브젝트 스토리지 | Cloudflare R2 (유지) |
+| 오브젝트 스토리지 | Cloudflare R2 — 운영 `kairos-prod` · CI·로컬 `kairos-dev` (ADR-033, 버킷 한정 토큰). CI 는 전환 완료(#198). ⏳ 운영·로컬은 이전 진행 중 — `.env` 전환 전까지 옛 공유 버킷 `nexus-core-storage` (`docs/TODO.md` Blocked "Gate 0 잔여") |
 | 인증 | Better Auth 자체 호스팅 (web 컨테이너, ADR-031) |
 | AI | Gemini · OpenAI (유지) |
 
@@ -50,6 +50,8 @@ mise run deploy-status         # 컨테이너 상태 + /ready + 서버 자원 (�
 `deploy-ship` 은 마지막에 `deploy-gc` 를 부른다 — 서버에 **운영중 태그 + 직전 태그**만 남기고
 나머지 `kairos-api` / `kairos-web` 이미지를 지운다. 이 서버는 quantbridge·truewords 와
 공유하므로 **`docker system prune` 계열을 쓰지 않는다** (남의 프로젝트 이미지가 지워진다).
+GC 가 이미지를 지우지 못하면 `deploy-ship` 은 `⚠ 이미지 정리 실패` 경고를 남기고 성공으로 끝난다 —
+배포 자체는 이미 끝난 상태다. 경고가 보이면 `docker rmi` 오류를 읽고 `mise run deploy-gc <직전 태그>` 를 다시 돌린다.
 
 레지스트리를 쓰지 않는다. 맥(darwin/arm64)과 서버(aarch64)가 같은 아키텍처라
 `--platform linux/arm64` 가 에뮬레이션 없이 돈다.
@@ -197,7 +199,8 @@ GCP 프로젝트 `gcp-project-504004` 와 WIF pool `github` 는 cookmark · nexu
 남겨 둔다.
 
 **남은 GitHub Secrets 15건은 전부 `test.yml` · `nightly-e2e.yml` · `r2-cleanup.yml` 이 실제로
-참조하는 것들이다.** 정리 판단은 워크플로 grep 과 대조해서 한다:
+참조하는 것들이다** (2026-09-27 재확인 — `E2E_R2_*` 3건 추가, 미참조 Clerk 3건 삭제). repo-level `R2_*` 는 `kairos-prod`
+**읽기 전용** 토큰으로 바꾼다 (`r2-cleanup.yml` 인벤토리 몫, ADR-033 — 교체 전까지는 옛 공유 토큰, `docs/TODO.md` "Gate 0 잔여" R4). 정리 판단은 워크플로 grep 과 대조해서 한다:
 
 ```bash
 comm -23 <(gh secret list --repo woosung-dev/kairos --json name --jq '.[].name' | sort) \

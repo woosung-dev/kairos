@@ -108,6 +108,8 @@ RAG 캐시 키가 sourceType 을 무시한다.
 
 ### BL-LR-9 — 전송·헤더·rate limit 하드닝 (P2/P3, 인프라) `[C-011 · C-009 · C-012 · C-013]`
 프로덕션이 평문 HTTP 200 을 주고 HSTS 가 없다 · Better Auth IP 판정 설정이 없다 · robots/sitemap 이 로그인으로 리다이렉트된다 · x-powered-by 가 노출되고 CSP 는 Report-Only 다.
+- **2026-09-27 사용자 결정: HTTPS 강제 + HSTS(C-011, 체크리스트 0-13)는 공개 오픈 직전(Gate 1)으로 옮긴다** — "지금 단계에서는 필요 없는 스펙". 그동안 `http://` 로도 로그인 화면이 열린다 (위험 수용). 할 때의 설정값은 결정돼 있다: kairos 두 호스트만, Cloudflare Redirect Rule(`not ssl` → 301 `https://`) + Transform Rule(`Strict-Transport-Security: max-age=86400`, 1주 뒤 15552000), includeSubDomains·preload 없음.
+- C-009 보강 (2026-09-27 PR #198 리뷰): 운영에서는 IP 가 식별된다(`docker logs kairos-web` 의 `could not determine a client IP` 0건, 대조군 요청 포함). 그러나 Better Auth `getIp` 는 `x-forwarded-for` 가 **단일 값일 때만** 신뢰하고, Cloudflare 는 클라이언트가 보낸 XFF 뒤에 실제 IP 를 덧붙인다 → 요청에 XFF 를 직접 넣으면 다중 값이 되어 `no-trusted-ip` 공유 버킷(경로당 전체 사용자 합산, sign-in 10초 3회)으로 떨어진다. 로그인 DoS 경로다. 수정 = 체크리스트 1-10 (`advanced.ipAddress.ipAddressHeaders: ["cf-connecting-ip"]`).
 
 ### BL-LR-10 — 프로젝트 범위 RAG 가 회의 청크를 `chunk.project_id` 로 판정한다 (P2, 기능 정확도) ⏳ **미착수**
 BL-LR-1 수정으로 **가시성**은 `meeting_project_links` 기준이 됐지만, `scope=project` 의 **범위 필터**는 여전히 `embedding_chunks.project_id = :pid` 다.
@@ -120,10 +122,10 @@ Better Auth 컷오버(ADR-031) 뒤 `clerk_id` 는 쓰기 경로가 없다. 다�
 순서: ① 프로덕션에서 `SELECT count(*) FROM users WHERE clerk_id IS NOT NULL AND auth_user_id IS NULL` `[확인 필요]`
 ② 0 이면 읽기 경로 제거 배포 → ③ 다음 배포에서 DROP (`docs/development/migrations.md` §6 2단계 원칙). 0 이 아니면 매핑부터.
 
-### BL-LR-12 — 비공개 프로젝트를 지우면 그 프로젝트에만 연결된 회의가 워크스페이스 전체 공개가 된다 (P2, 보안) ⏳ **미착수** `[E1-06]` `[확인 필요]`
+### BL-LR-12 — 비공개 프로젝트를 지우면 그 프로젝트에만 연결된 회의가 워크스페이스 전체 공개가 된다 (P2, 보안) ⏳ **미착수 · 결정 완료 (Gate 1)** `[E1-06]`
 회의 가시성은 "링크 0개 = 전원 공개" 다. admin 이 private 프로젝트를 삭제하면 링크가 CASCADE 로 사라져 그 회의(전사·인박스 요약·RAG 청크)가 viewer 에게까지 열린다.
 추출 액션은 `project_id` 가 NULL 이라 삭제 409 게이트(BL-S27e-5)에 안 걸린다. 규칙을 글자 그대로 따른 결과이고 main 에서도 같다.
-권장: 회의의 **유일한** 링크가 삭제 대상 프로젝트면 409 로 막고 "회의를 먼저 다른 프로젝트로 옮기거나 삭제" 를 안내 (notes/actions 409 와 같은 모양). 제품 규칙 결정이라 사용자 확인 후 착수.
+**2026-09-27 사용자 결정 (Gate 0 인계 Q6): 회의의 유일한 링크가 삭제 대상 프로젝트면 409 로 막는다** — "회의를 먼저 다른 프로젝트로 옮기거나 삭제" 안내 (notes/actions 409 와 같은 모양). 구현은 Gate 1.
 
 ### BL-LR-13 — 가시성 잠재 결함 묶음 (P3, 지금은 도달 경로 없음) ⏳ **미착수** `[E1-04 · E1-08 · E1-09 · E1-11]`
 - E1-04: 캐시 재검사에서 admin/owner 는 행이 없는 청크를 위반으로 보지 않는다. 메모 청크를 hard-delete 하는 경로가 생기면 남의 메모로 만든 캐시가 owner 에게 HIT (I-24 위반). 메모 삭제 기능을 만들 때 같이 고친다.
@@ -132,15 +134,15 @@ Better Auth 컷오버(ADR-031) 뒤 `clerk_id` 는 쓰기 경로가 없다. 다�
 - E1-11: `projects/service.py` `get_meeting_projects` 는 호출자 0 이고 테넌트만 검사한다. 라우터에 붙이면 C-018 이 재발한다 — 삭제하거나 `_verify_link_access` 를 거친다.
 
 ### BL-LR-14 — FE 권한·UX 후속 (P3) ⏳ **미착수** `[E-FE E-7 · E-9 · Phase 2 FE Generator]`
-- 작성자(member)는 자기 private 프로젝트의 visibility 는 바꿀 수 있지만 ProjectMember 추가는 못 한다 (`ProjectMembersPanel` 은 `canManage` 만 본다). BE 규칙부터 정해야 한다 `[확인 필요]`.
+- ~~작성자(member)는 자기 private 프로젝트의 visibility 는 바꿀 수 있지만 ProjectMember 추가는 못 한다~~ → **2026-09-27 사용자 결정 (Q7): admin 만 유지** (현행 BE·FE 그대로, 코드 0).
 - `useClassifyInbox` 성공 시 회의 목록·상세 키를 무효화하지 않는다 — 인박스에서 확정한 링크가 회의 상세에 새로고침 전까지 안 보인다.
 - 422 문구 끝에 wire 필드명 camelCase 가 붙는다 (`… (transcriptText)`) — 한국어 라벨 맵 또는 hint 제거.
 - 앱 안에서 WS 를 바꾸면 새 WS 멤버 목록을 불러오는 동안 이전 WS 의 role 이 남아 편집 버튼이 잠깐 보인다 (BE 403 으로 막힘). 로딩 중 role 을 null 로 (fail-closed).
 - Gate 0 가시성 수정(체크리스트 0-1)의 **e2e spec 이 없다**. 검증은 pytest 통합 테스트 + 라이브 Playwright 탐침(scratchpad, 커밋 안 됨)으로 했다. `apps/web/e2e/` 에 viewer 가 private 회의의 인박스 요약·추출 액션·RAG 출처를 못 보는 spec 1건을 추가한다.
 
 ### BL-LR-15 — 운영 후속 (P3) ⏳ **미착수** `[Phase 2 Ops]`
-- DB 덤프에 세션 토큰·Google OAuth 토큰·비밀번호 해시가 들어 있고 nexus-core 와 공유하는 버킷에 올라간다 → R2 토큰 prefix 제한 또는 덤프 암호화.
-- 로컬 dev·QA 도 같은 버킷 `uploads/` 에 쓴다 → 운영 cleanup 이 이들을 고아 후보로 본다 (dry-run 결과를 사람이 확인하는 이유).
+- DB 덤프에 세션 토큰·Google OAuth 토큰·비밀번호 해시가 들어 있다. **2026-09-27 사용자 결정 (Q13): 도그푸딩 규모라 암호화 없이 현행 수용** (위험 수용). 공유 버킷 문제는 ADR-033 으로 해소한다 — 백업은 R2 전환 **뒤에** 켜므로 덤프는 Kairos 전용 `kairos-prod` 에만 올라가고, 앱 토큰은 그 버킷 하나로 제한된다 (운영자 절차 `docs/TODO.md` "Gate 0 잔여"). 사용자 수가 늘면 덤프 암호화(복호화 키 별도 보관)를 다시 본다.
+- 로컬 dev·QA 도 같은 버킷 `uploads/` 에 쓴다 → ADR-033 (2026-09-27) 으로 분리: CI 는 `kairos-dev` 로 옮김 ✅ (#198) · 운영 `kairos-prod` 전환과 로컬 `.env` 교체는 ⏳ 운영자 작업. 이전 때 옛 dev 업로드도 `uploads/` 째로 넘어온다 → BL-LR-18.
 - `scripts/tests/` 는 어떤 CI job 도 돌리지 않는다 → `test.yml` 에 추가.
 - 세션 revoke 뒤에도 이미 발급된 JWT 는 최대 15분 유효하다 (jwt plugin 기본값). 수동 비밀번호 재설정 runbook 에 명시돼 있다.
 - 메모 AI 호출 실패 시 `memory_ai_calls.error_message` 에 `str(exc)` 가 저장된다 (API 노출 0건, E2-08). 회의 파이프라인처럼 정제할지 결정.
@@ -167,6 +169,24 @@ Better Auth 컷오버(ADR-031) 뒤 `clerk_id` 는 쓰기 경로가 없다. 다�
 같은 리뷰(Claude·Codex 교차)에서 반영: `.env` 를 바꾸기 전에 `docker image inspect` 로 이미지 존재 확인(없는 태그가 `.env` 에 남으면 다음
 deploy-ship 의 GC 가 실제 운영 이미지를 지운다) · 롤백 뒤 `deploy-status` 로 `/ready` 확인 · 보안 수정 이전 태그로의 롤백 경고 · revert 롤포워드 시 리비전 파일 유지.
 **후속 (P3)**: archify `docs/architecture/diagrams/deploy-workflow.*` 의 롤백 간선 라벨이 아직 "이전 태그로 up -d" (→ migrate 를 거치는 것처럼 그려짐). 다음 다이어그램 재생성 때 `--no-deps api web` 로.
+
+### BL-LR-17 — 팀→팀 promote 정책 (P2, 제품 규칙 · Gate 1) ⏳ **미착수 · 사용자 검토 중** `[Gate 0 인계 Q5]`
+사용자 고민 (2026-09-27): "권한이 제품을 어렵게 만든다" → **팀→팀 promote 금지** 또는 **수동 이동만** 을 검토 중. 5종(회의·노트·메모·액션·인박스) 공통으로 정한다.
+사실 (코드 확인): promote 는 WS 간 **1건 복사**다 (이동·일괄 아님). `common/promote_helpers.py` 는 원본 WS 의 type 을 보지 않아 **팀→팀이 5종 모두 허용**된다.
+M-7(공유 사본 재promote 는 원본 작성자만)은 메모에만 붙은 추가 제한이다. Drive 문서에는 복사·이동 경로가 없다 (owner 가 다시 고르는 수동 모델).
+선택지: ① 현행 유지 ② 팀→팀 금지 (개인→팀만) ③ promote 폐지 + 수동 이동. 결정 뒤 5개 라우터 + `promote_helpers.py` + FE `ItemPromoteModal` 을 같이 바꾼다.
+
+### BL-LR-18 — R2 버킷 이전(ADR-033) 후속 (P3, 운영) ⏳ **미착수**
+- **옛 버킷 `nexus-core-storage` 의 Kairos prefix(`uploads/`) 삭제 — 이전 +14일 이후, 결정 먼저 `[확인 필요]`.** 되돌리기 창이 끝나도 Neon(이전 원본, 사실상 백업 DB)·로컬 dev DB 가 옛 버킷 키를 참조할 수 있다. 지우기 전에 Neon 을 계속 보존할지부터 정한다. nexus-core 는 버킷 루트 키 + `db-backups/` 만 써서 `uploads/` 삭제의 영향이 없다 (`nexus-core/apps/api/app/services/storage/r2.py:53`).
+- **기존 R2 토큰 2개(`R2 Account Token`·`nexus-core-backend`)가 All buckets 범위라 `kairos-prod` 에도 닿는다.** nexus-core 가 쓰는 토큰이라 Kairos 에서 지우지 않는다. nexus-core 쪽에서 버킷 한정 토큰으로 바꾸는 작업이다.
+- **`kairos-prod` 로 운영 DB 미참조 객체도 같이 넘어온다** (옛 버킷 기준 candidates 101 — CI `test.m4a`·dev 업로드). Super Slurper 가 prefix 통째로 복사하기 때문이다. 복사로 LastModified 가 새로 찍혀 이전 직후에는 전부 7일 미만이다 → 이전 +7일 뒤 `r2_cleanup.py` dry-run 으로 목록 확인 → `--delete` (`docs/operations/r2-cleanup-cron.md` §2).
+- **DB 가 참조하는데 버킷에 없는 키 2개** (referenced 88 − protected 86). 이전 **전부터** 옛 버킷에 없었다. 어느 회의·메모인지부터 찾는다 (`meetings.file_key ∪ memory_items.r2_audio_key` 를 HEAD 로 대조). 원본이 없는 회의는 재처리가 실패한다.
+- `apps/api/tests/test_r2_cors_regression.py` 는 Vercel 시절 테스트다 (브라우저 직접 PUT 전제, 기본 버킷 `nexus-core-storage`). CI·`be-test` 둘 다 `--ignore` 로 제외돼 있고, 지금은 브라우저가 R2 에 직접 닿지 않는다 → 삭제 후보.
+
+### BL-LR-19 — PR #197·#198 리뷰에서 나온 범위 밖 발견 (P2/P3) ⏳ **미착수** `[2026-09-27 /review Claude·Codex 교차]`
+- **(P2) FE 토큰 캐시가 사용자 전환을 모른다.** `apps/web/src/lib/use-api-client.ts` 의 모듈 캐시(`cachedToken`)는 헤더 로그아웃(`components/layout/header.tsx:173`)에서만 비워진다. 로그인 성공은 `router.push`(`features/auth/components/auth-form.tsx:98`)라 JS 컨텍스트가 그대로다. 그래서 다른 탭 로그아웃·세션 만료 뒤 **같은 탭에서 다른 계정으로 로그인하면 이전 사용자의 JWT(최대 15분, 서명만 검증)를 계속 붙인다** `[가정: 코드 정적 확인, 재현 전]`. 공용 PC 에서 실제로 난다. 방향: 로그인 성공 시 `clearAuthTokenCache()` + 401 응답 시 캐시 비우고 1회 재시도. 재현 e2e 부터 쓴다.
+- (P3) `deploy-rollback` 은 이미지 태그 두 줄만 되돌린다. compose 파일과 태그 밖 `.env` 변경은 그대로다 — 새 compose 가 구 이미지에 없는 env 를 요구하면 롤백이 불완전하다. 지금 compose 는 가산형이라 문제없다. `deploy-ship` 이 남기는 `docker-compose.prod.yml.bak` 복원을 롤백 절차에 넣을지 결정.
+- (P3) nightly team spec 은 `QA_LOCAL_*` secret 이 비면 조용히 skip 된다 → secret 누락이 green 으로 보인다. 누락이면 실패로.
 
 ---
 

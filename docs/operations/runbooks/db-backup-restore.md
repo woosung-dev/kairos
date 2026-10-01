@@ -13,9 +13,11 @@
 - **호스트에서 `.env` 를 읽지 않는다.** 덤프는 db 컨테이너 안의 `POSTGRES_USER/POSTGRES_DB` 로,
   업로드는 `kairos-api` 컨테이너 안의 `R2_ACCOUNT_ID` · `R2_ACCESS_KEY_ID` · `R2_SECRET_ACCESS_KEY` ·
   `R2_BUCKET_NAME` 과 boto3 로 한다 (앱과 같은 변수·같은 라이브러리). 필요한 도구는 `docker` CLI 뿐이다.
-- **R2 버킷 `nexus-core-storage` 는 다른 프로젝트와 공유한다.** 키는 `backups/kairos/` 아래로만 쓰고
-  (업로드 코드가 다른 prefix 를 거부한다), 스크립트는 R2 에서 **아무것도 지우지 않는다.**
-  nexus-core 의 백업은 `db-backups/` 라 겹치지 않는다.
+- **R2 버킷은 Kairos 전용 `kairos-prod` 다** (ADR-033 — 회의·메모 원본 `uploads/`·`memory/` 와 같은 버킷).
+  ★업로드는 api 컨테이너의 `R2_*` 를 따라간다. **서버 `.env` 의 R2 전환(`R2_BUCKET_NAME=kairos-prod`) 뒤에** 첫 실행·cron 등록을 한다 —
+  전환 전에 돌리면 옛 공유 버킷 `nexus-core-storage` 로 올라간다 (`docs/TODO.md` Blocked "Gate 0 잔여" R3 → R4).
+  키는 `backups/kairos/` 아래로만 쓰고 (업로드 코드가 다른 prefix 를 거부한다 — 원본 prefix 를 덮어쓰지 않게),
+  스크립트는 R2 에서 **아무것도 지우지 않는다.**
 - 임시 이름(`.partial`)으로 쓰고 `pg_restore --list` 검증을 통과해야 최종 이름을 갖는다. 목차에
   `alembic_version · users · auth_user · auth_account · workspaces · meetings` 데이터가 없으면 실패다.
 - 실패하면 exit 1. 업로드가 실패해도 검증된 로컬 사본은 남는다. 보존 정리는 전부 성공했을 때만 돈다.
@@ -30,13 +32,13 @@
 맥(레포 루트)에서 스크립트를 올린다.
 
 ```bash
-scp -r deploy/oci/backup truewords-oracle:~/kairos/
+scp -r deploy/oci/backup oci-tokyo:~/kairos/
 ```
 
 서버에서:
 
 ```bash
-ssh truewords-oracle
+ssh oci-tokyo
 cd ~/kairos
 chmod 700 backup/*.sh
 mkdir -p -m 700 ~/kairos/backups       # cron 의 >> 리다이렉트가 스크립트보다 먼저 돈다
@@ -66,9 +68,9 @@ tail -n 20 ~/kairos/backups/backup.log          # "✅ R2 업로드 — key=back
 find ~/kairos/backups/last-success -mmin -1560   # 26시간 이내면 경로가 출력된다. 빈 출력 = 백업 멈춤
 ```
 
-**R2 보존 기간** — 스크립트는 R2 를 지우지 않으므로 Cloudflare 대시보드 → R2 → `nexus-core-storage` →
-Settings → Object lifecycle rules 에 prefix `backups/kairos/` 만 대상으로 "N일 후 삭제" 규칙을 건다.
-[확인 필요: N 값 — 기본 제안 30일]
+**R2 보존 기간 = 14일** (2026-09-27 사용자 결정, 로컬 보관과 같다) — 스크립트는 R2 를 지우지 않으므로
+`kairos-prod` → Settings → Object lifecycle rules 의 `backups-14d` (prefix `backups/kairos/` 만, 14일 후 삭제) 가 지운다.
+원본 prefix 에는 걸지 않는다.
 
 ## 3. 복원 리허설 (분기 1회 · 체크리스트 2-4)
 
@@ -142,7 +144,7 @@ curl -s https://kairos.woosung.dev/api/auth/jwks   # 키가 나와야 한다 (BE
 ### B. 볼륨·VM 을 잃었을 때
 
 1. `deploy/oci/README.md` "최초 부트스트랩" 대로 서버를 세운다. `.env` 는 별도 보관본에서 복구한다.
-2. 덤프를 구한다 — 로컬 사본이 없으면 Cloudflare 대시보드 → R2 → `nexus-core-storage` →
+2. 덤프를 구한다 — 로컬 사본이 없으면 Cloudflare 대시보드 → R2 → `kairos-prod` →
    `backups/kairos/YYYY/MM/DD/` 에서 내려받아 `scp` 로 올린다.
 3. `docker compose -f docker-compose.prod.yml up -d db` (db 만. initdb 가 확장을 만든다)
 4. `docker exec -i kairos-db pg_restore -U kairos -d kairos --no-owner --no-privileges --exit-on-error < "$DUMP"`
@@ -151,5 +153,5 @@ curl -s https://kairos.woosung.dev/api/auth/jwks   # 키가 나와야 한다 (BE
 ## 5. 하지 말 것
 
 - `docker compose down -v` — `db-data` 볼륨이 지워진다. 백업이 있어도 마지막 백업 이후 데이터는 사라진다.
-- 백업 prefix 를 바꾸거나 `backups/` 밖으로 올리기 — 공유 버킷이다.
+- 백업 prefix 를 바꾸거나 `backups/` 밖으로 올리기 — 같은 버킷에 회의·메모 원본이 있고, lifecycle `backups-14d` 가 이 prefix 에만 걸려 있다.
 - 복원 리허설을 운영 컨테이너(`kairos-db`) 안의 새 DB 로 하기 — 리허설은 항상 `pg-restore-check.sh` 의 임시 컨테이너로.
