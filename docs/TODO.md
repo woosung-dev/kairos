@@ -71,20 +71,20 @@
 - [ ] Cloudflare `woosung.dev` → Rules — 2026-09-27 에 만든 Redirect Rule · 응답 헤더(Transform) Rule 삭제 (0-13 은 Gate 1 1-17 로 이동). 만든 직후 검증에서 **미적용**이었다 (http 200 · HSTS 없음, 같은 날 재확인도 http 200) — 남겨 두면 나중에 모르게 켜질 수 있어 지운다
 
 **R2 · 이전 검증 (Mac, 2분 — 이전 작업 완료 후)** 지금 도는 api 컨테이너에 버킷만 바꿔 읽는다 (키를 argv 에 싣지 않음)
-- [ ] `ssh truewords-oracle 'bash -lc "docker exec -i -e R2_BUCKET_NAME=kairos-prod kairos-api python - --inventory"' < apps/api/scripts/r2_cleanup.py` → `uploads/ objects=187`
-- [ ] `ssh truewords-oracle 'bash -lc "docker exec -i -e R2_BUCKET_NAME=kairos-prod kairos-api python - --days 7"' < apps/api/scripts/r2_cleanup.py` → `protected(referenced)=86` (옛 버킷 기준값. too_young·candidates 는 복사로 시각이 바뀌어 달라진다). **다르면 R3 로 가지 않는다**
+- [ ] `ssh oci-tokyo 'bash -lc "docker exec -i -e R2_BUCKET_NAME=kairos-prod kairos-api python - --inventory"' < apps/api/scripts/r2_cleanup.py` → `uploads/ objects=187`
+- [ ] `ssh oci-tokyo 'bash -lc "docker exec -i -e R2_BUCKET_NAME=kairos-prod kairos-api python - --days 7"' < apps/api/scripts/r2_cleanup.py` → `protected(referenced)=86` (옛 버킷 기준값. too_young·candidates 는 복사로 시각이 바뀌어 달라진다). **다르면 R3 로 가지 않는다**
 
 **R3 · 전환 + Clerk + 멈춘 회의 (약 10분)**
 - [ ] Mac: `mise run deploy-preflight` → 0
-- [ ] Mac (0-20 · `runbooks/stuck-pipeline.md` §1 1회): `printf "SELECT id, status, updated_at FROM meetings WHERE status IN ('transcribing','analyzing') AND updated_at < now() - interval '2 hours';" | ssh truewords-oracle 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -tA"'`
-- [ ] Mac (BL-LR-11 ①): `printf "SELECT count(*) FROM users WHERE clerk_id IS NOT NULL AND auth_user_id IS NULL;" | ssh truewords-oracle 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -tA"'`
+- [ ] Mac (0-20 · `runbooks/stuck-pipeline.md` §1 1회): `printf "SELECT id, status, updated_at FROM meetings WHERE status IN ('transcribing','analyzing') AND updated_at < now() - interval '2 hours';" | ssh oci-tokyo 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -tA"'`
+- [ ] Mac (BL-LR-11 ①): `printf "SELECT count(*) FROM users WHERE clerk_id IS NOT NULL AND auth_user_id IS NULL;" | ssh oci-tokyo 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -tA"'`
 - [ ] 서버 `~/kairos`: `cp -p .env .env.bak-20260927` → `sed -i -E '/^[A-Z_]*CLERK[A-Z_]*=/d; /^[[:space:]]*#.*CLERK/d' .env` (CLERK 키 줄 + CLERK 를 언급한 주석 줄) → `nano .env` 로 `R2_ACCESS_KEY_ID`·`R2_SECRET_ACCESS_KEY` = `kairos-prod-app`, `R2_BUCKET_NAME=kairos-prod` (`R2_ACCOUNT_ID` 유지) → `grep -c CLERK .env` = 0 (T-37 기준) · `stat -c %a .env` = 600 → `docker compose -f docker-compose.prod.yml up -d --no-deps api`
-- [ ] Mac: `ssh truewords-oracle 'bash -lc "docker exec -i kairos-api python - --days 7"' < apps/api/scripts/r2_cleanup.py` (`-e` 없이 = 새 키) → `bucket=kairos-prod` · `protected(referenced)=86`
+- [ ] Mac: `ssh oci-tokyo 'bash -lc "docker exec -i kairos-api python - --days 7"' < apps/api/scripts/r2_cleanup.py` (`-e` 없이 = 새 키) → `bucket=kairos-prod` · `protected(referenced)=86`
 
 **R4 · 마무리 (약 15분)**
 - [ ] Data migration 같은 설정으로 재실행, **Overwrite = No(skip)** (R1~R3 사이 업로드분) → 끝나면 `migration-src-readonly` 토큰 삭제
 - [ ] GitHub repo-level `R2_*` → `kairos-prod-readonly`: `gh secret set R2_ACCESS_KEY_ID --repo woosung-dev/kairos` · `gh secret set R2_SECRET_ACCESS_KEY --repo woosung-dev/kairos` (프롬프트에 붙여넣기) · `gh secret set R2_BUCKET_NAME --repo woosung-dev/kairos --body kairos-prod` → `gh workflow run r2-cleanup.yml --repo woosung-dev/kairos -f days=30` success
-- [ ] 0-11 백업 (**전환 뒤에** — 전환 전에 돌리면 옛 공유 버킷으로 올라간다): Mac `scp -r deploy/oci/backup truewords-oracle:~/kairos/` (최신본 재업로드, 여러 번 해도 같다) → 서버 `chmod 700 ~/kairos/backup/*.sh && cd ~/kairos && backup/pg-backup.sh --dry-run && backup/pg-backup.sh && cat backups/last-success` → `timedatectl | grep 'Time zone'` → `crontab -e` 에 `37 18 * * * /bin/bash -lc '$HOME/kairos/backup/pg-backup.sh >> $HOME/kairos/backups/backup.log 2>&1'` (Asia/Seoul 이면 `37 3`) → `crontab -l | grep pg-backup`. 절차 정본 `docs/operations/runbooks/db-backup-restore.md` §2
+- [ ] 0-11 백업 (**전환 뒤에** — 전환 전에 돌리면 옛 공유 버킷으로 올라간다): Mac `scp -r deploy/oci/backup oci-tokyo:~/kairos/` (최신본 재업로드, 여러 번 해도 같다) → 서버 `chmod 700 ~/kairos/backup/*.sh && cd ~/kairos && backup/pg-backup.sh --dry-run && backup/pg-backup.sh && cat backups/last-success` → `timedatectl | grep 'Time zone'` → `crontab -e` 에 `37 18 * * * /bin/bash -lc '$HOME/kairos/backup/pg-backup.sh >> $HOME/kairos/backups/backup.log 2>&1'` (Asia/Seoul 이면 `37 3`) → `crontab -l | grep pg-backup`. 절차 정본 `docs/operations/runbooks/db-backup-restore.md` §2
 - [ ] 로컬 `apps/api/.env` 의 `R2_*` 3줄 → `kairos-dev-app` 키 + `R2_BUCKET_NAME=kairos-dev`
 - [ ] (전환 +14일 뒤) 옛 버킷 `uploads/` 삭제 여부 결정 · 서버 `.env.bak-20260927` 삭제 — BL-LR-18
 
