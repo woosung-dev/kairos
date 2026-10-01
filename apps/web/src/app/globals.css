@@ -89,7 +89,7 @@
   /* Typography */
   --font-display: 'Satoshi', sans-serif;
   --font-body: 'Pretendard Variable', 'Pretendard', sans-serif;
-  --font-mono: 'Geist Mono', monospace;
+  --font-mono: var(--font-geist-mono), monospace; /* layout.tsx next/font/local 이 <html> 에 주입 */
 
   /* Spacing: 4px base */
   --space-2xs: 2px;

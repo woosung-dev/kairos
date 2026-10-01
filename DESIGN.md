@@ -21,7 +21,7 @@
 - **Loading:**
   - Satoshi: Fontshare (`api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&display=swap`) — Indian Type Foundry 공식 호스팅. Google Fonts 미배포 (BL-045 fix 2026-05-16)
   - Pretendard: CDN (`cdn.jsdelivr.net/gh/orioncactus/pretendard`)
-  - Geist Mono: Google Fonts (`family=Geist+Mono:wght@400;500`)
+  - Geist Mono: 레포 self-host (`apps/web/src/app/fonts/`, `next/font/local`, latin 가변 wght 400–500) — 빌드가 Google Fonts 다운로드에 기대지 않는다 (2026-10-02)
 - **Scale:**
   - h1: 32px / 700 (Satoshi)
   - h2: 24px / 600 (Satoshi)
