@@ -52,6 +52,8 @@ export const config = {
     //   리다이렉트된다. Clerk 시절 매처는 `/_next(.*)` 전체를 public 으로 뒀으므로
     //   좁게 쓰면 그게 그대로 회귀다.
     // ★`/api/auth` 를 빼먹으면 로그인 요청 자체가 리다이렉트 루프에 걸린다.
-    "/((?!api/auth|_next|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
+    // ★`manifest\\.webmanifest$` 는 PWA manifest 1개만 뺀다 (docs/requirements/pwa.md REQ-001).
+    //   전방탐색이 경로 맨 앞에서 평가되므로 `/x/manifest.webmanifest` 는 계속 보호된다.
+    "/((?!api/auth|_next|favicon.ico|manifest\\.webmanifest$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
   ],
 };

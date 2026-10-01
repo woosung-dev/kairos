@@ -28,9 +28,13 @@ export function BottomNav() {
 
   return (
     <nav
+      data-testid="bottom-nav"
       className="fixed bottom-0 left-0 right-0 flex items-center justify-around z-50"
       style={{
+        // 높이 토큰이 홈 인디케이터만큼 늘어난 만큼 안쪽 하단을 비운다 — border-box 라
+        // 아이콘 영역은 56px 그대로 (docs/requirements/pwa.md §4.3).
         height: "var(--bottom-nav-height)",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
         background: "var(--surface)",
         borderTop: "1px solid var(--border)",
       }}

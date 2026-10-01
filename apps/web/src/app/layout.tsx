@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/layout/theme-provider";
+import { ServiceWorkerRegistrar } from "@/components/layout/service-worker-registrar";
 import { QueryProvider } from "@/lib/query-client";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -20,6 +21,20 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Kairos — 팀의 세컨드 브레인",
   description: "회의, 노트, 자료가 쌓일수록 조직이 똑똑해집니다",
+  // PWA 설치형 셸 (docs/requirements/pwa.md §4.3). manifest <link> 는 app/manifest.ts 가 만든다.
+  // statusBarStyle 은 default — black-translucent 는 웹뷰가 상태바 밑까지 올라가 헤더 상단
+  // safe-area 처리가 추가로 필요하다 (BL-PWA-10).
+  appleWebApp: { capable: true, title: "Kairos", statusBarStyle: "default" },
+  // ★Next 아이콘 파일 컨벤션(app/apple-icon.png)을 쓰지 않는다 — href 가 확장자 없는 경로면
+  //   proxy matcher 의 .png 제외에 걸리지 않아 로그인 리다이렉트될 수 있다 (pwa.md §4.2).
+  icons: { apple: "/icons/apple-touch-icon.png" },
+};
+
+// themeColor 는 앱 기본 테마(dark) 배경 단일값 — OS media 배열은 앱 테마와 어긋난다 (pwa.md C-10).
+// viewportFit=cover 여야 env(safe-area-inset-*) 가 0 이 아니다 (globals.css · bottom-nav).
+export const viewport: Viewport = {
+  themeColor: "#0A0A0B",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -67,6 +82,7 @@ export default function RootLayout({
             <Toaster />
           </QueryProvider>
         </ThemeProvider>
+        <ServiceWorkerRegistrar />
       </body>
     </html>
   );

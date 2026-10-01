@@ -30,7 +30,7 @@ mise run ci-local
 | `mise run be-test` | `backend-test` "Run tests" | pytest. `transcription` / `r2-cors` 2개 제외가 **정본** (외부 API·실 R2 의존) |
 | `mise run fe-test` | `frontend-build` "Unit tests (vitest)" | 코드 옆 `__tests__/` 단위 테스트 |
 | `mise run fe-build` | `frontend-build` "Build (includes type check)" | Next 빌드 = TS strict 타입 검사 |
-| `mise run fe-security-headers` | `frontend-build` "Security headers gate (build artifact, public route)" | 보안 헤더 회귀 (public route, secrets 불요). **빌드 산출물(`pnpm start`)을 검증한다** — ↓ §2.1 |
+| `mise run fe-security-headers` | `frontend-build` "Security headers gate (build artifact, public route)" | 보안 헤더 + PWA 셸 회귀 (public-only project, public route, secrets 불요). **빌드 산출물(`pnpm start`)을 검증한다** — ↓ §2.1 |
 | `mise run contracts-check` | `contract-check` | OpenAPI 재생성 + `git diff --exit-code` drift 차단 (ADR-027 D2) |
 | `mise run e2e` | `e2e` job (`vars.E2E_ENABLED`, **현재 미활성**) | Playwright |
 
@@ -85,7 +85,7 @@ CI 가 복구되면 이 표가 대조표가 된다 — 로컬만 green 이고 CI
 - **단위**: 코드 옆 `__tests__/` (`src/**/__tests__/*.test.tsx`). 별도 top-level `tests/` 없음
 - **e2e**: `apps/web/e2e/` (`playwright.config.ts` `testDir: "./e2e"`)
   - project `chromium` — 일반 spec
-  - project `public-only` — 보안 헤더. public route 만이라 secrets·BE 불요
+  - project `public-only` — 보안 헤더 + PWA 셸(`pwa.spec.ts`). public route 만이라 secrets·BE 불요
   - project `team` — 멀티테넌시/RBAC 회귀 T1~T23 (조건부)
 
 ★신규 page/component 를 만들면 **영향받는 spec 의 selector 도 같은 PR 에서** 갱신한다.

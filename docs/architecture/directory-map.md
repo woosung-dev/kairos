@@ -76,6 +76,7 @@ apps/web/
     ├── components/                    # 도메인 무관 공통 UI
     │   ├── ui/                        # shadcn/ui v4 (수정 금지, I-11)
     │   ├── layout/                    # Sidebar, Header, PanelLayout, RAGPanel, BottomNav, CmdK
+    │   │   └── service-worker-registrar.tsx # ★ SW 등록·해제 (root layout 마운트) — 등록 호출부 레포 1곳 (F-14, ADR-034)
     │   ├── landing/                   # 랜딩 섹션
     │   ├── onboarding/                # OnboardingTooltip
     │   └── shared/                    # 도메인 횡단 공통 (Sprint 23 D4)
@@ -104,7 +105,8 @@ apps/web/
     ├── lib/                           # 서드파티 설정, 유틸 (query-client, constants)
     │   ├── api-client.ts              # ★ ApiClient seam (2026-07-13) — createApiClient(getToken), 토큰 주입 SSOT
     │   ├── use-api-client.ts          # useApiClient() — JWT 캐시 + single-flight 주입 훅
-    │   └── query-keys.ts              # ★ queryKey factory 레지스트리 (2026-07-13) — cross-feature key import 금지 (eslint no-restricted-imports)
+    │   ├── query-keys.ts              # ★ queryKey factory 레지스트리 (2026-07-13) — cross-feature key import 금지 (eslint no-restricted-imports)
+    │   └── pwa/                       # ★ PWA 셸 (ADR-034) — sw.ts(worker 엔트리) · navigation/offline-page(SCR-001) · registration(모드 결정). Cache Storage 미사용 (F-14)
     ├── store/                         # Zustand 전역 상태
     │   └── ui.ts
     └── types/

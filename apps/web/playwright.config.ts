@@ -51,6 +51,8 @@ export default defineConfig({
       // override 하므로 여기에도 명시 (Playwright 동작).
       testIgnore: [
         /security-headers\.spec\.ts/,
+        // pwa.spec.ts 도 public-only 단독 — SW 는 prod 빌드에서만 등록돼 dev 서버(chromium 기본)에선 무의미.
+        /pwa\.spec\.ts/,
         // 팀 spine 스펙은 gated `team` project(E2E_RUN_TEAM=true) 에서만 실행 —
         // owner/member storageState 가 team-setup 에서만 생성되므로 chromium 에서 제외.
         /tests[\\/]team[\\/]/,
@@ -71,9 +73,10 @@ export default defineConfig({
     // FE 보안 헤더 회귀 가드 (security-headers.spec.ts) 의 CI 게이트 운영화 — 로그인 불요.
     // CI chromium 의 ERR_NAME_NOT_RESOLVED (localhost 도 127.0.0.1 도 fail) 회피:
     // --no-sandbox + --host-resolver-rules 로 internal DNS 강제 매핑.
+    // PWA 셸 회귀 가드 (pwa.spec.ts, docs/requirements/pwa.md §4) 도 같은 project — 로그인 불요 + prod 빌드 전제.
     {
       name: "public-only",
-      testMatch: /security-headers\.spec\.ts/,
+      testMatch: /(security-headers|pwa)\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
         launchOptions: {

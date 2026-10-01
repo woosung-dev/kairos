@@ -168,6 +168,37 @@ Better Auth 컷오버(ADR-031) 뒤 `clerk_id` 는 쓰기 경로가 없다. 다�
 deploy-ship 의 GC 가 실제 운영 이미지를 지운다) · 롤백 뒤 `deploy-status` 로 `/ready` 확인 · 보안 수정 이전 태그로의 롤백 경고 · revert 롤포워드 시 리비전 파일 유지.
 **후속 (P3)**: archify `docs/architecture/diagrams/deploy-workflow.*` 의 롤백 간선 라벨이 아직 "이전 태그로 up -d" (→ migrate 를 거치는 것처럼 그려짐). 다음 다이어그램 재생성 때 `--no-deps api web` 로.
 
+---
+
+## 2026-10-02 PWA 설치형 셸 비범위 (BL-PWA-N)
+
+> PR-1(설치형 셸)에서 범위 밖으로 둔 항목이다. 서술·근거의 정본은 [`requirements/pwa.md`](requirements/pwa.md) §6,
+> 결정은 [ADR-034](adr/034-pwa-installable-shell.md). 우선순위는 spec 에 없어 매기지 않았다.
+> BL-PWA-4·5·6·7·9·12·14 는 PR-2(웹 푸시)에서 등재한다.
+
+### BL-PWA-1 — 커스텀 설치 버튼 (`beforeinstallprompt`) ⏳ **미착수**
+비범위 근거: Next 번들 문서 비권장 — 크로스 브라우저 아님, Safari iOS 미동작 (`progressive-web-apps.md:597`).
+
+### BL-PWA-2 — 오프라인 배너 (`next/offline` `useOffline` — experimental) ⏳ **미착수**
+비범위 근거: SCR-001 이 대신한다 (spec 게이트 ① 확정). `use-offline.md` 는 experimental 플래그가 필요하다.
+
+### BL-PWA-3 — 오프라인 데이터 읽기 (회의·노트 캐시) ⏳ **미착수**
+비범위 근거: I-9/I-23/I-24 + revocation 즉시성 (pwa.md C-4). 하려면 별도 ADR 이 필요하다 (ADR-034 D1·기각 ①).
+
+### BL-PWA-8 — `position: fixed` 요소의 가로 모드 좌우 safe-area · `CaptureSheet` 하단 safe-area ⏳ **미착수**
+대상: 하단 nav · 피드백 버튼 · `CaptureSheet`. 비범위 근거: 이번 범위는 하단 nav 하단 inset + body 좌우 padding 이다 (pwa.md §4.3).
+
+### BL-PWA-10 — 라이트 테마·랜딩용 동적 `theme-color` · iOS 상태바 스타일 재검토 ⏳ **미착수**
+비범위 근거: 단일값 `#0A0A0B` 로 시작했다 (pwa.md C-10).
+
+### BL-PWA-11 — manifest `shortcuts`·`screenshots`·iOS 스플래시(`apple-touch-startup-image`) ⏳ **미착수**
+비범위 근거: 설치 최소 요건 밖이다.
+
+### BL-PWA-13 — mise task `fe-security-headers` 이름 정리 (PWA spec 도 이 task 로 돈다) ⏳ **미착수**
+낡은 **설명 문구**(mise `description` · `.github/workflows/test.yml:122` 주석 · `docs/development/testing.md` §1 표·§4 · `apps/web/README.md` project 목록)는 PR-1 에서 고쳤다.
+남은 것: task **이름** · CI step 이름("Security headers gate …") · 아직 "보안 헤더" 만 적은 코드 주석 2곳(`test.yml:121` · `apps/web/playwright.config.ts:72-73`).
+이름을 바꾸면 `test.yml`·`testing.md`·`apps/web/README.md` 의 호출 문자열이 같이 바뀌어야 해서(mise.toml "로컬 = CI 문자 동일" 규약) 별도 PR 로 둔다.
+
 ## BL-S29-1 — `mise run docs-check` 게이트 신설 (규칙 재중복 방지) ⏳ **미착수**
 
 **배경**: [ADR-029](adr/029-ai-rules-relocation.md) §2.2 가 「`apps/*/AGENTS.md` 는 `B-NN`·`F-NN`·`I-NN` 불변식을
