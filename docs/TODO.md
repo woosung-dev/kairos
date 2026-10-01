@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 갱신: **2026-09-06** (UI/UX sweep 후속 — 리뷰 잔여 13건 해소 · 회귀 테스트 +35)
+> 마지막 갱신: **2026-09-27** (Gate 0 잔여 — 운영자 작업 4라운드 등재 · M-1·ci-required 종결)
 > 4 섹션 운영: Completed / Blocked / Questions / Next Actions (`AGENTS.md` §5)
 > 완료 이력 정본 = `git log` + `docs/REFACTORING-BACKLOG.md`. 분할 직전 원본 = [`archive/todo-2026h1.md`](archive/todo-2026h1.md)
 >
@@ -56,6 +56,38 @@
 ## Blocked
 
 > 차단 사유 + 필요한 조치를 함께 기록한다. 빈번한 질문 대신 여기 누적 후 일괄 전달.
+
+### 🔴 Gate 0 잔여 — 운영자 작업 4라운드 (2026-09-27 등재, 순서대로)
+
+> 체크리스트 0-11 · 0-17 · 0-20 + R2 운영 이전(ADR-033). 합계 약 50분. 키 값은 채팅·셸 기록·문서에 남기지 않는다 (비밀번호 관리자).
+> 되돌리기: 서버 `cd ~/kairos && cp -p .env.bak-20260927 .env && docker compose -f docker-compose.prod.yml up -d --no-deps api`. 옛 버킷 원본은 그대로 있다.
+> 결과(출력)를 Claude 에 붙이면 ADR-033 검증 칸 · 체크리스트 0-11/0-17/0-20 · BL-LR-11 행 수를 채운다.
+
+**R1 · 대시보드 (약 20분, 순서 무관)**
+- [ ] Cloudflare R2 → Manage API tokens — 토큰 3개 (전부 버킷 한정): `kairos-prod-app` (Object Read & Write · `kairos-prod`) · `kairos-prod-readonly` (Object Read · `kairos-prod`) · `migration-src-readonly` (Object Read · `nexus-core-storage`)
+- [ ] `nexus-core-storage` 의 QA 파일 2개 삭제 (`phase2-results.md` §6 의 `uploads/…/beta-meeting.m4a`) · `kairos-prod` 에 실수로 만든 `kairos-dev/` 폴더가 있으면 삭제
+- [ ] R2 → Data migration → Migrate files — 원본 Cloudflare R2 `nexus-core-storage` (`migration-src-readonly`) · **Bucket sub path `uploads/`** (`memory/` 는 0개라 생략) · 대상 `kairos-prod` (`kairos-prod-app`) · Overwrite 기본
+- [ ] Clerk 대시보드 — Kairos 앱 삭제 (노출된 dev secret 무효화, 0-17 · ADR-031 종료 조건). 다른 앱과 이름 확인
+- [ ] Cloudflare `woosung.dev` → Rules — 2026-09-27 에 만든 Redirect Rule · 응답 헤더(Transform) Rule 삭제 (0-13 은 Gate 1 1-17 로 이동). 만든 직후 검증에서 **미적용**이었다 (http 200 · HSTS 없음, 같은 날 재확인도 http 200) — 남겨 두면 나중에 모르게 켜질 수 있어 지운다
+
+**R2 · 이전 검증 (Mac, 2분 — 이전 작업 완료 후)** 지금 도는 api 컨테이너에 버킷만 바꿔 읽는다 (키를 argv 에 싣지 않음)
+- [ ] `ssh oci-tokyo 'bash -lc "docker exec -i -e R2_BUCKET_NAME=kairos-prod kairos-api python - --inventory"' < apps/api/scripts/r2_cleanup.py` → `uploads/ objects=187`
+- [ ] `ssh oci-tokyo 'bash -lc "docker exec -i -e R2_BUCKET_NAME=kairos-prod kairos-api python - --days 7"' < apps/api/scripts/r2_cleanup.py` → `protected(referenced)=86` (옛 버킷 기준값. too_young·candidates 는 복사로 시각이 바뀌어 달라진다). **다르면 R3 로 가지 않는다**
+
+**R3 · 전환 + Clerk + 멈춘 회의 (약 10분)**
+- [ ] Mac: `mise run deploy-preflight` → 0
+- [ ] Mac (0-20 · `runbooks/stuck-pipeline.md` §1 1회): `printf "SELECT id, status, updated_at FROM meetings WHERE status IN ('transcribing','analyzing') AND updated_at < now() - interval '2 hours';" | ssh oci-tokyo 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -tA"'`
+- [ ] Mac (BL-LR-11 ①): `printf "SELECT count(*) FROM users WHERE clerk_id IS NOT NULL AND auth_user_id IS NULL;" | ssh oci-tokyo 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -tA"'`
+- [ ] 서버 `~/kairos`: `cp -p .env .env.bak-20260927` → `sed -i -E '/^[A-Z_]*CLERK[A-Z_]*=/d; /^[[:space:]]*#.*CLERK/d' .env` (CLERK 키 줄 + CLERK 를 언급한 주석 줄) → `nano .env` 로 `R2_ACCESS_KEY_ID`·`R2_SECRET_ACCESS_KEY` = `kairos-prod-app`, `R2_BUCKET_NAME=kairos-prod` (`R2_ACCOUNT_ID` 유지) → `grep -c CLERK .env` = 0 (T-37 기준) · `stat -c %a .env` = 600 → `docker compose -f docker-compose.prod.yml up -d --no-deps api`
+- [ ] Mac: `ssh oci-tokyo 'bash -lc "docker exec -i kairos-api python - --days 7"' < apps/api/scripts/r2_cleanup.py` (`-e` 없이 = 새 키) → `bucket=kairos-prod` · `protected(referenced)=86`
+
+**R4 · 마무리 (약 15분)**
+- [ ] Data migration 같은 설정으로 재실행, **Overwrite = No(skip)** (R1~R3 사이 업로드분) → 끝나면 `migration-src-readonly` 토큰 삭제
+- [ ] GitHub repo-level `R2_*` → `kairos-prod-readonly`: `gh secret set R2_ACCESS_KEY_ID --repo woosung-dev/kairos` · `gh secret set R2_SECRET_ACCESS_KEY --repo woosung-dev/kairos` (프롬프트에 붙여넣기) · `gh secret set R2_BUCKET_NAME --repo woosung-dev/kairos --body kairos-prod` → `gh workflow run r2-cleanup.yml --repo woosung-dev/kairos -f days=30` success
+- [ ] 0-11 백업 (**전환 뒤에** — 전환 전에 돌리면 옛 공유 버킷으로 올라간다): Mac `scp -r deploy/oci/backup oci-tokyo:~/kairos/` (최신본 재업로드, 여러 번 해도 같다) → 서버 `chmod 700 ~/kairos/backup/*.sh && cd ~/kairos && backup/pg-backup.sh --dry-run && backup/pg-backup.sh && cat backups/last-success` → `timedatectl | grep 'Time zone'` → `crontab -e` 에 `37 18 * * * /bin/bash -lc '$HOME/kairos/backup/pg-backup.sh >> $HOME/kairos/backups/backup.log 2>&1'` (Asia/Seoul 이면 `37 3`) → `crontab -l | grep pg-backup`. 절차 정본 `docs/operations/runbooks/db-backup-restore.md` §2
+- [ ] 로컬 `apps/api/.env` 의 `R2_*` 3줄 → `kairos-dev-app` 키 + `R2_BUCKET_NAME=kairos-dev`
+- [ ] (전환 +14일 뒤) 옛 버킷 `uploads/` 삭제 여부 결정 · 서버 `.env.bak-20260927` 삭제 — BL-LR-18
+
 - [x] ~~🔴 **GitHub Actions 결제 복구**~~ — **2026-08-16 해소.** 레포를 public 으로 전환해 Actions 가 복구됐다
   (public 레포는 standard 러너가 무료). 결제 자체를 고친 게 아니라 **과금 대상에서 벗어난 것**이다 —
   private 로 되돌리면 즉시 재발한다. 복구 확인: dependabot PR #163 재실행에서 `changes` success /
@@ -71,7 +103,7 @@
   현재 코드는 전부 fixture/stub 기준으로만 검증됐다.
 - [ ] **외부 user 1명 실제 dogfooding** — Sprint 22 spec `git history` 12분 walkthrough.
 - [x] ~~**T-3 Sprint 14 Clerk Production 인스턴스 발급**~~ — **ADR-031 로 무효.** Clerk 를 걷어냈으므로 Production 인스턴스 발급 자체가 대상이 아니다.
-- [ ] **T-SEC-CLERK-ROTATE → 인스턴스 삭제로 대체** (운영자) 노출된 dev `CLERK_SECRET_KEY`(`sk_test_mvhptL…`)는 **rotation 이 아니라 Clerk dev 인스턴스 삭제**로 무효화한다 (ADR-031 종료 조건). ⚠️ "시급 아님(dev 키 + repo private)" 이라는 2026-05-29 판단은 **레포가 public 이 된 시점에 무효**다. git 히스토리 675 커밋에 키가 남아 있다. **컷오버 +7일(롤백 창 종료) 시점에 실행**한다 — 그 전에 지우면 구 이미지로 롤백할 수 없다.
+- [ ] **T-SEC-CLERK-ROTATE → 인스턴스 삭제로 대체** (운영자) → 2026-09-27: 위 "Gate 0 잔여" R1 에 포함 (롤백 창 종료 · 서버 롤백 태그가 모두 Better Auth 이후라 지금 지워도 된다). 노출된 dev `CLERK_SECRET_KEY` 는 **rotation 이 아니라 Clerk dev 인스턴스 삭제**로 무효화한다 (ADR-031 종료 조건). ⚠️ "시급 아님(dev 키 + repo private)" 이라는 2026-05-29 판단은 **레포가 public 이 된 시점에 무효**다. git 히스토리 675 커밋에 키가 남아 있다. ~~컷오버 +7일(롤백 창 종료) 시점에 실행한다 — 그 전에 지우면 구 이미지로 롤백할 수 없다.~~ (롤백 창은 2026-08-24 에 끝났다)
 - [ ] **T-CLEANUP-1** production DB 에서 `DELETE FROM users WHERE clerk_id='user_QA20260521_sentinel_test_doNotUse'` (Sprint 25 PoC 잔존 정리). ADR-031 의 `clerk_id` DROP 리비전과 함께 처리하면 자동 소멸.
 - [ ] **PR #102 (Sprint 25 moonlit-sutton) ready review + squash merge** — 사용자 승인 후 main 머지
 - [ ] **post-merge 배포 verify** — Cloud Run rollout 후 `POST /api/v1/users/sync` 404 응답 + `/health` 200 + `/dashboard` 회귀 0건
@@ -82,11 +114,11 @@
 
 > 사용자 결정이 필요한 항목.
 
-- [ ] **promote 사본의 공개 범위** `[신규 · 2026-09-27 실사용 준비 Gate 0]` 결정 (a) "메모는 작성자 전용" 을 적용하면서,
+- [x] ~~**promote 사본의 공개 범위**~~ → 2026-09-27 사용자 확정: **현행 유지** (사본 `is_shared=true`, decisions-log M-1). 팀→팀 promote 정책 전반은 BL-LR-17. `[신규 · 2026-09-27 실사용 준비 Gate 0]` 결정 (a) "메모는 작성자 전용" 을 적용하면서,
   "팀으로 올리기"(promote) 로 만든 **사본**은 `memory_items.is_shared=true` 로 대상 WS 전원에게 보이게 했다 (원본은 작성자 전용).
   사본도 작성자 전용이어야 하면 `memory/service.py promote` 의 `is_shared=True` 1줄을 지운다.
   근거: `docs/plans/active/2026-09-26-launch-readiness/decisions-log.md` M-1.
-- [ ] **프로덕션 `users.clerk_id` 레거시 행 수 확인** `[신규 · 2026-09-27]` `SELECT count(*) FROM users WHERE clerk_id IS NOT NULL AND auth_user_id IS NULL`
+- [ ] **프로덕션 `users.clerk_id` 레거시 행 수 확인** (→ Blocked "Gate 0 잔여" R3) `[신규 · 2026-09-27]` `SELECT count(*) FROM users WHERE clerk_id IS NOT NULL AND auth_user_id IS NULL`
   결과가 0 이면 BL-LR-11 의 2단계 DROP 을 진행한다. 서버 DB 접근이 필요해 사용자 실행.
 
 - [x] ~~레포 public/private 여부~~ — **2026-08-16 public 전환 확정.** 따라서:
@@ -111,6 +143,7 @@
 ### 운영 · 인프라 (ADR-027/028 후속)
 - [ ] **BL-OCI-1** (P1) **DB 백업 자동화.** 오라클 셀프호스팅 DB 에 백업이 없다. 개발 단계라 의도적으로 제외했고, 운영 전환 시 착수한다(일 1회 `pg_dump` → R2). 그때까지 **`docker compose down -v` 금지** — `-v` 가 `db-data` 볼륨을 지운다. 현재 안전망은 Neon 원본(오라클 DB 가 그 복사본)뿐이므로 **Neon 프로젝트를 지우지 말 것.**
   → 2026-09-27: 백업 스크립트 완료 (`deploy/oci/backup/`, 절차 `docs/operations/runbooks/db-backup-restore.md`, 로컬 복원 리허설 통과). **남은 것 = 사용자 cron 등록 + R2 lifecycle + `.env`(BETTER_AUTH_SECRET·INTEGRATIONS_ENCRYPTION_KEY) 별도 보관.**
+  → 2026-09-27: 백업 버킷 = `kairos-prod` (ADR-033), lifecycle `backups-14d` 설정 완료. cron 은 Blocked "Gate 0 잔여" R4 (R2 전환 뒤).
 - [ ] **BL-OCI-2** (P3) **presigned URL 업로드 전환.** Cloudflare Free/Pro 는 요청 바디를 100MB 에서 자른다. 운영 실측 최대 파일이 5MB 라 지금은 무해하고, `MAX_UPLOAD_BYTES=90MB` + FE 사전 가드로 막아 뒀다. 100MB 초과 파일이 실제로 필요해지면 착수(약 5시간). BL-070(500MB RAM 적재)도 함께 해소된다. 2026-05 기각 사유는 "R2 버킷 CORS 미설정"이었고 여전히 미설정이다.
 - [ ] **BL-OCI-3** (P3) **GitHub Actions 자동 배포.** 진입 조건 = 수동 배포 3회 연속 성공 + 컷오버 후 7일 무사고 + 장시간 오디오 1건 end-to-end 완주. GH 러너가 amd64 라 arm64 빌드에 QEMU 가 붙는 문제를 먼저 풀어야 한다.
 - [ ] **BL-OCI-4** (P2) **stuck 상태 복구 경로.** `BackgroundTasks` 는 재시도가 없어 프로세스 재시작 시 진행 중이던 회의가 `transcribing`/`analyzing` 으로 영구 정지한다. 2026-08-14 에 그렇게 좌초한 8건(E2E 6 + uploading 2)을 수동 삭제했다. `mise run deploy-preflight` 가 최근 2시간만 검사하도록 우회했을 뿐 근본 해결이 아니다.
@@ -259,7 +292,7 @@
 - [ ] **`.github/actions/` composite 추출** — uv/pnpm/node setup 이 4곳 중복이다.
   CI 복구로 보류 사유는 사라졌으나, **dependabot #155/#156/#157 이 같은 워크플로 파일을 건드리고 있어**
   그 3건을 먼저 머지한 뒤 착수한다(충돌 회피).
-- [ ] **`ci-required` 를 required check 로 등록** `[신규 · 2026-08-16]` public 전환으로 Free 에서도
+- [x] ~~**`ci-required` 를 required check 로 등록**~~ → ✅ 2026-09-27 ruleset `main-protection` (id 24073517, 체크리스트 0-19). `[신규 · 2026-08-16]` public 전환으로 Free 에서도
   ruleset 을 쓸 수 있다. `test.yml` 주석이 "branch protection 도입 시 이 job 하나만 등록" 이라고
   적어둔 그 지점이다. 등록 전까지는 CI 가 red 여도 머지가 물리적으로 가능하다.
 - [ ] **public 노출 표면 점검** `[신규 · 2026-08-16]` `deploy/oci/README.md` 등 7파일에 SSH 별칭
@@ -269,6 +302,6 @@
   쓰거나 운영자 문의" 안내만 노출한다. 도그푸딩 규모에서는 수동 처리로 버티되, 외부 사용자 확대 전에
   Resend 등 발송 수단 + `sendResetPassword` 배선이 필요하다. **컷오버와 같은 창에서 하지 않는다.**
   → 2026-09-27: 수동 처리 절차 = `docs/operations/runbooks/manual-password-reset.md` (Gate 0 은 이것으로 충분 — 사용자 결정). 비밀번호 변경 UI 가 없어 임시 비밀번호가 그대로 영구 비밀번호가 되는 점은 Gate 1 과제로 남는다.
-- [ ] **Clerk dev 인스턴스 삭제** `[ADR-031 종료 조건 · 컷오버 +7일]` git 히스토리 675 커밋에
+- [ ] **Clerk dev 인스턴스 삭제** (→ Blocked "Gate 0 잔여" R1. GitHub 미참조 Clerk secret 3건은 2026-09-27 삭제 완료) `[ADR-031 종료 조건 · 컷오버 +7일]` git 히스토리 675 커밋에
   Clerk dev secret 이 남아 있고 레포가 public 이다. 전환 완료로 키가 무의미해지는 것과, 키가
   **실제로 무효화되는 것**은 다르다 — 인스턴스 삭제까지가 종료 조건이다.

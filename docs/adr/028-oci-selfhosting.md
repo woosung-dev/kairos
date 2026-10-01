@@ -8,6 +8,9 @@
 > **부분 개정 (2026-08-16, [ADR-031](031-better-auth-migration.md)):** D3 의 "Clerk 유지" 와
 > D5 의 "API 의 문은 Clerk JWT 다" 는 대체됐다. 인증은 Better Auth 로 자체 호스팅되고
 > JWKS 는 compose 내부망에서 가져온다. 본문은 당시 기록이라 수정하지 않는다.
+>
+> **부분 개정 (2026-09-27, [ADR-033](033-kairos-dedicated-r2-buckets.md)):** D3 의 "R2 유지" 는 그대로지만
+> 버킷은 nexus-core 공유 `nexus-core-storage` 에서 Kairos 전용 `kairos-prod`·`kairos-dev` 로 나눈다.
 
 ---
 
@@ -78,6 +81,7 @@ Neon 이 기본 설치했던 `pg_session_jwt` 는 코드 사용처가 0건이라
 
 > 2026-09-27 갱신 — 백업 스크립트가 생겼다 (`deploy/oci/backup/`, 절차 `docs/operations/runbooks/db-backup-restore.md`).
 > 남은 것은 서버 cron 등록 · R2 lifecycle · `.env` 별도 보관이다 (BL-OCI-1). `down -v` 금지는 그대로다.
+> 2026-09-27 후반 — R2 lifecycle 은 `kairos-prod` 의 `backups-14d` 로 설정했다 (ADR-033). cron 은 R2 전환 뒤 (`docs/TODO.md` "Gate 0 잔여" R4).
 
 ### D3. R2 · Clerk · Gemini · OpenAI · Sentry 는 유지
 

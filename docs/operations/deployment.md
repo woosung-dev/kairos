@@ -26,7 +26,7 @@
 | API | https://kairos-api.woosung.dev |
 | 서버 | `ssh oci-tokyo` (quantbridge · truewords 와 **공유**) |
 | 배포 디렉토리 | `~/kairos` (compose · `.env` · initdb) |
-| 오브젝트 스토리지 | Cloudflare R2 (유지) |
+| 오브젝트 스토리지 | Cloudflare R2 — 운영 `kairos-prod` · CI·로컬 `kairos-dev` (ADR-033, 버킷 한정 토큰). CI 는 전환 완료(#198). ⏳ 운영·로컬은 이전 진행 중 — `.env` 전환 전까지 옛 공유 버킷 `nexus-core-storage` (`docs/TODO.md` Blocked "Gate 0 잔여") |
 | 인증 | Better Auth 자체 호스팅 (web 컨테이너, ADR-031) |
 | AI | Gemini · OpenAI (유지) |
 
@@ -199,7 +199,8 @@ GCP 프로젝트 `gcp-project-504004` 와 WIF pool `github` 는 cookmark · nexu
 남겨 둔다.
 
 **남은 GitHub Secrets 15건은 전부 `test.yml` · `nightly-e2e.yml` · `r2-cleanup.yml` 이 실제로
-참조하는 것들이다.** 정리 판단은 워크플로 grep 과 대조해서 한다:
+참조하는 것들이다** (2026-09-27 재확인 — `E2E_R2_*` 3건 추가, 미참조 Clerk 3건 삭제). repo-level `R2_*` 는 `kairos-prod`
+**읽기 전용** 토큰으로 바꾼다 (`r2-cleanup.yml` 인벤토리 몫, ADR-033 — 교체 전까지는 옛 공유 토큰, `docs/TODO.md` "Gate 0 잔여" R4). 정리 판단은 워크플로 grep 과 대조해서 한다:
 
 ```bash
 comm -23 <(gh secret list --repo woosung-dev/kairos --json name --jq '.[].name' | sort) \
