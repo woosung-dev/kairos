@@ -62,10 +62,10 @@ api 컨테이너에 `R2_*` · `DATABASE_URL` · `APP_ENV` · aioboto3 · asyncpg
 
 ```bash
 # 1) dry-run — 후보 목록 + protected(referenced)/too_young/candidates 요약. 삭제 0건
-ssh truewords-oracle 'bash -lc "docker exec -i kairos-api python - --days 30"' < apps/api/scripts/r2_cleanup.py
+ssh oci-tokyo 'bash -lc "docker exec -i kairos-api python - --days 30"' < apps/api/scripts/r2_cleanup.py
 
 # 2) 목록을 눈으로 확인한 뒤 실제 삭제
-ssh truewords-oracle 'bash -lc "docker exec -i kairos-api python - --days 30 --delete"' < apps/api/scripts/r2_cleanup.py
+ssh oci-tokyo 'bash -lc "docker exec -i kairos-api python - --days 30 --delete"' < apps/api/scripts/r2_cleanup.py
 ```
 
 종료 코드: 0 정상 · 1 안전 규칙 거부 또는 삭제 실패 · 2 인자 오류.

@@ -306,7 +306,7 @@
     {
       "id": "oci",
       "type": "external",
-      "label": "truewords-oracle",
+      "label": "oci-tokyo",
       "sublabel": "Oracle A1 arm64 · compose kairos",
       "tag": "레포 밖",
       "row": 2,

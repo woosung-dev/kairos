@@ -14,7 +14,7 @@
 브라우저
   └─ Cloudflare (엣지 TLS)
        └─ Cloudflare Tunnel  ── 인바운드 포트 0개
-            └─ 오라클 A1 (truewords-oracle, aarch64, 도쿄)
+            └─ 오라클 A1 (oci-tokyo, aarch64, 도쿄)
                  ├─ kairos-web   127.0.0.1:3100   Next.js standalone
                  ├─ kairos-api   127.0.0.1:8200   FastAPI
                  └─ kairos-db    127.0.0.1:5434   PostgreSQL 17 + pgvector 0.8
@@ -24,7 +24,7 @@
 |---|---|
 | FE | https://kairos.woosung.dev |
 | API | https://kairos-api.woosung.dev |
-| 서버 | `ssh truewords-oracle` (quantbridge · truewords 와 **공유**) |
+| 서버 | `ssh oci-tokyo` (quantbridge · truewords 와 **공유**) |
 | 배포 디렉토리 | `~/kairos` (compose · `.env` · initdb) |
 | 오브젝트 스토리지 | Cloudflare R2 (유지) |
 | 인증 | Better Auth 자체 호스팅 (web 컨테이너, ADR-031) |
