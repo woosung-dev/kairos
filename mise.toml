@@ -28,7 +28,7 @@ shell = "bash -euo pipefail -c"
 # ── 배포 대상 상수 ────────────────────────────────────────────────────
 # 원격 명령은 전부 `bash -lc` 로 감싼다 — 비로그인 ssh 셸의 PATH 에 docker compose 가 없다.
 [vars]
-oci_host = "truewords-oracle"
+oci_host = "oci-tokyo"
 oci_dir = "~/kairos"
 oci_compose = "docker compose -f docker-compose.prod.yml"
 

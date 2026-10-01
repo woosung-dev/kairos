@@ -45,6 +45,10 @@ quantbridge · truewords 를 돌리는 오라클 서버가 있으므로 **개인
 
 ### D1. 기존 `truewords-oracle` 공유 (신규 인스턴스 아님)
 
+> 2026-10-02: 이 서버의 SSH 별칭을 프로젝트 중립 이름 **`oci-tokyo`** 로 바꿨다. 서버·IP 는 그대로이고,
+> 옛 별칭 `truewords-oracle` 은 truewords · quant-bridge 호환용으로 같은 `Host` 줄에 남긴다
+> (`deploy/oci/README.md` §배치). 이 ADR 본문의 옛 이름은 결정 당시 기록이라 고치지 않는다.
+
 무료 한도가 이미 소진돼 신규 A1 은 과금이다. 실측 여유(available 7.7GB / load 0.19)가 Kairos 상시
 요구(~500MB)를 크게 웃돈다. 유일한 실질 리스크는 ffmpeg chunk 병렬이 2 OCPU 를 순간 점유해 같은
 호스트의 quantbridge 소크를 굶기는 것 → `cpus: 1.5` 하드 캡으로 격리한다.
