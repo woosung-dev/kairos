@@ -32,13 +32,13 @@
 맥(레포 루트)에서 스크립트를 올린다.
 
 ```bash
-scp -r deploy/oci/backup truewords-oracle:~/kairos/
+scp -r deploy/oci/backup oci-tokyo:~/kairos/
 ```
 
 서버에서:
 
 ```bash
-ssh truewords-oracle
+ssh oci-tokyo
 cd ~/kairos
 chmod 700 backup/*.sh
 mkdir -p -m 700 ~/kairos/backups       # cron 의 >> 리다이렉트가 스크립트보다 먼저 돈다

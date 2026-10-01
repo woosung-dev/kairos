@@ -21,7 +21,7 @@
 재도입 지점은 `apps/web/src/lib/track-error.ts` seam.
 
 ```bash
-ssh truewords-oracle 'bash -lc "docker logs --tail 300 kairos-api"'
+ssh oci-tokyo 'bash -lc "docker logs --tail 300 kairos-api"'
 mise run deploy-status
 mise run deploy-logs
 ```

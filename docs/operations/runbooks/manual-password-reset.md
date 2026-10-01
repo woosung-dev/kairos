@@ -24,7 +24,7 @@
 
    ```bash
    printf "SELECT u.email, a.\"providerId\", u.\"createdAt\" FROM auth_user u JOIN auth_account a ON a.\"userId\" = u.id WHERE lower(u.email) = lower('user@example.com');" \
-     | ssh truewords-oracle 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -tA"'
+     | ssh oci-tokyo 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -tA"'
    ```
 
 4. 날짜·요청 채널·확인 방법을 **비공개 메모**에 남긴다 (공개 레포에 쓰지 않는다).
@@ -43,7 +43,7 @@ printf '%s\n' "$KAIROS_NEW_PASSWORD"                      # 사용자에게 전�
 
 ```bash
 node scripts/auth/reset-password.mjs user@example.com \
-  | ssh truewords-oracle 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -v ON_ERROR_STOP=1"'
+  | ssh oci-tokyo 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -v ON_ERROR_STOP=1"'
 unset KAIROS_NEW_PASSWORD
 ```
 
@@ -67,7 +67,7 @@ unset KAIROS_NEW_PASSWORD
 
 ```bash
 printf "SELECT count(*) FROM auth_session s JOIN auth_user u ON u.id = s.\"userId\" WHERE lower(u.email) = lower('user@example.com') AND s.\"createdAt\" > now() - interval '1 hour';" \
-  | ssh truewords-oracle 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -tA"'
+  | ssh oci-tokyo 'bash -lc "docker exec -i kairos-db psql -U kairos -d kairos -tA"'
 ```
 
 ## 로컬 리허설 (운영 전에 한 번)

@@ -65,7 +65,7 @@
       "sources": [{ "path": "apps/api/src/integrations/drive_client.py", "line": 27, "label": "Drive v3 files" }] }
   ],
   "boundaries": [
-    { "kind": "region", "label": "Oracle Cloud A1 · truewords-oracle (arm64 · 공유 호스트 · 인바운드 SSH 22 만)", "wraps": ["cloudflared", "web", "api", "db", "migrate"], "pad": 22 },
+    { "kind": "region", "label": "Oracle Cloud A1 · oci-tokyo (arm64 · 공유 호스트 · 인바운드 SSH 22 만)", "wraps": ["cloudflared", "web", "api", "db", "migrate"], "pad": 22 },
     { "kind": "security-group", "label": "docker compose `kairos` bridge 내부망 — publish 는 127.0.0.1 만", "wraps": ["web", "api", "db", "migrate"], "pad": 14 }
   ],
   "connections": [

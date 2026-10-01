@@ -20,8 +20,8 @@
 실행 — 운영 서버의 api 컨테이너 안에서 돈다 (R2_* · DATABASE_URL · aioboto3 · asyncpg 가 전부 있다).
 레포 체크아웃이 있는 맥에서 스크립트를 stdin 으로 흘려보낸다 (서버에 파일을 두지 않는다):
 
-  ssh truewords-oracle 'bash -lc "docker exec -i kairos-api python - --days 30"' < apps/api/scripts/r2_cleanup.py
-  ssh truewords-oracle 'bash -lc "docker exec -i kairos-api python - --days 30 --delete"' < apps/api/scripts/r2_cleanup.py
+  ssh oci-tokyo 'bash -lc "docker exec -i kairos-api python - --days 30"' < apps/api/scripts/r2_cleanup.py
+  ssh oci-tokyo 'bash -lc "docker exec -i kairos-api python - --days 30 --delete"' < apps/api/scripts/r2_cleanup.py
 
 인벤토리 (DB 불필요, 키 미출력): python -m scripts.r2_cleanup --inventory
 런북: docs/operations/r2-cleanup-cron.md

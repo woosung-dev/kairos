@@ -1,16 +1,34 @@
-node_modules
+# 빌드 컨텍스트 = apps/web. 패턴은 gitignore 가 아니라 Go filepath.Match 기반이라
+# `**/` 가 없으면 컨텍스트 루트에서만 매칭된다 (하위 폴더의 .DS_Store·로그가 그대로 들어간다).
+**/node_modules
 .next
 .git
-.env
-.env.*
+**/.env
+**/.env.*
 coverage
 playwright-report
 test-results
-*.log
+**/*.log
 Dockerfile
 .dockerignore
 # Dockerfile 의 `COPY . .` 가 빌드와 무관한 파일까지 담는다 — 하나만 바뀌어도
 # 레이어 해시가 깨져 pnpm build 가 매번 재실행된다 (tsbuildinfo 는 로컬 typecheck 마다 변경).
 tsconfig.tsbuildinfo
 e2e
-.DS_Store
+**/.DS_Store
+
+# 테스트·도구 설정 — 런타임 산출물과 무관하다. 테스트만 고쳐도 builder 캐시가 깨지는 것을 막는다.
+# 테스트 파일의 타입 검사는 CI frontend-build 가 계속 맡는다 (next build 는 이 이미지 안에서 앱 코드만 본다).
+**/*.test.ts
+**/*.test.tsx
+**/__tests__
+vitest.config.ts
+vitest.setup.ts
+playwright.config.ts
+
+# 문서·로컬 산출물 (src 에서 .md 를 import 하는 곳은 없다)
+**/*.md
+.vercel
+out
+build
+**/*.pem
