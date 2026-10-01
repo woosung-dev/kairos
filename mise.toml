@@ -31,6 +31,8 @@ shell = "bash -euo pipefail -c"
 oci_host = "oci-tokyo"
 oci_dir = "~/kairos"
 oci_compose = "docker compose -f docker-compose.prod.yml"
+# 앱 이미지 저장소 (release.yml 이 올린다, ADR-028 D7 Phase A). compose 의 image: 와 같아야 한다.
+ghcr = "ghcr.io/woosung-dev"
 
 # ══ 개발 ══════════════════════════════════════════════════════════════
 
@@ -255,9 +257,19 @@ run = './scripts/verify-prod.sh ${usage_args:-}'
 # 배포 전 필수 확인. BackgroundTasks 는 재시도가 없어서 처리 중인 회의가 있는 상태로
 # 컨테이너를 교체하면 그 회의는 transcribing 상태로 영구 정지한다.
 [tasks.deploy-preflight]
-description = "배포 전 게이트 — 진행 중 회의 0 + .env 인코딩"
+description = "배포 전 게이트 — 디스크 80% 미만 + 진행 중 회의 0 + .env 인코딩"
 quiet = true
 run = '''
+echo "── 서버 디스크 (/ 사용률 80% 미만이어야 배포 가능) ──"
+# 80 = 같은 서버의 disk-guard(quant-bridge 소유, 매시 텔레그램 경보) 기준과 같다.
+# 호스트 설정은 Kairos 가 소유하지 않으므로(ADR-028 D7 결정 5) 배포가 그 선을 넘기지 않게 여기서만 멈춘다.
+pct=$(ssh {{vars.oci_host}} 'df --output=pcent / | tail -1' | tr -dc '0-9')
+[ -n "$pct" ] || { echo "✗ 디스크 사용률을 읽지 못했다 — 배포 중단" >&2; exit 1; }
+echo "/ 사용률 ${pct}%"
+if [ "$pct" -ge 80 ]; then
+  echo "✗ 80% 이상 — 배포 중단. mise run deploy-gc <직전 태그> 로 정리 후 다시" >&2
+  exit 1
+fi
 echo "── 진행 중인 회의 처리 (0 이어야 배포 가능) ──"
 # SQL 은 stdin 으로 넘긴다. 인라인 -c 는 shell/ssh 이스케이프를 타면서 작은따옴표가
 # 깨지고 `$$` 는 shell PID 로 치환된다 (2026-08-14 실측).
@@ -268,14 +280,17 @@ echo "── .env 인코딩 게이트 (출력 0줄이어야 정상) ──"
 ssh {{vars.oci_host}} 'bash -lc "LC_ALL=C grep -n \"[^[:print:][:space:]]\" {{vars.oci_dir}}/.env || true"'
 '''
 
-# 이미지 2종 arm64 빌드. FE 는 NEXT_PUBLIC_* 이 빌드타임 인라인이라 build.env 가 필요하다.
+# ★비상 경로 전용 (2026-10-02 Phase A 부터). 평소 이미지는 release.yml 이 CI 에서 만든다.
+#   GitHub Actions·GHCR 장애 때만 맥에서 빌드해 SSH 로 올린다 (deploy/oci/README "비상 경로").
+#   이름은 GHCR 그대로 붙인다 — compose 가 그 이름을 찾고, deploy-ship 은 서버에 이미 있는 태그를 pull 하지 않는다.
+# FE 는 NEXT_PUBLIC_* 이 빌드타임 인라인이라 build.env 가 필요하다 (CI 는 repo Variables).
 [tasks.deploy-build]
-description = "이미지 2종 arm64 빌드"
-usage = 'arg "<tag>" help="이미지 태그 (보통 git short SHA)"'
+description = "[비상] 이미지 2종 맥 arm64 빌드 — 평소는 CI(release.yml)"
+usage = 'arg "<tag>" help="이미지 태그 — sha-<커밋 7자리> (git rev-parse --short=7 HEAD)"'
 run = '''
-docker buildx build --platform linux/arm64 -t "kairos-api:$usage_tag" --load apps/api
+docker buildx build --platform linux/arm64 -t "{{vars.ghcr}}/kairos-api:$usage_tag" --load apps/api
 set -a && source deploy/oci/build.env && set +a && \
-  docker buildx build --platform linux/arm64 -t "kairos-web:$usage_tag" --load \
+  docker buildx build --platform linux/arm64 -t "{{vars.ghcr}}/kairos-web:$usage_tag" --load \
     --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
     --build-arg NEXT_PUBLIC_RECALL_ENABLED="$NEXT_PUBLIC_RECALL_ENABLED" \
     --build-arg NEXT_PUBLIC_FOUNDER_USER_ID="$NEXT_PUBLIC_FOUNDER_USER_ID" \
@@ -304,18 +319,27 @@ scp deploy/oci/docker-compose.prod.yml {{vars.oci_host}}:{{vars.oci_dir}}/docker
 ssh {{vars.oci_host}} 'bash -lc "cd {{vars.oci_dir}} && {{vars.oci_compose}} config -q && echo \"compose 문법 OK\""'
 '''
 
-# 레지스트리 없이 SSH 파이프로 전송 후 태그 교체 + 기동.
+# 서버가 GHCR 에서 이미지를 받고 태그 교체 + 기동 (ADR-028 D7 Phase A — 2026-10-02 까지는 docker save | ssh | load).
 # ★compose 동기화가 **먼저**다 — 순서를 바꾸면 위 사고가 그대로 재현된다.
 #   `depends` 를 쓰지 않는 이유: 병렬 실행이라 순서 보장이 안 된다.
+# ★pull 이 `.env` 교체보다 먼저다. 없는 태그로 `.env` 를 바꾸면 `up` 만 실패하고 가짜 태그가 남아
+#   다음 배포의 "직전 태그"(GC 보존 대상)가 된다 — deploy-rollback 과 같은 이유.
 [tasks.deploy-ship]
-description = "이미지 전송 + 태그 교체 + 기동 (compose 동기화 선행)"
-usage = 'arg "<tag>" help="배포할 이미지 태그"'
+description = "GHCR 이미지 pull + 태그 교체 + 기동 (compose 동기화 선행)"
+usage = 'arg "<tag>" help="배포할 이미지 태그 — sha-<커밋 7자리> (release.yml 이 만든다)"'
 run = '''
+[[ "$usage_tag" =~ ^sha-[0-9a-f]{7}$ ]] || { echo "✗ 태그 형식은 sha-<커밋 7자리> (release.yml 규칙): $usage_tag" >&2; exit 1; }
 mise run deploy-sync-config
 # GC 가 보존할 "직전 태그" 다. .env 를 새 태그로 덮어쓰기 **전에** 읽어야 한다.
 prev_tag=$(ssh {{vars.oci_host}} 'bash -lc "grep -m1 ^KAIROS_API_TAG= {{vars.oci_dir}}/.env | cut -d= -f2"')
-docker save "kairos-api:$usage_tag" | gzip -1 | ssh {{vars.oci_host}} 'gunzip | docker load'
-docker save "kairos-web:$usage_tag" | gzip -1 | ssh {{vars.oci_host}} 'gunzip | docker load'
+# 서버에 이미 있으면 받지 않는다 — sha 태그는 불변이고, 비상 경로(맥 빌드 + docker load)도 이 단계를 그대로 지난다.
+ssh {{vars.oci_host}} "bash -ls -- '$usage_tag'" <<'REMOTE'
+set -euo pipefail
+for img in "{{vars.ghcr}}/kairos-api:$1" "{{vars.ghcr}}/kairos-web:$1"; do
+  docker image inspect "$img" >/dev/null 2>&1 && { echo "$img 서버에 있음 — pull 생략"; continue; }
+  docker pull -q "$img" || { echo "✗ pull 실패: $img — release.yml 런 성공 여부·GHCR 공개 설정 확인" >&2; exit 1; }
+done
+REMOTE
 ssh {{vars.oci_host}} "bash -lc 'cd {{vars.oci_dir}} && \
   sed -i \"s/^KAIROS_API_TAG=.*/KAIROS_API_TAG=$usage_tag/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=$usage_tag/\" .env && \
   {{vars.oci_compose}} up -d'"
@@ -367,12 +391,13 @@ ssh {{vars.oci_host}} "bash -ls -- '$usage_keep'" <<'REMOTE'
 set -uo pipefail
 keep_extra="${1:-__none__}"
 rc=0
-for repo in kairos-api kairos-web; do
+# GHCR 이름 + Phase A 전환(2026-10-02) 이전의 맥 빌드 이름. 옛 이름은 서버에서 비워지면 목록에서 뺀다.
+for repo in {{vars.ghcr}}/kairos-api {{vars.ghcr}}/kairos-web kairos-api kairos-web; do
   # ★리포마다 자기 태그를 읽는다. API 태그 하나로 web 보존을 판정하면
   #   두 값이 갈라진 상태(수동 롤백 등)에서 운영중인 web 이미지가 삭제 대상이 된다.
   case "$repo" in
-    kairos-api) var=KAIROS_API_TAG ;;
-    kairos-web) var=KAIROS_WEB_TAG ;;
+    *kairos-api) var=KAIROS_API_TAG ;;
+    *kairos-web) var=KAIROS_WEB_TAG ;;
   esac
   cur=$(grep -m1 "^$var=" {{vars.oci_dir}}/.env | cut -d= -f2)
   # ★빈 값 가드. cur 이 비면 아래 grep -vx 필터가 무력화돼 운영중 태그까지
@@ -388,7 +413,7 @@ for repo in kairos-api kairos-web; do
              | grep -vx -e "$repo:$cur" -e "$repo:$keep_extra" -e "$repo:<none>")
 done
 echo "── 잔여 kairos 이미지 ──"
-docker images | grep '^kairos-' || true
+docker images --format '{{"{{"}}.Repository{{"}}"}}:{{"{{"}}.Tag{{"}}"}}' | grep -E '(^|/)kairos-(api|web):' || true
 echo "── 서버 디스크 ──"
 df -h / | tail -1
 if [ "$rc" -ne 0 ]; then
@@ -419,15 +444,24 @@ ssh {{vars.oci_host}} "bash -lc 'cd {{vars.oci_dir}} && {{vars.oci_compose}} log
 #   api·web 은 `service_completed_successfully` 대기에 걸려 기동하지 않는다 — 롤백이 장애를 만든다
 #   (2026-09-27 토이 compose 재현). `--no-deps` 는 migrate 가 exit 0·exit 1·없음 어느 상태여도
 #   api·web 을 띄운다. 새 마이그레이션이 있는 태그로 올릴 때는 이 task 가 아니라 deploy-ship 을 쓴다.
-# ★이미지가 서버에 있는지 먼저 본다. 없는 태그(오타·GC 된 태그)로 `.env` 를 먼저 바꾸면 `up` 만 실패하고
+# ★이미지를 먼저 확보한다. 없는 태그(오타·GC 된 태그)로 `.env` 를 먼저 바꾸면 `up` 만 실패하고
 #   `.env` 는 가짜 태그로 남는다 — 다음 deploy-ship 이 그 값을 "직전 태그"로 읽어 GC 에 넘기므로
 #   실제로 돌던 이미지가 지워진다 (2026-09-27 리뷰).
+# ★서버에 없으면 GHCR 에서 받는다 (Phase A). 레지스트리가 이력을 보관하므로 GC 된 sha 로도 되돌릴 수 있다.
+#   Phase A 이전 태그(맥 빌드, `sha-` 없음)는 GHCR 에 없다 — deploy/oci/README "전환" 절의 수동 절차를 쓴다.
 [tasks.deploy-rollback]
 description = "이미지 태그를 이전 값으로 되돌린다 — migrate 생략 (RTO 약 2분, 진행 중 BG 작업이 있으면 최대 15분)"
-usage = 'arg "<tag>" help="되돌릴 이미지 태그"'
+usage = 'arg "<tag>" help="되돌릴 이미지 태그 (sha-<7자리>)"'
 run = '''
-ssh {{vars.oci_host}} "bash -lc 'cd {{vars.oci_dir}} && \
-  docker image inspect kairos-api:$usage_tag kairos-web:$usage_tag >/dev/null && \
-  sed -i \"s/^KAIROS_API_TAG=.*/KAIROS_API_TAG=$usage_tag/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=$usage_tag/\" .env && \
-  {{vars.oci_compose}} up -d --no-deps api web'"
+ssh {{vars.oci_host}} "bash -ls -- '$usage_tag'" <<'REMOTE'
+set -euo pipefail
+tag="$1"
+for img in "{{vars.ghcr}}/kairos-api:$tag" "{{vars.ghcr}}/kairos-web:$tag"; do
+  docker image inspect "$img" >/dev/null 2>&1 && continue
+  docker pull -q "$img" || { echo "✗ $img 를 서버에도 GHCR 에도 찾지 못했다 — .env 는 그대로" >&2; exit 1; }
+done
+cd {{vars.oci_dir}}
+sed -i "s/^KAIROS_API_TAG=.*/KAIROS_API_TAG=$tag/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=$tag/" .env
+{{vars.oci_compose}} up -d --no-deps api web
+REMOTE
 '''

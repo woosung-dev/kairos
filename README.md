@@ -403,15 +403,15 @@ mise run contracts-check   # OpenAPI 계약 drift 게이트
 자동 배포는 없다. **의도적으로 사람이 방아쇠를 당긴다** — 진행 중인 AI 파이프라인이 있으면
 프로세스 교체가 그 작업을 죽이기 때문이다(§5-⑤).
 
-맥에서 arm64 네이티브로 빌드해 SSH 파이프로 서버에 넘긴다.
+이미지는 CI 가 만든다 — `main` 의 Test 통과 커밋을 `release.yml` 이 arm64 로 빌드해 GHCR(공개)에 `sha-<7>` 로 올리고,
+서버는 pull 만 한다 (ADR-028 D7 Phase A).
 
 ```bash
-TAG=$(git rev-parse --short HEAD)
-mise run deploy-preflight    # 진행 중 작업 0 확인 + .env 인코딩 게이트
-mise run deploy-build $TAG   # arm64 이미지 2종
-mise run deploy-ship $TAG    # 전송 + 태그 교체 + 기동 + 구버전 이미지 GC
+TAG=sha-<커밋 7자리>          # gh run list --workflow release.yml 의 success 런
+mise run deploy-preflight    # 디스크 80% 미만 + 진행 중 작업 0 + .env 인코딩 게이트
+mise run deploy-ship $TAG    # compose 동기화 + 서버 pull + 태그 교체 + 기동 + 구버전 이미지 GC
 mise run deploy-status       # 컨테이너 상태 + /ready + 호스트 자원 (디스크 포함)
-mise run deploy-rollback     # 문제 시 — 이미지 태그 되돌리기 (RTO 약 2분)
+mise run deploy-rollback $PREV   # 문제 시 — 이미지 태그 되돌리기 (RTO 약 2분)
 ```
 
 절차 상세 → [`docs/operations/deployment.md`](docs/operations/deployment.md)

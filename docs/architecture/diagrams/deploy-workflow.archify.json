@@ -2,7 +2,7 @@
   "schema_version": 2,
   "diagram_type": "workflow",
   "meta": {
-    "title": "Kairos 배포 워크플로우 (mise → OCI)",
+    "title": "Kairos 배포 워크플로우 (CI → GHCR → OCI)",
     "quality_profile": "showcase",
     "legend": {
       "entries": {
@@ -17,6 +17,9 @@
         },
         "cloud": {
           "label": "서버 compose"
+        },
+        "external": {
+          "label": "CI 빌드 · GHCR"
         }
       }
     },
@@ -28,20 +31,20 @@
           "pr",
           "ci",
           "stop",
-          "preflight"
+          "release"
         ],
         "note": "PR 마다 test.yml — backend-test(pytest) · frontend-build(vitest+build+보안헤더) · contract-check(계약 drift) · e2e. 로컬 미러는 mise run ci-local."
       },
       {
         "id": "ship",
-        "label": "빌드 · 전송",
+        "label": "빌드 · 배포",
         "focus": [
+          "release",
           "preflight",
-          "build",
           "ship",
           "up"
         ],
-        "note": "레지스트리 없음 — 맥에서 arm64 네이티브 빌드 후 docker save | gzip | ssh | docker load. compose 파일 동기화가 이미지보다 먼저다 (2026-08-17 사고)."
+        "note": "release.yml 이 Test 통과 커밋을 arm64 로 빌드해 GHCR 에 sha-<7> 로 올리고 서버는 pull 만 한다. compose 동기화가 이미지보다 먼저 (2026-08-17 사고)."
       },
       {
         "id": "verify",
@@ -58,7 +61,7 @@
   "lanes": [
     {
       "id": "ci",
-      "label": "GitHub Actions — test.yml"
+      "label": "GitHub Actions — test.yml · release.yml"
     },
     {
       "id": "dev",
@@ -83,7 +86,7 @@
     },
     {
       "id": "shipping",
-      "label": "빌드 · 전송 · 기동",
+      "label": "빌드 · 배포 · 기동",
       "fromCol": 1,
       "toCol": 3,
       "variant": "emphasis"
@@ -99,8 +102,8 @@
   "mainPath": [
     "pr",
     "ci",
+    "release",
     "preflight",
-    "build",
     "ship",
     "up",
     "post"
@@ -128,20 +131,20 @@
     {
       "id": "preflight",
       "lane": "dev",
-      "col": 1,
-      "type": "backend",
-      "label": "deploy-preflight",
-      "sublabel": "회의 처리 0 · .env 인코딩",
-      "tag": "gate",
-      "width": 144
-    },
-    {
-      "id": "build",
-      "lane": "dev",
       "col": 2,
       "type": "backend",
-      "label": "deploy-build <tag>",
-      "sublabel": "arm64 buildx · api + web",
+      "label": "deploy-preflight",
+      "sublabel": "디스크 · 회의 0 · .env",
+      "tag": "gate",
+      "width": 136
+    },
+    {
+      "id": "release",
+      "lane": "ci",
+      "col": 1,
+      "type": "external",
+      "label": "release.yml",
+      "sublabel": "arm64 → GHCR sha-<7>",
       "width": 136
     },
     {
@@ -150,8 +153,8 @@
       "col": 3,
       "type": "backend",
       "label": "deploy-ship <tag>",
-      "sublabel": "compose sync → save | ssh",
-      "width": 150
+      "sublabel": "compose sync → pull",
+      "width": 136
     },
     {
       "id": "up",
@@ -187,7 +190,7 @@
       "col": 4,
       "type": "backend",
       "label": "deploy-rollback",
-      "sublabel": "이전 태그 · RTO ≈ 2분",
+      "sublabel": "이전 sha · GHCR pull",
       "tag": "마이그레이션은 유지",
       "width": 136
     }
@@ -203,24 +206,25 @@
     {
       "id": "e-green",
       "from": "ci",
-      "to": "preflight",
-      "label": "green → merge",
+      "to": "release",
+      "label": "main green",
       "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "e-release",
+      "from": "release",
+      "to": "preflight",
+      "label": "이미지 준비",
       "fromSide": "right",
       "toSide": "top"
     },
     {
       "id": "e-preflight",
       "from": "preflight",
-      "to": "build",
-      "label": "tag = git short SHA",
-      "fromSide": "right",
-      "toSide": "left"
-    },
-    {
-      "id": "e-build",
-      "from": "build",
       "to": "ship",
+      "label": "tag = sha-<7>",
       "fromSide": "right",
       "toSide": "left"
     },
@@ -228,7 +232,7 @@
       "id": "e-ship",
       "from": "ship",
       "to": "up",
-      "label": "scp compose · docker load",
+      "label": "docker pull · up -d",
       "variant": "emphasis"
     },
     {
@@ -275,23 +279,23 @@
       "dot": "emerald",
       "title": "한 번의 배포",
       "items": [
-        "PR → CI green → squash merge → preflight → build → ship, 태그 하나 = git short SHA",
-        "레지스트리 없음 — 맥 arm64 와 서버 aarch64 가 같아 docker save | ssh | load 로 충분"
+        "PR → CI green → squash merge → release.yml → preflight → ship, 태그 하나 = sha-<커밋 7자리>",
+        "빌드는 CI(ubuntu-24.04-arm), 보관은 GHCR 공개 패키지, 서버는 pull 만 — 맥 빌드는 비상 경로"
       ]
     },
     {
       "dot": "rose",
       "title": "게이트와 정지 조건",
       "items": [
-        "CI 4 잡 중 하나라도 red 면 머지 없음 — 로컬 미러는 mise run ci-local",
-        "preflight: 최근 2h 내 transcribing/analyzing 회의 0 — BackgroundTasks 는 재시도가 없다"
+        "CI 4 잡 중 하나라도 red 면 머지 없음 — release.yml 도 Test 성공 push 에서만 돈다",
+        "preflight: / 80% 미만 · 최근 2h 내 처리 중 회의 0 — BackgroundTasks 는 재시도가 없다"
       ]
     },
     {
       "dot": "amber",
       "title": "롤백과 GC",
       "items": [
-        "deploy-rollback 은 .env 태그만 되돌림 — 스키마는 가산형이라 구 이미지가 동작 (ADR-031 D7)",
+        "deploy-rollback 은 .env 태그만 되돌림 — 서버에 없으면 GHCR 에서 받는다 (ADR-028 D7 개정)",
         "deploy-gc 는 운영 + 직전 태그만 보존 — 공유 호스트라 system prune 금지 (ADR-028 D9)"
       ]
     }
