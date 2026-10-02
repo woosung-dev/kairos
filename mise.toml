@@ -397,8 +397,8 @@ ssh {{vars.oci_host}} "bash -ls -- '$usage_keep'" <<'REMOTE'
 set -uo pipefail
 keep_extra="${1:-__none__}"
 rc=0
-# GHCR 이름 + Phase A 전환(2026-10-02) 이전의 맥 빌드 이름. 옛 이름은 서버에서 비워지면 목록에서 뺀다.
-for repo in {{vars.ghcr}}/kairos-api {{vars.ghcr}}/kairos-web kairos-api kairos-web; do
+# GHCR 이름만. Phase A 이전 맥 빌드 이름(kairos-api·kairos-web)은 2026-10-02 전환 뒤 서버에서 비워져 뺐다.
+for repo in {{vars.ghcr}}/kairos-api {{vars.ghcr}}/kairos-web; do
   # ★리포마다 자기 태그를 읽는다. API 태그 하나로 web 보존을 판정하면
   #   두 값이 갈라진 상태(수동 롤백 등)에서 운영중인 web 이미지가 삭제 대상이 된다.
   case "$repo" in
@@ -454,7 +454,7 @@ ssh {{vars.oci_host}} "bash -lc 'cd {{vars.oci_dir}} && {{vars.oci_compose}} log
 #   `.env` 는 가짜 태그로 남는다 — 다음 deploy-ship 이 그 값을 "직전 태그"로 읽어 GC 에 넘기므로
 #   실제로 돌던 이미지가 지워진다 (2026-09-27 리뷰).
 # ★서버에 없으면 GHCR 에서 받는다 (Phase A). 레지스트리가 이력을 보관하므로 GC 된 sha 로도 되돌릴 수 있다.
-#   Phase A 이전 태그(맥 빌드, `sha-` 없음)는 GHCR 에 없다 — deploy/oci/README "전환" 절의 수동 절차를 쓴다.
+#   Phase A(2026-10-02) 이전 태그(맥 빌드, `sha-` 없음)는 GHCR 에도 서버에도 없다.
 [tasks.deploy-rollback]
 description = "이미지 태그를 이전 값으로 되돌린다 — migrate 생략 (RTO 약 2분, 진행 중 BG 작업이 있으면 최대 15분)"
 usage = 'arg "<tag>" help="되돌릴 이미지 태그 (sha-<7자리>)"'

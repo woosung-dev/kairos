@@ -59,7 +59,7 @@ mise run deploy-status             # 컨테이너 상태 + /ready + 서버 자�
 배포 실행(트리거)은 아직 수동이다. 자동 배포(Phase B)는 D7 진입 조건을 확인한 뒤 붙인다.
 
 `deploy-ship` 은 마지막에 `deploy-gc` 를 부른다 — 서버에 **운영중 태그 + 직전 태그**만 남기고
-나머지 `kairos-api` / `kairos-web` 이미지(GHCR 이름 · 전환 전 맥 빌드 이름)를 지운다. 이 서버는 다른 프로젝트와
+나머지 `ghcr.io/woosung-dev/kairos-{api,web}` 이미지를 지운다. 이 서버는 다른 프로젝트와
 공유하므로 **`docker system prune` 계열을 쓰지 않는다** (남의 프로젝트 이미지가 지워진다).
 GC 가 이미지를 지우지 못하면 `deploy-ship` 은 `⚠ 이미지 정리 실패` 경고를 남기고 성공으로 끝난다 —
 배포 자체는 이미 끝난 상태다. 경고가 보이면 `docker rmi` 오류를 읽고 `mise run deploy-gc <직전 태그>` 를 다시 돌린다.
