@@ -204,7 +204,6 @@ Kairos 쪽 대응은 둘뿐이다.
 
 ## 미착수 (BL 등재)
 
-- DB 백업 **cron 등록** — 스크립트는 준비됐다(위 "DB 백업"). 서버 crontab 등록은 사용자가 한다 (`docs/TODO.md` Gate 0 잔여 R4).
 - presigned URL 업로드 전환 — 100MB 초과 파일이 실제로 필요해지면.
 - 자동 배포 (Phase B) — release.yml 에 배포 job 추가. 진입 조건은 ADR-028 D7 (수동 3회 연속 성공 · 7일 무사고 · 장시간 오디오 1건).
 - GHCR 보존 정책 (Phase C) — 태그가 쌓이기만 한다. GHCR 저장은 현재 무료라 급하지 않다.
