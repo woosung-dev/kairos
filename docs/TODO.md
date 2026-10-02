@@ -152,6 +152,12 @@
 - [ ] **BL-OCI-2** (P3) **presigned URL 업로드 전환.** Cloudflare Free/Pro 는 요청 바디를 100MB 에서 자른다. 운영 실측 최대 파일이 5MB 라 지금은 무해하고, `MAX_UPLOAD_BYTES=90MB` + FE 사전 가드로 막아 뒀다. 100MB 초과 파일이 실제로 필요해지면 착수(약 5시간). BL-070(500MB RAM 적재)도 함께 해소된다. 2026-05 기각 사유는 "R2 버킷 CORS 미설정"이었고 여전히 미설정이다.
 - [ ] **BL-OCI-3** (P3) **GitHub Actions 자동 배포.** 진입 조건 = 수동 배포 3회 연속 성공 + 컷오버 후 7일 무사고 + 장시간 오디오 1건 end-to-end 완주. GH 러너가 amd64 라 arm64 빌드에 QEMU 가 붙는 문제를 먼저 풀어야 한다.
   → 2026-10-02: QEMU 전제는 무효(공개 레포 `ubuntu-24.04-arm` 무료). **Phase A(CI 빌드 + GHCR) 완료** — 남은 것 = Phase B(release.yml 에 배포 job · 배포 전용 SSH 키 · 스키마 관문 + 승인 · 처리 중 회의 60초×30분 연기, ADR-028 D7 개정 결정 2~4). 최우선 확인: OCI 보안 목록 22번 허용 출처(IP 제한이면 러너 접속 불가).
+- [ ] **secrets.md 의 FE 빌드 인자 위치 드리프트** (P3) `[신규 · 2026-10-02]` Phase A(#204) 뒤 평소 FE 빌드 인자는
+  repo **Variables**(`release.yml`)이고 `deploy/oci/build.env` 는 맥 비상 경로 전용이다. 그런데 `docs/development/secrets.md`
+  FE 표의 `NEXT_PUBLIC_*` 행(`NEXT_PUBLIC_PWA_SW` 제외)과 36·94줄 설명이 아직 "`build.env` 에서 설정" 기준이다. 정본 =
+  `deploy/oci/README.md` "FE 빌드 인자" 절. 문서만 고치면 된다 (약 10분). PWA PR #205 에서 발견, 범위 밖이라 미수정.
+  ★새 `NEXT_PUBLIC_*` 를 추가할 때는 4곳 배선: `apps/web/Dockerfile` ARG/ENV · `release.yml` build-args · `mise.toml`
+  deploy-build · `build.env.example` (#205 에서 `release.yml` 누락을 머지 직전에 발견).
 - [ ] **BL-OCI-4** (P2) **stuck 상태 복구 경로.** `BackgroundTasks` 는 재시도가 없어 프로세스 재시작 시 진행 중이던 회의가 `transcribing`/`analyzing` 으로 영구 정지한다. 2026-08-14 에 그렇게 좌초한 8건(E2E 6 + uploading 2)을 수동 삭제했다. `mise run deploy-preflight` 가 최근 2시간만 검사하도록 우회했을 뿐 근본 해결이 아니다.
 - [ ] **BL-OCI-5** (P3) **R2 고아 파일 정리.** 삭제된 회의의 원본이 버킷에 남는다. `r2-cleanup.yml` 은 `workflow_dispatch` 전용(cron 미설정)이라 수동 실행이 필요하다. 현재 잔여량은 수십 KB 수준이라 급하지 않다. → 2026-09-27: `r2-cleanup.yml` 은 읽기 전용 인벤토리로 바뀌었고 `delete` 입력은 없어졌다. 정리는 서버에서 DB 참조를 확인하고 실행한다 — `docs/operations/r2-cleanup-cron.md` §2.
 - [ ] **BL-OCI-6** (P2) **dev 와 prod 가 같은 Neon DB(`neondb`) 를 쓰고 있었다.** 로컬 개발이 운영 데이터를 직접 건드리는 구조. 오라클 이전으로 prod 는 분리됐지만 로컬 개발 DB 분리는 미해결.

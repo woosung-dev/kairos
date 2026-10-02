@@ -95,6 +95,60 @@ test.describe("Mobile 반응형 (375x812)", () => {
     });
   }
 
+  // T-PWA-16 (docs/plans/active/2026-10-02-pwa/test-matrix.md): safe-area 토큰 무회귀.
+  // Chromium 은 safe-area inset 이 0 이라 env() 폴백 0px → 기존 56px 그대로여야 한다.
+  test("safe-area 토큰 무회귀 — bottom-nav 56px · body 좌우 0px (T-PWA-16)", async ({
+    page,
+  }) => {
+    test.setTimeout(20_000);
+    await page.goto("/dashboard");
+    const nav = page.getByTestId("bottom-nav");
+    await expect(nav).toBeVisible({ timeout: 15_000 });
+
+    const metrics = await nav.evaluate((element) => {
+      const bodyStyle = getComputedStyle(document.body);
+      return {
+        navHeight: (element as HTMLElement).offsetHeight,
+        navPaddingBottom: getComputedStyle(element).paddingBottom,
+        bodyPaddingLeft: bodyStyle.paddingLeft,
+        bodyPaddingRight: bodyStyle.paddingRight,
+      };
+    });
+    expect(metrics).toEqual({
+      navHeight: 56,
+      navPaddingBottom: "0px",
+      bodyPaddingLeft: "0px",
+      bodyPaddingRight: "0px",
+    });
+  });
+
+  // T-PWA-16 inset 주입: inset 0 만 보면 bottom-nav 의 paddingBottom(env) 을 지워도 통과한다.
+  // CDP 로 하단 inset 을 넣어 높이 토큰·안쪽 여백이 둘 다 inset 만큼 늘어나는지 본다.
+  // CDP 미지원이면 skip 하지 않고 실패한다.
+  test("safe-area inset 적용 — bottom-nav 56+inset · paddingBottom === inset (T-PWA-16)", async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(20_000);
+    const bottomInset = 34;
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Emulation.setSafeAreaInsetsOverride", {
+      insets: { top: 0, left: 0, right: 0, bottom: bottomInset },
+    });
+    await page.goto("/dashboard");
+    const nav = page.getByTestId("bottom-nav");
+    await expect(nav).toBeVisible({ timeout: 15_000 });
+
+    const metrics = await nav.evaluate((element) => ({
+      navHeight: (element as HTMLElement).offsetHeight,
+      navPaddingBottom: getComputedStyle(element).paddingBottom,
+    }));
+    expect(metrics).toEqual({
+      navHeight: 56 + bottomInset,
+      navPaddingBottom: `${bottomInset}px`,
+    });
+  });
+
   // Sprint 22 BL-017: /memory FAB 가 bottom-nav 와 겹치지 않음
   test("/memory FAB — mobile bottom-nav 위로 띄움 (BL-017)", async ({
     page,

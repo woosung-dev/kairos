@@ -1,0 +1,15 @@
+{
+ "test": "T-PWA-15 kill-switch 실동작 (오케스트레이터 실측 2026-10-02, headless Chromium 147, 하네스 scratchpad orch/t15-killswitch.mjs)",
+ "defaultControlled": true,
+ "defaultRegs": 1,
+ "offBuildKillFlag": "killFlag:\"off\"",
+ "swStatus": 200,
+ "tabBRegistrations": 0,
+ "tabBRendered": 1,
+ "tabAFramenavigated": 0,
+ "tabAUrlSame": true,
+ "tabAEmailKept": true,
+ "tabAControllerchange": 0,
+ "tabAControllerStillSet": true,
+ "tabAControllerAfterReload": null
+}

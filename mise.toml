@@ -196,7 +196,7 @@ run = [
 # ★CI 도 이 task 를 호출한다 (`test.yml` frontend-build, 3000). 사본을 두지 않는다 —
 #   사본이 갈라지는 게 정확히 이 게이트가 잡으려는 버그 클래스다 (2026-08-16 코드리뷰 지적).
 [tasks.fe-security-headers]
-description = "보안 헤더 e2e (public route, secrets·BE 불요)"
+description = "public-only e2e — 보안 헤더 + PWA 셸 (public route, secrets·BE 불요)"
 dir = "apps/web"
 usage = 'arg "<port>" default="3005" help="검증할 포트"'
 run = '''
@@ -297,6 +297,7 @@ set -a && source deploy/oci/build.env && set +a && \
     --build-arg NEXT_PUBLIC_APP_ENV="$NEXT_PUBLIC_APP_ENV" \
     --build-arg NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID="$NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID" \
     --build-arg NEXT_PUBLIC_GOOGLE_PICKER_API_KEY="$NEXT_PUBLIC_GOOGLE_PICKER_API_KEY" \
+    --build-arg NEXT_PUBLIC_PWA_SW="$NEXT_PUBLIC_PWA_SW" \
     apps/web
 '''
 

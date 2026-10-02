@@ -36,7 +36,7 @@ apps/web/src/
 │   └── invite/    초대 수락 (그룹 밖 public 라우트)
 ├── components/
 │   ├── ui/        shadcn v4 — 수정 금지 (F-1)
-│   ├── layout/    Sidebar, Header, PanelLayout, RAGPanel, BottomNav, CmdK
+│   ├── layout/    Sidebar, Header, PanelLayout, RAGPanel, BottomNav, CmdK, ServiceWorkerRegistrar (F-14)
 │   ├── landing/   랜딩 섹션
 │   ├── shared/    도메인 횡단 공통 (ItemPromoteModal, ExportButton)
 │   └── onboarding/
@@ -48,6 +48,7 @@ apps/web/src/
 │                   (+선택 schemas.ts / store.ts / CONTEXT.md)
 ├── hooks/         앱 전역 유틸 훅
 ├── lib/           api-client, use-api-client, query-client, query-keys, visibility, format-date, utils
+│   └── pwa/       Service Worker(sw.ts) + 오프라인 화면 SCR-001 + 등록 모드 순수 로직 (ADR-034, F-14)
 ├── store/         Zustand (전역 UI 상태만)
 └── types/         api.gen.ts (생성물, I-22) + 공통 유틸 타입
 ```
@@ -80,6 +81,7 @@ apps/web/src/
 | F-11 | **API URL 패턴**: `/api/v1/workspaces/{workspaceId}/<resource>` (CONTEXT-MAP I-13). `workspaceId`는 라우트 또는 store에서 획득 | `<feature>/api.ts` |
 | F-12 | **SSE 수신 패턴**: RAG 답변은 `EventSource` 또는 `fetch + ReadableStream`으로 chunk 누적 | `features/rag/hooks.ts` |
 | F-13 | **Enter 로 제출하는 `onKeyDown` 은 `e.nativeEvent.isComposing` 이면 무시** — 한글 조합 확정용 Enter 에서 전송·생성·선택이 일어나면 안 된다 (G3-018) | `rag-input.test.tsx` · `cmd-k.test.tsx` |
+| F-14 | **SW 는 Cache Storage·IndexedDB 에 쓰지 않는다 · 같은 origin `navigate` 만 `respondWith` (`/api/*` 제외) · navigationPreload 미사용 · 등록 호출부 1곳** (`components/layout/service-worker-registrar.tsx`) — 사용자 데이터는 워크스페이스·가시성·작성자 규칙으로 즉시 차단돼야 하고(I-9·I-23·I-24), preload 는 일회용 OAuth `code` 를 두 번 소비한다 ([ADR-034](../../docs/adr/034-pwa-installable-shell.md)) | `lib/pwa/__tests__/{source-scan,navigation}.test.ts` · `e2e/tests/pwa.spec.ts` (T-PWA-10·13) |
 
 ---
 

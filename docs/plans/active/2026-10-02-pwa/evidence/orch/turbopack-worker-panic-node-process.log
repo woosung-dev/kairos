@@ -1,0 +1,25 @@
+---------------------------
+Failed to write app endpoint /favicon.ico/route
+
+Caused by:
+- the chunking context (unknown) does not support external modules (request: node:process)
+
+Debug info:
+- Execution of get_all_written_entrypoints_with_issues_operation failed
+- Execution of EntrypointsOperation::new failed
+- Execution of all_entrypoints_write_to_disk_operation failed
+- Execution of output_assets_operation failed
+- Execution of <AppEndpoint as Endpoint>::output failed
+- Failed to write app endpoint /favicon.ico/route
+- Execution of AppEndpoint::output failed
+- Execution of service_worker_output_assets failed
+- Execution of service_worker_chunk failed
+- Execution of <BrowserChunkingContext as ChunkingContext>::entry_chunk_group failed
+- Execution of make_chunks failed
+- Execution of chunk_items_with_info failed
+- Execution of batch_size failed
+- Execution of <EcmascriptChunkType as ChunkType>::chunk_item_size failed
+- Execution of <EcmascriptModuleAsset as EcmascriptChunkPlaceable>::chunk_item_content failed
+- Execution of *EcmascriptChunkItemContent::new failed
+- Execution of EcmascriptModuleContent::new failed
+- the chunking context (unknown) does not support external modules (request: node:process)

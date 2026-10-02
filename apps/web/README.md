@@ -106,12 +106,12 @@ wire 타입은 여기서 import 하고, 재생성은 루트에서 `mise run cont
 | 종류 | 위치 | 명령 |
 |---|---|---|
 | 단위 (39 파일) | 코드 옆 `__tests__/` | `mise run fe-test` |
-| e2e (44 spec) | `e2e/` | `mise run e2e` |
+| e2e (45 spec) | `e2e/` | `mise run e2e` |
 
 Playwright project 3종:
 
 - **`chromium`** — 로그인 후 본 기능 회귀. `setup`(auth.setup.ts)이 storageState 를 먼저 만든다
-- **`public-only`** — `security-headers.spec.ts` 전용. 로그인도 BE 도 필요 없어 CI 에서 단독으로 돈다
+- **`public-only`** — 보안 헤더(`security-headers.spec.ts`) + PWA 셸(`pwa.spec.ts`). 로그인도 BE 도 필요 없어 CI 에서 단독으로 돈다
   (`mise run fe-security-headers`)
 - **`team`** — RBAC 회귀 T1~T23. `team-setup` 이 별도 계정 세트를 준비한다
 

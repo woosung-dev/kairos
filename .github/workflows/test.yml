@@ -119,7 +119,7 @@ jobs:
           NEXT_PUBLIC_API_URL: "http://localhost:8000"
 
       # Sprint 27e Round 2 BUG-S27e-TEST-r2-1 — FE 보안 헤더 회귀 가드 CI 게이트.
-      # security-headers.spec.ts 는 public route (`/sign-in`, `/`) 만 검증 — secrets/BE 불요.
+      # public-only project (security-headers.spec.ts + pwa.spec.ts) 는 public route 만 검증 — secrets/BE 불요.
       # frontend-build job 의 build artifact 재사용 → 항상 실행 (E2E_ENABLED 무관).
       - name: Install Playwright (chromium only)
         run: pnpm exec playwright install --with-deps chromium
