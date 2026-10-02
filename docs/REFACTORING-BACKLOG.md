@@ -1713,3 +1713,22 @@ barrel `index.ts` 대신 (Vercel bundle-barrel-imports 규칙과 상충 회피) 
 ### 백엔드 deep-module (이연 유지)
 `audit/` 도메인 추출(`common/audit_*` + `promote_*`) + `core↔common` cycle 해소(`common/database.py` → `core/database.py`)는 **기존 BL-S27e-F** 클러스터로 이연(Scope C). 본 검증으로 둘 다 코드 재확인 완료 — core→common 단일 edge=`lifespan.py → common.database`(test gate 로 고정), `common/audit_router.py` 가 `prefix=/audit` + `tags=["audit"]` 자가선언(도메인 추출 신호).
 
+
+## 2026-10-02 web 의존성 갱신 후속 (BL-DEPS-N)
+
+> 배경: 2026-10-02 web lockfile 을 semver 범위 안 최신으로 갱신했다 (`pnpm update`, audit 128 → 0).
+> 8/16 dependabot 버전 업데이트를 끈 뒤 아무도 lockfile 을 갱신하지 않아 하위 의존성 취약점이 쌓였다.
+> dependabot 보안 PR 은 pnpm 10 에서 하위 의존성을 올리지 못한다 (`pnpm update <transitive>@ver` 가 무변경으로 끝남 — #199 가 "no longer updatable" 로 닫힌 원인).
+
+### BL-DEPS-1 — better-auth 1.7 업그레이드: `auth_jwks` 에 `alg`·`crv` 가산 마이그레이션 필요 (P3)
+1.7 의 jwt 플러그인 스키마가 `auth_jwks` 에 nullable `alg`·`crv` 를 추가한다 (1.6.33 대비 유일한 테이블 차이 — `getAuthTables` 실측 비교).
+새 키를 만들 때 두 컬럼을 쓰므로 마이그레이션 없이 올리면 빈 DB(CI e2e)·키 교체 시점에 INSERT 가 실패한다.
+그래서 갱신 PR 에서는 `"better-auth": "~1.6.33"` 으로 묶었다 (`^` 면 다음 `pnpm update` 가 1.7 을 조용히 가져온다).
+- 할 일: alembic 리비전 `alter table "auth_jwks" add column "alg" text, add column "crv" text` (가산 — 구 이미지 무영향) → `~1.6.33` 을 `^1.7.x` 로.
+  `c1a7e0b5d3f2` docstring 의 절차대로 `npx @better-auth/cli generate` 산출물과 대조한다.
+- 순서: 병렬 진행 중인 PWA push 리비전(`push_subscriptions`)과 head 가 갈라지지 않게 그쪽 머지 뒤에 down_revision 을 잡는다. 배포는 rc 3 → `oci-production-migrate` 승인.
+
+### BL-DEPS-2 — web lockfile 월 1회 갱신 루틴 (P3, 운영)
+`cd apps/web && pnpm update` (범위 안, 메이저 제외) → `pnpm audit` · vitest · build · e2e → PR 하나. 약 30분.
+dependabot 버전 업데이트(PR 15개/주)를 되살리는 대신 이걸로 대체한다 — 1인 개발 트리아지 부담(8/16 결정)과 누적 취약점 사이의 절충.
+메이저(vitest 5 · eslint 10 · @types/node 26 등)는 이 루틴에서 제외하고 필요할 때 따로 검토한다.
