@@ -13,7 +13,9 @@
 > 버킷은 nexus-core 공유 `nexus-core-storage` 에서 Kairos 전용 `kairos-prod`·`kairos-dev` 로 나눈다.
 >
 > **부분 개정 (2026-10-02, D7):** 이미지 빌드를 CI(`release.yml`, arm64 러너) + GHCR 공개 패키지로 옮겼다 (Phase A).
-> D7 의 QEMU 전제는 무효였다. 결정 5건은 D7 아래 "D7 개정" 절. 배포 트리거는 여전히 수동이다.
+> D7 의 QEMU 전제는 무효였다. 결정 5건은 D7 아래 "D7 개정" 절.
+> 같은 날 Phase B — 배포를 서버 스크립트 하나로 모으고 Actions 배포 job 을 붙였다. job 은 수동 실행에서만 돈다
+> (자동 트리거는 장시간 오디오 조건 대기). "D7 개정 — Phase B" 절.
 
 ---
 
@@ -173,8 +175,7 @@ D+7 무사고 후 삭제.
 2. **스키마 변경 = 관문 + 승인 클릭** (Phase B). alembic head 와 DB 리비전이 다르면 자동 배포를 멈추고,
    GitHub Environment 승인 뒤에만 migrate 한다.
 3. **진입 조건(위 3개)은 자동 트리거(Phase B)에만 건다.** CI 빌드는 배포 위험을 늘리지 않으므로 Phase A 는 바로 진행한다.
-   처음 3회는 production Environment 승인자를 둔다. 8/17 컷오버 사고를 "무사고"에서 빼는지, 장시간 오디오 기록은
-   Phase B 진입 때 확인한다.
+   처음 3회는 `oci-production` Environment 승인자를 둔다. "무사고"·"장시간 오디오" 해석은 아래 Phase B 절에서 확정했다.
 4. **처리 중 회의가 있으면 연기** (Phase B) — 60초 간격, 최대 30분. 자동 경로에는 강제 옵션을 두지 않는다.
 5. **호스트 공통 설정은 Kairos 가 소유하지 않는다** (문서만). daemon.json · journald · swap · 디스크 경보 · 빌더 캐시 정리는
    truewords · quant-bridge 가 쓴다 — 목록과 소유는 `deploy/oci/README.md` "호스트 공통 설정". 대신 `deploy-preflight` 가
@@ -183,6 +184,60 @@ D+7 무사고 후 삭제.
 설계 메모: 태그는 `github.event.workflow_run.head_sha` 로 만든다 (`workflow_run` 의 `github.sha` 는 기본 브랜치 최신 커밋이다).
 태그는 불변 — 이미 있으면 빌드를 건너뛰므로 재실행이 안전하다. `provenance`/`sbom` 은 끈다 (태그 없는 attestation manifest 가
 보존 정책을 복잡하게 만든다). 빌드 캐시는 `type=gha` 를 이미지별 scope 로 나눈다.
+
+#### D7 개정 — Phase B: 서버 단일 배포 스크립트 + Actions 배포 job (2026-10-02)
+
+**배포 경로를 하나로 모은다.** 서버의 `~/kairos/bin/kairos-deploy.sh` (정본 `deploy/oci/bin/kairos-deploy.sh`) 가
+pull → 스키마 관문 → 처리 중 회의 대기 → 태그 교체 + `up -d` → env 주입·health·`/ready` 확인 → GC 를 한다.
+부르는 곳은 둘이다 — 맥 `mise run deploy-ship` 과 `release.yml` 의 `deploy` job. 수동 배포가 성공할 때마다
+자동 경로의 코드도 같이 검증된다.
+
+**지금 상태: job 은 있지만 수동 실행에서만 돈다** (`workflow_dispatch` + `deploy` 체크). main 머지마다 자동으로 돌게 하는 건
+진입 조건을 다 채운 뒤 `deploy` job 의 `if` 에 `|| github.event_name == 'workflow_run'` 한 줄을 더하는 PR 이다.
+
+진입 조건 판정 (2026-10-02, 해석은 사용자 확정):
+
+| 조건 | 해석 | 상태 |
+|---|---|---|
+| 수동 배포 3회 연속 성공 | — | ✅ `e929a49` → `sha-e929a49` → `sha-cfbfe1e` (모두 10/2) |
+| 7일 무사고 | **배포가 원인인 사고만 센다.** 10/2 R2 3~4분 장애(보관함 키 쌍 불일치 — 설정 교체)는 제외 | ✅ 최근 7일 배포 원인 사고 0건. 8/17 사고(compose 미동기화)는 창 밖이고, 이제 해시 대조(rc 6)가 구조적으로 막는다 |
+| 장시간 오디오 1건 | **60분 녹음 1건이 운영에서 `completed`** | ❌ 운영 최장 완료 = 5.1분 |
+
+결정 (2026-10-02):
+
+1. **러너는 compose·스크립트를 보내지 않는다.** compose 는 볼륨·권한을 정한다 — 러너가 바꿀 수 있으면 배포 키 하나로
+   공유 호스트(4 프로젝트) 전체가 열린다. 러너는 배포할 커밋의 두 파일을 이어 붙인 sha256 만 보내고, 서버가 자기 파일과
+   대조한다. 다르면 rc 6 으로 멈춘다 → 그 커밋은 맥 `deploy-ship` 으로 한 번 배포한다 (`deploy-sync-config` 가 둘 다 올린다).
+   compose 만 해시하면 스크립트가 바뀐 커밋이 옛 서버 스크립트로 조용히 배포된다 — 그래서 둘을 묶는다.
+2. **배포 전용 키 = forced command + `restrict`.** `authorized_keys` 한 줄이 키를 `kairos-deploy.sh --from-ssh` 에 묶는다.
+   이 키로 할 수 있는 일은 `<tag> --files <sha256> [--migrate]` 형식의 배포 하나다. 포워딩·pty 는 막힌다
+   (실측: 임의 명령 rc 2, 명령 없음 rc 2, 포트 포워딩 `administratively prohibited`).
+3. **스키마 관문.** 이미지의 `alembic heads`(`--network none` 일회성 컨테이너) 와 DB `alembic_version` 이 다르면 아무것도
+   바꾸지 않고 rc 3. `deploy-migrate` job 이 `oci-production-migrate` 승인(Review deployments)을 기다린 뒤 `--migrate` 로
+   다시 부른다. `--migrate` 는 `pg-backup.sh --local-only` 덤프를 먼저 뜬다.
+4. **처리 중 회의는 최근 2시간 내 갱신분만 센다.** 최장 작업이 약 15분이라 더 오래된 `transcribing` 은 이미 죽은 좀비다.
+   그걸로 막으면 관문이 영구히 닫힌다. `deploy-preflight` 와 같은 SQL.
+5. **시크릿은 Environment 에만** (`DEPLOY_SSH_KEY`·`DEPLOY_HOST`·`DEPLOY_HOST_KEY`). 서버 IP 도 시크릿이다 — 공개 레포의
+   Actions 로그에 남기지 않는다. Environment 이름에 `oci-` 를 붙인다 — `Production`·`Preview` 는 Vercel 이 만든 잔재이고
+   GitHub 환경 이름은 대소문자를 가리지 않아 같은 환경이 된다. 둘 다 main 브랜치만 허용.
+6. **승인자.** `oci-production` 은 처음 3회만, `oci-production-migrate` 는 항상.
+
+종료 코드 (`release.yml` 이 읽는다):
+
+| rc | 뜻 | 서버 상태 |
+|---|---|---|
+| 0 | 배포 완료 (같은 태그 재실행은 api·web 재시작 없이 약 8초) | 새 태그 |
+| 1 | 실패 (디스크 80% 이상 · `.env` 인코딩 · pull · 백업 등) | 그대로 |
+| 2 | 인자 오류 · 허용되지 않는 명령 | 그대로 |
+| 3 | 스키마 변경 — 승인 필요 | 그대로 |
+| 4 | 처리 중 회의가 30분 동안 끝나지 않음 | 그대로 |
+| 5 | 기동 후 확인 실패 — 출력된 롤백 명령을 본다 | `.env` 태그 바뀜 |
+| 6 | 서버 compose·스크립트가 정본과 다름 | 그대로 |
+
+검증 (2026-10-02, 운영 서버 실측): 인자 거부 rc 2 · 해시 불일치 rc 6 · 같은 태그 무변경 배포 rc 0 (직접 호출 · `mise run
+deploy-ship` · 배포 키 + 러너와 같은 `.github/scripts/deploy-ssh.sh` 세 경로) · 스키마 관문 rc 3 · 대기 초과 rc 4 ·
+`--migrate` 경로(로컬 덤프 후) rc 0 · GC 가 운영·롤백 태그 보존. 22번 포트는 같은 서버의 quant-bridge 가 이미
+GitHub 러너에서 SSH 배포하고 있어 따로 열 일이 없다.
 
 ### D8. FE 이미지는 컨테이너 내부 빌드(멀티스테이지)
 

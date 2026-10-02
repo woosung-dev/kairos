@@ -311,48 +311,37 @@ set -a && source deploy/oci/build.env && set +a && \
 #   (BetterAuthError: You are using the default secret).
 #
 #   교훈: 배포 단위는 "이미지"가 아니라 "이미지 + 그 이미지를 띄우는 방법"이다.
+#   2026-10-02 (ADR-028 D7 Phase B): 서버 배포 스크립트도 같이 올린다. 자동 배포(release.yml)는 compose·스크립트를
+#   보내지 않고 서버 파일의 해시만 대조하므로, 둘 중 하나가 바뀐 커밋은 맥 deploy-ship 으로 한 번 배포해야 한다.
 [tasks.deploy-sync-config]
-description = "서버 compose 파일을 레포 정본으로 동기화 + 문법 검증"
+description = "서버 compose 파일 + 배포 스크립트를 레포 정본으로 동기화 + 문법 검증"
 run = '''
-ssh {{vars.oci_host}} 'bash -lc "cd {{vars.oci_dir}} && cp docker-compose.prod.yml docker-compose.prod.yml.bak"'
+ssh {{vars.oci_host}} 'bash -lc "cd {{vars.oci_dir}} && cp docker-compose.prod.yml docker-compose.prod.yml.bak && mkdir -p -m 700 bin"'
 scp deploy/oci/docker-compose.prod.yml {{vars.oci_host}}:{{vars.oci_dir}}/docker-compose.prod.yml
+scp deploy/oci/bin/kairos-deploy.sh {{vars.oci_host}}:{{vars.oci_dir}}/bin/kairos-deploy.sh
 # 문법 검증 — .env 참조가 깨졌으면 여기서 죽는다 (up -d 이후가 아니라)
-ssh {{vars.oci_host}} 'bash -lc "cd {{vars.oci_dir}} && {{vars.oci_compose}} config -q && echo \"compose 문법 OK\""'
+ssh {{vars.oci_host}} 'bash -lc "cd {{vars.oci_dir}} && chmod 700 bin/kairos-deploy.sh && {{vars.oci_compose}} config -q && echo \"compose 문법 OK\""'
 '''
 
-# 서버가 GHCR 에서 이미지를 받고 태그 교체 + 기동 (ADR-028 D7 Phase A — 2026-10-02 까지는 docker save | ssh | load).
-# ★compose 동기화가 **먼저**다 — 순서를 바꾸면 위 사고가 그대로 재현된다.
+# 배포 본체는 서버의 `deploy/oci/bin/kairos-deploy.sh` 하나다 — 자동 배포(release.yml)와 같은 코드 (ADR-028 D7 Phase B).
+# pull → 스키마 관문 → 처리 중 회의 대기(60초 × 30) → 태그 교체 + up -d → env·health·/ready 확인 → GC. 종료 코드는 스크립트 머리말.
+# ★compose 동기화가 **먼저**다 — 순서를 바꾸면 2026-08-17 사고가 그대로 재현된다.
 #   `depends` 를 쓰지 않는 이유: 병렬 실행이라 순서 보장이 안 된다.
-# ★pull 이 `.env` 교체보다 먼저다. 없는 태그로 `.env` 를 바꾸면 `up` 만 실패하고 가짜 태그가 남아
-#   다음 배포의 "직전 태그"(GC 보존 대상)가 된다 — deploy-rollback 과 같은 이유.
+# 스키마 변경(alembic head ≠ DB)이 있으면 rc 3 으로 아무것도 바꾸지 않고 멈춘다 → 확인 후 `--migrate` 로 다시.
 [tasks.deploy-ship]
-description = "GHCR 이미지 pull + 태그 교체 + 기동 (compose 동기화 선행)"
-usage = 'arg "<tag>" help="배포할 이미지 태그 — sha-<커밋 7자리> (release.yml 이 만든다)"'
+description = "서버 배포 스크립트로 배포 (compose·스크립트 동기화 선행)"
+usage = '''
+arg "<tag>" help="배포할 이미지 태그 — sha-<커밋 7자리> (release.yml 이 만든다)"
+flag "--migrate" help="스키마 변경을 승인한다 — alembic head 와 DB 가 다를 때만 필요 (로컬 덤프를 먼저 뜬다)"
+'''
 run = '''
 [[ "$usage_tag" =~ ^sha-[0-9a-f]{7}$ ]] || { echo "✗ 태그 형식은 sha-<커밋 7자리> (release.yml 규칙): $usage_tag" >&2; exit 1; }
 mise run deploy-sync-config
-# GC 가 보존할 "직전 태그" 다. .env 를 새 태그로 덮어쓰기 **전에** 읽어야 한다.
-prev_tag=$(ssh {{vars.oci_host}} 'bash -lc "grep -m1 ^KAIROS_API_TAG= {{vars.oci_dir}}/.env | cut -d= -f2"')
-# 서버에 이미 있으면 받지 않는다 — sha 태그는 불변이고, 비상 경로(맥 빌드 + docker load)도 이 단계를 그대로 지난다.
-ssh {{vars.oci_host}} "bash -ls -- '$usage_tag'" <<'REMOTE'
-set -euo pipefail
-for img in "{{vars.ghcr}}/kairos-api:$1" "{{vars.ghcr}}/kairos-web:$1"; do
-  docker image inspect "$img" >/dev/null 2>&1 && { echo "$img 서버에 있음 — pull 생략"; continue; }
-  docker pull -q "$img" || { echo "✗ pull 실패: $img — release.yml 런 성공 여부·GHCR 공개 설정 확인" >&2; exit 1; }
-done
-REMOTE
-ssh {{vars.oci_host}} "bash -lc 'cd {{vars.oci_dir}} && \
-  sed -i \"s/^KAIROS_API_TAG=.*/KAIROS_API_TAG=$usage_tag/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=$usage_tag/\" .env && \
-  {{vars.oci_compose}} up -d'"
-mise run deploy-verify-env
-# 같은 태그로 다시 돌린 경우(앞 시도가 .env 교체 뒤 실패 등)는 GC 를 건너뛴다. prev_tag 가 이미 새 태그라
-# 진짜 직전 태그를 모르는 상태다 — 그대로 GC 하면 롤백용 이미지를 지운다 (2026-10-02 리뷰).
-if [ "${prev_tag:-}" = "$usage_tag" ]; then
-  echo "⚠ 직전 태그가 이번 태그와 같다(재실행) — 이미지 정리를 건너뛴다. 필요하면 mise run deploy-gc <진짜 직전 태그>" >&2
-  exit 0
-fi
-# 배포는 여기서 이미 끝났다 — GC 실패로 deploy-ship 전체를 실패 처리하지 않고 경고만 남긴다.
-mise run deploy-gc "${prev_tag:-__none__}" || echo "⚠ 이미지 정리 실패 — 배포는 완료. 위 docker rmi 오류를 확인" >&2
+# 서버가 compose + 스크립트를 이은 해시로 정본과 대조한다 (방금 동기화했으니 같아야 한다)
+files_sha=$(cat deploy/oci/docker-compose.prod.yml deploy/oci/bin/kairos-deploy.sh | shasum -a 256 | cut -d' ' -f1)
+migrate=""
+[ "${usage_migrate:-}" = "true" ] && migrate="--migrate"
+ssh {{vars.oci_host}} "{{vars.oci_dir}}/bin/kairos-deploy.sh deploy $usage_tag --files $files_sha $migrate"
 '''
 
 # 컨테이너에 런타임 env 가 실제로 주입됐는지 확인한다.
@@ -368,66 +357,15 @@ ssh {{vars.oci_host}} 'bash -lc "docker exec kairos-api env | grep -q \"^AUTH_JW
 
 # 배포마다 이미지 2개가 서버에 쌓이는데 지우는 코드가 어디에도 없었다
 # (2026-08-30 실측: kairos 태그가 api·web 각 5개 + rc1 누적, 회수 가능 3.7GB).
-# 문서는 "직전 2개를 남긴다" 고 서술했지만 그걸 수행하는 명령이 없는 상태였다.
-#
-# ★이 호스트는 quantbridge·truewords 와 공유한다.
-#   `docker system prune -a` / `docker image prune -a` 는 남의 프로젝트 이미지를 지운다.
-#   반드시 kairos-api / kairos-web 리포지토리로 한정한다.
-#
-# ★정렬에 의존하지 않는다. 이 서버는 Docker 29 + containerd 이미지 스토어라
-#   `docker images` 가 생성일순이 아니라 **태그 알파벳순**으로 나온다 (2026-08-30 실측:
-#   7107a95 → 9e6d72b → 9e7dcf8 → a7c0b98 → d761615 → rc1). "최신 N개만 남긴다" 류의
-#   head/tail 컷은 운영 중인 태그를 삭제 대상에 넣는다. 그래서 **보존할 태그를 명시**하고
-#   나머지를 지운다 — 보존 = 서버 `.env` 의 현재 태그 + 인자로 준 롤백용 태그.
-#
-# repo:tag 로 지운다(이미지 ID 아님). 한 이미지에 태그가 여럿이면(예: rc1 == 7107a95)
-# docker 는 마지막 태그가 아닌 한 untag 만 하므로 보존 태그가 같이 날아가지 않는다.
-#
-# ★실패는 종료 코드로 남긴다. 예전 `xargs ... docker rmi || true` 는 `|| true` 만 지워도
-#   소용이 없었다 — 이 heredoc 에는 `-e` 가 없고 마지막 명령이 `df` 라 종료 코드가 늘 0 이었다.
-#   그래서 rmi 마다 rc 를 쌓고 맨 끝에서 `exit $rc` 한다.
-# ★목록은 `--format` 으로 받는다. 기본 출력은 Docker 29 의 트리 뷰라 첫 열 형식에 기대게 된다.
-#   `--format` 은 예전 형식(생성일 내림차순)이지만, 위 원칙대로 순서에는 여전히 기대지 않는다.
-#   run 안의 `{{"{{"}}` · `{{"}}"}}` 는 Tera 이스케이프다 — mise 가 run 문자열을 템플릿으로 렌더하므로
-#   docker 의 Go 템플릿 중괄호를 그대로 쓰면 렌더가 깨진다. 원격에는 `--format '<중괄호>.Repository...'` 로 도착한다.
+# 구현은 서버 배포 스크립트의 `gc` 다 — deploy-ship 도 배포 끝에 같은 함수를 부른다 (ADR-028 D7 Phase B).
+# ★이 호스트는 4 프로젝트가 공유한다 — prune 계열 금지, kairos-api / kairos-web 저장소로만 한정.
+# ★정렬에 기대지 않는다 (Docker 29 + containerd 는 태그 알파벳순) — 보존 = 서버 `.env` 의 현재 태그 + 인자 태그.
+#   repo:tag 로 지우므로 한 이미지에 태그가 여럿이어도 보존 태그는 untag 되지 않는다. 실패는 종료 코드로 남긴다.
 [tasks.deploy-gc]
 description = "서버 구버전 kairos 이미지 정리 (.env 현재 태그 + 인자 태그만 보존)"
 usage = 'arg "<keep>" help="추가 보존 태그 (롤백 대상. 없으면 __none__)"'
 run = '''
-ssh {{vars.oci_host}} "bash -ls -- '$usage_keep'" <<'REMOTE'
-set -uo pipefail
-keep_extra="${1:-__none__}"
-rc=0
-# GHCR 이름만. Phase A 이전 맥 빌드 이름(kairos-api·kairos-web)은 2026-10-02 전환 뒤 서버에서 비워져 뺐다.
-for repo in {{vars.ghcr}}/kairos-api {{vars.ghcr}}/kairos-web; do
-  # ★리포마다 자기 태그를 읽는다. API 태그 하나로 web 보존을 판정하면
-  #   두 값이 갈라진 상태(수동 롤백 등)에서 운영중인 web 이미지가 삭제 대상이 된다.
-  case "$repo" in
-    *kairos-api) var=KAIROS_API_TAG ;;
-    *kairos-web) var=KAIROS_WEB_TAG ;;
-  esac
-  cur=$(grep -m1 "^$var=" {{vars.oci_dir}}/.env | cut -d= -f2)
-  # ★빈 값 가드. cur 이 비면 아래 grep -vx 필터가 무력화돼 운영중 태그까지
-  #   삭제 대상이 된다. 지우지 않고 멈추는 쪽이 항상 옳다.
-  if [ -z "$cur" ]; then
-    echo "ERROR: .env 에서 $var 를 읽지 못했다 — GC 를 중단한다 (이미지는 그대로)" >&2
-    exit 1
-  fi
-  echo "$repo 보존: $cur (운영중), $keep_extra (롤백용)"
-  while read -r ref; do
-    docker rmi "$ref" || rc=1
-  done < <(docker images "$repo" --format '{{"{{"}}.Repository{{"}}"}}:{{"{{"}}.Tag{{"}}"}}' \
-             | grep -vx -e "$repo:$cur" -e "$repo:$keep_extra" -e "$repo:<none>")
-done
-echo "── 잔여 kairos 이미지 ──"
-docker images --format '{{"{{"}}.Repository{{"}}"}}:{{"{{"}}.Tag{{"}}"}}' | grep -E '(^|/)kairos-(api|web):' || true
-echo "── 서버 디스크 ──"
-df -h / | tail -1
-if [ "$rc" -ne 0 ]; then
-  echo "ERROR: 일부 이미지를 지우지 못했다 — 위 docker rmi 오류를 확인" >&2
-fi
-exit $rc
-REMOTE
+ssh {{vars.oci_host}} "{{vars.oci_dir}}/bin/kairos-deploy.sh gc '$usage_keep'"
 '''
 
 [tasks.deploy-status]
