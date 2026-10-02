@@ -42,7 +42,7 @@ apps/web/src/
 │   └── onboarding/
 ├── features/      도메인별 비즈니스 레이어 (FSD)
 │   ├── actions/  audit/  feedback/  home/  inbox/  integrations/  meetings/
-│   ├── members/  memory/  notes/  onboarding/  projects/  rag/  sources/
+│   ├── members/  memory/  notes/  onboarding/  projects/  push/  rag/  sources/
 │   ├── upload/  workspaces/
 │   └── 각 feature: api.ts + hooks.ts + types.ts + components/
 │                   (+선택 schemas.ts / store.ts / CONTEXT.md)
@@ -101,6 +101,7 @@ apps/web/src/
 | notes/ | notes | note-list, **note-detail** (Tiptap 에디터), quick-memo |
 | onboarding/ | onboarding | step progression |
 | projects/ | projects | project-list, dashboard/, create-project-dialog, ProjectAdminDialogs |
+| push/ | push | PushSettingsPanel (SCR-002 알림 탭), PushSync (`(app)` 셸 앱 로드 동기화), IosInstallHint (REQ-011) + flows (켜기·끄기=로그아웃 정리·동기화) · marker (소유자 표식) (ADR-035) |
 | rag/ | rag | RAGPanel, ask-input, answer-card (SSE), markdown-message |
 | sources/ | (다도메인 조합 — 출처 뷰) | source-viewer |
 | upload/ | upload | upload-dropzone (presigned URL), useRecording |

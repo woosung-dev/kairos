@@ -1,9 +1,9 @@
 # PWA — 설치형 셸 + 웹 푸시 (기능 명세)
 
-> **상태: PR-1 구현 완료 — 자동 검증 PASS + 실 Chrome 설치 T-PWA-18 PASS (2026-10-02). 수동 T-PWA-17(iOS)·T-PWA-22(배포 후 smoke) 는 별도 · PR-2 확정 · 미구현** — 사용자 spec 게이트 통과 (2026-10-02)
+> **상태: PR-1 구현 완료 — 자동 검증 PASS + 실 Chrome 설치 T-PWA-18 PASS (2026-10-02). 수동 T-PWA-17(iOS)·T-PWA-22(배포 후 smoke) 는 별도 · PR-2 구현 완료 — 자동 검증 PASS (EVAL-P2-1 PASS + GEN-P2-2 minor 3건 수정, 2026-10-02). 실푸시 수신 T-PWA-52·53·54 는 오케스트레이터 실브라우저 확인 대기 · T-PWA-55(iOS) 별도** — 사용자 spec 게이트 통과 (2026-10-02)
 > **근거**: PRD §9 "모바일 네이티브 앱 (PWA로 대체)" (`docs/requirements/prd.md:606`) · 계획 [`docs/plans/active/2026-10-02-pwa/plan.md`](../plans/active/2026-10-02-pwa/plan.md) · 테스트 매트릭스 [`test-matrix.md`](../plans/active/2026-10-02-pwa/test-matrix.md)
-> **관련 ADR**: [ADR-034](../adr/034-pwa-installable-shell.md) PWA 셸 (PR-1, Accepted) · ADR-035 웹 푸시 (PR-2, 예정). ADR-033 은 PR #200 이 머지돼(2026-10-02 KST, 커밋 `d35edf6`) main 에 있다 — 034 는 그대로다.
-> **불변식**: F-14 (`apps/web/CONTEXT.md` §4, PR-1 반영) · B-16 (`apps/api/CONTEXT.md` §5, PR-2 예정)
+> **관련 ADR**: [ADR-034](../adr/034-pwa-installable-shell.md) PWA 셸 (PR-1, Accepted) · [ADR-035](../adr/035-web-push.md) 웹 푸시 (PR-2, Accepted). ADR-033 은 PR #200 이 머지돼(2026-10-02 KST, 커밋 `d35edf6`) main 에 있다 — 034 는 그대로다.
+> **불변식**: F-14 (`apps/web/CONTEXT.md` §4, PR-1 반영) · B-16 (`apps/api/CONTEXT.md` §5, PR-2 반영)
 > **ID**: REQ-001~011 · SCR-001~002 · API-001~003 · ENT-001 · BL-PWA-1~. 레포에서 처음 부여하는 번호다 (`AGENTS.md` §5 ID 체계 — 이후 변경·재사용 금지).
 > **라벨**: `[사실]` 은 file:line 으로 확인함 · `[가정]` 은 확인하지 못한 추론 · `[확인 필요]` 는 사용자 결정 대기 — 2026-10-02 게이트로 전부 확정돼 본문에 남은 것 없음 (§8).
 
@@ -39,7 +39,7 @@ Kairos 를 홈 화면·데스크톱에 **설치할 수 있게** 하고(PR-1, FE 
 | C-10 | 앱 기본 테마는 dark (`data-theme`, `defaultTheme="dark"`), 랜딩만 `data-theme="landing"` 이고 OS 라이트면 라이트 | `components/layout/theme-provider.tsx:7-12` · `app/(landing)/layout.tsx:4` · `app/globals.css:197,252-253` | `themeColor` 단일값 `#0A0A0B`. OS media 배열은 앱 테마와 어긋나서 쓰지 않는다 |
 | C-11 | 로고 파일이 없다. 사이드바 접힘 상태가 'K' 텍스트 (Satoshi, accent). `src/app/favicon.ico` 는 create-next-app 기본값 | `components/layout/sidebar.tsx:394-404` · `apps/web/src/app/favicon.ico` | K 모노그램 아이콘 신규 제작 (REQ-002) |
 | C-12 | `/` 는 세션이 있으면 서버에서 `/dashboard` 로 리다이렉트한다 | `app/(landing)/page.tsx:9-14` | `start_url=/dashboard` (왕복 1회 절약). 비로그인이면 proxy 가 `/sign-in?callbackURL=%2Fdashboard` 로 보낸다 (`proxy.ts:36-40`) |
-| C-13 | 로그아웃 순서: `queryClient.clear()` → `clearAuthTokenCache()` → `await authClient.signOut()` | `components/layout/header.tsx:164-176` (signOut :174) · `lib/use-api-client.ts:72` | BE 구독 삭제는 **signOut 이전** (이후엔 `/api/auth/token` 이 401) |
+| C-13 | 로그아웃 순서: `queryClient.clear()` → `clearAuthTokenCache()` → `await authClient.signOut()` | `components/layout/header.tsx:164-176` (signOut :174, PR-2 착수 전) → PR-2 후 `:171-183` (푸시 정리 :175, signOut :180) · `lib/use-api-client.ts:72` | BE 구독 삭제는 **signOut 이전** (이후엔 `/api/auth/token` 이 401) |
 | C-14 | FE `NEXT_PUBLIC_*` 는 빌드타임 인라인 → Dockerfile ARG·CI repo Variables(`release.yml`)·맥 비상 `deploy/oci/build.env` 결합 | `apps/web/Dockerfile:27-46` · `.github/workflows/release.yml:136-143` · `mise.toml:287-300` | VAPID 공개키는 BE 엔드포인트로 제공 (API-001) |
 | C-15 | 회의 상태 `completed`/`failed` 전이는 `meetings/pipeline_service.py` 에만 있다 — 완료 :185-186 (`_analyze_and_store` 끝), 실패 :259-269 (`process_meeting`), :318-328 (`capture_text`) | `grep update_status( apps/api/src` | 푸시 훅은 오케스트레이터 안 (B-3, `apps/api/CONTEXT.md:73`). 온보딩 훅이 같은 자리에 같은 방식(지연 import + 비치명적 try)으로 있다 (:177-183) |
 | C-16 | 사용자 단위 경로 선례 `/api/v1/users/me`, `/api/v1/users/me/onboarding` — I-13 예외 `/api/v1/users` 안 | `apps/api/src/auth/router.py:9-15` · `apps/api/src/onboarding/router.py:10` · `CONTEXT-MAP.md:92` | 푸시 API 는 `/api/v1/users/me/push-*` |
@@ -68,7 +68,7 @@ Kairos 를 홈 화면·데스크톱에 **설치할 수 있게** 하고(PR-1, FE 
 | REQ-006 | 비범위 명시 | §6 의 항목은 이번 2개 PR 에서 구현하지 않는다 (BL 등재만) | 1·2 | — (리뷰) |
 | REQ-007 | 구독 API + 데이터 모델 (API-001~003, ENT-001) | §5.1·§5.2. endpoint 단위 upsert(ON CONFLICT), 재구독 시 현재 사용자로 rebind, 푸시 서비스 호스트 allowlist. 사용자당 개수 상한은 두지 않는다 (BL-PWA-14) | 2 | T-PWA-30~32·34·43·44 |
 | REQ-008 | 발송 — 회의 완료·실패 → 업로더 본인 | 최종 commit 이후 · best-effort(실패해도 회의 상태 불변) · 업로더의 구독에만 · 조회 → 트랜잭션 종료 → 발송 → 404/410 정리(새 짧은 트랜잭션) 순서 · `timeout=10` 명시 · 업로더가 워크스페이스 멤버가 아니면 미발송 | 2 | T-PWA-35~42·52·53 |
-| REQ-009 | FE 구독·해제·로그아웃·계정 전환 + SW `push`·`notificationclick` | 권한 요청은 토글 클릭 때만. SW 등록은 `getRegistration()` 으로만 조회 (`ready` 대기 금지). 등록이 없으면 알림 UI 는 '사용 불가'. 로그아웃은 BE 삭제 → 로컬 unsubscribe → 기존 순서, 등록이 없어도 대기 없이 진행. 소유자 표식 불일치면 unsubscribe. 클릭 이동은 같은 origin `/meetings/<uuid>` (+ `?workspace=<uuid>` 만) · 상세 진입 시 `?workspace=` 가 활성과 다르고 멤버면 1회 전환 후 파라미터 제거 (§5.5) | 2 | T-PWA-45~54·57·59 |
+| REQ-009 | FE 구독·해제·로그아웃·계정 전환 + SW `push`·`notificationclick` | 권한 요청은 토글 클릭 때만. SW 등록은 `getRegistration()` 으로만 조회 (`ready` 대기 금지). 등록이 없으면 알림 UI 는 '사용 불가'. 로그아웃은 ① BE 삭제 ∥ ② 로컬 unsubscribe (`Promise.allSettled`, 요청은 ①이 먼저, 전체 3초 상한) → ③ 표식 삭제 → 기존 순서, 등록이 없어도 대기 없이 진행. 소유자 표식 불일치면 unsubscribe. 클릭 이동은 같은 origin `/meetings/<uuid>` (+ `?workspace=<uuid>` 만) · 상세 진입 시 `?workspace=` 가 활성과 다르고 멤버면 1회 전환 후 파라미터 제거 (§5.5) | 2 | T-PWA-45~54·57·59 |
 | REQ-010 | 페이로드 스키마 + 프라이버시 | 페이로드는 `{v, kind, meetingId, workspaceId}` 만 (게이트 ⑥ 확정). 회의 제목·요약·전사 미포함 (게이트 ④). 문구는 SW 가 `kind` 로 결정 | 2 | T-PWA-42·46 |
 | REQ-011 | iOS 설치 안내 | iOS·iPadOS 에서 홈 화면 앱이 아닐 때만, 알림 설정(SCR-002) 안에 안내 표시. 그 외 환경에선 렌더하지 않는다 | 2 | T-PWA-56·55 |
 
@@ -223,7 +223,7 @@ icons: { apple: "/icons/apple-touch-icon.png" },
 
 - `workspace_id` 없음 — 사용자 단위 리소스다 (FeedbackEntry 와 같은 위치). B-2(`workspace_id` 필터) 의 예외이며, 대신 **Repository 의 모든 조회·삭제에 `user_id` WHERE 강제** (404/410 정리용 내부 삭제도 `id AND user_id`). 이 예외는 B-16 문구에 명시한다 (§9).
 - 키를 평문 저장하는 근거: `applicationServerKey`(VAPID 공개키)로 만든 구독은 우리 VAPID 개인키로 서명한 요청만 받는다 (RFC 8292). endpoint+keys 가 새도 제3자는 발송할 수 없다. 대신 응답·로그에 노출하지 않는다.
-- 마이그레이션: 새 테이블 1개, 가산형 (C-20). `down_revision` 은 PR-2 착수 시점 head 를 다시 확인한다 (현재 `b3d5f8a1c2e4`). `alembic/env.py` 에 모델 import 추가.
+- 마이그레이션: 새 테이블 1개, 가산형 (C-20). revision `563de342c8ae` · `down_revision` `b3d5f8a1c2e4` (PR-2 착수 시점 head 재확인). 제약 이름 4개 명시 (`push_subscriptions_pkey` · `fk_push_subscriptions_user_id_users` · `uq_push_subscriptions_endpoint` · `ix_push_subscriptions_user_id`). `alembic/env.py` 에 모델 import 추가.
 
 ### 5.2 API (모두 Bearer JWT 필수 — `get_current_user`, I-16 camelCase)
 
@@ -235,13 +235,15 @@ icons: { apple: "/icons/apple-touch-icon.png" },
 
 - API-001: VAPID 3개 설정이 다 있을 때만 `isEnabled=true`. 미설정이어도 200 (FE 가 섹션을 숨긴다). 공개키는 base64url 87자.
 - API-002 upsert: `INSERT … ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, updated_at = now() RETURNING id` 를 `session.execute` 로 (C-19). 같은 endpoint 면 id 가 유지된다 → **같은 기기에서 다른 사용자가 구독하면 그 행이 현재 사용자로 rebind** (서버 백스톱).
-  - 검증 (Pydantic, 실패 422): `endpoint` 는 `https` · 포트 없음 또는 443 · userinfo 없음 · IP 리터럴 아님 · 길이 ≤ 2048 · **호스트 allowlist** (정확 일치 또는 접미사): `fcm.googleapis.com`, `android.googleapis.com`, `.push.services.mozilla.com`, `.push.apple.com`, `.notify.windows.com` (Edge/WNS — **미검증**: 호스트 형식·실제 발송 모두 이번에 확인하지 않았다). `p256dh`·`auth` 는 base64url 이고 디코드 길이 65·16.
+  - 검증 (Pydantic, 실패 422): `endpoint` 는 **ASCII 만** (맨 먼저 검사 — 비ASCII 경로·IDN 호스트·lone surrogate 가 DB/인덱스·응답 인코딩에서 500 이 되던 것을 422 로, EVAL-P2-1 D1) · 공백·제어문자·역슬래시 없음 · `https` · 포트 없음 또는 443 · userinfo 없음 · IP 리터럴 아님 · 길이 ≤ 2048 · **호스트 allowlist** (정확 일치 또는 접미사): `fcm.googleapis.com`, `android.googleapis.com`, `.push.services.mozilla.com`, `.push.apple.com`, `.notify.windows.com` (Edge/WNS — **미검증**: 호스트 형식·실제 발송 모두 이번에 확인하지 않았다). `p256dh`·`auth` 는 base64url 이고 디코드 길이 65·16.
   - allowlist 근거: 서버가 사용자 입력 URL 로 POST 를 보내는 구조라 없으면 SSRF 다 (예: `https://169.254.169.254/`). 목록 밖 브라우저는 "이 브라우저는 지원하지 않음" 으로 처리된다 [가정 — 주요 브라우저 4종 호스트만 확인. 누락 시 422 로 실패하므로 안전 방향].
 - 사용자당 구독 개수 상한은 두지 않는다 — 발송은 업로더 본인의 구독에만 가고, 404/410 정리로 죽은 행이 줄어든다. 상한·축출은 BL-PWA-14.
 - API-003: `id AND user_id = 현재 사용자` 일 때만 삭제. 없거나 남의 것이어도 **204** (멱등 + 존재 여부 오라클 차단). endpoint 를 URL 에 넣지 않으려고 id 로 지정한다 (capability URL 이 접근 로그에 남지 않게).
 - 경로는 기존 I-13 예외 `/api/v1/users` 안이다 (C-16). CONTEXT-MAP I-13 문구에 `push` 를 예외 소유자로 추가한다 (§9).
 
 ### 5.3 REQ-008 발송 시퀀스
+
+> 아래 `pipeline_service.py` 줄 번호는 PR-2 착수 전 기준이다. 구현 후 위치는 ADR-035 D4 (`_notify_meeting_finished` = `:351-418`).
 
 ```
 BackgroundTask (meetings/pipeline_service.py, 오케스트레이터) — process_meeting / capture_text 각각
@@ -288,7 +290,9 @@ _notify_meeting_finished  — 전체를 try/except Exception 으로 감싼다 (�
     - **`timeout` 미지정 = 무제한** [사실]: `webpush_async` 의 시그니처가 `timeout: None | float = None` (`pywebpush/__init__.py:546`) 이고 이 값을 `send_async(..., timeout=timeout)` 로 **명시 전달**한다 (`:645-651`). 그래서 `send_async` 의 `kwargs.pop("timeout", 10000)` 기본값(`:395`)은 쓰이지 않고 `None` 이 `session.post(endpoint, timeout=None)` 까지 간다 (`:406`·`:410`). aiohttp 3.13.5 `_request` 는 sentinel 이 아닌 비-`ClientTimeout` 값을 `ClientTimeout(total=timeout)` 으로 바꾼다 (`aiohttp/client.py:589-595`. `None` 을 기본값으로 바꿔 주는 분기 `:333` 은 `ClientSession.__init__` 에만 있다) → `total=None` = 제한 없음. 요청 단위 값이라 `ClientSession(timeout=…)` 기본값도 덮어쓴다. → 반드시 `timeout=10` 을 넘긴다 (T-PWA-42 가 인자 고정).
     - `vapid_claims` dict 를 라이브러리가 변형(`aud`·`exp` 주입) → 매 호출 새 dict.
   - 의존성: `aiohttp`(이미 lock 에 3.13.5) · `requests` · `http-ece` · `py-vapid` · **`cryptography>=47`** — 현재 lock 은 `cryptography 46.0.6` 이라 상향된다 (R-7). 대안은 `pywebpush==2.3.0` (cryptography 하한 2.6.1) 고정 + `ex.response.status` 직접 사용.
-- 모듈 배치: 새 도메인 `apps/api/src/push/` — `models.py · schemas.py · repository.py · service.py · router.py · dependencies.py · exceptions.py · sender.py · CONTEXT.md`. `sender.py` 는 pywebpush 호출만 하는 얇은 래퍼(테스트에서 가짜로 교체). `pipeline_service.py` 가 `PushService` 를 부르는 건 오케스트레이터 경계 안이다 (B-3, 온보딩 훅과 같은 지연 import 패턴 :177-183).
+- 모듈 배치: 새 도메인 `apps/api/src/push/` — `models.py · schemas.py · repository.py · service.py · router.py · dependencies.py · exceptions.py · sender.py · CONTEXT.md`. `sender.py` 는 pywebpush 호출만 하는 얇은 래퍼(테스트에서 가짜로 교체).
+  - **서비스는 둘이다** (ADR-035 D5): `PushService` = API-001~003 (요청 세션의 `PushRepository`) · `PushDispatchService` = 발송 단계 (Repository·세션 없음, `PushTarget` 원시 값을 받아 보내고 성공 / 404·410 / 그 외로 분류만). VAPID 미구성이면 `create_push_dispatcher()` 가 `None`.
+  - `pipeline_service._notify_meeting_finished` 가 지연 import 로 `PushRepository`(조회·정리 세션)와 `create_push_dispatcher`(발송)를 쓰는 건 오케스트레이터 경계 안이다 (B-3, 온보딩 훅과 같은 지연 import 패턴).
 
 ### 5.4 REQ-010 페이로드 + 프라이버시
 
@@ -322,14 +326,16 @@ _notify_meeting_finished  — 전체를 try/except Exception 으로 감싼다 (�
 | 흐름 | 동작 | 수용 기준 |
 |---|---|---|
 | 켜기 (SCR-002 토글 클릭) | `getRegistration()` → `undefined` 면 '사용 불가' 상태로 전환하고 종료. 있으면 `Notification.requestPermission()` → `granted` 면 `registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey })` → API-002 → 표식 저장. 기존 구독의 `applicationServerKey` 가 현재 공개키와 다르면 먼저 `unsubscribe()` | 권한 요청은 **사용자 클릭 핸들러 안에서만** (페이지 로드 시 0회). `denied` 면 안내 문구 + 토글 비활성 |
-| 끄기 | API-003 → (등록 있으면) `unsubscribe()` → 표식 삭제 | 3단계 모두 best-effort, 실패해도 UI 는 꺼짐 |
-| 앱 로드 동기화 (`(app)` 셸, 페이지 로드당 1회, `me` 로드 후) | `getRegistration()` → **등록 없음**: 표식 userId == me.id → API-003 (best-effort, 타임아웃 3초) 후 표식 삭제 — kill-switch 등으로 등록만 사라진 경우의 서버 행 정리 · 표식 불일치(또는 없음) → 서버 호출 없이 표식만 삭제. **등록 있음**: 구독 있음 + 표식 userId == me.id → API-002 재전송 (브라우저의 endpoint 교체·서버 행 유실 복구) · 구독 있음 + (표식 없음 또는 불일치) → **`unsubscribe()` 만** (fail-closed, 서버 호출 없음) · 구독 없음 → 표식 삭제 | 불일치 시 PUT 0회. 등록 없음 + 표식 일치 → DELETE 1회 후 표식 삭제 (실패해도 삭제). 등록 없음 + 표식 불일치·없음 → 네트워크 0회 |
-| 로그아웃 (`header.tsx:164-176`) | **기존 순서 앞에** ① 표식이 있으면 그 id 로 API-003 (타임아웃 3초 — 등록이 없어도 보낸다: 앱 로드 동기화가 정리하지 못한 잔여, 예컨대 같은 로드 중 kill-switch 로 등록이 사라진 경우) ② `getRegistration()` → 있으면 `pushManager.getSubscription()` → `unsubscribe()`, 없으면 건너뜀 ③ 표식 삭제 → 이후 기존 `queryClient.clear()` → `clearAuthTokenCache()` → `signOut()` | 네트워크 로그상 `DELETE …/push-subscriptions/{id}` 가 `POST /api/auth/sign-out` 보다 앞. 실패·오프라인·**등록 없음**이어도 로그아웃은 대기 없이 진행 (추가 지연 ≤ 3초, `ready` 대기 0) |
+| 끄기 | 로그아웃 정리와 같은 함수 (`disablePushOnDevice`): ① API-003 ∥ ② (등록 있으면) `unsubscribe()` → ③ 표식 삭제 | 3단계 모두 best-effort, 실패해도 UI 는 꺼짐 |
+| 앱 로드 동기화 (`(app)` 셸, **계정당 1회** — 같은 JS 수명에서 계정이 바뀌면 다시, `me` 와 API-001 응답(성공·실패) 후) | `getRegistration()` → **등록 없음**: 표식 userId == me.id → API-003 (best-effort, 타임아웃 3초) 후 표식 삭제 — kill-switch 등으로 등록만 사라진 경우의 서버 행 정리 · 표식 불일치(또는 없음) → 서버 호출 없이 표식만 삭제. **등록 있음**: 구독 있음 + 표식 userId == me.id + 구독 키 == API-001 공개키 → API-002 재전송 (브라우저의 endpoint 교체·서버 행 유실 복구) · 구독 있음 + 표식 일치 + **구독 키 ≠ 공개키** → API-003(표식 id) ∥ `unsubscribe()` → 표식 compare-and-delete (아래 키 불일치) · 구독 있음 + (표식 없음 또는 불일치) → **`unsubscribe()` 만** (fail-closed, 서버 호출 없음) · 구독 없음 → 표식 삭제 | 불일치 시 PUT 0회. 키 불일치 → PUT 0 · DELETE 1 · unsubscribe 1 · 표식 삭제. 등록 없음 + 표식 일치 → DELETE 1회 후 표식 삭제 (실패해도 삭제). 등록 없음 + 표식 불일치·없음 → 네트워크 0회 |
+| 로그아웃 (`header.tsx:171-183`) | **기존 순서 앞에** ① 표식이 있으면 그 id 로 API-003 (등록이 없어도 보낸다: 앱 로드 동기화가 정리하지 못한 잔여, 예컨대 같은 로드 중 kill-switch 로 등록이 사라진 경우) **∥** ② `getRegistration()` → 있으면 `pushManager.getSubscription()` → `unsubscribe()`, 없으면 건너뜀 — ①·②는 `Promise.allSettled` 로 함께 시작하고 (요청은 ①이 먼저 나간다) **둘을 합친 전체가 3초 상한** ③ 표식 compare-and-delete → 이후 기존 `queryClient.clear()` → `clearAuthTokenCache()` → `signOut()`. 순차(①→②)면 느린 ①이 3초를 다 써 ②가 돌지 못하고 로그아웃 뒤에도 이 기기가 푸시를 받는다 | 네트워크 로그상 `DELETE …/push-subscriptions/{id}` 가 `POST /api/auth/sign-out` 보다 앞. 실패·오프라인·**등록 없음**이어도 로그아웃은 대기 없이 진행 (추가 지연 ≤ 3초, `ready` 대기 0) |
 
 - 결과: **로그아웃하면 그 기기의 푸시가 꺼진다.** 같은 사용자가 다시 로그인해도 설정에서 다시 켜야 한다 (게이트 ⑦ 확정). 브라우저 알림 권한은 origin 단위라 사용자를 구분하지 못하므로, 자동 재구독은 다음 사용자를 동의 없이 구독시킨다.
 - 로그아웃 없이 다른 계정으로 로그인된 경우(세션 만료 등): 앱 로드 동기화의 표식 불일치 분기가 로컬 구독을 끊는다. 서버의 옛 행은 다음 발송의 404/410 에서 정리된다 [가정 — 푸시 서비스가 unsubscribe 된 endpoint 에 404/410 을 준다].
 - kill-switch·수동 해제로 등록만 사라진 경우: 다음 앱 로드 동기화가 표식 일치면 API-003 으로 서버 행을 바로 지운다 (404/410 을 기다리지 않는다). 같은 로드 안에서 등록이 사라져 동기화가 놓친 잔여는 로그아웃 ① 이 지운다.
 - `pushsubscriptionchange` 는 처리하지 않는다 — SW 에는 인증 토큰이 없다. 앱 로드 동기화가 대신한다 (BL-PWA-9).
+- **VAPID 키 불일치 (운영 키 교체, EVAL-P2-1 D2)**: 구독의 `options.applicationServerKey` 가 API-001 `vapidPublicKey` 와 다르면 그 구독은 우리 서명을 받지 못한다. 앱 로드 동기화는 표식 일치면 API-003(표식 id) ∥ 로컬 `unsubscribe()` → 표식 compare-and-delete, 표식 불일치면 `unsubscribe()` 만 한다. SCR-002 상태 판정도 키가 다르면 '꺼짐' 이다. **자동 재구독은 없다** — 사용자가 다시 켜면 켜기 흐름이 옛 구독을 끊고 새 키로 구독한다. API-001 공개키가 `null`(미구성·조회 실패)이면 비교를 건너뛴다. 서버는 옛 키 구독의 발송 403 을 정리하지 않는다 (404·410 만 — ADR-035 D8).
+- **계정 전환 시 재동기화 (EVAL-P2-1 D3)**: 동기화 가드는 boolean 이 아니라 마지막으로 동기화한 계정 id(`lastSyncedMeId`)다. 로그아웃 → 다른 계정 로그인은 soft navigation 이라 JS 수명이 이어지므로, `me.id` 가 바뀌면 새 계정 기준으로 다시 동기화한다 (앞 계정의 구독이 남지 않게).
 
 **알림 딥링크 워크스페이스 전환 (게이트 ⑥ 확정)** — 회의 상세(`app/(app)/meetings/[id]/page.tsx` → `MeetingDetail`) 진입 시 `?workspace=<wid>` 를 1회 처리한다. 로직은 전환 규칙의 주인인 `features/workspaces` 에 훅 1개로 둔다. 무효화 predicate 는 `WorkspaceSwitcher.tsx:44-56` 의 `invalidateWorkspaceScopedQueries` 를 같은 feature 의 함수로 추출해 둘이 공유한다 (복제 금지).
 
@@ -372,7 +378,7 @@ _notify_meeting_finished  — 전체를 try/except Exception 으로 감싼다 (�
 | `vapid_subject` | `str \| None` (`mailto:` 또는 `https:`) | None |
 
 - 셋 다 있어야 활성. 형식 오류는 **warn-only** (부팅 차단 금지, C-18). CI fake env 추가 불필요.
-- 키 형식(raw base64url vs DER/PEM)은 구현 라운드에서 생성 명령과 함께 확정하고, pytest 로 "설정 키로 서명 → 공개키로 검증" 왕복을 고정한다 [가정 — py_vapid 가 raw base64url 을 받는지 미확인].
+- 키 형식 = **raw base64url** (개인키 32바이트·43자, 공개키 uncompressed 65바이트·87자) — 구현 라운드에서 확정. 생성 명령은 `apps/api/src/push/CONTEXT.md` §7, "설정 키로 서명 → 공개키로 검증" 왕복은 `apps/api/tests/push/test_push_sender.py` `test_vapid_raw_key_signs_and_settings_public_key_verifies` 가 고정한다. PEM 은 정상 형식으로 보지 않는다 (warning 만, BL-PWA-19).
 - 런타임 env 다 (build.env 아님): `deploy/oci/.env.example` 에 3줄 추가. 운영 서버 `.env` 반영은 사용자 실행 (SSH).
 
 ### 5.8 PR-2 변경 파일 (제안)
@@ -399,6 +405,8 @@ BE: `src/push/*` (신규) · `src/main.py` (router) · `src/core/config.py` (3�
 | BL-PWA-12 | Android 단색 badge 아이콘 | 시안 없음 | 2 |
 | BL-PWA-13 | mise task `fe-security-headers` 명칭 정리 (PWA spec 도 이 task 로 돈다) | 명칭만의 문제, CI 문자 동일 규약상 별도 PR. 낡은 **설명 문구**(mise `description` · `test.yml:122` 주석 · `testing.md` §1 표·§4 · `apps/web/README.md` project 목록)는 PR-1 에서 해소. 남은 것: task **이름** · CI step 이름 · 코드 주석 2곳(`test.yml:121` · `playwright.config.ts:72-73` — 아직 "보안 헤더" 만 적음) | 1 |
 | BL-PWA-14 | 사용자당 푸시 구독 개수 상한 + 오래된 순 축출 | 발송 대상이 업로더 본인뿐이고 404/410 정리가 있어 증폭 위험이 작다. 실제 행 수가 늘면 도입 | 2 |
+
+> PR-2 구현·검증 중 발견한 BL-PWA-15~19 (Better Auth rate limit · `auth-relogin.spec.ts` 상시 skip · `test_alembic_upgrade.py` 모델 import 누락 · WNS 미검증 · VAPID PEM 미지원)는 `docs/REFACTORING-BACKLOG.md` 에만 등재한다.
 
 ## 7. 리스크
 
@@ -439,7 +447,7 @@ BE: `src/push/*` (신규) · `src/main.py` (router) · `src/core/config.py` (3�
 | PR | 문서 |
 |---|---|
 | PR-1 | 본 문서 상태 갱신 · ADR-034 (셸 — Cache Storage 미사용 · navigate 만 · navigationPreload 미사용 · kill-switch) · `apps/web/CONTEXT.md` §4 **F-14** ("SW 는 Cache Storage·IndexedDB 에 쓰지 않는다 · 같은 origin `navigate` 만 `respondWith` (`/api/*` 제외) · navigationPreload 미사용 · 등록 호출부 1곳") · `apps/web/CONTEXT.md` §3 디렉터리 목록 (`:39` `components/layout/` 에 registrar, `:50` `lib/` 에 `lib/pwa/`) · `docs/architecture/directory-map.md` (`lib/pwa/`, registrar) · `docs/REFACTORING-BACKLOG.md` BL-PWA-1·2·3·8·10·11·13 · `docs/development/secrets.md` FE 변수 표 (`NEXT_PUBLIC_PWA_SW`) |
-| PR-2 | 본 문서 · ADR-035 (웹 푸시 — 수신자 규칙 · 페이로드 최소화 · allowlist · 로그아웃 순서) · `docs/architecture/erd.md` (ENT-001) · `docs/architecture/directory-map.md` (BE `push/` · FE `features/push/` — 현재 BE 17·FE 17 표기 `:1`·`:55`·`:84`·`:120`(BE 17 모듈) 를 18 로, `:179` 의 "BE 17 — `audit` 추가 시 18" 문구를 19 기준으로) · `contracts/` 재생성 + `apps/api/src/push/CONTEXT.md` · `CONTEXT-MAP.md` §4.1 (BE 모듈 17→18) · I-13 예외 문구 · §4.3 (FE features 17→18) · `apps/api/CONTEXT.md` §4 표 + **B-16** ("웹 푸시는 최종 commit 이후 best-effort · 수신자는 이벤트 주체 본인 · 엔드포인트 호스트 allowlist · 페이로드에 콘텐츠 미포함 · `push_subscriptions` 는 사용자 단위 리소스라 B-2(`workspace_id` 필터) 예외 — 대신 모든 조회·삭제에 `user_id` WHERE") · `apps/api/CONTEXT.md` §6 API 컨벤션 I-13 예외 목록에 `push → /api/v1/users/me/push-*` 추가 · `apps/web/CONTEXT.md` §3·§5 (`push/`) · `docs/REFACTORING-BACKLOG.md` BL-PWA-4·5·6·7·9·12·14 |
+| PR-2 | 본 문서 · ADR-035 (웹 푸시 — 수신자 규칙 · 페이로드 최소화 · allowlist · 로그아웃 순서) · `docs/architecture/erd.md` (ENT-001) · `docs/architecture/directory-map.md` (BE `push/` · FE `features/push/` — 현재 BE 17·FE 17 표기 `:1`·`:55`·`:84`·`:120`(BE 17 모듈) 를 18 로, `:179` 의 "BE 17 — `audit` 추가 시 18" 문구를 19 기준으로 — 2026-10-02 반영 시 실제 줄은 `:1`·`:55`·`:85`·`:122`·`:181` 이었다) · `contracts/` 재생성 + `apps/api/src/push/CONTEXT.md` · `CONTEXT-MAP.md` §4.1 (BE 모듈 17→18) · I-13 예외 문구 · §4.3 (FE features 17→18) · `apps/api/CONTEXT.md` §4 표 + **B-16** ("웹 푸시는 최종 commit 이후 best-effort · 수신자는 이벤트 주체 본인 · 엔드포인트 호스트 allowlist · 페이로드에 콘텐츠 미포함 · `push_subscriptions` 는 사용자 단위 리소스라 B-2(`workspace_id` 필터) 예외 — 대신 모든 조회·삭제에 `user_id` WHERE") · `apps/api/CONTEXT.md` §6 API 컨벤션 I-13 예외 목록에 `push → /api/v1/users/me/push-*` 추가 · `apps/web/CONTEXT.md` §3·§5 (`push/`) · `docs/REFACTORING-BACKLOG.md` BL-PWA-4·5·6·7·9·12·14 |
 
 ## 10. 외부 근거
 

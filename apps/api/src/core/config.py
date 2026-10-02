@@ -1,12 +1,27 @@
 # 앱 환경변수를 pydantic-settings로 관리하는 설정 모듈
+import base64
+import binascii
 import logging
+import re
 from functools import lru_cache
 
 from cryptography.fernet import Fernet
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
+
+_BASE64URL_RE = re.compile(r"^[A-Za-z0-9_-]+={0,2}$")
+
+
+def _decode_base64url(value: str) -> bytes | None:
+    """base64url(패딩 선택) 디코드. 알파벳 밖 문자·깨진 길이는 None."""
+    if not _BASE64URL_RE.fullmatch(value):
+        return None
+    try:
+        return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+    except (binascii.Error, ValueError):
+        return None
 
 # Sprint 15 R-CRON 의 dev fallback 토큰 — production 에선 절대 사용 X (validator 가 차단).
 _CRON_TOKEN_DEV_FALLBACK = "dev-cron-secret-CHANGE-ME-IN-PROD"
@@ -101,6 +116,13 @@ class Settings(BaseSettings):
     )
     google_picker_api_key: SecretStr | None = None
 
+    # 웹 푸시 VAPID (pwa.md §5.7) — 선택 기능. 셋 다 있어야 활성, 하나라도 없으면 발송·구독 UI 비활성.
+    # 형식: 개인키 = raw base64url 32바이트(43자), 공개키 = uncompressed P-256 base64url 65바이트(87자),
+    # subject = `mailto:` 또는 `https:`. 형식 오류는 warn-only — 부팅을 막지 않는다 (C-18).
+    vapid_public_key: str | None = None
+    vapid_private_key: SecretStr | None = None
+    vapid_subject: str | None = None
+
     # DB pool (PERF-r2-5) — 기본값 5+10 유지. PERF-SSE-COMMIT 으로 스트리밍 중
     # 커넥션 점유가 제거돼 상향 필요성은 낮아짐 — 상향 시 Neon max_connections
     # (compute 크기 의존) × Cloud Run 인스턴스 수 곱 초과 금지.
@@ -146,6 +168,46 @@ class Settings(BaseSettings):
                 "Fernet key validation failed"
             )
         return v
+
+    # pwa.md §5.7 / C-18: VAPID 는 선택 기능이라 integrations 키와 같이 항상 warn_only.
+    # 경고 문구에 키 값을 넣지 않는다 (개인키 = 발송 서명 키).
+    @model_validator(mode="after")
+    def _warn_invalid_vapid_config(self) -> "Settings":
+        public_key = self.vapid_public_key
+        private_key = (
+            self.vapid_private_key.get_secret_value()
+            if self.vapid_private_key is not None
+            else None
+        )
+        subject = self.vapid_subject
+        present = [value is not None for value in (public_key, private_key, subject)]
+        if not any(present):
+            return self
+        if not all(present):
+            logger.warning(
+                "[CONFIG GUARD · pwa §5.7 · startup allowed] VAPID_PUBLIC_KEY / "
+                "VAPID_PRIVATE_KEY / VAPID_SUBJECT are partially set; web push stays disabled"
+            )
+        if public_key is not None:
+            decoded = _decode_base64url(public_key)
+            if decoded is None or len(decoded) != 65 or decoded[0] != 0x04:
+                logger.warning(
+                    "[CONFIG GUARD · pwa §5.7 · startup allowed] VAPID_PUBLIC_KEY is not an "
+                    "uncompressed P-256 point in base64url (65 bytes)"
+                )
+        if private_key is not None:
+            decoded = _decode_base64url(private_key)
+            if decoded is None or len(decoded) != 32:
+                logger.warning(
+                    "[CONFIG GUARD · pwa §5.7 · startup allowed] VAPID_PRIVATE_KEY is not a "
+                    "raw P-256 private key in base64url (32 bytes)"
+                )
+        if subject is not None and not subject.startswith(("mailto:", "https:")):
+            logger.warning(
+                "[CONFIG GUARD · pwa §5.7 · startup allowed] VAPID_SUBJECT must start with "
+                "'mailto:' or 'https:'"
+            )
+        return self
 
     # Sprint 27e Round 2 BUG-S27e-SEC-r2-4 — production 판별 분기 통합.
     # main.py 의 _is_production (OR + lower) 와 validator 의 분기 일관성 회복.

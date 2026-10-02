@@ -1,4 +1,4 @@
-<!-- Kairos 디렉토리 구조 맵. BE 17 모듈(14 도메인 + common/core/services, 2026-07-30 문서 기준) + FE features 정합 (2026-09-04 기준 17). -->
+<!-- Kairos 디렉토리 구조 맵. BE 18 모듈(15 도메인 + common/core/services, 2026-10-02 기준) + FE features 정합 (2026-10-02 기준 18). -->
 
 # 디렉토리 구조 맵
 
@@ -25,6 +25,8 @@
 >
 > 2026-09-05: 흐름 다이어그램 4종(AI 데이터 흐름 · RAG `/ask` 시퀀스 · `meetings.status` 상태 전이 · 배포 워크플로우)을 같은 폴더에 추가해 7종이 됐다.
 > README 미리보기 PNG 는 `diagrams/capture-png.mjs` 로 재생성한다.
+>
+> 2026-10-02: PWA PR-2(ADR-035 웹 푸시) — BE `push/` 도메인과 FE `features/push/` 를 추가해 BE 18 모듈(15 도메인 + common/core/services) · FE features 18 로 정합했다.
 
 ## 최상위 레이아웃 (2026-08-16, ADR-030)
 
@@ -52,7 +54,7 @@ kairos/
 규칙: 독립 실행·배포되면 `apps/`, 언어를 넘는 계약이면 `contracts/`, 라이브러리 공유 패키지(`packages/`)는
 동일 언어 소비자 2개가 생길 때만 신설 (ADR-027 D5).
 
-## 프론트엔드 (FSD 기반, FE features — 2026-09-04 기준 17)
+## 프론트엔드 (FSD 기반, FE features — 2026-10-02 기준 18)
 
 ```
 apps/web/
@@ -82,7 +84,7 @@ apps/web/
     │   └── shared/                    # 도메인 횡단 공통 (Sprint 23 D4)
     │       └── ItemPromoteModal.tsx   # 5 도메인 generic promote modal
     │
-    ├── features/                      # FE 도메인 features (FSD, 2026-09-04 기준 17)
+    ├── features/                      # FE 도메인 features (FSD, 2026-10-02 기준 18)
     │   ├── actions/                   # 액션 아이템 list / detail
     │   ├── audit/                     # AdminAccessAudit / role 변경 trail (Sprint 25)
     │   ├── auth/                      # Better Auth 클라이언트 훅 (useMe 등) + sign-in / sign-up 폼 (ADR-031)
@@ -96,6 +98,7 @@ apps/web/
     │   ├── notes/                     # Tiptap 노트 (note-detail 가 유일 에디터, Sprint 29 R3)
     │   ├── onboarding/                # OnboardingTooltip + step progression
     │   ├── projects/                  # 프로젝트 CRUD + ProjectMember + visibility
+    │   ├── push/                      # 웹 푸시 (ADR-035) — SCR-002 알림 탭 · 앱 로드 동기화 · 로그아웃 정리 · 소유자 표식
     │   ├── rag/                       # RAG ⌘K + SSE stream + citation
     │   ├── sources/                   # 출처 인용 (RAG 결과 enriched chunk)
     │   ├── upload/                    # R2 presigned + proxy + MIME validation
@@ -119,7 +122,7 @@ apps/web/
 (2026-08-16 정정: 3개 문서가 없는 디렉터리를 안내하고 있었다).
 **barrel `index.ts` 는 두지 않는다** (현재 0개). `server/` 폴더도 없다 — 100% 클라이언트 TanStack Query.
 
-## 백엔드 (도메인 모듈러 구조, BE 17 모듈 = 14 도메인 + common/core/services — 2026-07-31 기준)
+## 백엔드 (도메인 모듈러 구조, BE 18 모듈 = 15 도메인 + common/core/services — 2026-10-02 기준)
 
 ```
 apps/api/
@@ -138,6 +141,7 @@ apps/api/
     ├── embeddings/                    # EmbeddingChunk + SemanticCache (cross-domain shared service, ADR-014 옵션 A). source_type 'memory' 추가 (Sprint 15)
     ├── upload/                        # R2 presigned URL + proxy + MIME validation
     ├── integrations/                  # ADR-026 — Google OAuth 연결·선택 외부 파일/ExternalDocument·sync 상태·외부 소스 생명주기 (PR #143 구현 완료)
+    ├── push/                          # ADR-035 웹 푸시 — PushSubscription(사용자 단위) API + 세션 없는 발송(PushDispatchService) + sender.py(pywebpush). prefix 예외: /api/v1/users/me/push-*
     ├── services/                      # 외부 wrapper (cross-domain shared service)
     │   ├── transcription.py           # Whisper 1hr 이하 단일 호출
     │   ├── chunked_transcription.py   # 1hr 초과 ffmpeg duration probe + 1hr chunk + 5초 overlap + 병렬 Whisper + merge
@@ -178,7 +182,7 @@ ADR-026 W3 로 `integrations/pipeline_service.py` 신설).
 
 **common 의 audit / promote 도메인 분리 권고**: `common/audit_*.py` + `common/promote_*.py`
 5 파일은 사실상 audit 도메인 — Sprint 27e BUG-S27e-ARCH-3 + Sprint 28 BUG-S28-ARCH-1 carry.
-BL-S27e-F (architecture deepening sprint) 진입 시 `apps/api/src/audit/` 신설 권고 (2026-07-30 문서 기준 BE 17 — `audit` 추가 시 18).
+BL-S27e-F (architecture deepening sprint) 진입 시 `apps/api/src/audit/` 신설 권고 (2026-10-02 기준 BE 18 — `audit` 추가 시 19).
 
 **의존성 cycle**: Sprint 28 BUG-S28-ARCH-4 측정 — 11 쌍 양방향 (`core ↔ common` layered
 최하위 cycle 포함). runtime 은 lazy import + model-only 회피로 ImportError 0 (Round B verify),

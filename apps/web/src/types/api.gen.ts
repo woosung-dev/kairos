@@ -184,6 +184,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/me/push-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Push Config
+         * @description API-001 — VAPID 미설정이어도 200 (isEnabled=false 면 FE 가 알림 탭을 숨긴다).
+         */
+        get: operations["get_push_config_api_v1_users_me_push_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/me/push-subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Upsert Push Subscription
+         * @description API-002 — endpoint 단위 upsert. 같은 endpoint 면 id 유지 + 현재 사용자로 rebind.
+         */
+        put: operations["upsert_push_subscription_api_v1_users_me_push_subscriptions_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/me/push-subscriptions/{subscription_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Push Subscription
+         * @description API-003 — 본인 것만 지운다. 없거나 남의 것이어도 204 (멱등 + 존재 여부 오라클 차단).
+         */
+        delete: operations["delete_push_subscription_api_v1_users_me_push_subscriptions__subscription_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces": {
         parameters: {
             query?: never;
@@ -1798,6 +1858,46 @@ export interface components {
             /** Filename */
             filename: string;
         };
+        /**
+         * PushConfigResponse
+         * @description API-001 응답 — VAPID 3개 설정이 다 있을 때만 isEnabled=true.
+         */
+        PushConfigResponse: {
+            /** Isenabled */
+            isEnabled: boolean;
+            /** Vapidpublickey */
+            vapidPublicKey: string | null;
+        };
+        /**
+         * PushSubscriptionKeys
+         * @description PushSubscription.toJSON().keys — 둘 다 base64url.
+         */
+        PushSubscriptionKeys: {
+            /** Auth */
+            auth: string;
+            /** P256Dh */
+            p256dh: string;
+        };
+        /**
+         * PushSubscriptionUpsertRequest
+         * @description API-002 요청 — PushSubscription.toJSON() 의 부분집합 (그 외 필드는 무시).
+         */
+        PushSubscriptionUpsertRequest: {
+            /** Endpoint */
+            endpoint: string;
+            keys: components["schemas"]["PushSubscriptionKeys"];
+        };
+        /**
+         * PushSubscriptionUpsertResponse
+         * @description API-002 응답 — 같은 endpoint 면 id 가 유지된다.
+         */
+        PushSubscriptionUpsertResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
         /** RagAskRequest */
         RagAskRequest: {
             /** Projectid */
@@ -2153,6 +2253,103 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["OnboardingResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_push_config_api_v1_users_me_push_config_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushConfigResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upsert_push_subscription_api_v1_users_me_push_subscriptions_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscriptionUpsertRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushSubscriptionUpsertResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_push_subscription_api_v1_users_me_push_subscriptions__subscription_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string;
+            };
+            path: {
+                subscription_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

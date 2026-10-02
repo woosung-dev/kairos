@@ -108,6 +108,12 @@ export const externalDocumentKeys = {
     [...externalDocumentKeys.all, "detail", wid, id] as const,
 };
 
+// PWA 웹 푸시 (docs/requirements/pwa.md §5.2 API-001) — 사용자 단위라 wid 가 없다
+export const pushKeys = {
+  all: ["push"] as const,
+  config: () => [...pushKeys.all, "config"] as const,
+};
+
 // ADR-026 — Google Drive 연동 (연결 · 발행 문서 · 동기화 실행)
 export const integrationKeys = {
   all: ["integrations"] as const,

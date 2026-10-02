@@ -12,6 +12,7 @@
 //   모듈 외부 참조를 지원하지 않음 — pwa.md C-28, 2026-10-02 실측). 이 파일과 그 상대 import 에
 //   Node 전역을 쓰지 않는다 (vitest source-scan 이 막는다).
 import { respondToNavigation, shouldHandleNavigation } from "./navigation";
+import { handlePush, openNotificationTarget } from "./push-notification";
 import type { SwGlobalScope } from "./sw-types";
 
 const scope = self as unknown as SwGlobalScope;
@@ -27,4 +28,18 @@ scope.addEventListener("activate", (event) => {
 scope.addEventListener("fetch", (event) => {
   if (!shouldHandleNavigation(event.request, scope.location.origin)) return;
   event.respondWith(respondToNavigation(event.request, (request) => fetch(request)));
+});
+
+// 웹 푸시 (pwa.md §5.4·§5.5) — 문구·URL 은 SW 가 kind·UUID 로 정한다. 서버 문자열을 URL 로 쓰지 않는다.
+scope.addEventListener("push", (event) => {
+  event.waitUntil(
+    handlePush(event.data, (title, options) => scope.registration.showNotification(title, options))
+  );
+});
+
+scope.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    openNotificationTarget(event.notification.data, scope.location.origin, scope.clients)
+  );
 });

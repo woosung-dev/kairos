@@ -4,7 +4,7 @@
 **Date**: 2026-10-02
 **Spec**: [`docs/requirements/pwa.md`](../requirements/pwa.md) §3·§4 (PR-1) · 테스트 [`test-matrix.md`](../plans/active/2026-10-02-pwa/test-matrix.md)
 **Invariant**: `apps/web/CONTEXT.md` §4 **F-14**
-**Related**: ADR-035 웹 푸시 (PR-2, 예정 — 같은 SW 에 `push`·`notificationclick` 을 더한다)
+**Related**: [ADR-035](035-web-push.md) 웹 푸시 (PR-2, Accepted — 같은 SW 에 `push`·`notificationclick` 을 더했다)
 
 ---
 

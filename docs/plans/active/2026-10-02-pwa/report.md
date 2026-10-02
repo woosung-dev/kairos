@@ -1,4 +1,4 @@
-# PWA PR-1 (설치형 셸) — 검증 보고
+# PWA PR-1 (설치형 셸) · PR-2 (웹 푸시) — 검증 보고
 
 > 2026-10-02 · 브랜치 `claude/pwa-feature-workflow-1785d8` · spec `docs/requirements/pwa.md` §4 · 결정 `docs/adr/034-pwa-installable-shell.md`
 > 진행 방식: 오케스트레이터(메인) / Generator(구현) / Evaluator(매 라운드 새 컨텍스트) 3역할. 라운드 전후 git 지문 비교로 역할 경계를 확인했다 (위반 0).
@@ -59,3 +59,60 @@
 - 운영 http 평문 접속에서는 SW 가 동작하지 않는다 (비보안 컨텍스트 → registrar `skip`). https 접속만 대상.
 - 비상시: repo Variables `NEXT_PUBLIC_PWA_SW=off` → main 에 새 커밋 (release.yml 이 새 sha 빌드) → `mise run deploy-ship sha-<7>`. 맥 비상 경로면 `deploy/oci/build.env`. 구 이미지 롤백으로는 SW 가 내려가지 않는다 (ADR-034 D6). 절차 원문 = `deploy/oci/build.env.example`.
 - 2026-10-02 main 병합 (#204 Phase A — 이미지 빌드가 CI `release.yml` 로 이동): CI 빌드 인자에 `NEXT_PUBLIC_PWA_SW` 가 빠져 있어 1줄 추가. 병합 전 PR CI 는 6/6 통과, e2e 62개 중 51 통과 · 11 skip (skip 은 기존 데이터 의존 스펙 — main 기준선 44개 중 10~11 skip, 새 테스트 18개 전부 통과).
+
+---
+
+## 7. PR-2 (웹 푸시) — 검증 보고
+
+> 2026-10-02 · 브랜치 `claude/pwa-push` · spec `docs/requirements/pwa.md` §5 · 결정 `docs/adr/035-web-push.md` · 불변식 B-16
+
+### 7.1 무엇이 동작하나
+
+| 기능 | 확인 방법 | 결과 |
+|---|---|---|
+| API-001~003 (`/api/v1/users/me/push-*`) — config · endpoint upsert(rebind) · id 삭제(없음·타인도 204) | pytest T-PWA-30·31·34 | PASS |
+| endpoint 검증 — ASCII · https · allowlist · IP·userinfo·포트 거부 · 비ASCII/lone surrogate/IDN 은 500 아닌 422 | pytest T-PWA-32 (+ GEN-P2-2 D1 4건) | PASS |
+| 회의 완료·실패 → 업로더 본인(현재 멤버)만 · commit 이후 · 발송 중 DB 세션 0 · 404/410 만 정리 · best-effort | pytest T-PWA-35~42 (세션 spy) | PASS |
+| 마이그레이션 `563de342c8ae` 가산형 (테이블 1 + 명시 이름 제약 4) | pytest T-PWA-43 · alembic dry-run (오케스트레이터) | PASS |
+| 계약 drift 0 | `mise run contracts-check` (T-PWA-44) | PASS |
+| SCR-002 알림 탭 · 권한 요청은 토글 클릭 때만 · 등록 없음 = '사용 불가' | vitest · e2e T-PWA-48 | PASS |
+| 로그아웃 = ① DELETE ∥ ② unsubscribe (3초 상한) → 표식 삭제 → sign-out | vitest · e2e T-PWA-49 (sign-out stub) | PASS |
+| 앱 로드 동기화 — 표식 불일치 unsubscribe · 키 불일치 정리 · 계정 전환 재동기화 | vitest T-PWA-50·51 (+ GEN-P2-2 D2·D3) | PASS |
+| SW `push`·`notificationclick` (UUID 로 URL 조립, open redirect 차단) | vitest T-PWA-46·47 | PASS |
+| 알림 딥링크 워크스페이스 1회 전환 | vitest T-PWA-57 · e2e T-PWA-59 | PASS |
+| 실푸시 수신 (완료·실패·계정 전환 미수신) | T-PWA-52·53·54 | **오케스트레이터 실브라우저 확인 대기** |
+
+### 7.2 테스트 결과
+
+- pytest 전체: 1082 passed (EVAL-P2-1 오케스트레이터 · 기준선 996) → **1086 passed** (GEN-P2-2, `be-test.sh`)
+- alembic dry-run: 가산형 — `CREATE TABLE push_subscriptions` 1 + 명시 이름 제약 4 (오케스트레이터)
+- contracts drift 0
+- vitest: 59 files / 415 passed · tsc 0 errors · eslint 0 (GEN-P2-2)
+- e2e (EVAL-P2-1 오케스트레이터): public-only 18 pass · chromium 42 pass / 11 skip · `push.spec.ts` 9 ✓ — GEN-P2-2 이후 재실행 필요 (D2·D3 로 동기화 시점이 API-001 응답 뒤로 바뀜)
+
+### 7.3 판정 라운드
+
+| 라운드 | 판정 | 요지 |
+|---|---|---|
+| IMPL-P2-BE · IMPL-P2-FE · IMPL-P2-FE-b | — | BE `push/`·마이그레이션·pipeline 훅 / FE 구독·로그아웃·동기화·딥링크 / T-PWA-49 rate limit flake → sign-out stub |
+| EVAL-P2-1 | PASS | blocker·major 0. 오케스트레이터가 코드로 확인한 minor 3건 (D1 비ASCII 500 · D2 VAPID 키 교체 후 옛 구독 · D3 계정 전환 시 동기화 생략) |
+| GEN-P2-2 | — | D1·D2·D3 수정 + Atomic Update (ADR-035 · erd · CONTEXT-MAP · apps/api·web CONTEXT · directory-map · secrets · BL-PWA-4~19) |
+
+### 7.4 구현 중 바뀐 결정
+
+1. **로그아웃 ①→② 순차 → ①∥② (`Promise.allSettled`, 전체 3초 상한)** — 느린 ①이 예산을 다 쓰면 ②(로컬 unsubscribe)가 돌지 못한다 (pwa.md §5.5, ADR-035 D6).
+2. **서비스 2개** — `PushService`(API) · `PushDispatchService`(세션 없는 발송). 발송 구간 세션 0 을 구조로 강제 (ADR-035 D5).
+3. **endpoint ASCII 검사 + 422 핸들러 ASCII 폴백** — lone surrogate 는 422 응답 직렬화도 깨뜨려 전역 핸들러에 폴백을 뒀다 (ADR-035 D3).
+4. **키 교체 = 다음 앱 로드에서 '꺼짐'** — 자동 재구독 없음, 서버는 403 을 정리하지 않는다 (ADR-035 D7·D8).
+5. **동기화 가드 = 마지막 계정 id** — 로그아웃→다른 계정 로그인이 soft navigation 이라 boolean 가드는 새 계정 동기화를 건너뛴다 (ADR-035 D6).
+
+### 7.5 증거 파일 (`evidence/eval-p2-1/`)
+
+- `explore-first-visit-375.png` · `explore-granted-first-visit-375.png` · `explore-denied-375.png` — 375px SCR-002 상태별 화면
+
+### 7.6 남은 확인 · 운영 메모
+
+- **T-PWA-52·53·54 실푸시 수신 — 오케스트레이터 실브라우저 확인 대기** (값 미기입).
+- T-PWA-55 iOS 실기기: 사용자 운영 작업.
+- 운영 VAPID 키: 생성 명령 `apps/api/src/push/CONTEXT.md` §7 → 서버 `~/kairos/.env` 3줄 (사용자 SSH). 비우면 알림 기능만 꺼진다.
+- 후속 BL: BL-PWA-15 (Better Auth rate limit — e2e 예산·`cf-connecting-ip`) · BL-PWA-16 (실제 로그아웃 e2e 0건) · BL-PWA-17~19.

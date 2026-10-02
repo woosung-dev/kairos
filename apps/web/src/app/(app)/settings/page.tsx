@@ -3,7 +3,7 @@
 // Sprint 23 D2 Variant C — 워크스페이스 설정 페이지 (Compact Header + Geist Mono + ?tab=*)
 
 import { Suspense, useState, type FormEvent } from "react";
-import { Settings, Users, Link2, Building2, PlugZap, ShieldCheck } from "lucide-react";
+import { Settings, Users, Link2, Building2, PlugZap, ShieldCheck, Bell } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,10 +20,13 @@ import {
 import { DangerZone } from "@/features/workspaces/components/DangerZone";
 import { GoogleDrivePanel } from "@/features/integrations/components/google-drive-panel";
 import { inferWorkspaceType } from "@/features/workspaces/utils";
+import { usePushConfig } from "@/features/push/hooks";
+import { PushSettingsPanel } from "@/features/push/components/push-settings-panel";
 
 const THRESHOLD_PRESETS = [0.7, 0.8, 0.9, 0.95] as const;
 // Sprint 24 Wave 2 T-AUDIT-VIEW: audit tab 추가 — admin/owner 만 노출.
-const VALID_TABS = ["members", "invites", "general", "audit", "integrations"] as const;
+// PWA PR-2: notifications(알림) — 역할 무관, API-001 isEnabled=false 면 탭 자체를 숨긴다 (pwa.md §5.6).
+const VALID_TABS = ["members", "invites", "general", "audit", "integrations", "notifications"] as const;
 
 const ROLE_LABEL: Record<string, string> = {
   owner: "owner",
@@ -69,6 +72,8 @@ function SettingsContent() {
   const { data: invites } = useInvites(activeWorkspaceId ?? undefined, {
     enabled: isAdminOrOwner,
   });
+  const { data: pushConfig } = usePushConfig();
+  const isPushEnabled = pushConfig?.isEnabled === true;
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -82,7 +87,8 @@ function SettingsContent() {
 
   const tabParam = searchParams.get("tab");
   const activeTab = (VALID_TABS as readonly string[]).includes(tabParam ?? "") &&
-    (tabParam !== "integrations" || isOwner)
+    (tabParam !== "integrations" || isOwner) &&
+    (tabParam !== "notifications" || isPushEnabled)
     ? tabParam ?? "members"
     : "members";
 
@@ -206,6 +212,16 @@ function SettingsContent() {
             >
               <ShieldCheck className="w-4 h-4" aria-hidden />
               Audit
+            </TabsTrigger>
+          )}
+          {isPushEnabled && (
+            <TabsTrigger
+              value="notifications"
+              data-testid="notifications-tab-trigger"
+              className="gap-1.5 cursor-pointer text-sm shrink-0"
+            >
+              <Bell className="w-4 h-4" aria-hidden />
+              알림
             </TabsTrigger>
           )}
         </TabsList>
@@ -397,6 +413,13 @@ function SettingsContent() {
         {isOwner && (
           <TabsContent value="integrations">
             <GoogleDrivePanel workspaceId={activeWorkspaceId} />
+          </TabsContent>
+        )}
+
+        {/* PWA PR-2 SCR-002 — 사용자 단위(워크스페이스 무관) 설정. 서버가 비활성이면 마운트하지 않는다. */}
+        {isPushEnabled && (
+          <TabsContent value="notifications">
+            <PushSettingsPanel vapidPublicKey={pushConfig?.vapidPublicKey ?? null} />
           </TabsContent>
         )}
       </Tabs>

@@ -28,6 +28,7 @@ import src.embeddings.models  # noqa: F401 — embedding_chunks, semantic_caches
 import src.memory.models  # noqa: F401 — memory_items, memory_ai_calls, memory_events, promotion_audit, memory_query_embedding_cache
 import src.common.promote_models  # noqa: F401 — item_promotion_audit (Sprint 23 D4)
 import src.feedback.models  # noqa: F401 — feedback_entries (Sprint 28 Wave 1)
+import src.push.models  # noqa: F401 — push_subscriptions (PWA PR-2, ENT-001)
 
 # Sprint 24 Wave 2 T-N+2 — composite FK 회귀 안전망 fixture (SCN-FK-01~12 자동화).
 # fixture 모듈 import 로 pytest 가 fixture 를 collect (별도 test 호출 없이 future test 에서 활용 가능).

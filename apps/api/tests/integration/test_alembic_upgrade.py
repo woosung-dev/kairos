@@ -33,6 +33,7 @@ import src.notes.models  # noqa: F401
 import src.inbox.models  # noqa: F401
 import src.embeddings.models  # noqa: F401
 import src.memory.models  # noqa: F401
+import src.push.models  # noqa: F401 — push_subscriptions (PWA PR-2)
 
 pytestmark = pytest.mark.integration
 
@@ -88,6 +89,10 @@ PR2_MANAGED_CONSTRAINTS = frozenset(
         "fk_inbox_suggested_project_workspace",
         "fk_embedding_chunks_project_workspace",
         "fk_semantic_caches_project_workspace",
+        # PWA PR-2 (ENT-001) push_subscriptions — FK(CASCADE)·UNIQUE(endpoint)·index(user_id)
+        "fk_push_subscriptions_user_id_users",
+        "uq_push_subscriptions_endpoint",
+        "ix_push_subscriptions_user_id",
     }
 )
 

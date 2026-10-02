@@ -1,3 +1,4 @@
+import json
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -29,6 +30,7 @@ from src.memory.router import router as memory_router
 from src.notes.router import router as notes_router
 from src.onboarding.router import router as onboarding_router
 from src.projects.router import meeting_project_router, router as projects_router
+from src.push.router import router as push_router
 from src.rag.router import router as rag_router
 from src.upload.router import router as upload_router
 from src.workspaces.invite_router import public_router as invite_public_router
@@ -108,6 +110,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 
+class _AsciiJSONResponse(JSONResponse):
+    """비ASCII 를 `\\uXXXX` 로 이스케이프하는 JSONResponse — UTF-8 로 못 쓰는 lone surrogate 도 직렬화된다."""
+
+    def render(self, content: object) -> bytes:
+        return json.dumps(content, ensure_ascii=True, separators=(",", ":")).encode("ascii")
+
+
 def _attach_cors(request: Request, response: JSONResponse) -> JSONResponse:
     """CORS 헤더 set-once 패턴 부착.
 
@@ -159,10 +168,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     ctx 에 담을 수 있어 직접 직렬화 시 TypeError → 500. jsonable_encoder 로 안전 직렬화.
     (예: POST /rag/ask {"question":"a"} → 422 정상 반환)
     """
-    response = JSONResponse(
-        status_code=422,
-        content={"detail": jsonable_encoder(exc.errors())},
-    )
+    content = {"detail": jsonable_encoder(exc.errors())}
+    try:
+        response = JSONResponse(status_code=422, content=content)
+    except UnicodeEncodeError:
+        # 요청 본문의 lone surrogate(JSON `\ud800`)가 errors()[*].input 으로 되돌아오면 UTF-8 인코딩이
+        # 실패해 422 가 500 이 된다 (EVAL-P2-1 D1). 그때만 ASCII 이스케이프로 직렬화한다 — JSON 의미는 같다.
+        response = _AsciiJSONResponse(status_code=422, content=content)
     return _attach_cors(request, response)
 
 
@@ -186,6 +198,7 @@ app.include_router(integrations_router)
 app.include_router(integrations_public_router)
 app.include_router(audit_router)
 app.include_router(feedback_router)
+app.include_router(push_router)
 
 
 @app.get("/api/v1/health")

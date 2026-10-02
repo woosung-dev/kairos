@@ -50,6 +50,13 @@ vi.mock("@/features/workspaces/components/DangerZone", () => ({
 vi.mock("@/features/integrations/components/google-drive-panel", () => ({
   GoogleDrivePanel: () => null,
 }));
+// 알림 탭(PWA PR-2)도 React Query 훅을 쓴다 — 서버 비활성(탭 숨김)으로 둔다.
+vi.mock("@/features/push/hooks", () => ({
+  usePushConfig: () => ({ data: undefined }),
+}));
+vi.mock("@/features/push/components/push-settings-panel", () => ({
+  PushSettingsPanel: () => null,
+}));
 vi.mock("@/components/ui/tabs", () => ({
   Tabs: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   TabsList: ({ children }: { children: ReactNode }) => <div>{children}</div>,

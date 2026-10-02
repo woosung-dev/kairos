@@ -12,6 +12,7 @@ import {
   noteKeys,
   onboardingKeys,
   projectKeys,
+  pushKeys,
   ragKeys,
   workspaceKeys,
 } from "../query-keys";
@@ -112,5 +113,10 @@ describe("query-keys 형태 스냅샷", () => {
       WID,
       ID,
     ]);
+  });
+
+  it("pushKeys — 사용자 단위 (워크스페이스 무관)", () => {
+    expect(pushKeys.all).toEqual(["push"]);
+    expect(pushKeys.config()).toEqual(["push", "config"]);
   });
 });

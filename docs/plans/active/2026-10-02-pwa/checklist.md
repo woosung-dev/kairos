@@ -29,10 +29,14 @@
 - [ ] 커밋 → 푸쉬 → PR (각 승인) → CI green → 사용자 머지
 
 ## PR-2 — 웹 푸시
-- [ ] Phase 5 전체 스택 환경 (kairos-qa-db · BE :8000 · dev VAPID)
-- [ ] Phase 6 구현 (BE `push/` · 마이그레이션 · pipeline 훅 · FE 구독 · 로그아웃 순서)
-- [ ] Phase 7 평가 (pytest · contracts-check · alembic dry-run · e2e · 실푸시 수신 · 계정 전환 미수신)
-- [ ] Phase 8 게이트·Atomic Update (ADR-035 · erd · CONTEXT-MAP · apps/api/CONTEXT) · PR
+- [x] 2026-10-02 Phase 5 전체 스택 환경 (kairos-qa-db · BE :8000 — EVAL-P2-1 chromium e2e 실행 기준. dev VAPID 실발송은 T-PWA-52 에서 확인)
+- [x] 2026-10-02 Phase 6 구현 — IMPL-P2-BE (BE `push/` · 마이그레이션 `563de342c8ae` · pipeline 훅) → IMPL-P2-FE (FE 구독·로그아웃 ①∥②·동기화·딥링크·SW) → IMPL-P2-FE-b (T-PWA-49 rate limit flake → sign-out stub)
+- [x] 2026-10-02 Phase 7 자동 평가 — EVAL-P2-1 PASS (blocker·major 0). pytest 1082 (기준선 996) · alembic dry-run 가산형 · contracts drift 0 · public-only 18 · chromium 42 pass/11 skip · push.spec 9 ✓
+- [x] 2026-10-02 GEN-P2-2 minor 3건 수정 (D1 비ASCII 422 · D2 VAPID 키 불일치 정리 · D3 계정 전환 재동기화) — pytest 1086 · vitest 59 files/415 · tsc 0 · eslint 0 · contracts drift 0
+- [ ] e2e 재실행 (GEN-P2-2 D2·D3 이후 — chromium `push.spec.ts`)
+- [ ] 실푸시 수신 T-PWA-52·53·54 — 오케스트레이터 실브라우저 확인 대기
+- [x] 2026-10-02 Atomic Update — ADR-035 · erd(ENT-001) · CONTEXT-MAP(§4.1 BE 18 · I-13 · §4.3 FE 18) · `apps/api/CONTEXT.md`(§4 · B-16 · §6) · `apps/web/CONTEXT.md`(§3 · §5) · directory-map · secrets(VAPID) · BL-PWA-4·5·6·7·9·12·14 + 15~19 · pwa.md · `apps/api/src/push/CONTEXT.md`
+- [ ] Phase 8 게이트 · 커밋 → 푸쉬 → PR (각 승인) → CI green → 사용자 머지
 
 ## 로컬 정리 절차 (작업 종료 시)
 - `chrome://serviceworker-internals` 에서 localhost:3005 등록 제거 · 설치한 앱 제거

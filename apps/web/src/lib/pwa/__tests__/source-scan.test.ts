@@ -84,7 +84,13 @@ describe("source scan", () => {
     const graph = collectRelativeImportGraph(path.join(PWA_DIR, "sw.ts"));
     // 공허 통과 방지 — 그래프가 실제로 따라갔는지 본다.
     expect(graph.map((file) => path.relative(PWA_DIR, file))).toEqual(
-      expect.arrayContaining(["sw.ts", "navigation.ts", "offline-page.ts", "sw-types.ts"])
+      expect.arrayContaining([
+        "sw.ts",
+        "navigation.ts",
+        "offline-page.ts",
+        "sw-types.ts",
+        "push-notification.ts",
+      ])
     );
     // 그래프는 상대 경로만 따라간다 → `@/` alias·패키지 import 가 있으면 그 너머를 못 본다. 0건이어야 한다.
     const nonRelative = graph.flatMap((file) =>
