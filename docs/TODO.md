@@ -152,6 +152,8 @@
 - [ ] **BL-OCI-2** (P3) **presigned URL 업로드 전환.** Cloudflare Free/Pro 는 요청 바디를 100MB 에서 자른다. 운영 실측 최대 파일이 5MB 라 지금은 무해하고, `MAX_UPLOAD_BYTES=90MB` + FE 사전 가드로 막아 뒀다. 100MB 초과 파일이 실제로 필요해지면 착수(약 5시간). BL-070(500MB RAM 적재)도 함께 해소된다. 2026-05 기각 사유는 "R2 버킷 CORS 미설정"이었고 여전히 미설정이다.
 - [ ] **BL-OCI-3** (P3) **GitHub Actions 자동 배포.** 진입 조건 = 수동 배포 3회 연속 성공 + 컷오버 후 7일 무사고 + 장시간 오디오 1건 end-to-end 완주. GH 러너가 amd64 라 arm64 빌드에 QEMU 가 붙는 문제를 먼저 풀어야 한다.
   → 2026-10-02: QEMU 전제는 무효(공개 레포 `ubuntu-24.04-arm` 무료). **Phase A(CI 빌드 + GHCR) 완료** — 남은 것 = Phase B(release.yml 에 배포 job · 배포 전용 SSH 키 · 스키마 관문 + 승인 · 처리 중 회의 60초×30분 연기, ADR-028 D7 개정 결정 2~4). 최우선 확인: OCI 보안 목록 22번 허용 출처(IP 제한이면 러너 접속 불가).
+  → 2026-10-02: **Phase B 구현 완료** — 서버 단일 스크립트 `deploy/oci/bin/kairos-deploy.sh` + `release.yml` `deploy`·`deploy-migrate` job (수동 실행 전용) + 배포 전용 키(forced command) + Environment `oci-production`·`oci-production-migrate`. 22번 포트는 quant-bridge 가 이미 러너에서 SSH 배포 중이라 확인 불필요. 진입 조건 해석 확정: 무사고 = 배포 원인 사고만, 장시간 = 60분 (ADR-028 "D7 개정 — Phase B").
+    **남은 것:** ① 사용자가 운영에 60분 오디오 1건 업로드 → `completed` 확인 ② 자동 전환 PR — `deploy` job `if` 에 `|| github.event_name == 'workflow_run'` ③ `oci-production` 승인 3회 통과 후 승인자 제거 (`oci-production-migrate` 는 유지).
 - [ ] **secrets.md 의 FE 빌드 인자 위치 드리프트** (P3) `[신규 · 2026-10-02]` Phase A(#204) 뒤 평소 FE 빌드 인자는
   repo **Variables**(`release.yml`)이고 `deploy/oci/build.env` 는 맥 비상 경로 전용이다. 그런데 `docs/development/secrets.md`
   FE 표의 `NEXT_PUBLIC_*` 행(`NEXT_PUBLIC_PWA_SW` 제외)과 36·94줄 설명이 아직 "`build.env` 에서 설정" 기준이다. 정본 =

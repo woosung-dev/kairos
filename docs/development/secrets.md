@@ -114,6 +114,21 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 
 ---
 
+### CI 전용 — Environment Secrets (배포, ADR-028 D7 Phase B)
+
+`release.yml` 의 `deploy` job 은 `oci-production`, `deploy-migrate` job 은 `oci-production-migrate` Environment 에서 읽는다.
+**두 Environment 에 같은 세 값**을 둔다. repo Secrets 에 두지 않는다 — Environment 는 main 브랜치만 허용하고 승인자를 건다.
+
+| 이름 | 값 |
+|---|---|
+| `DEPLOY_SSH_KEY` | 배포 전용 ed25519 개인 키 (서버 `authorized_keys` 에서 forced command 로 묶임 — 배포 하나만 가능) |
+| `DEPLOY_HOST` | 서버 IP — 공개 레포 Actions 로그에 남기지 않으려고 시크릿이다 |
+| `DEPLOY_HOST_KEY` | 서버 호스트 키 `known_hosts` 한 줄 (`ssh-keyscan` 의 `#` 주석 줄만 있으면 안 된다) |
+
+교체 절차는 `deploy/oci/README.md` "배포". 값은 파일에서 stdin 으로 넣는다 (`gh secret set ... --env <이름> < 파일`) — 셸 기록에 남기지 않는다.
+
+---
+
 ## 자주 하는 실수
 
 | 실수 | 결과 | 방지 |

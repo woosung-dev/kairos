@@ -59,30 +59,51 @@ XHR 과 SSR 헤어핀이 그 리다이렉트를 따라가지 못한다. API 의 
 
 이미지는 CI 가 만든다. `main` 에 push 된 커밋이 Test 를 통과하면 `.github/workflows/release.yml` 이
 `ubuntu-24.04-arm` 러너(서버와 같은 aarch64 — 에뮬레이션 없음)에서 빌드해 **GHCR 공개 패키지**에 올린다.
-서버는 빌드하지 않고 pull 만 한다 (ADR-028 D7 Phase A, 2026-10-02). 배포 실행은 아직 수동이다.
+서버는 빌드하지 않고 pull 만 한다 (ADR-028 D7 Phase A, 2026-10-02).
 
 | 이미지 | 태그 |
 |---|---|
 | `ghcr.io/woosung-dev/kairos-api` | `sha-<커밋 7자리>` — 불변. 같은 sha 는 다시 빌드하지 않는다 |
 | `ghcr.io/woosung-dev/kairos-web` | 〃 |
 
+배포는 서버 스크립트 하나가 한다 — `~/kairos/bin/kairos-deploy.sh` (정본 `bin/kairos-deploy.sh`, ADR-028 D7 Phase B).
+부르는 곳은 둘이다. main 머지마다 자동으로 도는 것은 아직 꺼져 있다 (진입 조건 = 60분 오디오 1건 운영 완주).
+
 ```bash
 gh run list --workflow release.yml --repo woosung-dev/kairos --limit 3   # 배포할 커밋의 런이 success 인지
 TAG=sha-<커밋 7자리>
 
-mise run deploy-preflight     # 디스크 80% 미만 · 진행 중 회의 0 · .env 인코딩
-mise run deploy-ship $TAG     # compose 동기화 → 서버 pull → .env 태그 교체 → up -d → env 확인 → GC
+# A. 맥에서 — compose·스크립트 동기화 후 서버 스크립트 실행
+mise run deploy-preflight             # 디스크 80% 미만 · 진행 중 회의 0 · .env 인코딩 (스크립트도 다시 확인한다)
+mise run deploy-ship $TAG             # 스키마 변경이 있으면 rc 3 으로 멈춘다 → 확인 후 --migrate 를 붙여 다시
 mise run deploy-status
+
+# B. GitHub Actions — 빌드 후 배포. Actions 화면의 Review deployments 에서 승인한다
+gh workflow run release.yml --repo woosung-dev/kairos -f sha=<40자 sha> -f deploy=true
 ```
 
-`deploy-ship` 의 순서에는 이유가 있다.
+스크립트 순서와 이유:
 
-1. **compose 동기화가 이미지보다 먼저.** 2026-08-17 Better Auth 컷오버에서 이 단계가 없어 web 이 전면 500 이었다.
-   서버 파일이 최초 부트스트랩 버전이라 ADR-031 이 추가한 web.environment 5줄이 없었고
-   `BETTER_AUTH_SECRET` 이 빈 문자열로 주입됐다(`environment:` 치환은 미설정도 조용히 통과한다).
+1. **compose·스크립트 해시 대조가 먼저.** 2026-08-17 Better Auth 컷오버에서 서버 compose 가 최초 부트스트랩 버전이라
+   ADR-031 이 추가한 web.environment 5줄이 없었고 `BETTER_AUTH_SECRET` 이 빈 문자열로 주입돼 web 이 전면 500 이었다.
+   `deploy-ship` 은 동기화한 뒤 부른다. Actions 는 파일을 보내지 않으므로 다르면 **rc 6** 으로 멈춘다 → 그 커밋은 A 로 배포.
 2. **pull 이 `.env` 교체보다 먼저.** 없는 태그로 `.env` 를 바꾸면 `up` 만 실패하고 가짜 태그가 남아
-   다음 배포의 GC 보존 대상이 된다.
-3. 서버에 이미 있는 태그는 pull 하지 않는다 (태그 불변). 아래 비상 경로가 이 성질을 쓴다.
+   다음 배포의 GC 보존 대상이 된다. 서버에 이미 있는 태그는 pull 하지 않는다 (태그 불변) — 아래 비상 경로가 이 성질을 쓴다.
+3. **스키마 관문.** 이미지의 `alembic heads` 와 DB 리비전이 다르면 아무것도 바꾸지 않고 **rc 3**.
+   `--migrate`(A) 또는 `deploy-migrate` job 승인(B) 뒤에만 로컬 덤프를 뜨고 진행한다.
+4. **처리 중 회의 대기.** 60초마다 최대 30분. 끝나지 않으면 **rc 4** (아무것도 바꾸지 않았다). 강제 옵션은 없다.
+5. 기동 후 healthy → env 주입(이름만) → `/api/v1/ready` 를 확인한다. 실패하면 **rc 5** 와 롤백 명령을 출력한다.
+
+종료 코드 전체와 결정 근거는 ADR-028 "D7 개정 — Phase B". 출력은 서버 `~/kairos/deploy.log` 에도 남는다.
+
+**배포 전용 키** (Actions 용) — 서버 `~/.ssh/authorized_keys` 에 이 형식의 한 줄로 묶여 있다. 이 키로는 배포 하나만 할 수 있다.
+
+```
+restrict,command="/home/ubuntu/kairos/bin/kairos-deploy.sh --from-ssh" ssh-ed25519 AAAA... kairos-deploy@github-actions
+```
+
+키 교체: 맥에서 `ssh-keygen -t ed25519 -N "" -C kairos-deploy@github-actions -f <임시 경로>` → 서버의 그 줄 교체 →
+`gh secret set DEPLOY_SSH_KEY --repo woosung-dev/kairos --env oci-production < <임시 경로>` (`oci-production-migrate` 도) → 임시 파일 삭제.
 
 **FE 빌드 인자** `NEXT_PUBLIC_*` 는 repo **Variables** 에 있다 (secrets 가 아니다 — 브라우저 번들에 실리는 공개 값).
 빌드타임 인라인이라 도메인이 바뀌면 변수를 고친 뒤 **새 커밋**으로 다시 빌드해야 한다 — 같은 sha 는 태그가 이미 있어 건너뛴다.
@@ -113,10 +134,11 @@ mise run deploy-ship $TAG
 ### 배포 전 확인
 
 진행 중인 회의 처리가 있으면 배포하지 않는다. BackgroundTasks 는 재시도가 없어서
-컨테이너가 교체되면 그 회의는 `transcribing` 상태로 영구 정지한다.
+컨테이너가 교체되면 그 회의는 `transcribing` 상태로 영구 정지한다. 배포 스크립트가 이 SQL 로 기다린다.
+최근 2시간 내 갱신분만 센다 — 최장 작업이 약 15분이라 더 오래된 것은 이미 죽은 좀비이고, 그걸로 막으면 배포가 영영 못 나간다.
 
 ```sql
-SELECT count(*) FROM meetings WHERE status IN ('transcribing','analyzing');
+SELECT count(*) FROM meetings WHERE status IN ('transcribing','analyzing') AND updated_at > now() - interval '2 hours';
 ```
 
 ## 롤백
@@ -205,5 +227,5 @@ Kairos 쪽 대응은 둘뿐이다.
 ## 미착수 (BL 등재)
 
 - presigned URL 업로드 전환 — 100MB 초과 파일이 실제로 필요해지면.
-- 자동 배포 (Phase B) — release.yml 에 배포 job 추가. 진입 조건은 ADR-028 D7 (수동 3회 연속 성공 · 7일 무사고 · 장시간 오디오 1건).
+- main 머지마다 자동 배포 — 배포 job 은 있다(수동 실행). 남은 진입 조건 = 60분 오디오 1건 운영 완주 (ADR-028 D7 Phase B). 충족 후 `release.yml` `deploy` job 의 `if` 에 `|| github.event_name == 'workflow_run'` 한 줄.
 - GHCR 보존 정책 (Phase C) — 태그가 쌓이기만 한다. GHCR 저장은 현재 무료라 급하지 않다.
