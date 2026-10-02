@@ -119,7 +119,7 @@ BL-LR-1 수정으로 **가시성**은 `meeting_project_links` 기준이 됐지�
 
 ### BL-LR-11 — `users.clerk_id` 2단계 DROP (P3, 정리) ⏳ **프로덕션 데이터 확인 대기** `[D-038 · 0-17]`
 Better Auth 컷오버(ADR-031) 뒤 `clerk_id` 는 쓰기 경로가 없다. 다만 모델 주석상 **레거시 행 식별의 유일한 단서**다.
-순서: ① 프로덕션에서 `SELECT count(*) FROM users WHERE clerk_id IS NOT NULL AND auth_user_id IS NULL` `[확인 필요]`
+순서: ① 프로덕션에서 `SELECT count(*) FROM users WHERE clerk_id IS NOT NULL AND auth_user_id IS NULL` → **2026-10-02: 15행** (0 이 아니라 ② 전에 매핑이 먼저다)
 ② 0 이면 읽기 경로 제거 배포 → ③ 다음 배포에서 DROP (`docs/development/migrations.md` §6 2단계 원칙). 0 이 아니면 매핑부터.
 
 ### BL-LR-12 — 비공개 프로젝트를 지우면 그 프로젝트에만 연결된 회의가 워크스페이스 전체 공개가 된다 (P2, 보안) ⏳ **미착수 · 결정 완료 (Gate 1)** `[E1-06]`
@@ -142,7 +142,7 @@ Better Auth 컷오버(ADR-031) 뒤 `clerk_id` 는 쓰기 경로가 없다. 다�
 
 ### BL-LR-15 — 운영 후속 (P3) ⏳ **미착수** `[Phase 2 Ops]`
 - DB 덤프에 세션 토큰·Google OAuth 토큰·비밀번호 해시가 들어 있다. **2026-09-27 사용자 결정 (Q13): 도그푸딩 규모라 암호화 없이 현행 수용** (위험 수용). 공유 버킷 문제는 ADR-033 으로 해소한다 — 백업은 R2 전환 **뒤에** 켜므로 덤프는 Kairos 전용 `kairos-prod` 에만 올라가고, 앱 토큰은 그 버킷 하나로 제한된다 (운영자 절차 `docs/TODO.md` "Gate 0 잔여"). 사용자 수가 늘면 덤프 암호화(복호화 키 별도 보관)를 다시 본다.
-- 로컬 dev·QA 도 같은 버킷 `uploads/` 에 쓴다 → ADR-033 (2026-09-27) 으로 분리: CI 는 `kairos-dev` 로 옮김 ✅ (#198) · 운영 `kairos-prod` 전환과 로컬 `.env` 교체는 ⏳ 운영자 작업. 이전 때 옛 dev 업로드도 `uploads/` 째로 넘어온다 → BL-LR-18.
+- 로컬 dev·QA 도 같은 버킷 `uploads/` 에 쓴다 → ADR-033 (2026-09-27) 으로 분리: CI 는 `kairos-dev` 로 옮김 ✅ (#198) · 운영 `kairos-prod` 전환과 로컬 `.env` 교체 ✅ (2026-10-02). 이전 때 옛 dev 업로드도 `uploads/` 째로 넘어온다 → BL-LR-18.
 - `scripts/tests/` 는 어떤 CI job 도 돌리지 않는다 → `test.yml` 에 추가.
 - 세션 revoke 뒤에도 이미 발급된 JWT 는 최대 15분 유효하다 (jwt plugin 기본값). 수동 비밀번호 재설정 runbook 에 명시돼 있다.
 - 메모 AI 호출 실패 시 `memory_ai_calls.error_message` 에 `str(exc)` 가 저장된다 (API 노출 0건, E2-08). 회의 파이프라인처럼 정제할지 결정.
@@ -177,6 +177,7 @@ M-7(공유 사본 재promote 는 원본 작성자만)은 메모에만 붙은 추
 선택지: ① 현행 유지 ② 팀→팀 금지 (개인→팀만) ③ promote 폐지 + 수동 이동. 결정 뒤 5개 라우터 + `promote_helpers.py` + FE `ItemPromoteModal` 을 같이 바꾼다.
 
 ### BL-LR-18 — R2 버킷 이전(ADR-033) 후속 (P3, 운영) ⏳ **미착수**
+전환일 2026-10-02 기준 — +7일(10/9) 미참조 객체 정리 가능 · +14일(10/16) 옛 버킷 `uploads/`·`.env.bak-20260927` 결정 (`docs/TODO.md` Blocked "Gate 0 잔여").
 - **옛 버킷 `nexus-core-storage` 의 Kairos prefix(`uploads/`) 삭제 — 이전 +14일 이후, 결정 먼저 `[확인 필요]`.** 되돌리기 창이 끝나도 Neon(이전 원본, 사실상 백업 DB)·로컬 dev DB 가 옛 버킷 키를 참조할 수 있다. 지우기 전에 Neon 을 계속 보존할지부터 정한다. nexus-core 는 버킷 루트 키 + `db-backups/` 만 써서 `uploads/` 삭제의 영향이 없다 (`nexus-core/apps/api/app/services/storage/r2.py:53`).
 - **기존 R2 토큰 2개(`R2 Account Token`·`nexus-core-backend`)가 All buckets 범위라 `kairos-prod` 에도 닿는다.** nexus-core 가 쓰는 토큰이라 Kairos 에서 지우지 않는다. nexus-core 쪽에서 버킷 한정 토큰으로 바꾸는 작업이다.
 - **`kairos-prod` 로 운영 DB 미참조 객체도 같이 넘어온다** (옛 버킷 기준 candidates 101 — CI `test.m4a`·dev 업로드). Super Slurper 가 prefix 통째로 복사하기 때문이다. 복사로 LastModified 가 새로 찍혀 이전 직후에는 전부 7일 미만이다 → 이전 +7일 뒤 `r2_cleanup.py` dry-run 으로 목록 확인 → `--delete` (`docs/operations/r2-cleanup-cron.md` §2).

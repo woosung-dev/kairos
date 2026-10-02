@@ -122,6 +122,7 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 | `.env`에 인라인 주석(`KEY=값  # 설명`) | 값에 섞인 한글이 헤더 인코딩을 깨서 500 / CORS 전면 차단 | 설명은 별도 줄 주석으로만. 배포 전 비ASCII 게이트 |
 | 도메인 변경 후 FE 재빌드 누락 | `NEXT_PUBLIC_*`은 빌드타임 인라인이라 런타임 env로 안 바뀜 | repo Variables 수정 → 새 커밋으로 release.yml 재빌드 (맥 비상 경로는 `build.env` → `mise run deploy-build`) |
 | R2 Secret Access Key 재발급 없이 분실 | 재발급 필요 | 발급 직후 즉시 GitHub Secret에 저장 |
+| 비밀번호 관리자에 둔 R2 키 두 값이 서로 다른 발급의 것 | `SignatureDoesNotMatch`/`Unauthorized` — 시험 없이 `.env` 를 바꾸고 재기동하면 운영 R2 가 끊긴다 (2026-10-02 약 3~4분) | 두 값은 토큰 생성 결과 화면에서 같이 받는다. `.env` 반영·재기동 **전에** 그 쌍으로 대상 버킷에 쓰기·읽기·삭제를 먼저 시험한다 |
 
 ---
 

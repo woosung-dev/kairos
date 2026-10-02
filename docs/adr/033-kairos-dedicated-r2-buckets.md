@@ -51,19 +51,25 @@ DB 는 버킷 이름 없이 키만 저장한다 (`meetings.file_key` · `memory_
 
 되돌리기: `.env` 백업 복원 + `up -d --no-deps api`. 옛 버킷 원본은 지우지 않았다.
 
-## 진행 상태 (2026-09-27)
+## 진행 상태 (2026-10-02)
 
 | 단계 | 상태 |
 |---|---|
 | 버킷 2개 + lifecycle (`backups-14d` · `expire-7d`) | ✅ |
 | `kairos-dev-app` → GitHub `E2E_R2_*` · CI 전환 (#198) | ✅ nightly heavy spec 이 `kairos-dev` 업·다운로드 성공 (run 36318222143 이후 3회) |
-| 운영 이전 (D3 1~4) · repo-level `R2_*` 교체 · 로컬 `.env` 교체 | ⏳ 운영자 작업 — `docs/TODO.md` Blocked "Gate 0 잔여" |
+| 운영 이전 (D3 1~4) · repo-level `R2_*` 교체 · 로컬 `.env` 교체 | ✅ 2026-10-02 (결과는 아래). 2차 이전은 전환 **전에** 돌렸고, 그 사이 업로드는 재기동 직전 옛 버킷 수로 0건 확인 |
+| `kairos-dev-app` 재발급 → `E2E_R2_*` 재등록 | ✅ 2026-10-02 — 비밀번호 관리자의 키 쌍이 인증 실패(`Unauthorized`)라 재발급. 다음 nightly heavy 런에서 업·다운로드 재확인 |
 
 이전 검증의 기준값 (옛 버킷 `nexus-core-storage`, 2026-09-27 전환 전):
 - inventory `uploads/ objects=189 bytes=75387002` · `memory/ objects=0`
 - dry-run `--days 7`: `referenced=88 · protected(referenced)=86 · too_young=2 · candidates=101`
 - QA 파일 2개(too_young 2)를 지운 뒤 복사하므로 새 버킷 기대값 = `uploads/ objects=187` · `protected(referenced)=86`.
   88 − 86 = 2 는 이전 **전부터** 버킷에 없던 키다 (BL-LR-18).
+
+전환 후 실측 (`kairos-prod`, 2026-10-02 — 기대값과 일치):
+- inventory `uploads/ objects=187 bytes=75000120` · `memory/ objects=0`
+- dry-run `--days 7`: `referenced=88 · protected(referenced)=86 · too_young=101 · candidates=0` (복사로 시각이 새로 찍혀 전부 7일 미만)
+- 운영 컨테이너 쓰기·읽기·삭제 시험 OK · GitHub `R2_*`(읽기 전용) 인벤토리 run 36952278871 성공
 
 ## 기각한 대안
 

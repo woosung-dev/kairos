@@ -1,7 +1,7 @@
 # 런북: DB 백업 · 복원 · 복원 리허설
 
 > BL-OCI-1 · 체크리스트 0-11. 스크립트는 [`deploy/oci/backup/`](../../../deploy/oci/backup/) 에 있다.
-> **서버 cron 등록 전까지 백업은 없다.** 등록 여부는 `crontab -l | grep pg-backup` 로 본다.
+> **2026-10-02 서버 cron 등록 완료** (`37 18 * * *` UTC = KST 03:37, 첫 실행 R2 업로드 확인). 등록 여부는 `crontab -l | grep pg-backup` 로 본다.
 
 | 스크립트 | 하는 일 |
 |---|---|
@@ -15,7 +15,7 @@
   `R2_BUCKET_NAME` 과 boto3 로 한다 (앱과 같은 변수·같은 라이브러리). 필요한 도구는 `docker` CLI 뿐이다.
 - **R2 버킷은 Kairos 전용 `kairos-prod` 다** (ADR-033 — 회의·메모 원본 `uploads/`·`memory/` 와 같은 버킷).
   ★업로드는 api 컨테이너의 `R2_*` 를 따라간다. **서버 `.env` 의 R2 전환(`R2_BUCKET_NAME=kairos-prod`) 뒤에** 첫 실행·cron 등록을 한다 —
-  전환 전에 돌리면 옛 공유 버킷 `nexus-core-storage` 로 올라간다 (`docs/TODO.md` Blocked "Gate 0 잔여" R3 → R4).
+  전환 전에 돌리면 옛 공유 버킷 `nexus-core-storage` 로 올라간다 (전환은 2026-10-02 완료).
   키는 `backups/kairos/` 아래로만 쓰고 (업로드 코드가 다른 prefix 를 거부한다 — 원본 prefix 를 덮어쓰지 않게),
   스크립트는 R2 에서 **아무것도 지우지 않는다.**
 - 임시 이름(`.partial`)으로 쓰고 `pg_restore --list` 검증을 통과해야 최종 이름을 갖는다. 목차에
