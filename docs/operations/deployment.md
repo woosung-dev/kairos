@@ -24,7 +24,7 @@
 |---|---|
 | FE | https://kairos.woosung.dev |
 | API | https://kairos-api.woosung.dev |
-| 서버 | `ssh oci-tokyo` (quantbridge · truewords 와 **공유**) |
+| 서버 | `ssh oci-tokyo` (truewords · quantbridge · nexus-core 와 **공유**) |
 | 배포 디렉토리 | `~/kairos` (compose · `.env` · initdb) |
 | 오브젝트 스토리지 | Cloudflare R2 — 운영 `kairos-prod` · CI·로컬 `kairos-dev` (ADR-033, 버킷 한정 토큰). CI 는 전환 완료(#198). ⏳ 운영·로컬은 이전 진행 중 — `.env` 전환 전까지 옛 공유 버킷 `nexus-core-storage` (`docs/TODO.md` Blocked "Gate 0 잔여") |
 | 인증 | Better Auth 자체 호스팅 (web 컨테이너, ADR-031) |
@@ -32,32 +32,41 @@
 
 **같은 호스트의 다른 프로젝트가 쓰는 포트**(건드리지 말 것): 3200 quantbridge-frontend ·
 5432 truewords postgres · 5433 quantbridge-db · 6333 qdrant · 6380 quantbridge-redis ·
-8100 quantbridge-api.
+8100 quantbridge-api · 3300 · 3301 · 8300 · 5435 nexus-core.
+서버 전체 설정(로그 회전 · journald · swap · 디스크 경보 · 빌더 캐시 정리)은 Kairos 가 소유하지 않는다 —
+[`deploy/oci/README.md`](../../deploy/oci/README.md) "호스트 공통 설정".
 
 ---
 
 ## 배포
 
-```bash
-TAG=$(git rev-parse --short HEAD)
-
-mise run deploy-preflight      # 진행 중인 회의 처리가 0 인지 + .env 인코딩 게이트
-mise run deploy-build $TAG     # 맥에서 arm64 네이티브 빌드 (BE + FE)
-mise run deploy-ship $TAG      # docker save | ssh | docker load → 태그 교체 → up -d → GC
-mise run deploy-status         # 컨테이너 상태 + /ready + 서버 자원 (디스크 포함)
+```
+main push → Test 통과 → release.yml (ubuntu-24.04-arm) → GHCR ghcr.io/woosung-dev/kairos-{api,web}:sha-<7>
+                                                              ↓ docker pull (서버)
+맥: mise run deploy-preflight → mise run deploy-ship sha-<7> → deploy-status
 ```
 
+```bash
+gh run list --workflow release.yml --repo woosung-dev/kairos --limit 3   # 배포할 커밋의 런이 success 인지
+
+mise run deploy-preflight          # 디스크 80% 미만 + 진행 중 회의 0 + .env 인코딩 게이트
+mise run deploy-ship sha-<7자리>   # compose 동기화 → 서버 pull → 태그 교체 → up -d → env 확인 → GC
+mise run deploy-status             # 컨테이너 상태 + /ready + 서버 자원 (디스크 포함)
+```
+
+이미지는 CI 가 만든다 (ADR-028 D7 Phase A, 2026-10-02). 그전에는 맥에서 빌드해 `docker save | ssh | docker load` 로
+옮겼다. 그 경로는 GitHub Actions · GHCR 장애 때의 **비상 경로**로만 남는다 — `deploy/oci/README.md` "비상 경로".
+배포 실행(트리거)은 아직 수동이다. 자동 배포(Phase B)는 D7 진입 조건을 확인한 뒤 붙인다.
+
 `deploy-ship` 은 마지막에 `deploy-gc` 를 부른다 — 서버에 **운영중 태그 + 직전 태그**만 남기고
-나머지 `kairos-api` / `kairos-web` 이미지를 지운다. 이 서버는 quantbridge·truewords 와
+나머지 `ghcr.io/woosung-dev/kairos-{api,web}` 이미지를 지운다. 이 서버는 다른 프로젝트와
 공유하므로 **`docker system prune` 계열을 쓰지 않는다** (남의 프로젝트 이미지가 지워진다).
 GC 가 이미지를 지우지 못하면 `deploy-ship` 은 `⚠ 이미지 정리 실패` 경고를 남기고 성공으로 끝난다 —
 배포 자체는 이미 끝난 상태다. 경고가 보이면 `docker rmi` 오류를 읽고 `mise run deploy-gc <직전 태그>` 를 다시 돌린다.
 
-레지스트리를 쓰지 않는다. 맥(darwin/arm64)과 서버(aarch64)가 같은 아키텍처라
-`--platform linux/arm64` 가 에뮬레이션 없이 돈다.
-
-**FE 빌드 인자**는 `deploy/oci/build.env` (gitignore) 에서 읽는다. `NEXT_PUBLIC_*` 은
-빌드타임에 번들로 인라인되므로 **도메인이 바뀌면 반드시 재빌드**해야 한다.
+**FE 빌드 인자** `NEXT_PUBLIC_*` 는 repo Variables 에서 읽는다 (맥 비상 경로는 `deploy/oci/build.env`, gitignore).
+빌드타임에 번들로 인라인되므로 **도메인이 바뀌면 반드시 재빌드**해야 한다 — 태그가 sha 라 같은 커밋은 다시 빌드하지 않으므로
+변수를 고친 뒤 새 커밋을 올린다.
 
 ### 배포 전 반드시 확인
 
@@ -71,8 +80,8 @@ Heavy e2e(실제 Whisper·Gemini + 회의 업로드 + 팀 spine)는 PR CI 에 �
 gh workflow run nightly-e2e.yml --ref main --repo woosung-dev/kairos
 ```
 
-`deploy-build` 는 **로컬 작업 트리**를 빌드하고 dispatch 는 원격 `main` 을 검증한다. 둘이 같은 커밋일 때만 의미가 있으므로
-배포는 `origin/main` 과 같은 clean `main` 에서 한다. 결과는 기다려서 본다:
+이미지는 `main` 의 커밋에서만 만들어지므로(release.yml) dispatch 는 배포할 sha 가 `main` 에 있을 때 의미가 있다.
+결과는 기다려서 본다:
 `gh run list --workflow nightly-e2e.yml --repo woosung-dev/kairos --limit 1`.
 
 ---
@@ -82,10 +91,10 @@ gh workflow run nightly-e2e.yml --ref main --repo woosung-dev/kairos
 `~/kairos/.env` 의 태그 두 줄을 이전 값으로 되돌리고 **api·web 만** 다시 띄운다 (`up -d --no-deps api web`).
 
 ```bash
-mise run deploy-rollback <이전TAG>
+mise run deploy-rollback sha-<이전>   # 서버에 없으면 GHCR 에서 pull
 ```
 
-**migrate 를 다시 돌리지 않는 이유.** migrate 는 api 와 같은 이미지(`kairos-api:${KAIROS_API_TAG}`)를 쓴다.
+**migrate 를 다시 돌리지 않는 이유.** migrate 는 api 와 같은 이미지(`ghcr.io/woosung-dev/kairos-api:${KAIROS_API_TAG}`)를 쓴다.
 전체 `up -d` 로 되돌리면 migrate 가 구 이미지로 재생성되는데, 구 이미지의 alembic 은 DB 에 이미 올라간
 새 리비전을 몰라 `Can't locate revision` 으로 실패한다. api·web 은 `service_completed_successfully` 를
 기다리므로 **기동하지 않는다 — 롤백이 장애를 만든다** (2026-09-27 토이 compose 재현, BL-LR-16).
@@ -115,7 +124,7 @@ Gate 0(#196 — 작성자 전용 메모 · 파생 데이터 visibility) 이전�
 
 서버에 **운영중 + 직전 1개** 태그를 남긴다 (`deploy-gc` 가 매 배포마다 강제한다 —
 직전 태그는 `deploy-ship` 이 `.env` 를 덮어쓰기 전에 읽어 GC 에 넘긴다).
-그보다 오래된 태그로 되돌리려면 이미지를 다시 빌드해 보내야 한다.
+그보다 오래된 태그는 `deploy-rollback` 이 GHCR 에서 받아 온다. Phase A 이전 태그(`sha-` 없는 맥 빌드)는 GHCR 에 없다.
 
 **마이그레이션은 자동 롤백되지 않으므로** 스키마 변경은 expand-then-contract 로만 한다.
 

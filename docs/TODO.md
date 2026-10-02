@@ -1,6 +1,6 @@
 # Kairos TODO
 
-> 마지막 갱신: **2026-09-27** (Gate 0 잔여 — 운영자 작업 4라운드 등재 · M-1·ci-required 종결)
+> 마지막 갱신: **2026-10-02** (배포 파이프라인 Phase A — CI 빌드 + GHCR · e929a49 배포 기록)
 > 4 섹션 운영: Completed / Blocked / Questions / Next Actions (`AGENTS.md` §5)
 > 완료 이력 정본 = `git log` + `docs/REFACTORING-BACKLOG.md`. 분할 직전 원본 = [`archive/todo-2026h1.md`](archive/todo-2026h1.md)
 >
@@ -12,6 +12,19 @@
 ## Completed
 
 현행 sprint 완료분만 여기 적는다. 지난 sprint 이력은 `git log` 와 아카이브를 본다.
+
+- [x] **배포 파이프라인 Phase 0 → A (2026-10-02, ADR-028 D7 개정 · D9)** — 진단 보고서(PASS 4 / WARN 6 / FAIL 1) 후속.
+  Phase 0 (#201): web runner 분리 243→227MB · web `.dockerignore` 보강 · `deploy-gc` 실패를 종료 코드로.
+  **e929a49 프로덕션 배포**: preflight 0 · ship(env 3 OK, GC 가 884a145 삭제) · api/web healthy · 공개 `/ready` 200.
+  서버 디스크 33G/97G(34%), 보존 = e929a49 + 2694847. 서버 별칭 `truewords-oracle` → `oci-tokyo` (#202).
+  CI flake(`next/font/google` 다운로드 실패) → Geist Mono `next/font/local` self-host (#203).
+  **Phase A**: `release.yml` (main Test 통과 → `ubuntu-24.04-arm` → GHCR 공개 `sha-<7>`) · compose 이미지 GHCR ·
+  `deploy-ship` save/load → 서버 pull · `deploy-gc`·`deploy-rollback` GHCR 이름 + 롤백 시 GHCR pull ·
+  `deploy-preflight` 디스크 80% 관문 · 호스트 공통 설정 문서화(Kairos 비소유) · nexus-core 포트 등재 (#204).
+  **전환 완료 (같은 날)**: repo Variables 4개 → dispatch `e929a49` 런 2분 45초 → 패키지는 레포 공개를 상속(익명 manifest 200, 수동 전환 불필요)
+  → 서버 롤백용 `docker tag` → `deploy-ship sha-e929a49` 56초(같은 코드 = 파이프라인만 검증) → 머지 커밋 `cfbfe1e` 가
+  workflow_run 으로 자동 빌드 → `deploy-ship sha-cfbfe1e` (font self-host 운영 반영, Google Fonts 참조 0). 둘 다 api/web healthy ·
+  `/ready` 200 · JWKS 1. 서버 이미지 = GHCR 이름만(운영 + 롤백 1), 디스크 32G/97G. 이후 정리 PR 로 전환 절차·GC 옛 이름 제거.
 
 - [x] **UI/UX sweep 후속 — PR #189 독립 리뷰 잔여 13건 해소 (2026-09-06)** — A) `actions/api.ts`·`projects/api.ts`
   쿼리 파라미터 camelCase 회귀 테스트(snake 변이 시 fail 확인). B) `useProjectTitleMap` 신설(상태 3종 × pageSize 100 병합 —
@@ -146,6 +159,7 @@
   → 2026-09-27: 백업 버킷 = `kairos-prod` (ADR-033), lifecycle `backups-14d` 설정 완료. cron 은 Blocked "Gate 0 잔여" R4 (R2 전환 뒤).
 - [ ] **BL-OCI-2** (P3) **presigned URL 업로드 전환.** Cloudflare Free/Pro 는 요청 바디를 100MB 에서 자른다. 운영 실측 최대 파일이 5MB 라 지금은 무해하고, `MAX_UPLOAD_BYTES=90MB` + FE 사전 가드로 막아 뒀다. 100MB 초과 파일이 실제로 필요해지면 착수(약 5시간). BL-070(500MB RAM 적재)도 함께 해소된다. 2026-05 기각 사유는 "R2 버킷 CORS 미설정"이었고 여전히 미설정이다.
 - [ ] **BL-OCI-3** (P3) **GitHub Actions 자동 배포.** 진입 조건 = 수동 배포 3회 연속 성공 + 컷오버 후 7일 무사고 + 장시간 오디오 1건 end-to-end 완주. GH 러너가 amd64 라 arm64 빌드에 QEMU 가 붙는 문제를 먼저 풀어야 한다.
+  → 2026-10-02: QEMU 전제는 무효(공개 레포 `ubuntu-24.04-arm` 무료). **Phase A(CI 빌드 + GHCR) 완료** — 남은 것 = Phase B(release.yml 에 배포 job · 배포 전용 SSH 키 · 스키마 관문 + 승인 · 처리 중 회의 60초×30분 연기, ADR-028 D7 개정 결정 2~4). 최우선 확인: OCI 보안 목록 22번 허용 출처(IP 제한이면 러너 접속 불가).
 - [ ] **BL-OCI-4** (P2) **stuck 상태 복구 경로.** `BackgroundTasks` 는 재시도가 없어 프로세스 재시작 시 진행 중이던 회의가 `transcribing`/`analyzing` 으로 영구 정지한다. 2026-08-14 에 그렇게 좌초한 8건(E2E 6 + uploading 2)을 수동 삭제했다. `mise run deploy-preflight` 가 최근 2시간만 검사하도록 우회했을 뿐 근본 해결이 아니다.
 - [ ] **BL-OCI-5** (P3) **R2 고아 파일 정리.** 삭제된 회의의 원본이 버킷에 남는다. `r2-cleanup.yml` 은 `workflow_dispatch` 전용(cron 미설정)이라 수동 실행이 필요하다. 현재 잔여량은 수십 KB 수준이라 급하지 않다. → 2026-09-27: `r2-cleanup.yml` 은 읽기 전용 인벤토리로 바뀌었고 `delete` 입력은 없어졌다. 정리는 서버에서 DB 참조를 확인하고 실행한다 — `docs/operations/r2-cleanup-cron.md` §2.
 - [ ] **BL-OCI-6** (P2) **dev 와 prod 가 같은 Neon DB(`neondb`) 를 쓰고 있었다.** 로컬 개발이 운영 데이터를 직접 건드리는 구조. 오라클 이전으로 prod 는 분리됐지만 로컬 개발 DB 분리는 미해결.

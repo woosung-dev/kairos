@@ -1,0 +1,148 @@
+# main 에서 Test 가 통과한 커밋을 arm64 로 빌드해 GHCR 에 올린다 (ADR-028 D7 Phase A).
+# 서버는 빌드하지 않고 pull 만 한다 — 배포 트리거는 아직 수동 (`mise run deploy-ship sha-<7>`).
+# 자동 배포(Phase B)는 D7 진입 조건 확인 후 이 파일에 job 으로 추가한다.
+name: Release images
+
+on:
+  # 다른 워크플로의 job 은 needs 로 걸 수 없다 → Test 완료 이벤트를 받는다.
+  workflow_run:
+    workflows: [Test]
+    types: [completed]
+    branches: [main]
+  # 리허설·재빌드용. workflow_dispatch 는 기본 브랜치에 있는 워크플로만 실행된다.
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "빌드할 main 커밋 (40자 sha)"
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+# 워크플로 단위 concurrency 는 두지 않는다. 태그가 sha 라 불변이고 이미 있으면 빌드를 건너뛰므로
+# 두 런이 겹쳐도 안전하다. 대기열 취소로 어떤 sha 의 이미지가 영영 안 생기는 쪽이 더 나쁘다.
+
+jobs:
+  meta:
+    # PR 의 Test(pull_request 이벤트)는 거른다 — main 에 push 된 커밋만 이미지가 된다.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.s.outputs.sha }}
+      tag: ${{ steps.s.outputs.tag }}
+    steps:
+      - id: s
+        env:
+          # workflow_run 에서 github.sha 는 테스트한 커밋이 아니라 기본 브랜치 최신 커밋이다 → head_sha
+          SHA: ${{ github.event.workflow_run.head_sha || inputs.sha }}
+        run: |
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "잘못된 sha: $SHA"; exit 1; }
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "tag=sha-${SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+  api:
+    needs: meta
+    runs-on: ubuntu-24.04-arm      # 서버와 같은 aarch64 — QEMU 없음, 공개 레포 무료
+    timeout-minutes: 20
+    env:
+      IMG: ghcr.io/${{ github.repository_owner }}/kairos-api:${{ needs.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1 — test.yml 과 같은 핀
+        with:
+          ref: ${{ needs.meta.outputs.sha }}
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: exists     # 태그는 불변 — 이미 있으면 다시 만들지 않는다 (재실행 안전)
+        run: |
+          if docker buildx imagetools inspect "$IMG" >/dev/null 2>&1; then
+            echo "hit=true" >> "$GITHUB_OUTPUT"; echo "::notice::$IMG 이미 있음 — 빌드 생략"
+          else
+            echo "hit=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.exists.outputs.hit != 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
+        with:
+          context: apps/api
+          platforms: linux/arm64
+          push: true
+          # 태그 없는 attestation manifest 를 만들지 않는다 — GHCR 보존 정책이 단순해진다
+          provenance: false
+          sbom: false
+          tags: ${{ env.IMG }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.meta.outputs.sha }}
+          # scope 를 이미지별로 나눈다 — 같으면 두 이미지가 서로의 캐시를 덮어쓴다
+          cache-from: type=gha,scope=kairos-api
+          cache-to: type=gha,scope=kairos-api,mode=max
+      # 검사는 태그가 이미 있어도 돈다. push 가 검사보다 먼저라, 검사에 실패한 이미지도 GHCR 에 남는다 —
+      # 재실행이 "이미 있음"으로 검사까지 건너뛰면 실패한 이미지가 초록 런이 된다 (2026-10-02 리뷰).
+      - name: 오프라인 import 확인 (네트워크 차단 — 숨은 재설치로 건강해 보이는 것을 막는다)
+        run: |
+          docker pull -q "$IMG"
+          # 더미 값은 test.yml backend-test 의 env 와 같은 것 (비밀 아님)
+          docker run --rm --network none --entrypoint "" \
+            -e DATABASE_URL=postgresql://fake:fake@localhost:5432/fake \
+            -e R2_ACCOUNT_ID=fake -e R2_ACCESS_KEY_ID=fake -e R2_SECRET_ACCESS_KEY=fake -e R2_BUCKET_NAME=fake \
+            -e GEMINI_API_KEY=fake -e OPENAI_API_KEY=fake \
+            "$IMG" python -c "import src.main"
+
+  web:
+    needs: meta
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    env:
+      IMG: ghcr.io/${{ github.repository_owner }}/kairos-web:${{ needs.meta.outputs.tag }}
+      API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1 — test.yml 과 같은 핀
+        with:
+          ref: ${{ needs.meta.outputs.sha }}
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: 빌드 인자 확인 (비면 배포 후에야 번들이 localhost 를 가리키는 것을 안다)
+        run: test -n "$API_URL" || { echo "repo Variables 의 NEXT_PUBLIC_API_URL 이 비어 있다"; exit 1; }
+      - id: exists
+        run: |
+          if docker buildx imagetools inspect "$IMG" >/dev/null 2>&1; then
+            echo "hit=true" >> "$GITHUB_OUTPUT"; echo "::notice::$IMG 이미 있음 — 빌드 생략"
+          else
+            echo "hit=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.exists.outputs.hit != 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
+        with:
+          # 멀티스테이지 유지 — 러너에서 pnpm build 하면 glibc sharp 가 alpine 에 들어가 next/image 가 깨진다 (ADR-028 D8)
+          context: apps/web
+          platforms: linux/arm64
+          push: true
+          provenance: false
+          sbom: false
+          tags: ${{ env.IMG }}
+          labels: |
+            org.opencontainers.image.revision=${{ needs.meta.outputs.sha }}
+          # 전부 브라우저 번들에 실리는 공개 값 → secrets 가 아니라 vars (맥 비상 경로는 deploy/oci/build.env)
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_RECALL_ENABLED=${{ vars.NEXT_PUBLIC_RECALL_ENABLED }}
+            NEXT_PUBLIC_FOUNDER_USER_ID=${{ vars.NEXT_PUBLIC_FOUNDER_USER_ID }}
+            NEXT_PUBLIC_APP_ENV=${{ vars.NEXT_PUBLIC_APP_ENV }}
+            NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID=${{ vars.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID }}
+            NEXT_PUBLIC_GOOGLE_PICKER_API_KEY=${{ vars.NEXT_PUBLIC_GOOGLE_PICKER_API_KEY }}
+          cache-from: type=gha,scope=kairos-web
+          cache-to: type=gha,scope=kairos-web,mode=max
+      - name: 번들에 API URL 이 인라인됐는지 확인 (태그가 이미 있어도 돈다 — api 쪽 주석)
+        run: |
+          docker pull -q "$IMG"
+          docker run --rm --entrypoint "" -e API_URL "$IMG" sh -c 'grep -rqF "$API_URL" /app/.next/static'
