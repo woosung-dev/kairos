@@ -232,8 +232,8 @@ LABEL 을 붙였다(레지스트리 연결·범위 한정 정리의 표식).
 `deploy-status` 에 `df -h /` 를 추가했다 — 그전에는 `uptime`/`free -h` 만 봐서 디스크가
 관측 밖이었다.
 
-**Phase A (2026-10-02) 이후.** GC 대상 저장소 = `ghcr.io/woosung-dev/kairos-{api,web}` + 전환 전 맥 빌드 이름
-`kairos-{api,web}` (서버에서 비워지면 목록에서 뺀다). 레지스트리가 이력을 보관하므로 `deploy-rollback` 은
+**Phase A (2026-10-02) 이후.** GC 대상 저장소 = `ghcr.io/woosung-dev/kairos-{api,web}`. 전환 배포(`sha-e929a49` →
+`sha-cfbfe1e`) 뒤 맥 빌드 이름 `kairos-{api,web}` 이 서버에서 비워져 목록에서 뺐다. 레지스트리가 이력을 보관하므로 `deploy-rollback` 은
 서버에 없는 태그를 GHCR 에서 받아 온다 — "직전 1개보다 오래된 태그는 재빌드" 제약이 사라졌다.
 
 ## 3. 기각한 대안

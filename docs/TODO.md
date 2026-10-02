@@ -20,7 +20,11 @@
   CI flake(`next/font/google` 다운로드 실패) → Geist Mono `next/font/local` self-host (#203).
   **Phase A**: `release.yml` (main Test 통과 → `ubuntu-24.04-arm` → GHCR 공개 `sha-<7>`) · compose 이미지 GHCR ·
   `deploy-ship` save/load → 서버 pull · `deploy-gc`·`deploy-rollback` GHCR 이름 + 롤백 시 GHCR pull ·
-  `deploy-preflight` 디스크 80% 관문 · 호스트 공통 설정 문서화(Kairos 비소유) · nexus-core 포트 등재.
+  `deploy-preflight` 디스크 80% 관문 · 호스트 공통 설정 문서화(Kairos 비소유) · nexus-core 포트 등재 (#204).
+  **전환 완료 (같은 날)**: repo Variables 4개 → dispatch `e929a49` 런 2분 45초 → 패키지는 레포 공개를 상속(익명 manifest 200, 수동 전환 불필요)
+  → 서버 롤백용 `docker tag` → `deploy-ship sha-e929a49` 56초(같은 코드 = 파이프라인만 검증) → 머지 커밋 `cfbfe1e` 가
+  workflow_run 으로 자동 빌드 → `deploy-ship sha-cfbfe1e` (font self-host 운영 반영, Google Fonts 참조 0). 둘 다 api/web healthy ·
+  `/ready` 200 · JWKS 1. 서버 이미지 = GHCR 이름만(운영 + 롤백 1), 디스크 32G/97G. 이후 정리 PR 로 전환 절차·GC 옛 이름 제거.
 
 - [x] **UI/UX sweep 후속 — PR #189 독립 리뷰 잔여 13건 해소 (2026-09-06)** — A) `actions/api.ts`·`projects/api.ts`
   쿼리 파라미터 camelCase 회귀 테스트(snake 변이 시 fail 확인). B) `useProjectTitleMap` 신설(상태 3종 × pageSize 100 병합 —
@@ -65,14 +69,6 @@
 ## Blocked
 
 > 차단 사유 + 필요한 조치를 함께 기록한다. 빈번한 질문 대신 여기 누적 후 일괄 전달.
-
-### 🟡 Phase A 전환 — 1회 (2026-10-02 등재, 절차 정본 `deploy/oci/README.md` "Phase A 전환")
-
-- [ ] repo Variables `NEXT_PUBLIC_*` 4개 등록 (`deploy/oci/build.env` 값, 빈 값 2개는 생략) — `gh variable set ... --repo woosung-dev/kairos`
-- [ ] `gh workflow run release.yml --repo woosung-dev/kairos -f sha=<e929a49 40자>` → success
-- [ ] GitHub Packages `kairos-api` · `kairos-web` visibility → **Public**
-- [ ] 서버 `docker tag kairos-{api,web}:e929a49 ghcr.io/woosung-dev/kairos-{api,web}:e929a49` (롤백 경로) → `mise run deploy-preflight` → `mise run deploy-ship sha-e929a49` → `deploy-status` · 공개 `/ready` 200
-- [ ] 전환 후 README "Phase A 전환" 절 삭제 · `deploy-gc` 옛 이름(`kairos-api`·`kairos-web`) 제거 (서버에서 비워진 뒤)
 
 ### 🔴 Gate 0 잔여 — 운영자 작업 4라운드 (2026-09-27 등재, 순서대로)
 

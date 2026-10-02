@@ -108,21 +108,6 @@ mise run deploy-ship $TAG
 
 나중에 CI 가 같은 sha 를 GHCR 에 올려도 서버는 맥 빌드본을 계속 쓴다 (같은 커밋이라 내용은 같다).
 
-### Phase A 전환 (1회 — 끝나면 이 절을 지운다)
-
-전환 직전 운영 = `e929a49` (맥 빌드, 옛 이름 `kairos-api:e929a49`). 같은 커밋을 CI 로 다시 빌드해 갈아 끼운다 —
-코드가 같으므로 문제가 생기면 원인은 파이프라인뿐이다.
-
-1. repo Variables `NEXT_PUBLIC_*` 등록 (`deploy/oci/build.env` 의 값, 빈 값은 건너뛴다)
-2. `gh workflow run release.yml --repo woosung-dev/kairos -f sha=<e929a49 의 40자 sha>` → success
-3. GitHub → Packages → `kairos-api` · `kairos-web` → Package settings → visibility **Public** (첫 push 는 비공개일 수 있다)
-4. 롤백 경로 고정 — 서버에서 운영 중인 맥 빌드에 GHCR 이름을 붙인다 (`deploy-rollback` 이 찾는 이름):
-   `docker tag kairos-api:e929a49 ghcr.io/woosung-dev/kairos-api:e929a49 && docker tag kairos-web:e929a49 ghcr.io/woosung-dev/kairos-web:e929a49`
-5. `mise run deploy-preflight` → `mise run deploy-ship sha-e929a49` → `mise run deploy-status`
-6. 실패하면 `mise run deploy-rollback e929a49` — 새 compose 그대로 4번에서 붙인 이름을 띄운다 (`.bak` 에 기대지 않는다.
-   `deploy-sync-config` 를 다시 돌리면 `.bak` 이 새 파일로 덮인다). 첫 시도에서 GC 는 `e929a49` 를 롤백용으로 남기고,
-   같은 태그로 재실행하면 GC 를 건너뛴다
-
 원격 명령은 항상 `bash -lc` (또는 `bash -ls`) 로 감싼다. 비로그인 ssh 셸은 PATH 에 docker compose 가 없다.
 
 ### 배포 전 확인
