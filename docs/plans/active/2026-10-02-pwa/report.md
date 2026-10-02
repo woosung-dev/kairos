@@ -54,7 +54,7 @@
 
 ## 6. 남은 수동 확인 · 운영 메모
 
-- T-PWA-18 실 Chrome 설치 → standalone 창: 사용자 클릭 대기 (아래 갱신)
+- **T-PWA-18 실 Chrome 설치 — PASS (2026-10-02, Chrome 154.0.8037.93 macOS)**: 사용자가 주소창 설치 클릭 → `~/Applications/Chrome Apps.localized/Kairos.app` 생성 (`CrAppModeShortcutName`=Kairos, `CrAppModeShortcutURL`=`http://localhost:3005/dashboard` = manifest `start_url`). 앱 아이콘 = 승인한 K 모노그램 (`evidence/orch/t18-installed-app-icon.png`, app.icns 추출). 설치 직전 같은 탭에서 manifest·아이콘 3장 200/실측 크기 일치 · SW activated · controlled 확인. 앱 shim 은 설치 클릭 뒤 수 분 지나 생성됐다. 설치 직후 뜬 창은 주소창·탭 바 없는 독립 창 (standalone, 사용자 육안 확인).
 - T-PWA-17 iOS 실기기 (safe-area·statusBarStyle) · T-PWA-22 배포 후 smoke: 배포 뒤 사용자 운영 작업
 - 운영 http 평문 접속에서는 SW 가 동작하지 않는다 (비보안 컨텍스트 → registrar `skip`). https 접속만 대상.
 - 비상시: `deploy/oci/build.env` 에 `NEXT_PUBLIC_PWA_SW=off` → 재배포. 구 이미지 롤백으로는 SW 가 내려가지 않는다 (ADR-034 D6).

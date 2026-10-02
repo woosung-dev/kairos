@@ -1,6 +1,6 @@
 # ADR-034 — PWA 설치형 셸 (캐시 없는 Service Worker + 오프라인 화면 1장)
 
-**Status**: Accepted — PR-1 구현 완료, 자동 검증 PASS (2026-10-02). 수동 T-PWA-17(iOS)·T-PWA-18(실 Chrome 설치)·T-PWA-22(배포 후 smoke) 는 별도
+**Status**: Accepted — PR-1 구현 완료, 자동 검증 PASS + 실 Chrome 설치 T-PWA-18 PASS (2026-10-02). 수동 T-PWA-17(iOS)·T-PWA-22(배포 후 smoke) 는 별도
 **Date**: 2026-10-02
 **Spec**: [`docs/requirements/pwa.md`](../requirements/pwa.md) §3·§4 (PR-1) · 테스트 [`test-matrix.md`](../plans/active/2026-10-02-pwa/test-matrix.md)
 **Invariant**: `apps/web/CONTEXT.md` §4 **F-14**
@@ -136,5 +136,5 @@ proxy matcher 의 이미지 확장자 제외에 걸리지 않고 로그인 리�
 - e2e (`public-only`, prod 빌드): manifest·아이콘·메타·SW 헤더(request 그룹) + 등록·오프라인·`/api/*` 1회
   도달·inset(browser 그룹, CI 판정은 draft PR spike — pwa.md R-1).
 - 수동: kill-switch 실동작 T-PWA-15 (2026-10-02 로컬 실측 PASS, `evidence/orch/t15-killswitch.json`).
-  **실제 Chrome 설치 T-PWA-18 · iOS 실기기 T-PWA-17 · 배포 후 헤더 스모크 T-PWA-22 는 이 ADR 채택 시점에 미실행 — 별도로 한다.**
+  실제 Chrome 설치 T-PWA-18 은 2026-10-02 PASS (Chrome 154 macOS, `Kairos.app` · start URL `/dashboard` · K 아이콘 — `docs/plans/active/2026-10-02-pwa/report.md` §6). **iOS 실기기 T-PWA-17 · 배포 후 헤더 스모크 T-PWA-22 는 채택 시점에 미실행 — 별도로 한다.**
 - 행별 상태·기대값의 정본은 test-matrix 다.

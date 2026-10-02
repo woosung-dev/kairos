@@ -20,12 +20,12 @@
 - [x] 2026-10-02 Generator 구현 + 자체검증 — IMPL-1 → 1b(favicon ICO RGBA, Turbopack 디코더 요구) → 1c(worker 청크 env 미인라인 panic → kill-switch 페이지 쪽만, C-28) → 2(EVAL-IMPL-1 D1~D5) → 3(Phase 4 문서). tsc 0 · vitest 53 files/332
 - [x] 2026-10-02 Evaluator 라운드 PASS — EVAL-IMPL-1 REVISE(major 3) · EVAL-IMPL-2 PASS. public-only 54/54(×3) · T-PWA-11 ③ Chromium 147·Chrome 154 각 15/15 · T-PWA-15 kill-switch 실측 PASS (`evidence/orch/t15-killswitch.json`)
 - [ ] draft PR CI spike (public-only 페이지 렌더)
-- [ ] Claude in Chrome 실제 설치 → standalone 확인 (사용자 클릭)
+- [x] 2026-10-02 Claude in Chrome 실제 설치 (사용자 클릭) — `Kairos.app` 생성, start URL `/dashboard`, K 아이콘 (`evidence/orch/t18-installed-app-icon.png`)
 
 ### Phase 4 — 게이트·PR
 - [x] 2026-10-02 best-practices 게이트 FAIL 0 — GATE-PR1 PASS, 24 규칙 (PASS 15 · N/A 9) (`evidence/pr1-best-practices.md`)
-- [ ] Atomic Update (ADR-034 · pwa.md · F-14 · `apps/web/CONTEXT.md` §3 목록(:39 layout 에 registrar · :50 lib 에 `lib/pwa/`) · directory-map · BL-PWA-1·2·3·8·10·11·13 — pwa.md §9 와 동일). PR-1 은 새 FE feature 를 만들지 않으므로(registrar=`components/layout/`, worker=`lib/pwa/`) CONTEXT-MAP §4.3 갱신 없음 — §4.3 FE features 17→18 은 PR-2(`features/push/`)
-- [ ] report.md 증거 (스크린샷 · console.error 0 · vitest/e2e)
+- [x] 2026-10-02 Atomic Update (ADR-034 · pwa.md · F-14 · `apps/web/CONTEXT.md` §3 목록(:39 layout 에 registrar · :50 lib 에 `lib/pwa/`) · directory-map · BL-PWA-1·2·3·8·10·11·13 — pwa.md §9 와 동일). PR-1 은 새 FE feature 를 만들지 않으므로(registrar=`components/layout/`, worker=`lib/pwa/`) CONTEXT-MAP §4.3 갱신 없음 — §4.3 FE features 17→18 은 PR-2(`features/push/`)
+- [x] 2026-10-02 report.md 증거 (스크린샷 · console.error 0 · vitest/e2e)
 - [ ] 커밋 → 푸쉬 → PR (각 승인) → CI green → 사용자 머지
 
 ## PR-2 — 웹 푸시

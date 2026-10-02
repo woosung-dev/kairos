@@ -1,6 +1,6 @@
 # PWA — 설치형 셸 + 웹 푸시 (기능 명세)
 
-> **상태: PR-1 구현 완료 — 자동 검증 PASS (2026-10-02). 수동 T-PWA-17(iOS)·T-PWA-18(실 Chrome 설치)·T-PWA-22(배포 후 smoke) 는 별도 · PR-2 확정 · 미구현** — 사용자 spec 게이트 통과 (2026-10-02)
+> **상태: PR-1 구현 완료 — 자동 검증 PASS + 실 Chrome 설치 T-PWA-18 PASS (2026-10-02). 수동 T-PWA-17(iOS)·T-PWA-22(배포 후 smoke) 는 별도 · PR-2 확정 · 미구현** — 사용자 spec 게이트 통과 (2026-10-02)
 > **근거**: PRD §9 "모바일 네이티브 앱 (PWA로 대체)" (`docs/requirements/prd.md:606`) · 계획 [`docs/plans/active/2026-10-02-pwa/plan.md`](../plans/active/2026-10-02-pwa/plan.md) · 테스트 매트릭스 [`test-matrix.md`](../plans/active/2026-10-02-pwa/test-matrix.md)
 > **관련 ADR**: [ADR-034](../adr/034-pwa-installable-shell.md) PWA 셸 (PR-1, Accepted) · ADR-035 웹 푸시 (PR-2, 예정). ADR-033 은 PR #200 이 머지돼(2026-10-02 KST, 커밋 `d35edf6`) main 에 있다 — 034 는 그대로다.
 > **불변식**: F-14 (`apps/web/CONTEXT.md` §4, PR-1 반영) · B-16 (`apps/api/CONTEXT.md` §5, PR-2 예정)
