@@ -200,7 +200,7 @@ Repository WHERE와 cross-workspace 참조의 composite FK `(workspace_id, secon
 | **AI** | Gemini `gemini-3.1-flash-lite` (요약·생성) · OpenAI Whisper (STT) · `text-embedding-3-small` 1536d |
 | **Storage** | Cloudflare R2 (presigned URL · aioboto3) |
 | **Infra** | Oracle Cloud A1 단일 VM (arm64) · Docker Compose · Cloudflare Tunnel |
-| **Toolchain** | mise (툴체인 핀 + 29 task) · uv 0.10.4 · pnpm 8.15.9 · Node 22 |
+| **Toolchain** | mise (툴체인 핀 + 29 task) · uv 0.10.4 · pnpm 10.34.6 · Node 22 |
 | **Test** | pytest + testcontainers(실 PostgreSQL) · vitest · Playwright (chromium / public-only / team) |
 
 ---
@@ -329,7 +329,7 @@ promote 감사 조회)다. `packages/`도 없다 — 같은 언어 소비자가 
 PostgreSQL 17 + pgvector 0.8 접근 권한
 
 ```bash
-# 1. 툴체인 — Node 22 / pnpm 8.15.9 / uv 0.10.4 를 프로덕션과 같은 버전으로 설치
+# 1. 툴체인 — Node 22 / pnpm 10.34.6 / uv 0.10.4 를 프로덕션과 같은 버전으로 설치
 brew install mise
 mise trust && mise install
 

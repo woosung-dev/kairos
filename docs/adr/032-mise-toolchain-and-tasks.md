@@ -4,6 +4,14 @@
 **Date**: 2026-08-17
 **Amends**: [ADR-027](027-apps-monorepo-and-contract-governance.md) D3 (단일 명령 진입점 = `justfile`)
 
+> **부분 개정 (2026-10-02): pnpm 8.15.9 → 10.34.6.** dependabot 이 pnpm 8(lockfile v6)을 더 이상 쓰지 않아
+> 보안 PR(#199)마다 lockfile 을 v9 로 다시 쓰고, 고정된 pnpm 8 이 그걸 "lockfile 없음"으로 읽어 CI 가 실패했다.
+> 전환 방법이 중요하다 — **pnpm 10 으로 바로 `install` 하면 v6 를 읽지 못해 전부 다시 해석한다**(실측: 직접 의존성 41개 중
+> 28개가 몰래 올라감, better-auth 1.6→1.7 포함). 그래서 pnpm 9.15.9 `install --lockfile-only` 로 **형식만** v9 로 바꾸고
+> (패키지 1018개 버전 변경 0) pnpm 10 `--frozen-lockfile` 로 확인했다. pnpm 10 은 의존성 설치 스크립트를 기본으로 막는다 —
+> 막히는 것은 msw(미사용)·unrs-resolver(ESLint, 플랫폼 바이너리 설치됨) 둘이고 sharp 는 스크립트가 없다(컨테이너에서 로드 확인).
+> 아래 표의 8.15.9 는 당시 기록이다.
+
 ---
 
 ## 배경
