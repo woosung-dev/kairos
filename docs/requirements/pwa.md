@@ -40,7 +40,7 @@ Kairos 를 홈 화면·데스크톱에 **설치할 수 있게** 하고(PR-1, FE 
 | C-11 | 로고 파일이 없다. 사이드바 접힘 상태가 'K' 텍스트 (Satoshi, accent). `src/app/favicon.ico` 는 create-next-app 기본값 | `components/layout/sidebar.tsx:394-404` · `apps/web/src/app/favicon.ico` | K 모노그램 아이콘 신규 제작 (REQ-002) |
 | C-12 | `/` 는 세션이 있으면 서버에서 `/dashboard` 로 리다이렉트한다 | `app/(landing)/page.tsx:9-14` | `start_url=/dashboard` (왕복 1회 절약). 비로그인이면 proxy 가 `/sign-in?callbackURL=%2Fdashboard` 로 보낸다 (`proxy.ts:36-40`) |
 | C-13 | 로그아웃 순서: `queryClient.clear()` → `clearAuthTokenCache()` → `await authClient.signOut()` | `components/layout/header.tsx:164-176` (signOut :174) · `lib/use-api-client.ts:72` | BE 구독 삭제는 **signOut 이전** (이후엔 `/api/auth/token` 이 401) |
-| C-14 | FE `NEXT_PUBLIC_*` 는 빌드타임 인라인 → Dockerfile ARG·`deploy/oci/build.env` 결합 | `apps/web/Dockerfile:27-44` · `mise.toml:271-284` | VAPID 공개키는 BE 엔드포인트로 제공 (API-001) |
+| C-14 | FE `NEXT_PUBLIC_*` 는 빌드타임 인라인 → Dockerfile ARG·CI repo Variables(`release.yml`)·맥 비상 `deploy/oci/build.env` 결합 | `apps/web/Dockerfile:27-46` · `.github/workflows/release.yml:136-143` · `mise.toml:287-300` | VAPID 공개키는 BE 엔드포인트로 제공 (API-001) |
 | C-15 | 회의 상태 `completed`/`failed` 전이는 `meetings/pipeline_service.py` 에만 있다 — 완료 :185-186 (`_analyze_and_store` 끝), 실패 :259-269 (`process_meeting`), :318-328 (`capture_text`) | `grep update_status( apps/api/src` | 푸시 훅은 오케스트레이터 안 (B-3, `apps/api/CONTEXT.md:73`). 온보딩 훅이 같은 자리에 같은 방식(지연 import + 비치명적 try)으로 있다 (:177-183) |
 | C-16 | 사용자 단위 경로 선례 `/api/v1/users/me`, `/api/v1/users/me/onboarding` — I-13 예외 `/api/v1/users` 안 | `apps/api/src/auth/router.py:9-15` · `apps/api/src/onboarding/router.py:10` · `CONTEXT-MAP.md:92` | 푸시 API 는 `/api/v1/users/me/push-*` |
 | C-17 | `common/notifications.py` 는 Slack webhook 유틸이다 | `apps/api/src/common/notifications.py:1-29` | 새 도메인 이름은 `push` |
@@ -197,13 +197,13 @@ icons: { apple: "/icons/apple-touch-icon.png" },
 - 열린 창 강제 이동을 하지 않는 근거: 해제 뒤에도 열린 창의 controller 는 남지만(C-27) Cache Storage 없는 통과형이라 요청은 네트워크로 그대로 가고, 다음 내비게이션부터 제어되지 않는다 [사실 — C-27, `eval-spec2/unreg.mjs`]. 강제 `navigate()` 는 작성 중인 입력을 날린다.
 - kill-switch 가 페이지 쪽만으로 충분한 근거: SW 는 Cache Storage 가 없는 통과형이라 kill 빌드 배포 뒤 다음 내비게이션에서 새 페이지 JS 가 항상 내려오고, registrar 가 `getRegistrations()` → 전부 `unregister()` 한다.
 - ★한계 [사실 — C-28]: sw.js 가 스스로 내려가는 보조 안전망은 없다 (worker 번들이 빌드 플래그를 못 읽는다). SW 자체 버그(예: 온라인인데 오프라인 HTML 반환)로 페이지 JS 가 못 뜨면 kill-switch 가 닿지 않는다 → 복구는 **수정한 `sw.ts` 배포**다 (sw.js 바이트 변경 → `updateViaCache: 'none'` + `max-age=0` 로 내비게이션마다 업데이트 확인 → `skipWaiting`+`claim` 으로 즉시 교체).
-- 플래그 배선: `apps/web/Dockerfile` ARG/ENV 1줄씩 · `mise.toml` 이미지 빌드 `--build-arg` 1줄 · `deploy/oci/build.env.example` 1줄. 비상시 운영자는 로컬 `deploy/oci/build.env` 에 `NEXT_PUBLIC_PWA_SW=off` 를 넣고 재배포한다 (코드 변경 없음).
+- 플래그 배선: `apps/web/Dockerfile` ARG/ENV 1줄씩 · `.github/workflows/release.yml` build-args 1줄 (평소 CI 빌드, repo Variables) · `mise.toml` 맥 비상 빌드 `--build-arg` 1줄 · `deploy/oci/build.env.example` 1줄. 비상시 운영자는 repo Variables 에 `NEXT_PUBLIC_PWA_SW=off` 를 넣고 main 에 새 커밋 → 새 sha 태그로 `deploy-ship` 한다 (코드 변경 없음. 같은 sha 는 태그가 이미 있어 빌드를 건너뛴다. 절차 원문 `deploy/oci/build.env.example`).
 - PR-2 이후 unregister 는 그 등록에 묶인 푸시 구독도 함께 없앤다 (서버 행은 다음 앱 로드 동기화의 API-003 — 표식 일치 시 — 또는 다음 발송의 404/410 에서 정리, §5.5).
 - **등록 없음 상태** — 이 origin 에 SW 등록이 하나도 없는 상태. 다음 경우에 생긴다: dev 빌드 · kill-switch 빌드 · `serviceWorker` 미지원 또는 비보안 컨텍스트(R-4) · prod 첫 방문에서 registrar 가 `load` 뒤 등록을 마치기 전. 이 상태에서 `navigator.serviceWorker.ready` 는 **영원히 resolve 되지 않는다** → 앱 코드는 `ready` 를 기다리지 않고 `navigator.serviceWorker.getRegistration()`(즉시 `undefined` 로 resolve) 으로만 조회한다 (§5.5).
 
 ### 4.6 PR-1 변경 파일 (제안)
 
-`app/manifest.ts`(신규) · `app/layout.tsx`(viewport·metadata·registrar) · `proxy.ts`(matcher 1항목) · `app/globals.css`(토큰 1줄 + body 좌우 safe-area padding) · `components/layout/bottom-nav.tsx`(padding 1줄) · `components/layout/service-worker-registrar.tsx`(신규) · `lib/pwa/sw.ts`(+순수 로직·오프라인 HTML 파일, 신규) · `public/icons/*.png` 4장 · `app/favicon.ico`(교체) · `e2e/tests/pwa.spec.ts`(신규) · `playwright.config.ts`(public-only testMatch + chromium testIgnore) · vitest 파일 · `Dockerfile`·`mise.toml`·`deploy/oci/build.env.example`(플래그) · 문서 (§9).
+`app/manifest.ts`(신규) · `app/layout.tsx`(viewport·metadata·registrar) · `proxy.ts`(matcher 1항목) · `app/globals.css`(토큰 1줄 + body 좌우 safe-area padding) · `components/layout/bottom-nav.tsx`(padding 1줄) · `components/layout/service-worker-registrar.tsx`(신규) · `lib/pwa/sw.ts`(+순수 로직·오프라인 HTML 파일, 신규) · `public/icons/*.png` 4장 · `app/favicon.ico`(교체) · `e2e/tests/pwa.spec.ts`(신규) · `playwright.config.ts`(public-only testMatch + chromium testIgnore) · vitest 파일 · `Dockerfile`·`.github/workflows/release.yml`·`mise.toml`·`deploy/oci/build.env.example`(플래그) · 문서 (§9).
 
 ---
 

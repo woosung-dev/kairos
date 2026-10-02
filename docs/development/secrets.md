@@ -70,7 +70,7 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 | `GOOGLE_CLIENT_SECRET` 🔒 | ✅ | ➖ | 서버 `.env` (web) | 위와 같은 클라이언트의 시크릿 |
 | `NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID` | ✅ | ➖ | `build.env` | ★api 의 `GOOGLE_OAUTH_CLIENT_ID` 와 **같은 값** (ADR-026 D5 — client_id 동일성이 필수 불변식) |
 | `NEXT_PUBLIC_GOOGLE_PICKER_API_KEY` | ✅ | ➖ | `build.env` | GCP → API 키. 보호 수단은 **HTTP referrer 제한** (ADR-026 D10 개정) |
-| `NEXT_PUBLIC_PWA_SW` | ➖ | ➖ | `build.env` | 발급 없음 — `off` = PWA kill-switch (페이지가 SW 등록 대신 기존 등록 해제), **평소 비움** (= SW 사용). [ADR-034](../adr/034-pwa-installable-shell.md) · `docs/requirements/pwa.md` §4.5 |
+| `NEXT_PUBLIC_PWA_SW` | ➖ | ➖ | repo Variables (맥 비상 경로 `build.env`) | 발급 없음 — `off` = PWA kill-switch (페이지가 SW 등록 대신 기존 등록 해제), **평소 미설정** (= SW 사용). 바꾼 뒤 새 커밋이 있어야 반영 (절차 `deploy/oci/build.env.example`). [ADR-034](../adr/034-pwa-installable-shell.md) · `docs/requirements/pwa.md` §4.5 |
 
 ---
 

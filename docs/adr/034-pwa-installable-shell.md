@@ -79,7 +79,9 @@ prod 빌드 · secure context · `load` 이후에만 등록한다. dev 빌드는
 
 구 이미지에는 sw.js 가 없어 404 → 브라우저의 `update()` 만 실패하고 기존 등록·제어가 남는다
 (pwa.md C-25, R-2). 남은 SW 는 D2 의 통과형이라 구 이미지 앱도 그대로 동작한다. 등록을 걷어내는 수단은
-D5 의 플래그 빌드뿐이다 — 운영 절차는 `deploy/oci/build.env.example` 주석에 둔다.
+D5 의 플래그 빌드뿐이다 — 운영 절차는 `deploy/oci/build.env.example` 주석에 둔다. 평소 이미지는 CI
+(`release.yml`, ADR-028 D7 Phase A)가 repo Variables 로 빌드하므로, 플래그를 바꾼 뒤 **새 커밋**이 있어야
+반영된다 (같은 sha 는 태그가 이미 있어 빌드를 건너뛴다).
 
 ### D7. 설치 메타 — manifest·아이콘은 비로그인 공개 경로
 

@@ -140,6 +140,7 @@ jobs:
             NEXT_PUBLIC_APP_ENV=${{ vars.NEXT_PUBLIC_APP_ENV }}
             NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID=${{ vars.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID }}
             NEXT_PUBLIC_GOOGLE_PICKER_API_KEY=${{ vars.NEXT_PUBLIC_GOOGLE_PICKER_API_KEY }}
+            NEXT_PUBLIC_PWA_SW=${{ vars.NEXT_PUBLIC_PWA_SW }}
           cache-from: type=gha,scope=kairos-web
           cache-to: type=gha,scope=kairos-web,mode=max
       - name: 번들에 API URL 이 인라인됐는지 확인 (태그가 이미 있어도 돈다 — api 쪽 주석)
