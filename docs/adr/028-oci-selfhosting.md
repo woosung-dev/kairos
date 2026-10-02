@@ -11,6 +11,9 @@
 >
 > **부분 개정 (2026-09-27, [ADR-033](033-kairos-dedicated-r2-buckets.md)):** D3 의 "R2 유지" 는 그대로지만
 > 버킷은 nexus-core 공유 `nexus-core-storage` 에서 Kairos 전용 `kairos-prod`·`kairos-dev` 로 나눈다.
+>
+> **부분 개정 (2026-10-02, D7):** 이미지 빌드를 CI(`release.yml`, arm64 러너) + GHCR 공개 패키지로 옮겼다 (Phase A).
+> D7 의 QEMU 전제는 무효였다. 결정 5건은 D7 아래 "D7 개정" 절. 배포 트리거는 여전히 수동이다.
 
 ---
 
@@ -152,6 +155,35 @@ AUTOCOMMIT 으로** 잡는다. 2026-08-14 실측한 실패 2종:
 `apps/backend/**` 머지가 Cloud Run 을 조용히 재배포하는 것을 막되, 롤백 경로는 유지한다.
 D+7 무사고 후 삭제.
 
+#### D7 개정 — Phase A: CI 빌드 + GHCR (2026-10-02)
+
+위 QEMU 전제는 작성 시점에 이미 무효였다 — 공개 레포는 `ubuntu-24.04-arm` 러너를 무료로 쓴다(2025-08 GA).
+같은 서버의 quant-bridge 는 ADR-043 으로 GHCR + `deploy.sh <sha>` 를 먼저 쓰고 있었다.
+
+**빌드와 배포를 나눈다.** `main` 에 push 된 커밋이 Test 를 통과하면 `.github/workflows/release.yml` 이 arm64 로 빌드해
+`ghcr.io/woosung-dev/kairos-{api,web}:sha-<7>` 로 올린다. 서버는 빌드하지 않고 pull 만 한다
+(`mise run deploy-ship` 의 `docker save | ssh | docker load` → 서버 `docker pull`). **배포 트리거는 아직 수동**이다.
+맥 빌드 + SSH 전송은 Actions · GHCR 장애 때의 비상 경로로 남긴다 (`deploy/oci/README.md`).
+
+결정 (2026-10-02 사용자 확정, 근거 = 배포 파이프라인 진단 보고서):
+
+1. **GHCR 패키지 = 공개.** 이미지 내용은 공개 레포 코드 + 번들에 이미 노출된 `NEXT_PUBLIC_*` 뿐이다. 비공개면 공유 호스트에
+   읽기 토큰을 평문으로 둬야 한다. 되돌릴 수 없다 — 공개 중에 받아 간 이미지는 회수할 수 없다.
+   귀결: 빌드 인자에 비밀을 넣으면 레이어 히스토리로 공개된다 (`docs/development/secrets.md`).
+2. **스키마 변경 = 관문 + 승인 클릭** (Phase B). alembic head 와 DB 리비전이 다르면 자동 배포를 멈추고,
+   GitHub Environment 승인 뒤에만 migrate 한다.
+3. **진입 조건(위 3개)은 자동 트리거(Phase B)에만 건다.** CI 빌드는 배포 위험을 늘리지 않으므로 Phase A 는 바로 진행한다.
+   처음 3회는 production Environment 승인자를 둔다. 8/17 컷오버 사고를 "무사고"에서 빼는지, 장시간 오디오 기록은
+   Phase B 진입 때 확인한다.
+4. **처리 중 회의가 있으면 연기** (Phase B) — 60초 간격, 최대 30분. 자동 경로에는 강제 옵션을 두지 않는다.
+5. **호스트 공통 설정은 Kairos 가 소유하지 않는다** (문서만). daemon.json · journald · swap · 디스크 경보 · 빌더 캐시 정리는
+   truewords · quant-bridge 가 쓴다 — 목록과 소유는 `deploy/oci/README.md` "호스트 공통 설정". 대신 `deploy-preflight` 가
+   `/` 80% 이상(disk-guard 와 같은 기준)이면 배포를 멈춘다. 서버 전용 레포로 모으는 안은 채택하지 않았다.
+
+설계 메모: 태그는 `github.event.workflow_run.head_sha` 로 만든다 (`workflow_run` 의 `github.sha` 는 기본 브랜치 최신 커밋이다).
+태그는 불변 — 이미 있으면 빌드를 건너뛰므로 재실행이 안전하다. `provenance`/`sbom` 은 끈다 (태그 없는 attestation manifest 가
+보존 정책을 복잡하게 만든다). 빌드 캐시는 `type=gha` 를 이미지별 scope 로 나눈다.
+
 ### D8. FE 이미지는 컨테이너 내부 빌드(멀티스테이지)
 
 `next/image` 사용으로 런타임에 sharp 네이티브 바이너리가 필요하다. 맥에서 빌드한
@@ -199,6 +231,10 @@ LABEL 을 붙였다(레지스트리 연결·범위 한정 정리의 표식).
 
 `deploy-status` 에 `df -h /` 를 추가했다 — 그전에는 `uptime`/`free -h` 만 봐서 디스크가
 관측 밖이었다.
+
+**Phase A (2026-10-02) 이후.** GC 대상 저장소 = `ghcr.io/woosung-dev/kairos-{api,web}` + 전환 전 맥 빌드 이름
+`kairos-{api,web}` (서버에서 비워지면 목록에서 뺀다). 레지스트리가 이력을 보관하므로 `deploy-rollback` 은
+서버에 없는 태그를 GHCR 에서 받아 온다 — "직전 1개보다 오래된 태그는 재빌드" 제약이 사라졌다.
 
 ## 3. 기각한 대안
 

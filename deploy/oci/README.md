@@ -5,8 +5,8 @@ ADR-028. Vercel(FE) + GCP Cloud Run(BE) + Neon(DB) → 오라클 단일 VM 셀�
 ## 배치
 
 서버 `oci-tokyo` (Ampere A1 aarch64, 2 OCPU / 12GB, 도쿄, Ubuntu 22.04)를
-quantbridge · truewords 와 **공유**한다. 인바운드는 SSH 22 만 열려 있고, 공개 경로는
-Cloudflare Tunnel 이다.
+truewords · quantbridge · nexus-core 와 **공유**한다 (4개 프로젝트, `ubuntu` 계정 하나). 인바운드는 SSH 22 만 열려 있고,
+공개 경로는 Cloudflare Tunnel 이다. 서버 전체 설정은 Kairos 가 소유하지 않는다 — 아래 "호스트 공통 설정".
 
 `oci-tokyo` 는 맥 `~/.ssh/config` 의 별칭이다 (`mise.toml` 의 `oci_host`). 옛 별칭 `truewords-oracle` 을
 같은 `Host` 줄에 남겨 둔다 — truewords · quant-bridge 레포의 스크립트가 아직 그 이름을 쓴다(2026-10-02 개명).
@@ -26,7 +26,8 @@ Host oci-tokyo truewords-oracle
 | Cloudflare Tunnel | `kairos-cloudflared` | `network_mode: host` | — |
 
 이미 점유된 포트(건드리지 말 것): 3200 quantbridge-frontend · 5432 truewords postgres ·
-5433 quantbridge-db · 6333 qdrant · 6380 quantbridge-redis · 8100 quantbridge-api.
+5433 quantbridge-db · 6333 qdrant · 6380 quantbridge-redis · 8100 quantbridge-api ·
+3300 · 3301 · 8300 · 5435 nexus-core (2026-10-02 실측 — 그전 목록에서 빠져 있었다).
 
 ## 최초 부트스트랩
 
@@ -56,42 +57,73 @@ XHR 과 SSR 헤어핀이 그 리다이렉트를 따라가지 못한다. API 의 
 
 ## 배포
 
-맥에서 arm64 네이티브로 빌드해 SSH 파이프로 넘긴다. 레지스트리를 쓰지 않는다.
-맥(darwin/arm64)과 서버(aarch64)가 같은 아키텍처라 에뮬레이션이 없다.
+이미지는 CI 가 만든다. `main` 에 push 된 커밋이 Test 를 통과하면 `.github/workflows/release.yml` 이
+`ubuntu-24.04-arm` 러너(서버와 같은 aarch64 — 에뮬레이션 없음)에서 빌드해 **GHCR 공개 패키지**에 올린다.
+서버는 빌드하지 않고 pull 만 한다 (ADR-028 D7 Phase A, 2026-10-02). 배포 실행은 아직 수동이다.
+
+| 이미지 | 태그 |
+|---|---|
+| `ghcr.io/woosung-dev/kairos-api` | `sha-<커밋 7자리>` — 불변. 같은 sha 는 다시 빌드하지 않는다 |
+| `ghcr.io/woosung-dev/kairos-web` | 〃 |
 
 ```bash
-TAG=$(git rev-parse --short HEAD)
+gh run list --workflow release.yml --repo woosung-dev/kairos --limit 3   # 배포할 커밋의 런이 success 인지
+TAG=sha-<커밋 7자리>
 
-# BE
-docker buildx build --platform linux/arm64 -t kairos-api:$TAG --load apps/api
-
-# FE — NEXT_PUBLIC_* 는 빌드타임 인라인이다. 도메인이 바뀌면 반드시 재빌드.
-docker buildx build --platform linux/arm64 -t kairos-web:$TAG --load \
-  --build-arg NEXT_PUBLIC_API_URL=https://kairos-api.woosung.dev \
-  --build-arg NEXT_PUBLIC_RECALL_ENABLED=true \
-  --build-arg NEXT_PUBLIC_APP_ENV=production \
-  --build-arg NEXT_PUBLIC_FOUNDER_USER_ID=<users.id UUID> \
-  apps/web
-
-# ★compose 파일 동기화 — 이미지보다 먼저.
-#   2026-08-17 Better Auth 컷오버에서 이 단계가 없어 web 이 전면 500 이었다.
-#   서버 파일이 최초 부트스트랩 버전이라 ADR-031 이 추가한 web.environment 5줄이 없었고
-#   BETTER_AUTH_SECRET 이 빈 문자열로 주입됐다(environment: 치환은 미설정도 조용히 통과한다).
-#   `mise run deploy-ship` 은 이걸 선행 의존으로 자동 수행한다.
-scp deploy/oci/docker-compose.prod.yml oci-tokyo:~/kairos/docker-compose.prod.yml
-ssh oci-tokyo 'bash -lc "cd ~/kairos && docker compose -f docker-compose.prod.yml config -q"'
-
-# 전송
-docker save kairos-api:$TAG | gzip -1 | ssh oci-tokyo 'gunzip | docker load'
-docker save kairos-web:$TAG | gzip -1 | ssh oci-tokyo 'gunzip | docker load'
-
-# 태그 교체 후 기동
-ssh oci-tokyo "bash -lc \"cd ~/kairos && \
-  sed -i 's/^KAIROS_API_TAG=.*/KAIROS_API_TAG=$TAG/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=$TAG/' .env && \
-  docker compose -f docker-compose.prod.yml up -d\""
+mise run deploy-preflight     # 디스크 80% 미만 · 진행 중 회의 0 · .env 인코딩
+mise run deploy-ship $TAG     # compose 동기화 → 서버 pull → .env 태그 교체 → up -d → env 확인 → GC
+mise run deploy-status
 ```
 
-원격 명령은 항상 `bash -lc` 로 감싼다. 비로그인 ssh 셸은 PATH 에 docker compose 가 없다.
+`deploy-ship` 의 순서에는 이유가 있다.
+
+1. **compose 동기화가 이미지보다 먼저.** 2026-08-17 Better Auth 컷오버에서 이 단계가 없어 web 이 전면 500 이었다.
+   서버 파일이 최초 부트스트랩 버전이라 ADR-031 이 추가한 web.environment 5줄이 없었고
+   `BETTER_AUTH_SECRET` 이 빈 문자열로 주입됐다(`environment:` 치환은 미설정도 조용히 통과한다).
+2. **pull 이 `.env` 교체보다 먼저.** 없는 태그로 `.env` 를 바꾸면 `up` 만 실패하고 가짜 태그가 남아
+   다음 배포의 GC 보존 대상이 된다.
+3. 서버에 이미 있는 태그는 pull 하지 않는다 (태그 불변). 아래 비상 경로가 이 성질을 쓴다.
+
+**FE 빌드 인자** `NEXT_PUBLIC_*` 는 repo **Variables** 에 있다 (secrets 가 아니다 — 브라우저 번들에 실리는 공개 값).
+빌드타임 인라인이라 도메인이 바뀌면 변수를 고친 뒤 **새 커밋**으로 다시 빌드해야 한다 — 같은 sha 는 태그가 이미 있어 건너뛴다.
+GHCR 이 공개이므로 이미지 레이어 히스토리도 공개다 — 빌드 인자에 비밀을 넣지 않는다 (`docs/development/secrets.md`).
+
+```bash
+gh variable list --repo woosung-dev/kairos
+gh variable set NEXT_PUBLIC_API_URL --repo woosung-dev/kairos --body https://kairos-api.woosung.dev
+```
+
+### 비상 경로 — GitHub Actions · GHCR 장애 시
+
+2026-08 에 Actions 결제 실패로 워크플로가 아예 돌지 않은 전례가 있다. 그때는 맥에서 빌드해 SSH 로 올린다.
+이름은 GHCR 그대로 붙이므로 `deploy-ship` 이 서버에 있는 이미지를 보고 pull 을 건너뛴다.
+
+```bash
+TAG=sha-$(git rev-parse --short=7 HEAD)   # origin/main 과 같은 clean main 에서
+mise run deploy-build $TAG                # 맥 arm64 빌드 — deploy/oci/build.env 필요 (gitignore)
+docker save ghcr.io/woosung-dev/kairos-api:$TAG | gzip -1 | ssh oci-tokyo 'gunzip | docker load'
+docker save ghcr.io/woosung-dev/kairos-web:$TAG | gzip -1 | ssh oci-tokyo 'gunzip | docker load'
+mise run deploy-ship $TAG
+```
+
+나중에 CI 가 같은 sha 를 GHCR 에 올려도 서버는 맥 빌드본을 계속 쓴다 (같은 커밋이라 내용은 같다).
+
+### Phase A 전환 (1회 — 끝나면 이 절을 지운다)
+
+전환 직전 운영 = `e929a49` (맥 빌드, 옛 이름 `kairos-api:e929a49`). 같은 커밋을 CI 로 다시 빌드해 갈아 끼운다 —
+코드가 같으므로 문제가 생기면 원인은 파이프라인뿐이다.
+
+1. repo Variables `NEXT_PUBLIC_*` 등록 (`deploy/oci/build.env` 의 값, 빈 값은 건너뛴다)
+2. `gh workflow run release.yml --repo woosung-dev/kairos -f sha=<e929a49 의 40자 sha>` → success
+3. GitHub → Packages → `kairos-api` · `kairos-web` → Package settings → visibility **Public** (첫 push 는 비공개일 수 있다)
+4. 롤백 경로 고정 — 서버에서 운영 중인 맥 빌드에 GHCR 이름을 붙인다 (`deploy-rollback` 이 찾는 이름):
+   `docker tag kairos-api:e929a49 ghcr.io/woosung-dev/kairos-api:e929a49 && docker tag kairos-web:e929a49 ghcr.io/woosung-dev/kairos-web:e929a49`
+5. `mise run deploy-preflight` → `mise run deploy-ship sha-e929a49` → `mise run deploy-status`
+6. 실패하면 `mise run deploy-rollback e929a49` — 새 compose 그대로 4번에서 붙인 이름을 띄운다 (`.bak` 에 기대지 않는다.
+   `deploy-sync-config` 를 다시 돌리면 `.bak` 이 새 파일로 덮인다). 첫 시도에서 GC 는 `e929a49` 를 롤백용으로 남기고,
+   같은 태그로 재실행하면 GC 를 건너뛴다
+
+원격 명령은 항상 `bash -lc` (또는 `bash -ls`) 로 감싼다. 비로그인 ssh 셸은 PATH 에 docker compose 가 없다.
 
 ### 배포 전 확인
 
@@ -108,12 +140,11 @@ SELECT count(*) FROM meetings WHERE status IN ('transcribing','analyzing');
 구 이미지의 migrate 는 DB 의 새 리비전을 몰라 실패하고, 그러면 api·web 이 기동하지 않는다 (`docs/operations/deployment.md` 롤백 절).
 롤백 상태에서는 `--no-deps` 없는 `up -d` 를 쓰지 않는다 (`up -d api` 도 — `.env` 를 바꾼 뒤면 api 가 멈춘다). 다음 정방향 배포는 `mise run deploy-ship`.
 서버에 남는 것은 **운영중 + 직전 1개** 뿐이다 (`mise run deploy-gc` 가 매 배포마다 강제).
-그보다 오래된 태그는 서버에 없으므로 재빌드 후 재전송해야 한다.
+그보다 오래된 태그는 `deploy-rollback` 이 GHCR 에서 받아 온다 — 레지스트리가 이력을 보관한다.
+Phase A 이전 태그(`sha-` 없는 맥 빌드)는 GHCR 에 없다.
 
 ```bash
-ssh oci-tokyo "bash -lc 'cd ~/kairos && \
-  sed -i \"s/^KAIROS_API_TAG=.*/KAIROS_API_TAG=<이전>/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=<이전>/\" .env && \
-  docker compose -f docker-compose.prod.yml up -d --no-deps api web'"
+mise run deploy-rollback sha-<이전>   # 서버에 없으면 pull → .env 태그 교체 → up -d --no-deps api web
 ```
 
 마이그레이션은 자동 롤백되지 않는다. 스키마 변경은 expand-then-contract 로만 한다.
@@ -147,6 +178,27 @@ mise run deploy-gc <롤백용_태그>
 scp -r deploy/oci/backup oci-tokyo:~/kairos/     # 맥에서. 이후 서버에서 런북 §2 대로 crontab 등록
 ```
 
+## 호스트 공통 설정 — Kairos 는 소유하지 않는다
+
+서버 전체에 하나뿐인 설정 5개가 있다. Kairos 도 기대고 있지만 만든 곳은 다른 레포이고,
+**Kairos 레포는 이 중 어느 것도 쓰지 않는다** (2026-10-02 결정, ADR-028 D7 결정 5).
+
+| 설정 | 값 (2026-10-02 실측) | 소유 |
+|---|---|---|
+| Docker 로그 회전 `/etc/docker/daemon.json` | json-file 10m × 3 | truewords `setup-vm.sh`(없을 때만 씀) · quant-bridge `host-bootstrap.sh`(덮어씀) |
+| journald 상한 | 500M (`quantbridge.conf`) | quant-bridge |
+| swap | 4GB | truewords |
+| 디스크 경보 `dev.quantbridge.disk-guard` | 매시 :15, `/` 80% 이상이면 텔레그램 (회복 · 유닛 실패 알림 포함) | quant-bridge (user 타이머) |
+| 빌더 캐시 정리 | 주 1회, 168h 초과분 | quant-bridge `docker-reclaim` · truewords |
+
+Kairos 쪽 대응은 둘뿐이다.
+
+- `mise run deploy-preflight` 가 `/` 사용률 80% 이상이면 배포를 멈춘다 — disk-guard 와 같은 기준.
+- compose 의 `x-logging`(10m × 3)은 서비스 단위라 daemon.json 이 바뀌어도 Kairos 컨테이너 로그는 회전된다.
+
+★**quant-bridge 가 이 서버에서 빠지면 디스크 경보와 빌더 캐시 정리가 함께 사라진다.** 그때 경보를 남는 프로젝트로 옮긴다.
+지금 Kairos 에 따로 두지 않는 이유는 같은 경보가 두 개가 되기 때문이다.
+
 ## 함정
 
 - **`/health` 200 은 배포 검증이 아니다.** 플레이스홀더 키로도 200 이 난다. 인증까지 살아 있는지는
@@ -157,8 +209,8 @@ scp -r deploy/oci/backup oci-tokyo:~/kairos/     # 맥에서. 이후 서버에�
 - **원격 실행은 `bash -lc`.** 비로그인 셸의 PATH 문제.
 - **`docker compose down -v` 금지.** `-v` 는 `db-data` 볼륨을 지운다. 백업은 `backup/pg-backup.sh` 가
   cron 으로 돌 때만 존재한다 (`crontab -l | grep pg-backup`). 있어도 마지막 백업 이후 데이터는 잃는다.
-- **`docker system prune` / `docker image prune -a` 금지.** 이 호스트는 quantbridge·truewords 와
-  공유한다. 정리는 `mise run deploy-gc` 로만 — `kairos-api` / `kairos-web` 리포지토리로 한정한다.
+- **`docker system prune` / `docker image prune -a` 금지.** 이 호스트는 truewords·quantbridge·nexus-core 와
+  공유한다. 정리는 `mise run deploy-gc` 로만 — `kairos-api` / `kairos-web` 리포지토리(GHCR 이름 포함)로 한정한다.
 - **`docker images` 는 생성일순이 아니다.** 이 서버는 Docker 29 + containerd 이미지 스토어라
   **태그 알파벳순**으로 나온다 (2026-08-30 실측). "최신 N개만 남긴다" 류의 `head`/`tail` 컷은
   운영중 태그를 삭제 대상에 넣는다 — 보존할 태그를 **명시**해야 한다.
@@ -167,6 +219,7 @@ scp -r deploy/oci/backup oci-tokyo:~/kairos/     # 맥에서. 이후 서버에�
 
 ## 미착수 (BL 등재)
 
-- DB 백업 **cron 등록** — 스크립트는 준비됐다(위 "DB 백업"). 서버 crontab 등록은 사용자가 한다.
+- DB 백업 **cron 등록** — 스크립트는 준비됐다(위 "DB 백업"). 서버 crontab 등록은 사용자가 한다 (`docs/TODO.md` Gate 0 잔여 R4).
 - presigned URL 업로드 전환 — 100MB 초과 파일이 실제로 필요해지면.
-- GitHub Actions 자동 배포 — 수동 3회 성공 + 7일 무사고 후.
+- 자동 배포 (Phase B) — release.yml 에 배포 job 추가. 진입 조건은 ADR-028 D7 (수동 3회 연속 성공 · 7일 무사고 · 장시간 오디오 1건).
+- GHCR 보존 정책 (Phase C) — 태그가 쌓이기만 한다. GHCR 저장은 현재 무료라 급하지 않다.
