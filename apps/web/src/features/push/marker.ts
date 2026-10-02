@@ -4,16 +4,32 @@
 //   켰는가" 의 유일한 근거다. userId 는 `useMe()` 의 내부 users.id (auth_user.id 아님).
 // ★파싱 실패 = 없음. 키에 버전(v1)을 박아 두어 모양이 바뀌면 새 키로 옮긴다 (vercel client-localstorage-schema).
 // ★localStorage 는 사파리 비공개 모드 등에서 throw 할 수 있다 → 모든 접근을 감싼다.
-import { z } from "zod/v4";
+// ★검증은 손으로 쓴 타입 가드다 (zod 아님) — 이 모듈은 `(app)` 셸(PushSync·로그아웃 정리)이 import 해서
+//   zod 를 쓰면 모든 인증 라우트의 공용 청크에 zod 전체가 실린다 (GATE-PR2 bundle-conditional).
+//   `lib/pwa/push-notification.ts` 의 페이로드 가드와 같은 방식.
 
 export const PUSH_OWNER_MARKER_KEY = "kairos:push:v1";
 
-export const pushOwnerMarkerSchema = z.object({
-  userId: z.uuid(),
-  subscriptionId: z.uuid(),
-});
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export type PushOwnerMarker = z.infer<typeof pushOwnerMarkerSchema>;
+export interface PushOwnerMarker {
+  /** 내부 users.id */
+  readonly userId: string;
+  /** API-002 가 돌려준 push_subscriptions.id */
+  readonly subscriptionId: string;
+}
+
+function isUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_RE.test(value);
+}
+
+/** JSON.parse 결과 → 표식. 모양이 다르면 null (추가 필드는 버리고 두 필드만 돌려준다). */
+function parseOwnerMarker(value: unknown): PushOwnerMarker | null {
+  if (typeof value !== "object" || value === null) return null;
+  const { userId, subscriptionId } = value as Record<string, unknown>;
+  if (!isUuid(userId) || !isUuid(subscriptionId)) return null;
+  return { userId, subscriptionId };
+}
 
 export type MarkerStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -30,8 +46,7 @@ export function readOwnerMarker(storage: MarkerStorage | null): PushOwnerMarker 
   try {
     const raw = storage.getItem(PUSH_OWNER_MARKER_KEY);
     if (raw === null) return null;
-    const parsed = pushOwnerMarkerSchema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : null;
+    return parseOwnerMarker(JSON.parse(raw));
   } catch {
     return null;
   }

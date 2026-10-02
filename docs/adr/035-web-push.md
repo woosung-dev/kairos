@@ -97,14 +97,16 @@ _notify_meeting_finished  (전체 try/except — 어떤 실패도 회의 상태�
   전체를 3초 상한(`PUSH_CLEANUP_TIMEOUT_MS`, `:29`)으로 감싸고, 끝나면 ③ 표식 compare-and-delete. throw 하지 않는다.
   ①→② 순차였다면 느린 네트워크(①)가 3초를 다 써서 ②가 돌지 못하고, 로그아웃 뒤에도 이 기기가 푸시를 받는다.
 - ①은 SW 등록이 없어도 보낸다 — 같은 로드 안에 kill-switch 로 등록만 사라진 잔여를 지운다. 등록은
-  `getRegistration()` 1회로만 얻고 `serviceWorker.ready` 는 기다리지 않는다 (등록 없음이면 영원히 pending, ADR-034 D5).
+  `getRegistration()` 1회로만 얻고 `serviceWorker.ready` 는 기다리지 않는다 (등록 없음이면 영원히 pending — `docs/requirements/pwa.md` §4.5 등록 없음 상태 · §5.5 SW 등록 조회 규칙).
 - 같은 id 의 API-003 이 동기화와 로그아웃에서 겹치면 요청 1회·promise 공유 (`:82-99`).
-- **2차 방어선 — 앱 로드 동기화** (`:212-269` `syncPushOnAppLoad`, `hooks.ts:37-56` `usePushAppLoadSync`):
-  소유자 표식(`localStorage["kairos:push:v1"]` = `{userId, subscriptionId}`, zod 파싱)이 현재 사용자와 다르거나 없으면
+- **2차 방어선 — 앱 로드 동기화** (`:212-269` `syncPushOnAppLoad`, `hooks.ts:29-48` `usePushAppLoadSync`):
+  소유자 표식(`localStorage["kairos:push:v1"]` = `{userId, subscriptionId}`, 손으로 쓴 타입 가드로 파싱 — zod 가 아닌 이유는 이 모듈이 셸 공용 청크에 실려서다, GATE-PR2)이 현재 사용자와 다르거나 없으면
   서버를 부르지 않고 `unsubscribe()` 만 한다 (세션 만료 등 로그아웃 없이 계정이 바뀐 경우). 표식이 일치하면 API-002 를
   다시 보내 브라우저의 endpoint 교체·서버 행 유실을 복구한다 (`pushsubscriptionchange` 대신 — BL-PWA-9).
 - 동기화는 **계정당 1회**다 — 모듈 상태 `lastSyncedMeId` (EVAL-P2-1 D3). 로그아웃→다른 계정 로그인은 soft navigation 이라
-  JS 수명이 이어지므로 boolean 가드면 새 계정 기준 동기화를 건너뛴다.
+  JS 수명이 이어지므로 boolean 가드면 새 계정 기준 동기화를 건너뛴다. 로그아웃 정리는 시작할 때 이 가드를 `null` 로
+  되돌린다 (`hooks.ts:50-61`) — 같은 계정이 다시 로그인했는데 ①·②가 둘 다 실패했던 경우에도 다음 동기화(표식 없음 →
+  unsubscribe)가 돈다.
 - 서버 백스톱: API-002 는 `ON CONFLICT (endpoint)` upsert 라 같은 기기에서 다른 사용자가 구독하면 그 행이 현재 사용자로
   rebind 된다 (`apps/api/src/push/repository.py` `upsert`).
 
@@ -145,6 +147,12 @@ _notify_meeting_finished  (전체 try/except — 어떤 실패도 회의 상태�
 형식 오류는 warning 만 (부팅 차단 금지, C-18). build.env 가 아니라 api 컨테이너 런타임 env 다 — 공개키는 API-001 로 FE 에
 준다 (`NEXT_PUBLIC_*` 빌드 인라인을 피한다, pwa.md C-14). 개인키는 raw 32바이트 base64url 만 정상으로 본다 (PEM 은 BL-PWA-19).
 생성 명령은 `apps/api/src/push/CONTEXT.md` §7.
+
+**배포** — 마이그레이션 `563de342c8ae` 가 있어 서버 배포 스크립트가 스키마 관문에서 rc 3 으로 멈춘다
+(`deploy/oci/bin/kairos-deploy.sh:112-123`, 아무것도 바꾸지 않음). 승인 경로는 맥 `mise run deploy-ship <tag> --migrate`
+또는 Actions `release.yml` 의 `deploy-migrate` job 승인 (`docs/operations/deployment.md:65`). VAPID 3개는 배포 **전에** 서버
+`~/kairos/.env` 에 넣는다 — api 는 `env_file: [.env]` 로 읽어서(`deploy/oci/docker-compose.prod.yml:73`) 나중에 넣으면 api
+컨테이너를 다시 만들어야 반영된다. 비우면 알림 기능만 꺼진다.
 
 ---
 
@@ -194,6 +202,6 @@ _notify_meeting_finished  (전체 try/except — 어떤 실패도 회의 상태�
 - alembic dry-run: 가산형 — `CREATE TABLE push_subscriptions` 1 + 명시 이름 제약 4 (오케스트레이터 실측).
 - 계약: `mise run contracts-check` drift 0 (API-001~003 추가).
 - FE vitest: 동기화·로그아웃·키 불일치·계정 전환 재동기화·표식·SW `push`/`notificationclick`·딥링크.
-- e2e (오케스트레이터, EVAL-P2-1): public-only 18 pass · chromium 42 pass / 11 skip · `push.spec.ts` 9 ✓.
+- e2e (오케스트레이터, origin/main 병합 `1063903` 후 재실행): public-only 18 passed · chromium 42 passed / 11 skipped (`push.spec.ts` 9 포함). GEN-P2-3 수정 뒤 다시 돌리면 오케스트레이터가 값을 덮어쓴다.
 - 수동: 실푸시 수신 T-PWA-52(완료)·53(실패)·54(계정 전환 미수신)는 **오케스트레이터 실브라우저 확인 대기**. iOS T-PWA-55 는 별도.
 - 행별 상태·기대값의 정본은 test-matrix 다.

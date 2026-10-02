@@ -317,7 +317,7 @@ _notify_meeting_finished  — 전체를 try/except Exception 으로 감싼다 (�
 
 새 feature `apps/web/src/features/push/` (`api.ts`·`hooks.ts`·`components/`) — F-9 (API 호출은 feature `api.ts` 만), wire 타입은 `types/api.gen.ts` 에서 (I-22).
 
-**소유자 표식** — `localStorage["kairos:push:v1"] = { userId: <users.id>, subscriptionId: <uuid> }`, zod v4 스키마로 파싱 (파싱 실패 = 없음). `userId` 는 `useMe()` 의 내부 id (`apps/web/AGENTS.md:66-69`).
+**소유자 표식** — `localStorage["kairos:push:v1"] = { userId: <users.id>, subscriptionId: <uuid> }`, 손으로 쓴 타입 가드(UUID 정규식 + `typeof`)로 파싱 (파싱 실패 = 없음, 추가 필드는 버린다). zod 를 쓰지 않는 이유: 표식 모듈은 `(app)` 셸(앱 로드 동기화·로그아웃 정리)이 import 해서, zod 를 쓰면 모든 인증 라우트의 공용 청크에 zod 전체가 실린다 (GATE-PR2). `userId` 는 `useMe()` 의 내부 id (`apps/web/AGENTS.md:66-69`).
 - **표식 삭제는 compare-and-delete** — 흐름 시작 때 읽은 `subscriptionId` 와 지금 저장된 값이 같을 때만 지운다 (그 사이 다른 탭·켜기 흐름이 새 표식을 썼으면 남긴다).
 - **API-003 DELETE 는 진행 중 promise 를 공유한다** — 같은 `subscriptionId` 에 대해 앱 로드 동기화와 로그아웃 ① 이 겹치면 요청은 1번만 나가고 둘 다 같은 promise 를 기다린다 (모듈 수준 `Map<subscriptionId, Promise>`).
 
@@ -380,6 +380,7 @@ _notify_meeting_finished  — 전체를 try/except Exception 으로 감싼다 (�
 - 셋 다 있어야 활성. 형식 오류는 **warn-only** (부팅 차단 금지, C-18). CI fake env 추가 불필요.
 - 키 형식 = **raw base64url** (개인키 32바이트·43자, 공개키 uncompressed 65바이트·87자) — 구현 라운드에서 확정. 생성 명령은 `apps/api/src/push/CONTEXT.md` §7, "설정 키로 서명 → 공개키로 검증" 왕복은 `apps/api/tests/push/test_push_sender.py` `test_vapid_raw_key_signs_and_settings_public_key_verifies` 가 고정한다. PEM 은 정상 형식으로 보지 않는다 (warning 만, BL-PWA-19).
 - 런타임 env 다 (build.env 아님): `deploy/oci/.env.example` 에 3줄 추가. 운영 서버 `.env` 반영은 사용자 실행 (SSH).
+- **배포 순서**: VAPID 3개는 배포 **전에** 서버 `~/kairos/.env` 에 넣는다 — api 가 `env_file: [.env]` 로 읽어서 (`deploy/oci/docker-compose.prod.yml:73`) 나중에 넣으면 api 컨테이너를 다시 만들어야 한다. 비우면 알림 기능만 꺼진다. 마이그레이션 `563de342c8ae` 때문에 `kairos-deploy.sh` 가 스키마 관문에서 rc 3 으로 멈춘다 (`deploy/oci/bin/kairos-deploy.sh:112-123`) → 맥 `mise run deploy-ship <tag> --migrate` 또는 Actions `release.yml` `deploy-migrate` job 승인 (`docs/operations/deployment.md:65`).
 
 ### 5.8 PR-2 변경 파일 (제안)
 

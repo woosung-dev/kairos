@@ -32,11 +32,14 @@
 - [x] 2026-10-02 Phase 5 전체 스택 환경 (kairos-qa-db · BE :8000 — EVAL-P2-1 chromium e2e 실행 기준. dev VAPID 실발송은 T-PWA-52 에서 확인)
 - [x] 2026-10-02 Phase 6 구현 — IMPL-P2-BE (BE `push/` · 마이그레이션 `563de342c8ae` · pipeline 훅) → IMPL-P2-FE (FE 구독·로그아웃 ①∥②·동기화·딥링크·SW) → IMPL-P2-FE-b (T-PWA-49 rate limit flake → sign-out stub)
 - [x] 2026-10-02 Phase 7 자동 평가 — EVAL-P2-1 PASS (blocker·major 0). pytest 1082 (기준선 996) · alembic dry-run 가산형 · contracts drift 0 · public-only 18 · chromium 42 pass/11 skip · push.spec 9 ✓
-- [x] 2026-10-02 GEN-P2-2 minor 3건 수정 (D1 비ASCII 422 · D2 VAPID 키 불일치 정리 · D3 계정 전환 재동기화) — pytest 1086 · vitest 59 files/415 · tsc 0 · eslint 0 · contracts drift 0
-- [ ] e2e 재실행 (GEN-P2-2 D2·D3 이후 — chromium `push.spec.ts`)
-- [ ] 실푸시 수신 T-PWA-52·53·54 — 오케스트레이터 실브라우저 확인 대기
-- [x] 2026-10-02 Atomic Update — ADR-035 · erd(ENT-001) · CONTEXT-MAP(§4.1 BE 18 · I-13 · §4.3 FE 18) · `apps/api/CONTEXT.md`(§4 · B-16 · §6) · `apps/web/CONTEXT.md`(§3 · §5) · directory-map · secrets(VAPID) · BL-PWA-4·5·6·7·9·12·14 + 15~19 · pwa.md · `apps/api/src/push/CONTEXT.md`
-- [ ] Phase 8 게이트 · 커밋 → 푸쉬 → PR (각 승인) → CI green → 사용자 머지
+- [x] 2026-10-02 GEN-P2-2 minor 3건 수정 (D1 비ASCII 422 · D2 VAPID 키 불일치 정리 · D3 계정 전환 재동기화) — pytest 1086 · vitest 59 files/415 · tsc 0 · eslint 0 (변경 파일) · contracts drift 0
+- [x] 2026-10-02 GEN-P2-3 셸 번들·가드·문서 (`marker.ts` zod 제거 · `use-push-settings.ts` 분리 · 로그아웃 시 `lastSyncedMeId` 초기화 · 배포 안내 · BL-PWA-20) — pytest 1086 · vitest 59 files/423 · tsc 0 · eslint 0 (변경 파일). 번들 크기는 오케스트레이터 재빌드로 확인
+- [x] 2026-10-02 e2e 재실행 (오케스트레이터, GEN-P2-3 최종 빌드) — public-only 18 passed · chromium 41 passed / 2 failed / 10 skipped (`push.spec.ts` 9 전부 통과, 실패 2건은 main 에도 재현 → BL-PWA-21)
+- [x] 2026-10-02 실푸시 수신 T-PWA-52·53·54 — 실제 Chrome + FCM, 3/3 PASS (완료 6초 · 실패 2초 · 계정 전환 미수신)
+- [x] 2026-10-02 best-practices 게이트 — GATE-PR2 REVISE (FAIL 1) → GEN-P2-3 → GATE-PR2-R2 PASS (`evidence/pr2-best-practices.md`) · arm64 api 이미지 빌드 OK
+- [x] 2026-10-02 Atomic Update — ADR-035 · erd(ENT-001) · CONTEXT-MAP(§4.1 BE 18 · I-13 · §4.3 FE 18) · `apps/api/CONTEXT.md`(§4 · B-16 · §6) · `apps/web/CONTEXT.md`(§3 · §5) · directory-map · secrets(VAPID) · BL-PWA-4·5·6·7·9·12·14 + 15~22 · pwa.md · `apps/api/src/push/CONTEXT.md`
+- [ ] Phase 8 커밋 → 푸쉬 → PR → CI green → 사용자 머지
+- [ ] 배포 (사용자): 서버 `.env` VAPID 3줄 → 머지 → Release images `deploy=true` → `oci-production` · `oci-production-migrate` 승인 → 운영 https 실푸시 확인
 
 ## 로컬 정리 절차 (작업 종료 시)
 - `chrome://serviceworker-internals` 에서 localhost:3005 등록 제거 · 설치한 앱 제거

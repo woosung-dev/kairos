@@ -41,7 +41,7 @@ apps/web/src/
 │   ├── shared/    도메인 횡단 공통 (ItemPromoteModal, ExportButton)
 │   └── onboarding/
 ├── features/      도메인별 비즈니스 레이어 (FSD)
-│   ├── actions/  audit/  feedback/  home/  inbox/  integrations/  meetings/
+│   ├── actions/  audit/  auth/  feedback/  home/  inbox/  integrations/  meetings/
 │   ├── members/  memory/  notes/  onboarding/  projects/  push/  rag/  sources/
 │   ├── upload/  workspaces/
 │   └── 각 feature: api.ts + hooks.ts + types.ts + components/

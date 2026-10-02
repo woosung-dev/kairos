@@ -1,24 +1,16 @@
 "use client";
-// 웹 푸시 훅 — API-001 조회 · SCR-002 상태·토글 · 앱 로드 동기화 · 로그아웃 정리
-// (docs/requirements/pwa.md §5.5 · §5.6)
-import { useCallback, useEffect, useState } from "react";
+// 웹 푸시 셸 훅 — API-001 조회 · 앱 로드 동기화 · 로그아웃 정리 (docs/requirements/pwa.md §5.5)
+// ★`(app)` 셸(PushSync)과 헤더(로그아웃)가 import 해 모든 인증 라우트의 공용 청크에 실린다.
+//   설정 화면 전용 로직(SCR-002 상태·토글)은 `use-push-settings.ts` 에 둔다 (GATE-PR2).
+import { useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
 
 import { useMe } from "@/features/auth/hooks";
 import { pushKeys } from "@/lib/query-keys";
 import { useApiClient } from "@/lib/use-api-client";
 
 import { fetchPushConfig } from "./api";
-import {
-  createBrowserPushDeps,
-  disablePushOnDevice,
-  enablePush,
-  resolvePushDeviceState,
-  syncPushOnAppLoad,
-  type PushDeviceState,
-} from "./flows";
-import { readPushEnvironment } from "./utils";
+import { createBrowserPushDeps, disablePushOnDevice, syncPushOnAppLoad } from "./flows";
 
 export function usePushConfig() {
   const api = useApiClient();
@@ -55,68 +47,15 @@ export function usePushAppLoadSync(): void {
   }, [api, meId, isConfigSettled, vapidPublicKey]);
 }
 
-/** 로그아웃 앞단 정리 — signOut 이전에 await 한다 (이후엔 토큰이 401). 3초 안에 끝나고 throw 하지 않는다. */
+/**
+ * 로그아웃 앞단 정리 — signOut 이전에 await 한다 (이후엔 토큰이 401). 3초 안에 끝나고 throw 하지 않는다.
+ * 시작할 때 동기화 가드를 비운다 — 같은 JS 수명에서 **같은 계정**이 다시 로그인했는데 ①·②가 둘 다
+ * 실패했으면 남은 구독을 다음 동기화(표식 없음 → unsubscribe)가 끊어야 한다.
+ */
 export function usePushLogoutCleanup(): () => Promise<void> {
   const api = useApiClient();
-  return useCallback(() => disablePushOnDevice(api, createBrowserPushDeps()), [api]);
-}
-
-export type PushSettingsState = "loading" | PushDeviceState;
-
-/** SCR-002 — 마운트 시 상태 판정, 토글 클릭 때만 켜기(권한 요청)·끄기. */
-export function usePushSettings(vapidPublicKey: string | null) {
-  const api = useApiClient();
-  const { data: me } = useMe();
-  const meId = me?.id;
-  const [state, setState] = useState<PushSettingsState>("loading");
-  const [isBusy, setIsBusy] = useState(false);
-
-  useEffect(() => {
-    if (!meId) return;
-    let isActive = true;
-    const deps = createBrowserPushDeps();
-    const evaluate = () => {
-      const env = readPushEnvironment();
-      void resolvePushDeviceState(meId, vapidPublicKey, env, deps).then((next) => {
-        if (!isActive) return;
-        setState(next);
-        // 등록 없음 — prod 첫 방문은 registrar 가 load 뒤 등록하고 claim 하면 controllerchange 가 온다.
-        // dev·kill-switch 에선 오지 않아 '사용 불가' 로 남는다 (pwa.md §5.6).
-        if (next === "unavailable" && env.hasServiceWorker) {
-          navigator.serviceWorker.addEventListener("controllerchange", evaluate, { once: true });
-        }
-      });
-    };
-    evaluate();
-    return () => {
-      isActive = false;
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.removeEventListener("controllerchange", evaluate);
-      }
-    };
-  }, [meId, vapidPublicKey]);
-
-  const handleToggle = async () => {
-    if (!meId || isBusy || (state !== "on" && state !== "off")) return;
-    setIsBusy(true);
-    try {
-      const deps = createBrowserPushDeps();
-      if (state === "on") {
-        // 끄기는 실패해도 UI 를 끈다 (best-effort, pwa.md §5.5)
-        await disablePushOnDevice(api, deps);
-        setState("off");
-        return;
-      }
-      if (!vapidPublicKey) throw new Error("VAPID public key is missing");
-      const outcome = await enablePush(api, { meId, vapidPublicKey }, deps);
-      setState(outcome === "dismissed" ? "off" : outcome);
-    } catch {
-      // 상태를 바꾸지 않았으므로 토글은 이전 값 그대로다 (원복)
-      toast.error("알림 설정을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.");
-    } finally {
-      setIsBusy(false);
-    }
-  };
-
-  return { state, isBusy, handleToggle };
+  return useCallback(() => {
+    lastSyncedMeId = null;
+    return disablePushOnDevice(api, createBrowserPushDeps());
+  }, [api]);
 }

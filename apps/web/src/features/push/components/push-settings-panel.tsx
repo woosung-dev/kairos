@@ -3,7 +3,7 @@
 // SCR-002 알림 설정 — `/settings?tab=notifications` (docs/requirements/pwa.md §5.6).
 // 탭 노출(API-001 isEnabled)은 설정 페이지가 정한다. 이 패널은 이 기기·이 계정의 구독 상태만 다룬다.
 // 등록 없음은 탭 숨김이 아니라 '사용 불가' 상태다 — 탭은 서버 값 하나에만 의존한다 (§5.6 근거).
-import { usePushSettings, type PushSettingsState } from "../hooks";
+import { usePushSettings, type PushSettingsState } from "../use-push-settings";
 import { IosInstallHint } from "./ios-install-hint";
 
 const STATUS_TEXT: Record<PushSettingsState, string> = {

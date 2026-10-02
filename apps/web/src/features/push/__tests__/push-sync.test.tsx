@@ -1,13 +1,15 @@
 // T-PWA-51 앱 로드 동기화 — 표식 일치 → PUT 정확히 1회 (재렌더·라우트 이동(셸 재마운트)에도 추가 0)
-// + 계정 전환 시 재동기화 (EVAL-P2-1 D3) · API-001 공개키 전달 (D2) · API-001 실패 시 키 없이 동기화.
+// + 계정 전환 시 재동기화 (EVAL-P2-1 D3) · API-001 공개키 전달 (D2) · API-001 실패 시 키 없이 동기화
+// + 로그아웃 정리가 가드를 비운다 (같은 계정 재로그인 시 재동기화, GATE-PR2 경미 6).
 // 계정당 1회 가드(lastSyncedMeId)는 모듈 상태라 이 파일의 테스트는 순서대로 이어진다 —
 // 테스트마다 아직 동기화하지 않은 계정 id 를 쓴다 (vitest 는 파일마다 모듈을 새로 읽는다).
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, waitFor } from "@testing-library/react";
+import { act, render, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ApiClient } from "@/lib/api-client";
 import { PushSync } from "../components/push-sync";
+import { usePushLogoutCleanup } from "../hooks";
 import { PUSH_OWNER_MARKER_KEY } from "../marker";
 import { base64UrlToUint8Array } from "../utils";
 
@@ -21,11 +23,12 @@ const STALE_KEY_BYTES = new Uint8Array(65).fill(7);
 
 type FetchFn = (path: string, init?: RequestInit) => Promise<unknown>;
 
-const { fetchMock, meState, configState } = vi.hoisted(() => ({
+const { fetchMock, meState, configState, deleteState } = vi.hoisted(() => ({
   fetchMock: vi.fn<FetchFn>(),
   meState: { current: undefined as { id: string } | undefined },
   // API-001 응답을 테스트가 정한다 — pending 이면 resolve 를 쥐고 있다
   configState: { respond: (): Promise<unknown> => Promise.resolve(undefined) },
+  deleteState: { shouldFail: false },
 }));
 
 const api: ApiClient = {
@@ -41,6 +44,7 @@ vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }))
 fetchMock.mockImplementation((path, init) => {
   if (path === "/users/me/push-config") return configState.respond();
   if (init?.method === "PUT") return Promise.resolve({ id: SUBSCRIPTION_ID });
+  if (init?.method === "DELETE" && deleteState.shouldFail) return Promise.reject(new Error("offline"));
   return Promise.resolve(undefined);
 });
 
@@ -85,6 +89,7 @@ afterEach(() => {
   Reflect.deleteProperty(navigator, "serviceWorker");
   localStorage.clear();
   fetchMock.mockClear();
+  deleteState.shouldFail = false;
 });
 
 describe("T-PWA-51 usePushAppLoadSync", () => {
@@ -148,5 +153,33 @@ describe("T-PWA-51 usePushAppLoadSync", () => {
     await waitFor(() => expect(callsOf("PUT")).toHaveLength(1));
     expect(callsOf("DELETE")).toHaveLength(0);
     expect(subscription.unsubscribe).not.toHaveBeenCalled();
+  });
+
+  it("로그아웃 정리가 가드를 비운다 — 같은 계정 재로그인 시 다시 동기화 (①·② 둘 다 실패했던 구독을 끊는다)", async () => {
+    // 직전 테스트가 THIRD_USER 로 동기화했다 — 같은 계정이면 가드가 막는다
+    const subscription = installRegistrationWithSubscription(base64UrlToUint8Array(VAPID_PUBLIC_KEY));
+    setMarker(THIRD_USER);
+    configState.respond = () => Promise.resolve({ isEnabled: true, vapidPublicKey: VAPID_PUBLIC_KEY });
+    meState.current = { id: THIRD_USER };
+    const Wrapper = createWrapper();
+
+    const view = render(<PushSync />, { wrapper: Wrapper });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(syncCalls()).toBe(0);
+
+    // 로그아웃 — ① DELETE 실패 ∥ ② unsubscribe 실패 → 표식만 지워지고 구독은 남는다
+    deleteState.shouldFail = true;
+    subscription.unsubscribe.mockImplementationOnce(() => Promise.reject(new Error("unsubscribe failed")));
+    const { result } = renderHook(() => usePushLogoutCleanup(), { wrapper: Wrapper });
+    await act(() => result.current());
+    expect(callsOf("DELETE")).toHaveLength(1);
+    expect(subscription.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(PUSH_OWNER_MARKER_KEY)).toBeNull();
+
+    // 같은 계정으로 다시 로그인 — `(app)` 셸이 다시 마운트된다. 표식 없음 → 서버 호출 없이 unsubscribe
+    view.unmount();
+    render(<PushSync />, { wrapper: Wrapper });
+    await waitFor(() => expect(subscription.unsubscribe).toHaveBeenCalledTimes(2));
+    expect(callsOf("PUT")).toHaveLength(0);
   });
 });

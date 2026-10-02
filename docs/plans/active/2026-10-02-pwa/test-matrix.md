@@ -82,9 +82,9 @@
 | REQ-009 | T-PWA-49 | 로그아웃 순서 — ① DELETE ∥ ② unsubscribe (`Promise.allSettled`, 요청은 ①이 먼저, 전체 3초 상한) | chromium (PushManager stub + **sign-out stub** — 실 로그인 0, BL-PWA-15) | △ E2E_ENABLED | **전제: prod 빌드 + SW 등록·제어 상태**. 네트워크 로그에서 `DELETE …/push-subscriptions/{id}` 가 **로그아웃 클릭 이후 · `POST /api/auth/sign-out` 이전** · 도착지 `/` (랜딩 — `header.tsx:181` `router.push("/")`) · `unsubscribe` 1회 · 표식 삭제. DELETE 가 응답하지 않아도 로그아웃 완료 (추가 지연 ≤ 3초 — ②는 ①을 기다리지 않는다, vitest 가 고정). 등록 없음 케이스(`serviceWorkers: "block"`): 표식은 **로드 후 — 앱 로드 동기화가 끝난 뒤** (`GET /users/me` 응답 + `networkidle` 이후) `page.evaluate` 로 심는다 (먼저 심으면 동기화가 DELETE·삭제를 해 버려 로그아웃 ① 을 검증하지 못한다) → 로그아웃이 대기 없이 완료 (`/` 도달, 추가 지연 ≤ 3초) · 동기화+로그아웃 전체에서 DELETE 정확히 1회 (클릭 이후·sign-out POST 이전) · 표식 삭제 |
 | REQ-009 | T-PWA-50 | 계정 전환 (표식 불일치) + 등록 없음 분기 | vitest (동기화 로직) | ✅ | 등록 있음: 구독 있음 + 표식 userId≠me.id → `unsubscribe` 1회, PUT 0 · 표식 없음 → `unsubscribe` 1회, PUT 0 · 구독 없음 → 표식 삭제. **등록 없음 (`getRegistration()` → `undefined`)**: 표식 userId==me.id → DELETE(API-003) 1회 후 표식 삭제 (DELETE 실패·3초 타임아웃이어도 삭제) · 표식 불일치 → 네트워크 0 + 표식 삭제 · 표식 없음 → 네트워크 0 · 세 경우 모두 `ready` 접근 0. **compare-and-delete**: DELETE 대기 중 표식이 다른 `subscriptionId` 로 바뀌면 삭제하지 않음. **promise 공유**: 동기화 DELETE 가 진행 중일 때 로그아웃 정리를 부르면 DELETE 요청 1회, 두 호출이 같은 promise 로 끝남. **VAPID 키 불일치** (구독 `applicationServerKey` ≠ API-001 공개키, EVAL-P2-1 D2): 표식 일치 → DELETE(표식 id) 1 · unsubscribe 1 · 표식 삭제 · PUT 0 (DELETE hang 이어도 unsubscribe 는 즉시, 3초 뒤 표식 삭제) · 표식 불일치 → unsubscribe 만, 네트워크 0 · 공개키 `null` → 비교 생략(PUT 1) · SCR-002 판정 → 키 다르면 `off` |
 | REQ-009 | T-PWA-51 | 앱 로드 동기화 | vitest | ✅ | 표식 일치 → PUT 정확히 1회 (재렌더·라우트 이동에도 추가 0) · `me` 와 API-001 이 모두 끝나기 전 PUT 0 · **같은 JS 수명에서 계정이 바뀌면 다시 동기화** (`lastSyncedMeId`, EVAL-P2-1 D3) · API-001 실패 → 키 비교 없이 동기화 |
-| REQ-008·009 | T-PWA-52 | 실푸시 수신 — 완료 | Claude in Chrome 수동 (로컬 전체 스택, dev VAPID) | ❌ **오케스트레이터 실브라우저 확인 대기** (결과: ) | 알림 켜기 → 짧은 텍스트 캡처 업로드 → OS 알림 "회의 처리 완료" 수신 · 클릭 → `/meetings/<id>` 로 열림/포커스 · 알림 본문에 회의 제목 없음 |
-| REQ-008·009 | T-PWA-53 | 실푸시 수신 — 실패 | Claude in Chrome 수동 | ❌ **오케스트레이터 실브라우저 확인 대기** (결과: ) | 처리 실패를 유도한 업로드 → "회의 처리 실패" 수신 · 클릭 → 해당 회의 상세 |
-| REQ-009 | T-PWA-54 | 계정 전환 미수신 | Claude in Chrome 수동 (2계정) | ❌ **오케스트레이터 실브라우저 확인 대기** (결과: ) | A 알림 켜기 → 로그아웃 → 같은 Chrome 에 B 로그인 → A 의 회의를 다른 컨텍스트에서 완료시킴 → 이 기기 알림 0 · 서버 A 행은 삭제됐거나 다음 발송에서 404/410 정리 |
+| REQ-008·009 | T-PWA-52 | 실푸시 수신 — 완료 | 실제 Chrome 자동 (로컬 전체 스택, dev VAPID) — Claude in Chrome 은 사용자 Chrome 의 알림 권한이 '차단'으로 바뀌어 대체 | ✅ PASS (2026-10-02 · Google Chrome (Playwright `channel: "chrome"` 영속 프로필 + `grantPermissions`) · macOS · 로컬 QA 스택 :3005/:8000 · dev VAPID · FCM 실배달) — capture 202 → 6초 뒤 "회의 처리 완료" · 본문 일반 문구 (제목 없음) · `data.url` = `/meetings/<id>?workspace=<wid>`. 클릭 자체는 실브라우저로 누르지 않았다 (클릭 → 경로 조립은 vitest T-PWA-47) | 알림 켜기 → 짧은 텍스트 캡처 업로드 → OS 알림 "회의 처리 완료" 수신 · 클릭 → `/meetings/<id>` 로 열림/포커스 · 알림 본문에 회의 제목 없음 |
+| REQ-008·009 | T-PWA-53 | 실푸시 수신 — 실패 | 실제 Chrome 자동 (위와 같음) + Gemini 키를 일부러 틀린 BE | ✅ PASS — 2초 뒤 "회의 처리 실패" · BE 로그 `push_dispatch_done ... sent=1 failed=0 pruned=0` · 로그에 endpoint 0회. 클릭은 위와 같이 vitest 담당 | 처리 실패를 유도한 업로드 → "회의 처리 실패" 수신 · 클릭 → 해당 회의 상세 |
+| REQ-009 | T-PWA-54 | 계정 전환 미수신 | 실제 Chrome 자동 (2계정, owner 회의는 브라우저 밖 세션으로 생성) | ✅ PASS — 로그아웃 353 ms · 기기 구독·표식 삭제 · DELETE 204 · DB `push_subscriptions` 0행 · member 로그인 후 owner 회의 completed → 16초 대기 → 이 기기 알림 0건 | A 알림 켜기 → 로그아웃 → 같은 Chrome 에 B 로그인 → A 의 회의를 다른 컨텍스트에서 완료시킴 → 이 기기 알림 0 · 서버 A 행은 삭제됐거나 다음 발송에서 404/410 정리 |
 | REQ-011 | T-PWA-55 | iOS 설치 앱 푸시 | iOS 실기기 (사용자) | ❌ | iOS 16.4+ 홈 화면 앱에서 알림 켜기 → 완료 알림 수신 → 클릭 시 앱 안에서 상세 열림 |
 | REQ-011 | T-PWA-56 | iOS 안내 표시 조건 | vitest + Playwright MCP (UA·`display-mode` 에뮬레이션) | ✅ (vitest) / ❌ (MCP) | iPhone UA + 비standalone → `[data-testid=ios-install-hint]` 표시 · iPadOS(MacIntel+touch) 동일 · standalone → 미표시 · Android·데스크톱 → 미표시 |
 | REQ-009 | T-PWA-57 | 워크스페이스 딥링크 — 판정·호출 | vitest (훅 + mock store·queryClient·router) | ✅ | pwa.md §5.5 딥링크 표의 7개 조건 각각: 파라미터 없음 → 전환 0·replace 0 · 비UUID → 전환 0·replace 1 · 목록 로딩 중 → 전환 0·replace 0 · `me` 로딩 중 / 활성 ws `null` / 활성 ws 가 목록 밖(self-heal 대기) → 전환 0·replace 0, self-heal 로 활성이 목록 안 값이 된 뒤에야 판정 (`eval-spec3/deeplink-selfheal-race.cjs` S2~S4 를 회귀 케이스로 — 부모 self-heal 을 함께 렌더해 최종 활성 = 파라미터 wid) · 같은 wid → 전환 0·replace 1 · 멤버+다른 wid → `setActiveWorkspaceId` 1회 (store 소유자 == me.id) 또는 `activateWorkspaceForUser(me.id, wid)` 1회 (소유자 없음·다름) + `invalidateQueries` 1회 (predicate 가 `["workspaces","list"]` 에 false) + toast 1회 (`“<ws명>” 워크스페이스로 전환했습니다`) + `router.replace("/meetings/<mid>")` 1회 · 비멤버 → 전환 0·toast 0·replace 1. 공통: `queryClient.clear` 0 · `router.refresh` 0 · 재렌더 2회 후에도 전환 추가 0 |
@@ -95,13 +95,15 @@
 
 | 게이트 | 결과 | 출처 |
 |---|---|---|
-| pytest 전체 (T-PWA-30~43·58) | 1082 passed (기준선 996) → GEN-P2-2 후 **1086 passed** (D1 회귀 4건 추가) | EVAL-P2-1 오케스트레이터 · GEN-P2-2 `be-test.sh` |
+| pytest 전체 (T-PWA-30~43·58) | 1082 passed (기준선 996) → GEN-P2-2 후 **1086 passed** (D1 회귀 4건 추가) → GEN-P2-3 병합 후 재실행 1086 passed | EVAL-P2-1 오케스트레이터 · GEN-P2-2·GEN-P2-3 `be-test.sh` |
 | alembic dry-run (T-PWA-43) | 가산형 — `CREATE TABLE push_subscriptions` 1 + 명시 이름 제약 4 | 오케스트레이터 |
 | 계약 drift (T-PWA-44) | 0 (GEN-P2-2 `mise run --force contracts` 후 sha 동일) | 오케스트레이터 · GEN-P2-2 |
-| vitest 전체 (T-PWA-45~47·50·51·56·57) | 59 files / **415 passed** · tsc 0 · eslint 0 (변경 파일) | GEN-P2-2 |
-| e2e public-only | 18 pass | EVAL-P2-1 오케스트레이터 |
-| e2e chromium (T-PWA-48·49·59 포함) | 42 pass / 11 skip · `push.spec.ts` 9 ✓ | EVAL-P2-1 오케스트레이터 — GEN-P2-2 의 D2·D3(동기화가 API-001 응답 뒤로) 이후 재실행 필요 |
-| 실푸시 T-PWA-52·53·54 | **오케스트레이터 실브라우저 확인 대기** | — |
+| vitest 전체 (T-PWA-45~47·50·51·56·57) | 59 files / 415 passed (GEN-P2-2) → **423 passed** (GEN-P2-3 — 표식 경계 · 로그아웃 가드) · tsc 0 · eslint 0 (변경 파일) | GEN-P2-2 · GEN-P2-3 |
+| e2e public-only | 18 passed | 오케스트레이터 — GEN-P2-3 최종 빌드 |
+| e2e chromium (T-PWA-48·49·59 포함) | 41 passed / 2 failed / 10 skipped (`push.spec.ts` 9 전부 통과). 실패 2건 `home.spec.ts:34`·`mobile-responsive.spec.ts:52` 는 main `ef79e3c` 빌드에서도 실패 → BL-PWA-21 | 오케스트레이터 — GEN-P2-3 최종 빌드 (병합 직후 실행은 42 passed / 11 skipped) |
+| 실푸시 T-PWA-52·53·54 | 3/3 PASS (완료 6초 · 실패 2초 · 계정 전환 미수신) | 오케스트레이터 — 최종 빌드, 실제 Chrome + FCM |
+| best-practices 게이트 | GATE-PR2 REVISE (FAIL 1 zod 셸 번들) → GATE-PR2-R2 **PASS** (layout 그룹 144,737 B gz) | 새 Evaluator 2회 (`evidence/pr2-best-practices.md`) |
+| arm64 api 이미지 | `docker build --platform linux/arm64` 성공 · push 의존성 import OK · cryptography 50.0.2 | 오케스트레이터 |
 | iOS T-PWA-55 | 미실행 (사용자 실기기) | — |
 
 ## 증거 표준 (`AGENTS.md` §4)

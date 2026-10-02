@@ -161,12 +161,37 @@ describe("T-PWA-45 등록 없음 (getRegistration → undefined)", () => {
 describe("T-PWA-45 표식 파싱", () => {
   it.each([
     ["깨진 JSON", "{not json"],
+    ["JSON null", "null"],
+    ["JSON 문자열", JSON.stringify(ME)],
+    ["JSON 숫자", "42"],
     ["uuid 아닌 userId", JSON.stringify({ userId: "me", subscriptionId: SUBSCRIPTION_ID })],
+    ["uuid 아닌 subscriptionId", JSON.stringify({ userId: ME, subscriptionId: `${SUBSCRIPTION_ID}x` })],
+    ["문자열 아닌 userId", JSON.stringify({ userId: 1, subscriptionId: SUBSCRIPTION_ID })],
     ["필드 누락", JSON.stringify({ userId: ME })],
     ["배열", JSON.stringify([ME, SUBSCRIPTION_ID])],
   ])("%s → 없음", (_label, raw) => {
     localStorage.setItem(PUSH_OWNER_MARKER_KEY, raw);
     expect(readOwnerMarker(localStorage)).toBeNull();
+  });
+
+  it("추가 필드는 버리고 두 필드만 돌려준다", () => {
+    localStorage.setItem(
+      PUSH_OWNER_MARKER_KEY,
+      JSON.stringify({ userId: ME, subscriptionId: SUBSCRIPTION_ID, extra: "x" }),
+    );
+    expect(readOwnerMarker(localStorage)).toStrictEqual({ userId: ME, subscriptionId: SUBSCRIPTION_ID });
+  });
+
+  it("저장소가 없거나 getItem 이 throw 하면 없음", () => {
+    expect(readOwnerMarker(null)).toBeNull();
+    const throwing = {
+      getItem: () => {
+        throw new Error("SecurityError");
+      },
+      setItem: () => {},
+      removeItem: () => {},
+    };
+    expect(readOwnerMarker(throwing)).toBeNull();
   });
 
   it("파싱 실패 표식은 '켜짐' 근거가 되지 않는다", async () => {
