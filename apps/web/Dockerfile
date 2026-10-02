@@ -7,8 +7,8 @@
 #   맥(darwin/arm64) ↔ 서버(aarch64) 가 같은 아키텍처라 --platform linux/arm64 는 에뮬레이션 없이 돈다.
 
 FROM node:22-alpine AS base
-# lockfileVersion 6.0 = pnpm 8 계열. 로컬(8.15.9)과 문자 그대로 동일하게 고정해 재현성을 보장한다.
-RUN corepack enable && corepack prepare pnpm@8.15.9 --activate
+# lockfileVersion 9.0 = pnpm 9 이상. 로컬(mise.toml 10.34.6)과 문자 그대로 동일하게 고정해 재현성을 보장한다 (toolchain-check 게이트).
+RUN corepack enable && corepack prepare pnpm@10.34.6 --activate
 
 # ── deps: 의존성만 설치 (레이어 캐시) ──────────────────────────────────────
 FROM base AS deps

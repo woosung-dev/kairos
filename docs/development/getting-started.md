@@ -23,7 +23,7 @@ task 기본 cwd, 그리고 ADR-032 D6 이 기록한 `arg()` 템플릿 제거 예
 | 도구 | 고정 버전 | 출처 |
 |------|----------|------|
 | Node.js | 22 | `apps/web/Dockerfile` |
-| pnpm | 8.15.9 | `apps/web/Dockerfile` |
+| pnpm | 10.34.6 | `apps/web/Dockerfile` |
 | uv | 0.10.4 | `apps/api/Dockerfile` |
 | Python | 3.12 | `apps/api/.python-version` (uv 소유 — `[tools]` 에 없다) |
 
@@ -34,7 +34,7 @@ git clone <repository-url> kairos
 cd kairos
 
 mise trust        # 이 레포의 mise.toml 을 신뢰 (최초 1회)
-mise install      # Node 22 / pnpm 8.15.9 / uv 0.10.4 설치
+mise install      # Node 22 / pnpm 10.34.6 / uv 0.10.4 설치
 mise run install  # = apps/api uv sync --frozen + apps/web pnpm install --frozen-lockfile
 ```
 

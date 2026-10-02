@@ -15,7 +15,7 @@
 #   `requires-python` 으로 uv 가 이미 소유한다. 여기에 또 쓰면 소유자가 둘이 된다.
 [tools]
 node = "22"        # apps/web/Dockerfile:9  FROM node:22-alpine
-pnpm = "8.15.9"    # apps/web/Dockerfile:11 corepack prepare pnpm@8.15.9
+pnpm = "10.34.6"   # apps/web/Dockerfile:11 corepack prepare pnpm@10.34.6
 uv = "0.10.4"      # apps/api/Dockerfile:10 ghcr.io/astral-sh/uv:0.10.4
 
 # ── task 전역 설정 ────────────────────────────────────────────────────
