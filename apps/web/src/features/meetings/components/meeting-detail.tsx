@@ -12,6 +12,7 @@ import { ExportButton } from "@/components/shared/ExportButton";
 import { exportMeeting } from "../api";
 import { useMeetingDetail } from "../hooks";
 import { useWorkspaceStore } from "@/features/workspaces/store";
+import { useWorkspaceDeepLink } from "@/features/workspaces/hooks";
 import { ItemPromoteModal } from "@/components/shared/ItemPromoteModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MeetingStatus } from "../types";
@@ -122,9 +123,11 @@ function FailedMeetingView() {
 
 interface MeetingDetailProps {
   meetingId: string;
+  /** 알림 딥링크 `?workspace=<wid>` 원문 (pwa.md §5.5). 없으면 null */
+  workspaceParam?: string | null;
 }
 
-export function MeetingDetail({ meetingId }: MeetingDetailProps) {
+export function MeetingDetail({ meetingId, workspaceParam = null }: MeetingDetailProps) {
   const [activeTab, setActiveTab] = useState<TabType>("요약");
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
@@ -132,8 +135,10 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
   const workspaceRole = useWorkspaceStore((s) => s.workspaceRole);
   const canEditProjectLinks = workspaceRole !== null && workspaceRole !== "viewer";
 
-  const { data: meeting, isLoading, error } = useMeetingDetail(
-    activeWorkspaceId ?? undefined,
+  // 알림 딥링크 워크스페이스 전환 — 처리 전에는 상세 쿼리를 옛 활성 워크스페이스로 보내지 않는다 (pwa.md §5.5)
+  const { isSettled: isDeepLinkSettled } = useWorkspaceDeepLink(meetingId, workspaceParam);
+  const { data: meeting, isLoading, isPending, error } = useMeetingDetail(
+    isDeepLinkSettled ? activeWorkspaceId ?? undefined : undefined,
     meetingId
   );
 
@@ -141,13 +146,17 @@ export function MeetingDetail({ meetingId }: MeetingDetailProps) {
     setActiveTab("트랜스크립트");
   }
 
-  /* 로딩 */
-  if (isLoading) return <MeetingDetailSkeleton />;
+  /* 로딩 — 딥링크 처리 전에는 쿼리가 꺼져 isLoading=false 다. isPending 기준으로 스켈레톤을 그려야
+     아래 오류 블록이 한 번 깜빡이지 않는다 (pwa.md §5.5) */
+  if (isLoading || (!isDeepLinkSettled && isPending)) return <MeetingDetailSkeleton />;
 
   /* 에러 */
   if (error || !meeting) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center py-20 text-center">
+      <div
+        data-testid="meeting-detail-error"
+        className="p-6 flex flex-col items-center justify-center py-20 text-center"
+      >
         <AlertTriangle className="w-10 h-10 mb-4" style={{ color: "var(--error)" }} />
         <p className="text-sm" style={{ color: "var(--error)" }}>
           회의 데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.

@@ -40,6 +40,7 @@ from src.integrations.models import (  # noqa: F401
     IntegrationSyncRun,
 )
 from src.common.promote_models import ItemPromotionAudit  # noqa: F401
+from src.push.models import PushSubscription  # noqa: F401
 
 from sqlmodel import SQLModel
 

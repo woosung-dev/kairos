@@ -55,6 +55,9 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 | `R2_BUCKET_NAME` | ✅ | ➖ fake | 서버 `.env` | Cloudflare R2 버킷 이름 |
 | `GEMINI_API_KEY` 🔒 | ✅ | ➖ fake | 서버 `.env` | [Google AI Studio](https://aistudio.google.com) → Get API key |
 | `OPENAI_API_KEY` 🔒 | ✅ | ➖ fake | 서버 `.env` | [OpenAI Platform](https://platform.openai.com/api-keys) |
+| `VAPID_PUBLIC_KEY` | ➖ 선택 | ➖ (비움) | 서버 `.env` (api 런타임, 선택) | 웹 푸시 (ADR-035). uncompressed P-256 공개키 base64url 87자. 생성 명령 = `apps/api/src/push/CONTEXT.md` §7. 셋 다 있어야 활성, 없으면 알림 기능만 꺼진다 (warn-only) |
+| `VAPID_PRIVATE_KEY` 🔒 | ➖ 선택 | ➖ (비움) | 서버 `.env` (api 런타임, 선택) | 위 명령이 함께 출력. **raw P-256 개인키 base64url 32바이트(43자)만** 유효 — PEM 미지원. 바꾸면 기존 구독이 전부 무효가 된다 |
+| `VAPID_SUBJECT` | ➖ 선택 | ➖ (비움) | 서버 `.env` (api 런타임, 선택) | `mailto:…` 또는 `https:…` (푸시 서비스가 연락처로 쓴다) |
 
 ---
 
@@ -90,6 +93,7 @@ cp apps/web/.env.example apps/web/.env.local  # Next.js: .env.local 표준
 | R2 | `R2_ACCOUNT_ID` 🔒, `R2_ACCESS_KEY_ID` 🔒, `R2_SECRET_ACCESS_KEY` 🔒, `R2_BUCKET_NAME` |
 | AI | `GEMINI_API_KEY` 🔒, `OPENAI_API_KEY` 🔒 |
 | 운영 | `CRON_SECRET_TOKEN` 🔒 (`openssl rand -hex 32`) |
+| 웹 푸시 (api, 선택) | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` 🔒, `VAPID_SUBJECT` — 런타임 env (build.env 아님). 생성 명령 `apps/api/src/push/CONTEXT.md` §7, 비우면 알림만 꺼진다 (ADR-035) |
 
 **FE 빌드 인자**는 별도 파일 `deploy/oci/build.env` (gitignore, 템플릿 `build.env.example`).
 전부 `NEXT_PUBLIC_*` 이라 브라우저 번들에 인라인되므로 시크릿이 아니지만,

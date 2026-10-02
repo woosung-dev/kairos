@@ -55,6 +55,7 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 | memory | `src/memory/CONTEXT.md` | Sprint 15 Recall-first wedge — MemoryItem capture(text+voice) / Distill / Recall / Promote. Sprint 24 Wave 2 BL-006: `MemoryPipelineService.save_memory_chunk` 가 embeddings 호출 격리 (헌법 §4.2) |
 | rag | `src/rag/CONTEXT.md` | RAG 6-Layer + Gemini 답변 (SSE 스트리밍) |
 | onboarding | `src/onboarding/CONTEXT.md` | User.onboarding_step (0~4) lifecycle — workspaces/projects/meetings/rag 가 hook 호출 (Sprint 22 OBN-02) |
+| push | `src/push/CONTEXT.md` | 웹 푸시 — PushSubscription(ENT-001, 사용자 단위) 저장·삭제(`PushService`, API-001~003) + 회의 완료·실패 발송(`PushDispatchService`, 세션 없음). 발송 시점·수신자는 `meetings/pipeline_service.py` 오케스트레이터 (ADR-035). **prefix 예외**: `/api/v1/users/me/push-*` |
 | common | — | database / r2 / pagination / exceptions / prompts / **promote_models** + **promote_helpers** (Sprint 23 D4 — ItemPromotionAudit 4 도메인 audit + validate_promote_target/build_item_promotion_audit utility) |
 | core | — | config (pydantic-settings) |
 
@@ -83,13 +84,14 @@ External Service (services/*.py)        ← 외부 API wrapper (transcription, a
 | B-13 | **R2 클라이언트는 aioboto3** (boto3 동기 사용 금지). 불가피한 경우 `run_in_executor` | `common/r2.py` |
 | B-14 | **SSE 스트리밍 응답**: `EventSourceResponse` (`sse_starlette.sse`) — 내부적으로 `text/event-stream` 헤더, `data:` 포맷. `StreamingResponse` 직접 사용하지 않음 (RAG에서 사용) | `rag/router.py:6,40` |
 | B-15 | **read-path 공용 규약 SSOT (2026-07-13)**: ① visibility 규칙 = `common/visibility.py` 만 (arch gate 강제) ② 페이지 응답 조립 = `common/pagination.py` `build_page`/`empty_page` (`"hasNext"` 손조립 금지, list/count 는 동일 필터 계약) ③ secondary FK workspace 검증 = `common/fk_guard.py` `require_in_workspace` (예외 타입 매핑은 도메인 소유) | `tests/architecture/test_visibility_single_source.py` + code review |
+| B-16 | **웹 푸시 (2026-10-02, ADR-035)**: 웹 푸시는 최종 commit 이후 best-effort (발송 실패·지연이 회의 상태에 영향 0, 재시도 없음) · 수신자는 이벤트 주체 본인 (회의 = `created_by_id`, 현재 워크스페이스 멤버일 때만) · 엔드포인트는 **ASCII 만** + `https` + 호스트 allowlist (`push/schemas.PUSH_HOST_ALLOWLIST`, IP 리터럴·userinfo·443 외 포트 거부) · 페이로드에 콘텐츠 미포함 (`{v,kind,meetingId,workspaceId}` 만) · 발송 구간에는 열린 DB 세션 0개 · `push_subscriptions` 는 사용자 단위 리소스라 B-2(`workspace_id` 필터) 예외 — 대신 모든 조회·삭제에 `user_id` WHERE | `tests/push/` + `tests/meetings/test_push_hook.py` |
 
 ---
 
 ## 6. API 컨벤션
 
 - **Prefix 강제 (I-13)**: `/api/v1/workspaces/{workspace_id}/<resource>`
-  - 예외: `auth → /api/v1/users`, `workspaces 루트 → /api/v1/workspaces` (워크스페이스 자체 CRUD)
+  - 예외: `auth → /api/v1/users`, `push → /api/v1/users/me/push-*` (사용자 단위 웹 푸시 구독, ADR-035), `workspaces 루트 → /api/v1/workspaces` (워크스페이스 자체 CRUD)
   - 리소스 이름은 케밥 케이스 (`action-items`, 단일어는 그대로 `inbox`/`meetings`/`notes`)
 - Status code: 생성 201, 비동기 인제스트 202, 삭제 204
 - 페이지네이션: `common/pagination.py` 표준

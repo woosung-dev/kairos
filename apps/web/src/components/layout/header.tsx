@@ -10,6 +10,7 @@ import { WorkspaceSwitcher } from "@/features/workspaces/components/WorkspaceSwi
 import { authClient } from "@/lib/auth-client";
 import { clearAuthTokenCache } from "@/lib/use-api-client";
 import { useMe } from "@/features/auth/hooks";
+import { usePushLogoutCleanup } from "@/features/push/hooks";
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
 import {
@@ -29,6 +30,7 @@ export function Header() {
   const queryClient = useQueryClient();
   const { data: me } = useMe();
   const router = useRouter();
+  const cleanupPushSubscription = usePushLogoutCleanup();
 
   // ADR-031: Better Auth 는 fullName/firstName 을 나누지 않는다 — 단일 name 이다.
   // 표시 이름의 정본은 백엔드 `users.display_name`(= /users/me 의 displayName)이다.
@@ -167,6 +169,10 @@ export function Header() {
               variant="destructive"
               className="px-3 py-2 cursor-pointer"
               onClick={async () => {
+                // 웹 푸시 정리를 기존 순서 앞에 둔다 (pwa.md §5.5) — BE 구독 삭제는 signOut 이후엔
+                // 토큰이 401 이라 불가능하다. 3초 상한·best-effort 라 실패·오프라인·SW 등록 없음이어도
+                // 로그아웃은 그대로 진행된다. 결과: 로그아웃하면 이 기기의 푸시가 꺼진다 (게이트 ⑦).
+                await cleanupPushSubscription();
                 queryClient.clear();
                 // ★토큰 캐시를 비우지 않으면 로그아웃 후에도 메모리의 JWT 가 최대
                 //   15분(Better Auth 기본 exp)간 Authorization 헤더에 붙는다.

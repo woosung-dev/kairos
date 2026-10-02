@@ -9,6 +9,7 @@
 import logging
 import uuid
 from datetime import date
+from typing import TYPE_CHECKING
 
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -26,6 +27,10 @@ from src.projects.repository import ProjectRepository
 from src.workspaces.repository import WorkspaceRepository
 from src.services.ai_processing import AIProcessingService
 from src.services.transcription import TranscriptionService
+
+if TYPE_CHECKING:
+    # 런타임 import 는 _notify_meeting_finished 안에서 지연 (온보딩 훅과 같은 패턴)
+    from src.push.schemas import PushKind
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +198,8 @@ class MeetingPipelineService:
         헌법 I-9 Critical (Codex F-1): 진입점 시그니처 workspace_id 필수.
         BackgroundTasks.add_task 시 router 에서 path workspace_id 동반 전달.
         """
+        # 웹 푸시 결과 플래그 (pwa.md §5.3) — 최종 commit 이 성공했을 때만 채운다
+        outcome: "PushKind | None" = None
         async with self._session_factory() as session:
             meeting_repo = MeetingRepository(session)
             project_repo = ProjectRepository(session)
@@ -255,6 +262,7 @@ class MeetingPipelineService:
                     inbox_repo=inbox_repo,
                     embedding_service=embedding_service,
                 )
+                outcome = "meeting.completed"
 
             except Exception as e:
                 logger.exception("파이프라인 실패 (meeting=%s): %s", meeting_id, e)
@@ -265,8 +273,13 @@ class MeetingPipelineService:
                         error_message=_public_error_message(e),
                     )
                     await meeting_repo.commit()
+                    outcome = "meeting.failed"
                 except Exception as rollback_err:
                     logger.exception("상태 failed 업데이트 실패 (meeting=%s): %s", meeting_id, rollback_err)
+
+        # 파이프라인 세션 close 이후에만 발송한다 (안쪽에서 부르면 발송 내내 세션이 열려 있다)
+        if outcome is not None:
+            await self._notify_meeting_finished(meeting_id, workspace_id, outcome)
 
     async def capture_text(
         self, meeting_id: uuid.UUID, workspace_id: uuid.UUID, transcript_text: str
@@ -275,6 +288,8 @@ class MeetingPipelineService:
 
         헌법 I-9 (Codex F-1): 진입점 시그니처 workspace_id 필수.
         """
+        # 웹 푸시 결과 플래그 (pwa.md §5.3) — 최종 commit 이 성공했을 때만 채운다
+        outcome: "PushKind | None" = None
         async with self._session_factory() as session:
             meeting_repo = MeetingRepository(session)
             project_repo = ProjectRepository(session)
@@ -314,6 +329,7 @@ class MeetingPipelineService:
                     inbox_repo=inbox_repo,
                     embedding_service=embedding_service,
                 )
+                outcome = "meeting.completed"
 
             except Exception as e:
                 logger.exception("capture_text 파이프라인 실패 (meeting=%s): %s", meeting_id, e)
@@ -324,5 +340,79 @@ class MeetingPipelineService:
                         error_message=_public_error_message(e),
                     )
                     await meeting_repo.commit()
+                    outcome = "meeting.failed"
                 except Exception as rollback_err:
                     logger.exception("상태 failed 업데이트 실패 (meeting=%s): %s", meeting_id, rollback_err)
+
+        # 파이프라인 세션 close 이후에만 발송한다 (안쪽에서 부르면 발송 내내 세션이 열려 있다)
+        if outcome is not None:
+            await self._notify_meeting_finished(meeting_id, workspace_id, outcome)
+
+    async def _notify_meeting_finished(
+        self,
+        meeting_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        kind: "PushKind",
+    ) -> None:
+        """회의 완료·실패를 업로더 본인에게 웹 푸시 (REQ-008, pwa.md §5.3) — best-effort.
+
+        인자는 원시 값만 받는다 (rollback 뒤 만료된 ORM 객체를 건드리지 않는다).
+        순서: 조회 세션 → 닫기 → 발송(열린 DB 세션 0개) → 404/410 이 있으면 정리용 새 세션.
+        느린 푸시 서비스가 커넥션 풀을 붙잡지 않게 발송 구간에는 세션을 열지 않는다.
+        어떤 실패도 회의 상태·파이프라인 흐름에 영향을 주지 않는다 (예외 타입명만 warning).
+        """
+        try:
+            from src.push.repository import PushRepository
+            from src.push.service import create_push_dispatcher
+
+            dispatcher = create_push_dispatcher()
+            if dispatcher is None:
+                logger.info("push_dispatch_skipped reason=not_configured meeting=%s", meeting_id)
+                return
+
+            # 1. 조회 — 짧은 세션. 구독은 원시 값으로 복사해 세션 밖으로 가져간다
+            async with self._session_factory() as session:
+                meeting = await MeetingRepository(session).find_by_id(meeting_id, workspace_id)
+                if meeting is None:
+                    return
+                recipient_id = meeting.created_by_id
+                meeting_workspace_id = meeting.workspace_id
+                member = await WorkspaceRepository(session).find_member(
+                    meeting_workspace_id, recipient_id
+                )
+                if member is None:
+                    logger.info(
+                        "push_dispatch_skipped reason=not_member meeting=%s user=%s",
+                        meeting_id, recipient_id,
+                    )
+                    return
+                targets = await PushRepository(session).list_by_user(recipient_id)
+
+            # 2. 조회 세션 반납 완료 — 이 아래 발송 구간에는 열린 세션이 없다
+            if not targets:
+                return
+
+            # 3. 발송
+            report = await dispatcher.dispatch_meeting_finished(
+                targets,
+                kind=kind,
+                meeting_id=meeting_id,
+                workspace_id=meeting_workspace_id,
+            )
+
+            # 4. 정리 — 404·410 이 있을 때만 새 짧은 세션 (회의 commit 과 별개 트랜잭션)
+            pruned = 0
+            if report.gone_ids:
+                async with self._session_factory() as session:
+                    push_repo = PushRepository(session)
+                    pruned = await push_repo.delete_by_ids(report.gone_ids, recipient_id)
+                    await push_repo.commit()
+
+            logger.info(
+                "push_dispatch_done meeting=%s user=%s sent=%d failed=%d pruned=%d",
+                meeting_id, recipient_id, report.sent, report.failed, pruned,
+            )
+        except Exception as push_err:
+            logger.warning(
+                "push_dispatch_failed meeting=%s error=%s", meeting_id, type(push_err).__name__
+            )

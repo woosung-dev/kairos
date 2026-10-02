@@ -40,9 +40,9 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 ## 4. 도메인 경계
 
-### 4.1 백엔드 모듈 (2026-07-31 기준 17)
+### 4.1 백엔드 모듈 (2026-10-02 기준 18)
 
-`auth · workspaces · projects · inbox · meetings · notes · actions · feedback · memory · onboarding · upload · integrations (ADR-026 — Google OAuth 연결 · 선택 외부 파일/ExternalDocument · sync 상태 · 외부 소스 생명주기. PR #143 구현 완료) · embeddings · rag · common · core · services`. 폴더 표준: `router/service/repository/schemas/models/dependencies/exceptions.py`. 상세: `docs/architecture/directory-map.md`.
+`auth · workspaces · projects · inbox · meetings · notes · actions · feedback · memory · onboarding · upload · integrations (ADR-026 — Google OAuth 연결 · 선택 외부 파일/ExternalDocument · sync 상태 · 외부 소스 생명주기. PR #143 구현 완료) · push (ADR-035 — 웹 푸시 구독 저장 + 회의 완료·실패 발송, 사용자 단위 리소스. PWA PR-2) · embeddings · rag · common · core · services`. 폴더 표준: `router/service/repository/schemas/models/dependencies/exceptions.py`. 상세: `docs/architecture/directory-map.md`.
 
 ### 4.2 의존 규칙 (헌법 결정 #1, ADR-014)
 
@@ -57,7 +57,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 
 ### 4.3 프론트엔드 features (FSD)
 
-`actions · audit · auth · feedback · home · inbox · integrations · meetings · members · memory · notes · onboarding · projects · rag · sources · upload · workspaces` (17 — `auth` 는 ADR-031 Better Auth 전환으로 신설). shadcn `components/ui/` 수정 금지 (DESIGN.md). TiptapEditor (useEditor/EditorContent) 는 `features/notes/components/note-detail.tsx` (Sprint 29 R3 정정 — 옛 `note-editor.tsx` 는 importer 0 dead-code 로 삭제).
+`actions · audit · auth · feedback · home · inbox · integrations · meetings · members · memory · notes · onboarding · projects · push · rag · sources · upload · workspaces` (18 — `auth` 는 ADR-031 Better Auth 전환으로 신설, `push` 는 ADR-035 웹 푸시로 신설). shadcn `components/ui/` 수정 금지 (DESIGN.md). TiptapEditor (useEditor/EditorContent) 는 `features/notes/components/note-detail.tsx` (Sprint 29 R3 정정 — 옛 `note-editor.tsx` 는 importer 0 dead-code 로 삭제).
 
 ## 5. visibility 도메인 용어 (ADR-014)
 
@@ -89,7 +89,7 @@ Distill L0~L4 매핑: L0 원본 (upload/meetings/notes) · L1 트랜스크립트
 | I-10 | Inbox confidence 임계값: 워크스페이스별 `workspaces.inbox_threshold` (기본 0.9), PATCH 가능 | `workspaces/models.py`, `meetings/pipeline_service.py` |
 | I-11 | shadcn `components/ui/` 수정 금지 | `apps/web/src/components/ui/` |
 | I-12 | 언어 정책: 사고/문서/주석 한국어, 코드/네이밍 영어 | AGENTS.md §1 |
-| I-13 | API workspace prefix: `/api/v1/workspaces/{workspace_id}/<resource>` (예외: auth `/api/v1/users`, user-level `/api/v1/feedback` — 워크스페이스 비종속 dogfooding 피드백, OAuth callback `/api/v1/integrations/google-drive/callback` — Google Cloud Console에 사전 등록하는 고정 redirect URI에는 `workspace_id`를 경로에 넣을 수 없으므로, 서명된 state의 `workspace_id`·요청자 ID·nonce·PKCE·만료를 검증해 I-9 격리를 보전; ADR-026 D9) | `<domain>/router.py` |
+| I-13 | API workspace prefix: `/api/v1/workspaces/{workspace_id}/<resource>` (예외: auth `/api/v1/users`, push `/api/v1/users/me/push-*` — 같은 `/api/v1/users` 안의 사용자 단위 웹 푸시 구독 (ADR-035), user-level `/api/v1/feedback` — 워크스페이스 비종속 dogfooding 피드백, OAuth callback `/api/v1/integrations/google-drive/callback` — Google Cloud Console에 사전 등록하는 고정 redirect URI에는 `workspace_id`를 경로에 넣을 수 없으므로, 서명된 state의 `workspace_id`·요청자 ID·nonce·PKCE·만료를 검증해 I-9 격리를 보전; ADR-026 D9) | `<domain>/router.py` |
 | I-14 | Pydantic V2 + 100% async + SQLModel typed query (Sprint 20 BL-054): 상세 allowlist (G1~G3-keep-dialect 5 카테고리) `apps/api/CONTEXT.md` B-10 | code review |
 | I-15 | Secret 은 `SecretStr`, 사용 시 `.get_secret_value()` | `core/config.py` |
 | I-16 | DB snake_case ↔ API camelCase: Pydantic alias 변환 | `<domain>/schemas.py` |

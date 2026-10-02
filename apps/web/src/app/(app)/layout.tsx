@@ -2,6 +2,7 @@
 // 본 layout 은 PanelLayout 만 wrap (사이드바 + 헤더 + 메인 컨테이너).
 import { PanelLayout } from "@/components/layout/panel-layout";
 import { FeedbackButton } from "@/features/feedback/components/feedback-button";
+import { PushSync } from "@/features/push/components/push-sync";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -9,6 +10,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {children}
       {/* dogfooding 피드백 우하단 floating 버튼 (Sprint 28 Wave 1) */}
       <FeedbackButton />
+      {/* 웹 푸시 앱 로드 동기화 — 페이지 로드당 1회, null 렌더 (pwa.md §5.5) */}
+      <PushSync />
     </PanelLayout>
   );
 }

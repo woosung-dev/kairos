@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useMe } from "@/features/auth/hooks";
 import { workspaceKeys } from "@/lib/query-keys";
 import { useApiClient } from "@/lib/use-api-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -12,7 +15,9 @@ import {
   deleteWorkspace,
   type UpdateWorkspaceSettingsInput,
 } from "./api";
+import { useWorkspaceStore } from "./store";
 import type { Workspace } from "./types";
+import { invalidateWorkspaceScopedQueries, resolveWorkspaceDeepLink } from "./utils";
 
 export function useWorkspaces() {
   const api = useApiClient();
@@ -141,4 +146,71 @@ export function useUpdateWorkspaceSettings(wid: string | undefined) {
       toast.error(error.message || "설정 변경에 실패했습니다");
     },
   });
+}
+
+/**
+ * 알림 딥링크 워크스페이스 전환 (docs/requirements/pwa.md §5.5, 게이트 ⑥) — 회의 상세가 마운트한다.
+ * `?workspace=<wid>` 를 1회 처리하고 `router.replace("/meetings/<mid>")` 로 파라미터를 지운다.
+ *
+ * - 전환 = store 소유자가 me 면 `setActiveWorkspaceId`, 아니면 `activateWorkspaceForUser` (C-001)
+ *   → WorkspaceSwitcher 와 같은 predicate 로 무효화 → toast 1회. ref 가드로 재렌더·목록 refetch 에도 1회.
+ * - `queryClient.clear()`·`router.refresh()` 를 쓰지 않는다 (Sprint 23 D1). `replace` 라 히스토리 추가 0.
+ * - `isSettled=false` 동안 상세 쿼리를 보내지 않는다 — 옛 활성 ws 로 오류 블록이 한 번 그려지는 깜빡임 방지.
+ */
+export function useWorkspaceDeepLink(
+  meetingId: string,
+  workspaceParam: string | null,
+): { isSettled: boolean } {
+  const { data: workspaces, isPending: isWorkspaceListPending } = useWorkspaces();
+  const { data: me } = useMe();
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const ownerUserId = useWorkspaceStore((s) => s.ownerUserId);
+  const setActiveWorkspaceId = useWorkspaceStore((s) => s.setActiveWorkspaceId);
+  const activateWorkspaceForUser = useWorkspaceStore((s) => s.activateWorkspaceForUser);
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const handledParamRef = useRef<string | null>(null);
+  const meId = me?.id;
+
+  const decision = resolveWorkspaceDeepLink({
+    workspaceParam,
+    workspaces,
+    isWorkspaceListPending,
+    meId,
+    activeWorkspaceId,
+  });
+  const decisionType = decision.type;
+  const targetWorkspaceId = decision.type === "switch" ? decision.workspaceId : null;
+  const targetWorkspaceName = decision.type === "switch" ? decision.workspaceName : null;
+
+  useEffect(() => {
+    if (workspaceParam === null || decisionType === "none" || decisionType === "wait") return;
+    if (handledParamRef.current === workspaceParam) return;
+    handledParamRef.current = workspaceParam;
+
+    if (decisionType === "switch" && targetWorkspaceId && meId) {
+      if (ownerUserId === meId) {
+        setActiveWorkspaceId(targetWorkspaceId);
+      } else {
+        activateWorkspaceForUser(meId, targetWorkspaceId);
+      }
+      invalidateWorkspaceScopedQueries(queryClient);
+      toast(`“${targetWorkspaceName}” 워크스페이스로 전환했습니다`);
+    }
+    router.replace(`/meetings/${meetingId}`);
+  }, [
+    workspaceParam,
+    decisionType,
+    targetWorkspaceId,
+    targetWorkspaceName,
+    meId,
+    ownerUserId,
+    meetingId,
+    setActiveWorkspaceId,
+    activateWorkspaceForUser,
+    queryClient,
+    router,
+  ]);
+
+  return { isSettled: decisionType === "none" || decisionType === "strip" };
 }

@@ -1384,6 +1384,85 @@
         "title": "PresignedUrlRequest",
         "type": "object"
       },
+      "PushConfigResponse": {
+        "description": "API-001 응답 — VAPID 3개 설정이 다 있을 때만 isEnabled=true.",
+        "properties": {
+          "isEnabled": {
+            "title": "Isenabled",
+            "type": "boolean"
+          },
+          "vapidPublicKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vapidpublickey"
+          }
+        },
+        "required": [
+          "isEnabled",
+          "vapidPublicKey"
+        ],
+        "title": "PushConfigResponse",
+        "type": "object"
+      },
+      "PushSubscriptionKeys": {
+        "description": "PushSubscription.toJSON().keys — 둘 다 base64url.",
+        "properties": {
+          "auth": {
+            "title": "Auth",
+            "type": "string"
+          },
+          "p256dh": {
+            "title": "P256Dh",
+            "type": "string"
+          }
+        },
+        "required": [
+          "p256dh",
+          "auth"
+        ],
+        "title": "PushSubscriptionKeys",
+        "type": "object"
+      },
+      "PushSubscriptionUpsertRequest": {
+        "description": "API-002 요청 — PushSubscription.toJSON() 의 부분집합 (그 외 필드는 무시).",
+        "properties": {
+          "endpoint": {
+            "maxLength": 2048,
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "keys": {
+            "$ref": "#/components/schemas/PushSubscriptionKeys"
+          }
+        },
+        "required": [
+          "endpoint",
+          "keys"
+        ],
+        "title": "PushSubscriptionUpsertRequest",
+        "type": "object"
+      },
+      "PushSubscriptionUpsertResponse": {
+        "description": "API-002 응답 — 같은 endpoint 면 id 가 유지된다.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "PushSubscriptionUpsertResponse",
+        "type": "object"
+      },
       "RagAskRequest": {
         "properties": {
           "projectId": {
@@ -2130,6 +2209,151 @@
         "summary": "Get My Onboarding",
         "tags": [
           "onboarding"
+        ]
+      }
+    },
+    "/api/v1/users/me/push-config": {
+      "get": {
+        "description": "API-001 — VAPID 미설정이어도 200 (isEnabled=false 면 FE 가 알림 탭을 숨긴다).",
+        "operationId": "get_push_config_api_v1_users_me_push_config_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushConfigResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Push Config",
+        "tags": [
+          "push"
+        ]
+      }
+    },
+    "/api/v1/users/me/push-subscriptions": {
+      "put": {
+        "description": "API-002 — endpoint 단위 upsert. 같은 endpoint 면 id 유지 + 현재 사용자로 rebind.",
+        "operationId": "upsert_push_subscription_api_v1_users_me_push_subscriptions_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushSubscriptionUpsertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushSubscriptionUpsertResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upsert Push Subscription",
+        "tags": [
+          "push"
+        ]
+      }
+    },
+    "/api/v1/users/me/push-subscriptions/{subscription_id}": {
+      "delete": {
+        "description": "API-003 — 본인 것만 지운다. 없거나 남의 것이어도 204 (멱등 + 존재 여부 오라클 차단).",
+        "operationId": "delete_push_subscription_api_v1_users_me_push_subscriptions__subscription_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "subscription_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Subscription Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Authorization",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Push Subscription",
+        "tags": [
+          "push"
         ]
       }
     },

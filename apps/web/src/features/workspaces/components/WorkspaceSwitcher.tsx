@@ -14,7 +14,11 @@ import {
 import { useWorkspaces, useCreateWorkspace } from "../hooks";
 import { useWorkspaceStore } from "../store";
 import { WorkspaceTypeBadge } from "./WorkspaceTypeBadge";
-import { inferWorkspaceType, buildDisambiguationMap } from "../utils";
+import {
+  inferWorkspaceType,
+  buildDisambiguationMap,
+  invalidateWorkspaceScopedQueries,
+} from "../utils";
 
 interface WorkspaceSwitcherProps {
   memberCount?: number;
@@ -41,24 +45,12 @@ export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
   // Sprint 23 D1 fix: queryClient.clear() → predicate invalidate (ws list 보존) + router.refresh() 제거.
   // queryClient.clear() 가 workspaces.list 까지 invalidate → user 의 ws list 잠시 사라짐 + race.
   // workspaces.list 만 보존 + 나머지 wid-scoped query 만 invalidate.
-  const invalidateWorkspaceScopedQueries = () => {
-    queryClient.invalidateQueries({
-      predicate: (query) => {
-        const key = query.queryKey;
-        // workspaces.list (`["workspaces", "list"]`) 만 보존 — 사용자 ws list 유지
-        return !(
-          Array.isArray(key) &&
-          key[0] === "workspaces" &&
-          key[1] === "list"
-        );
-      },
-    });
-  };
+  // predicate 는 utils.ts 로 추출 — 알림 딥링크 전환(useWorkspaceDeepLink)과 공유한다 (pwa.md §5.5).
 
   const handleSwitch = (wid: string) => {
     if (wid === activeWid) return;
     setActiveWorkspaceId(wid);
-    invalidateWorkspaceScopedQueries();
+    invalidateWorkspaceScopedQueries(queryClient);
     // router.refresh() 제거: invalidateQueries 만으로 wid 의존 컴포넌트 모두 새 데이터.
     // Sprint 23 D1 진단 결과 — router.refresh() 가 RSC 재페치를 추가 트리거 → race.
   };
@@ -69,7 +61,7 @@ export function WorkspaceSwitcher({ memberCount }: WorkspaceSwitcherProps) {
     createWorkspace(name, {
       onSuccess: (ws) => {
         setActiveWorkspaceId(ws.id);
-        invalidateWorkspaceScopedQueries();
+        invalidateWorkspaceScopedQueries(queryClient);
         setNewName("");
         setIsCreateOpen(false);
       },

@@ -3,7 +3,12 @@
 // ★tsconfig 는 `dom` lib 만 쓴다. `webworker` lib 를 더하면 `self`·`addEventListener` 같은
 //   전역 선언이 dom 과 겹쳐 프로젝트 전체 타입이 흔들린다 (docs/requirements/pwa.md R-14).
 //   그래서 표준 lib 를 끌어오지 않고 필요한 부분만 여기 둔다. PR-2 의 push·notificationclick 도
-//   이 파일에 같은 방식으로 더한다.
+//   이 파일에 같은 방식으로 더했다 (pwa.md §5.5).
+import type {
+  ClientsLike,
+  KairosNotificationOptions,
+  PushMessageDataLike,
+} from "./push-notification";
 
 export interface SwExtendableEvent extends Event {
   waitUntil(promise: Promise<unknown>): void;
@@ -14,15 +19,28 @@ export interface SwFetchEvent extends SwExtendableEvent {
   respondWith(response: Response | Promise<Response>): void;
 }
 
+export interface SwPushEvent extends SwExtendableEvent {
+  readonly data: PushMessageDataLike | null;
+}
+
+export interface SwNotificationEvent extends SwExtendableEvent {
+  readonly notification: { readonly data: unknown; close(): void };
+}
+
 interface SwEventMap {
   install: SwExtendableEvent;
   activate: SwExtendableEvent;
   fetch: SwFetchEvent;
+  push: SwPushEvent;
+  notificationclick: SwNotificationEvent;
 }
 
 export interface SwGlobalScope {
   readonly location: { readonly origin: string };
-  readonly clients: { claim(): Promise<void> };
+  readonly clients: ClientsLike & { claim(): Promise<void> };
+  readonly registration: {
+    showNotification(title: string, options: KairosNotificationOptions): Promise<void>;
+  };
   skipWaiting(): Promise<void>;
   addEventListener<K extends keyof SwEventMap>(
     type: K,

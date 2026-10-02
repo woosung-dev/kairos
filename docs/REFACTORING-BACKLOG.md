@@ -191,11 +191,11 @@ M-7(공유 사본 재promote 는 원본 작성자만)은 메모에만 붙은 추
 
 ---
 
-## 2026-10-02 PWA 설치형 셸 비범위 (BL-PWA-N)
+## 2026-10-02 PWA 설치형 셸 · 웹 푸시 비범위 (BL-PWA-N)
 
-> PR-1(설치형 셸)에서 범위 밖으로 둔 항목이다. 서술·근거의 정본은 [`requirements/pwa.md`](requirements/pwa.md) §6,
-> 결정은 [ADR-034](adr/034-pwa-installable-shell.md). 우선순위는 spec 에 없어 매기지 않았다.
-> BL-PWA-4·5·6·7·9·12·14 는 PR-2(웹 푸시)에서 등재한다.
+> PR-1(설치형 셸)·PR-2(웹 푸시)에서 범위 밖으로 둔 항목이다. 서술·근거의 정본은 [`requirements/pwa.md`](requirements/pwa.md) §6,
+> 결정은 [ADR-034](adr/034-pwa-installable-shell.md) · [ADR-035](adr/035-web-push.md). 우선순위는 spec 에 없어 매기지 않았다.
+> BL-PWA-1·2·3·8·10·11·13 = PR-1 등재 · BL-PWA-4·5·6·7·9·12·14 = PR-2 등재 (spec §6) · BL-PWA-15~22 = PR-2 구현·검증 중 발견.
 
 ### BL-PWA-1 — 커스텀 설치 버튼 (`beforeinstallprompt`) ⏳ **미착수**
 비범위 근거: Next 번들 문서 비권장 — 크로스 브라우저 아님, Safari iOS 미동작 (`progressive-web-apps.md:597`).
@@ -219,6 +219,65 @@ M-7(공유 사본 재promote 는 원본 작성자만)은 메모에만 붙은 추
 낡은 **설명 문구**(mise `description` · `.github/workflows/test.yml:122` 주석 · `docs/development/testing.md` §1 표·§4 · `apps/web/README.md` project 목록)는 PR-1 에서 고쳤다.
 남은 것: task **이름** · CI step 이름("Security headers gate …") · 아직 "보안 헤더" 만 적은 코드 주석 2곳(`test.yml:121` · `apps/web/playwright.config.ts:72-73`).
 이름을 바꾸면 `test.yml`·`testing.md`·`apps/web/README.md` 의 호출 문자열이 같이 바뀌어야 해서(mise.toml "로컬 = CI 문자 동일" 규약) 별도 PR 로 둔다.
+
+### BL-PWA-4 — 추가 푸시 이벤트 (메모 변환 완료 · 액션 담당자 지정 · 초대 · Drive 동기화 완료/실패) ⏳ **미착수**
+비범위 근거: 사용자 결정 — 이번 이벤트는 회의 처리 완료·실패 2종뿐이다 (pwa.md §1). 추가 시 `PushKind`·SW 문구 표·수신자 규칙(B-16 "이벤트 주체 본인")을 같이 정한다.
+
+### BL-PWA-5 — 알림 설정 세분화 (이벤트별 on/off · 방해 금지 시간) ⏳ **미착수**
+비범위 근거: 이벤트가 2종뿐이다. 지금 SCR-002 는 기기·계정 단위 토글 1개다.
+
+### BL-PWA-6 — 발송 재시도 (429/5xx `Retry-After`) ⏳ **미착수**
+비범위 근거: best-effort 1회로 시작했다 (pwa.md §5.3). pywebpush 2.5.0 의 `WebPushException.retry_after` 를 쓸 수 있다. 지금은 429·5xx·403·413·타임아웃 모두 행 유지 + warning 1줄 (`push/service.py` `PushDispatchService`).
+
+### BL-PWA-7 — 앱이 포커스된 동안 시스템 알림 억제 ⏳ **미착수**
+비범위 근거: 결정적 동작 우선 — SW 는 `push` 마다 항상 `showNotification` 1회 (`userVisibleOnly`).
+
+### BL-PWA-9 — SW `pushsubscriptionchange` 처리 ⏳ **미착수**
+비범위 근거: SW 에는 인증 토큰이 없다. 브라우저의 endpoint 교체는 앱 로드 동기화(표식 일치 → API-002 재전송)가 대신한다 (pwa.md §5.5).
+
+### BL-PWA-12 — Android 단색 badge 아이콘 ⏳ **미착수**
+비범위 근거: 단색 아이콘 시안이 없다. 알림은 `icon=/icons/icon-192.png` 만 쓴다 (pwa.md §5.4).
+
+### BL-PWA-14 — 사용자당 푸시 구독 개수 상한 + 오래된 순 축출 ⏳ **미착수**
+비범위 근거: 발송 대상이 업로더 본인뿐이고 404/410 정리가 있어 증폭 위험이 작다. 실제 행 수가 늘면 도입한다 (pwa.md §5.2).
+
+### BL-PWA-15 — Better Auth rate limit 이 e2e·공유 출구 IP 에서 소진된다 ⏳ **미착수** `[PR-2 T-PWA-49 flake 원인]`
+- [사실] 기본 규칙 = 경로별 **10초 100회**, 키 = IP+경로, `enabled = isProduction` (`better-auth@1.6.33` `dist/context/create-context.mjs:171-174` — origin/main 병합 `1063903` 후 설치 버전, 1.6.29 와 줄 번호 동일). `/sign-in*` 은 특수 규칙 10초 3회 (`dist/api/rate-limiter/index.mjs:373-376`).
+- [사실] 메모리 저장소의 창은 **마지막 요청 기준**이라 요청이 계속 오면 리셋되지 않는다 — 10초 동안 조용해야 리셋된다 (`rate-limiter/index.mjs:37`).
+- [사실 — 오케스트레이터 실측] e2e chromium 1회가 `/api/auth/token` 예산의 약 71/100 을 쓴다. `pnpm start` 는 production 이라 limiter 가 켜진다 → 로그인을 더하는 spec 은 flake 가 된다 (PR-2 는 T-PWA-49 를 sign-out stub 으로 바꿔 우회).
+- [사실] `@better-auth/core` 의 기본 IP 헤더는 `x-forwarded-for` 하나다 (`dist/utils/ip.mjs:194,204` `DEFAULT_IP_HEADERS`). IP 를 못 정하면 경로당 공유 버킷 `no-trusted-ip` 로 떨어지고 warning 을 남긴다 (`rate-limiter/index.mjs:275,284`). `apps/web/src/lib/auth.ts` 에는 `advanced.ipAddress`·`rateLimit` 설정이 없다 (grep 0건).
+- [확인 필요] Cloudflare Tunnel 뒤에서 XFF 가 단일 값으로 오는지 — BL-LR-9 C-009 가 2026-09-27 운영 로그 경고 0건을 기록했지만 이번 라운드에 재확인하지 않았다. 사용자 서버 로그(`docker logs kairos-web` 의 `could not determine a client IP`)로 재확인하고 `ipAddressHeaders: ["cf-connecting-ip"]` 지정을 검토한다 — BL-LR-9 / 체크리스트 1-10 과 같은 수정이다. e2e 쪽은 테스트 전용 `rateLimit` 설정 또는 storageState 재사용 확대를 검토.
+
+### BL-PWA-16 — `auth-relogin.spec.ts` 가 항상 skip 된다 — 실제 로그아웃 e2e 0건 ⏳ **미착수**
+[사실] 사용자 메뉴 셀렉터 `[data-testid="user-menu"], button[aria-label*="user" i], button[aria-label*="profile" i]` (`apps/web/e2e/tests/auth-relogin.spec.ts:28-30`) 가 실제 버튼 `aria-label="계정 메뉴"` (`apps/web/src/components/layout/header.tsx:101`) 와 맞지 않아 `count()==0` → `test.skip` (`:33`). PR-2 의 로그아웃 ①∥② 는 `push.spec.ts` T-PWA-49 가 sign-out 을 stub 해 검증한다 — Better Auth `signOut` 을 실제로 부르는 e2e 는 없다. 셀렉터를 `data-testid` 로 고치면 BL-PWA-15 의 로그인 예산을 같이 본다.
+
+### BL-PWA-17 — `tests/integration/test_alembic_upgrade.py` 가 일부 모델만 import 한다 ⏳ **미착수** (기존 부채)
+[사실] `src.feedback.models` · `src.integrations.models` · `src.common.promote_models` 를 import 하지 않는다 (`:27-36`, PR-2 는 `src.push.models` 만 추가).
+[사실] **`alembic/env.py:13-43` 도 `src.feedback.models` 를 import 하지 않는다** — 오케스트레이터 실측 metadata 26 테이블, `feedback_entries` 없음 (EVAL-P2-2). autogenerate 가 `feedback_entries` 를 "모델에 없음" 으로 볼 수 있다. env.py 와 테스트가 같은 모델 import 목록(공유 모듈)을 쓰게 하고 feedback 을 넣는다.
+
+### BL-PWA-18 — WNS(`.notify.windows.com`) 호스트 형식·실제 발송 미검증 ⏳ **미착수**
+[사실] allowlist 에 있지만(`apps/api/src/push/schemas.py` `PUSH_HOST_ALLOWLIST`) Edge/WNS endpoint 의 실제 호스트 형식과 발송 성공을 확인하지 않았다 (pwa.md §5.2). 목록 밖이면 API-002 가 422 라 안전 방향으로 실패한다. Edge 실기기로 endpoint 호스트 + 발송 1회를 확인한다.
+
+### BL-PWA-19 — VAPID 개인키는 raw 32바이트 base64url 만 유효 (PEM 미지원) ⏳ **미착수**
+[사실] 설정 검증이 raw P-256 32바이트 base64url 만 정상으로 보고, 그 밖의 형식은 warning 만 남긴다 (`apps/api/src/core/config.py:198-204`, warn-only C-18). 활성 판정은 3필드 존재만 본다 (`push/service.py` `resolve_vapid_config`) → PEM 키를 넣으면 기능은 켜지고 발송 서명이 실패한다 [가정 — PEM 발송은 실행해 보지 않았다]. PEM 을 받거나, 형식 오류면 비활성으로 두는 쪽을 정한다. 생성 명령은 `apps/api/src/push/CONTEXT.md` §7.
+
+### BL-PWA-20 — 전역 422 핸들러: 본문에 `NaN` 이 있으면 422 대신 500 ⏳ **미착수** (기존 부채, main 에도 있는 경로)
+[사실] Python `json` 은 본문의 `NaN`·`Infinity` 를 float 로 받아들인다. 검증이 실패해 그 값이 `exc.errors()[*].input` 으로 돌아오면 `jsonable_encoder` 는 nan 을 그대로 두고, `JSONResponse` 가 `allow_nan=False` 로 직렬화하다 `ValueError` → 500 (`apps/api/src/main.py:171-177`, starlette `responses.py:199-200`). PR-2 의 `_AsciiJSONResponse` 폴백은 `UnicodeEncodeError` 만 잡는다.
+[사실] 같은 모양의 핸들러를 단 최소 앱으로 재현 (GEN-P2-3, TestClient): `{"name": NaN}`(str 필드) → 500 · `{"other": NaN}`(필수 필드 누락 — input 이 본문 전체) → 500 · `{"name": "a", "extra": NaN}`(검증 통과) → 200. 본문을 받는 모든 endpoint 에 해당한다 [가정 — 실제 앱 endpoint 로는 돌려 보지 않았다].
+고치는 방향: 422 본문의 비유한 float 를 문자열로 바꾸거나(`input` 만 대상), 요청 JSON 파싱에서 `NaN` 을 거부한다. 회귀 테스트는 lone surrogate 422 테스트 옆에 둔다.
+
+### BL-PWA-21 — e2e 선택자 2건이 대시보드 요소와 겹쳐 strict mode 위반 ⏳ **미착수** (PWA 무관, main 에도 재현)
+[사실] 2026-10-02 로컬 QA DB(127.0.0.1:5436)에서 아래 2건이 **main(`ef79e3c`) 빌드와 PR-2 빌드 둘 다** 실패했다. 새로 가입한 계정과 기존 계정 모두 같다. 같은 날 앞선 실행(`1063903` 빌드)에서는 통과했다. 어느 상태가 결과를 가르는지는 특정하지 못했다.
+- `e2e/tests/home.spec.ts:38` `getByText("프로젝트", { exact: true })` → 2개가 잡힌다: 사이드바 섹션 헤더와 대시보드 "빠른 접근" 의 `프로젝트` 링크 (`app/(app)/dashboard/page.tsx:108`).
+- `e2e/tests/mobile-responsive.spec.ts:56` `getByRole("button", { name: /지식 검색|⌘K/ })` → 3개가 잡힌다: 헤더 `검색 ⌘K`, 대시보드 온보딩 툴팁 트리거 (`components/onboarding/onboarding-tooltip.tsx`, `kairos.onboarding.tooltip_shown.dashboard` 가 storageState 에 없으면 매 테스트 열린다), 대시보드 `검색하거나 질문 입력...⌘K`.
+고치는 방향 (AGENTS.md §8): `getByRole("complementary")` 범위 지정 또는 `data-testid` 로 바꾼다. CI 에서는 아직 재현되지 않았다.
+
+### BL-PWA-22 — best-practices 게이트 경미 사항 묶음 ⏳ **미착수** (영향 작음)
+[사실] PR-2 게이트(`plans/active/2026-10-02-pwa/evidence/pr2-best-practices.md`)가 FAIL 과 별개로 남긴 항목이다. 1차 경미 1 의 셸 훅 분리와 경미 6 은 PR-2 에서 고쳤다.
+- 설정 전용 흐름(`enablePush`·`resolvePushDeviceState`·`readPushEnvironment`)이 `(app)` 셸 청크에 남는다. 약 0.3 KB gz 다. `flows.ts` 를 셸용과 설정용으로 나누면 빠진다.
+- 워크스페이스를 전환할 때마다 `GET /users/me/push-config` 가 다시 나간다. 무효화 predicate(`features/workspaces/utils.ts`)가 `["workspaces","list"]` 만 남기기 때문이다.
+- `/settings?tab=notifications` 를 콜드 로드하면 API-001 응답 전까지 `members` 탭이 보였다가 바뀐다 (`settings/page.tsx` `activeTab`). 기존 `integrations` 탭과 같은 패턴이다.
+- `useWorkspaceDeepLink` 가 구독하는 `ownerUserId` 는 effect 안의 `getState()` 로 바꿀 수 있다 (`rerender-defer-reads`).
 
 ## BL-S29-1 — `mise run docs-check` 게이트 신설 (규칙 재중복 방지) ⏳ **미착수**
 

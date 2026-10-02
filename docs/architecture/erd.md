@@ -300,6 +300,16 @@ erDiagram
         timestamp created_at
     }
 
+    PushSubscription {
+        uuid id PK "ENT-001 (ADR-035)"
+        uuid user_id FK "users.id ON DELETE CASCADE, index — workspace_id 없음 (B-16)"
+        text endpoint UK "uq_push_subscriptions_endpoint — capability URL, 로그·응답 금지"
+        text p256dh "base64url 65바이트 (0x04 시작)"
+        text auth "base64url 16바이트"
+        timestamp created_at
+        timestamp updated_at "upsert·rebind 마다 갱신"
+    }
+
     User ||--o{ Workspace : "소유"
     Workspace ||--o{ WorkspaceMember : "멤버"
     User ||--o{ WorkspaceMember : "소속"
@@ -353,6 +363,9 @@ erDiagram
     Workspace ||--o{ IntegrationSyncRun : "I-9 격리"
     User ||--o{ IntegrationSyncRun : "요청자"
     ExternalDocument ||--o{ EmbeddingChunk : "source_type=external_document; source_id=ExternalDocument.id"
+
+    %% ADR-035 — 웹 푸시 (사용자 단위, workspace 비종속)
+    User ||--o{ PushSubscription : "브라우저 푸시 구독 (CASCADE)"
 ```
 
 ---
@@ -438,6 +451,18 @@ erDiagram
 - `expires_at`에 인덱스를 둔다. 만료 행 GC는 authorize 진입 시 **자기 workspace 범위로만** 수행한다 (I-9).
 - Workspace 삭제 cascade에 등재되어 있다 (`workspaces/repository.py` `_CASCADE_DELETE_STATEMENTS`).
 
+## ADR-035 웹 푸시 엔티티 (PWA PR-2)
+
+> 마이그레이션 `563de342c8ae` (down_revision `b3d5f8a1c2e4`) — 새 테이블 1개, 가산형. 정본 spec: `docs/requirements/pwa.md` §5.1.
+> 상단 개요 다이어그램(31 테이블)은 이 테이블을 아직 그리지 않는다.
+
+### PushSubscription (ENT-001, `push_subscriptions`)
+- 로그인 사용자의 브라우저 푸시 구독(`PushSubscription.toJSON()` 의 endpoint + keys). 소유 도메인 `push` (`apps/api/src/push/models.py`).
+- `user_id` → `users.id` (`fk_push_subscriptions_user_id_users`, ON DELETE CASCADE) + index `ix_push_subscriptions_user_id`. 내부 `users.id` 이고 `auth_user.id` 가 아니다.
+- `endpoint` `UNIQUE` (`uq_push_subscriptions_endpoint`) — API-002 upsert 의 `ON CONFLICT (endpoint)` 대상. 같은 endpoint 면 id 를 유지하고 **현재 사용자로 rebind** 한다 (같은 기기 계정 전환의 서버 백스톱).
+- **`workspace_id` 가 없다** — 사용자 단위 리소스라 B-2 예외. 대신 Repository 의 모든 조회·삭제에 `user_id` WHERE (B-16, 404/410 정리 삭제도 `id AND user_id`).
+- `p256dh`·`auth` 평문 저장 근거: 구독은 우리 VAPID 개인키로 서명한 요청만 받는다 (RFC 8292). endpoint·keys 는 응답·로그에 내보내지 않는다.
+
 ## 관계 설명
 
 ### N:M 관계
@@ -451,6 +476,7 @@ erDiagram
 - **Workspace → EmbeddingChunk, SemanticCache**: 멀티테넌시 격리
 - **Project → EmbeddingChunk**: 프로젝트 범위 검색 (프로젝트 단위 RAG)
 - **Project → SemanticCache**: 프로젝트 범위별 캐시 격리
+- **User → PushSubscription** (ADR-035): 사용자 단위 웹 푸시 구독. 사용자 삭제 시 CASCADE
 
 ### 1:1 관계
 - **Meeting → MeetingSummary**: 회의당 AI 요약 하나
