@@ -71,7 +71,7 @@
 - [ ] repo Variables `NEXT_PUBLIC_*` 4개 등록 (`deploy/oci/build.env` 값, 빈 값 2개는 생략) — `gh variable set ... --repo woosung-dev/kairos`
 - [ ] `gh workflow run release.yml --repo woosung-dev/kairos -f sha=<e929a49 40자>` → success
 - [ ] GitHub Packages `kairos-api` · `kairos-web` visibility → **Public**
-- [ ] `mise run deploy-preflight` → `mise run deploy-ship sha-e929a49` → `deploy-status` · 공개 `/ready` 200
+- [ ] 서버 `docker tag kairos-{api,web}:e929a49 ghcr.io/woosung-dev/kairos-{api,web}:e929a49` (롤백 경로) → `mise run deploy-preflight` → `mise run deploy-ship sha-e929a49` → `deploy-status` · 공개 `/ready` 200
 - [ ] 전환 후 README "Phase A 전환" 절 삭제 · `deploy-gc` 옛 이름(`kairos-api`·`kairos-web`) 제거 (서버에서 비워진 뒤)
 
 ### 🔴 Gate 0 잔여 — 운영자 작업 4라운드 (2026-09-27 등재, 순서대로)

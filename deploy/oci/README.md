@@ -116,9 +116,12 @@ mise run deploy-ship $TAG
 1. repo Variables `NEXT_PUBLIC_*` 등록 (`deploy/oci/build.env` 의 값, 빈 값은 건너뛴다)
 2. `gh workflow run release.yml --repo woosung-dev/kairos -f sha=<e929a49 의 40자 sha>` → success
 3. GitHub → Packages → `kairos-api` · `kairos-web` → Package settings → visibility **Public** (첫 push 는 비공개일 수 있다)
-4. `mise run deploy-preflight` → `mise run deploy-ship sha-e929a49` → `mise run deploy-status`
-5. 실패하면 서버에서 되돌린다 (GC 가 옛 `kairos-*:e929a49` 를 롤백용으로 남긴다):
-   `cd ~/kairos && cp docker-compose.prod.yml.bak docker-compose.prod.yml && sed -i 's/^KAIROS_API_TAG=.*/KAIROS_API_TAG=e929a49/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=e929a49/' .env && docker compose -f docker-compose.prod.yml up -d --no-deps api web`
+4. 롤백 경로 고정 — 서버에서 운영 중인 맥 빌드에 GHCR 이름을 붙인다 (`deploy-rollback` 이 찾는 이름):
+   `docker tag kairos-api:e929a49 ghcr.io/woosung-dev/kairos-api:e929a49 && docker tag kairos-web:e929a49 ghcr.io/woosung-dev/kairos-web:e929a49`
+5. `mise run deploy-preflight` → `mise run deploy-ship sha-e929a49` → `mise run deploy-status`
+6. 실패하면 `mise run deploy-rollback e929a49` — 새 compose 그대로 4번에서 붙인 이름을 띄운다 (`.bak` 에 기대지 않는다.
+   `deploy-sync-config` 를 다시 돌리면 `.bak` 이 새 파일로 덮인다). 첫 시도에서 GC 는 `e929a49` 를 롤백용으로 남기고,
+   같은 태그로 재실행하면 GC 를 건너뛴다
 
 원격 명령은 항상 `bash -lc` (또는 `bash -ls`) 로 감싼다. 비로그인 ssh 셸은 PATH 에 docker compose 가 없다.
 

@@ -82,8 +82,9 @@ jobs:
           # scope 를 이미지별로 나눈다 — 같으면 두 이미지가 서로의 캐시를 덮어쓴다
           cache-from: type=gha,scope=kairos-api
           cache-to: type=gha,scope=kairos-api,mode=max
+      # 검사는 태그가 이미 있어도 돈다. push 가 검사보다 먼저라, 검사에 실패한 이미지도 GHCR 에 남는다 —
+      # 재실행이 "이미 있음"으로 검사까지 건너뛰면 실패한 이미지가 초록 런이 된다 (2026-10-02 리뷰).
       - name: 오프라인 import 확인 (네트워크 차단 — 숨은 재설치로 건강해 보이는 것을 막는다)
-        if: steps.exists.outputs.hit != 'true'
         run: |
           docker pull -q "$IMG"
           # 더미 값은 test.yml backend-test 의 env 와 같은 것 (비밀 아님)
@@ -141,8 +142,7 @@ jobs:
             NEXT_PUBLIC_GOOGLE_PICKER_API_KEY=${{ vars.NEXT_PUBLIC_GOOGLE_PICKER_API_KEY }}
           cache-from: type=gha,scope=kairos-web
           cache-to: type=gha,scope=kairos-web,mode=max
-      - name: 번들에 API URL 이 인라인됐는지 확인
-        if: steps.exists.outputs.hit != 'true'
+      - name: 번들에 API URL 이 인라인됐는지 확인 (태그가 이미 있어도 돈다 — api 쪽 주석)
         run: |
           docker pull -q "$IMG"
           docker run --rm --entrypoint "" -e API_URL "$IMG" sh -c 'grep -rqF "$API_URL" /app/.next/static'

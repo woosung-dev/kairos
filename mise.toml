@@ -344,6 +344,12 @@ ssh {{vars.oci_host}} "bash -lc 'cd {{vars.oci_dir}} && \
   sed -i \"s/^KAIROS_API_TAG=.*/KAIROS_API_TAG=$usage_tag/; s/^KAIROS_WEB_TAG=.*/KAIROS_WEB_TAG=$usage_tag/\" .env && \
   {{vars.oci_compose}} up -d'"
 mise run deploy-verify-env
+# 같은 태그로 다시 돌린 경우(앞 시도가 .env 교체 뒤 실패 등)는 GC 를 건너뛴다. prev_tag 가 이미 새 태그라
+# 진짜 직전 태그를 모르는 상태다 — 그대로 GC 하면 롤백용 이미지를 지운다 (2026-10-02 리뷰).
+if [ "${prev_tag:-}" = "$usage_tag" ]; then
+  echo "⚠ 직전 태그가 이번 태그와 같다(재실행) — 이미지 정리를 건너뛴다. 필요하면 mise run deploy-gc <진짜 직전 태그>" >&2
+  exit 0
+fi
 # 배포는 여기서 이미 끝났다 — GC 실패로 deploy-ship 전체를 실패 처리하지 않고 경고만 남긴다.
 mise run deploy-gc "${prev_tag:-__none__}" || echo "⚠ 이미지 정리 실패 — 배포는 완료. 위 docker rmi 오류를 확인" >&2
 '''
